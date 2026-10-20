@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Dayboard app icon, large sizes (96 px and up), the toast logo and the in-app
+       mark: a softly graded white card, three rows of a coloured ring with a light
+       centre and a thin, light, equal-length line. Proportions (tile = 1): ring 0.167, light centre 0.47 of the ring, row pitch
+       0.255, vertical margins 0.15, left margin 0.10, line 0.017 thick and 0.58
+       long, ring→line gap 0.08. scripts/icons.cjs rasterises this drawing once
+       at 512 px and downsizes it for every icon size. -->
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#f7f8fb"/>
+      <stop offset="1" stop-color="#e9ecf2"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="blue" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#5f9cff"/>
+      <stop offset="0.7" stop-color="#2f78f0"/>
+      <stop offset="1" stop-color="#2264d6"/>
+    </radialGradient>
+    <radialGradient id="orange" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#ffb04a"/>
+      <stop offset="0.7" stop-color="#f5911a"/>
+      <stop offset="1" stop-color="#dc790c"/>
+    </radialGradient>
+    <radialGradient id="green" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#63d583"/>
+      <stop offset="0.7" stop-color="#35b95b"/>
+      <stop offset="1" stop-color="#269d4d"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="1016" height="1016" rx="226" ry="226" fill="url(#card)" stroke="#cdd2da" stroke-width="6"/>
+  <rect x="12" y="12" width="1000" height="1000" rx="220" ry="220" fill="none" stroke="url(#rim)" stroke-width="6"/>
+  <circle cx="199" cy="251" r="85" fill="url(#blue)"/>
+  <circle cx="199" cy="251" r="40" fill="#ffffff" fill-opacity="0.86"/>
+  <rect x="366" y="242" width="594" height="18" rx="9" fill="#c6cbd3"/>
+  <circle cx="199" cy="512" r="85" fill="url(#orange)"/>
+  <circle cx="199" cy="512" r="40" fill="#ffffff" fill-opacity="0.86"/>
+  <rect x="366" y="503" width="594" height="18" rx="9" fill="#c6cbd3"/>
+  <circle cx="199" cy="773" r="85" fill="url(#green)"/>
+  <circle cx="199" cy="773" r="40" fill="#ffffff" fill-opacity="0.86"/>
+  <rect x="366" y="764" width="594" height="18" rx="9" fill="#c6cbd3"/>
+</svg>

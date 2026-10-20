@@ -1,0 +1,29 @@
+Third-party components in Dayboard
+
+Dayboard itself is under the MIT License (LICENSE in the source repository).
+These parts keep their own licenses:
+
+- Pretendard font (renderer/fonts/PretendardVariable.woff2): SIL Open Font
+  License 1.1, see renderer/fonts/OFL.txt. The font file is not modified.
+- Electron: MIT. The app folder also carries Electron's LICENSE and
+  LICENSES.chromium.html (Chromium and its components).
+- npm packages bundled in the app (package-lock.json has the exact versions):
+  - electron-updater, builder-util-runtime, fs-extra, jsonfile, universalify,
+    js-yaml, lazy-val, lodash.escaperegexp, lodash.isequal, tiny-typed-emitter,
+    debug, ms: MIT
+  - graceful-fs, semver: ISC
+  - argparse: Python Software Foundation License 2.0
+  - sax: Blue Oak Model License 1.0.0
+  - koffi (and its prebuilt @koromix/koffi-* binaries): MIT
+  - tsdav, xml-js: MIT
+  - ical.js: Mozilla Public License 2.0. Used unmodified; its source is
+    available from the npm package and https://github.com/kewisch/ical.js.
+  Each package's license is in its folder under node_modules, in the source
+  checkout after `npm ci` and in the installed app (resources\app\node_modules):
+  a license file, or for lazy-val and the prebuilt @koromix/koffi-win32-x64
+  binary only the "license" field of its package.json.
+- Service marks: the Microsoft four-squares mark and the Google "G" drawn on the
+  account screens are trademarks of Microsoft and Google, shown only to name the
+  service a user connects. They are not covered by the MIT License. The iCloud
+  cloud is Dayboard's own simple drawing. Dayboard is independent and not
+  affiliated with or endorsed by Microsoft, Google or Apple.

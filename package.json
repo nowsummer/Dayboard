@@ -1,0 +1,74 @@
+{
+  "name": "dayboard-desktop",
+  "productName": "Dayboard",
+  "version": "1.0.0",
+  "description": "A quiet place for your day. Windows tasks, calendar and desktop widgets.",
+  "main": "main.cjs",
+  "private": true,
+  "author": "Dayboard",
+  "license": "MIT",
+  "homepage": "https://nowsummer.github.io/dayboard/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nowsummer/dayboard.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "smoke": "electron . --smoke-test",
+    "package": "node scripts/package.cjs",
+    "dist": "node scripts/dist.cjs",
+    "release": "node scripts/release.cjs"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10",
+    "ical.js": "2.2.1",
+    "koffi": "3.3.3",
+    "tsdav": "2.5.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.dayboard.desktop",
+    "productName": "Dayboard",
+    "copyright": "Copyright © 2026 Dayboard",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
+      "shortcutName": "Dayboard",
+      "deleteAppDataOnUninstall": false,
+      "differentialPackage": true,
+      "artifactName": "Dayboard-${version}.${ext}",
+      "include": "build/installer.nsh"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "nowsummer",
+        "repo": "dayboard",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

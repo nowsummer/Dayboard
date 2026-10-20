@@ -1,0 +1,11 @@
+node_modules/
+dist/
+앱/
+artifacts/
+private/
+.test-data/
+*.log
+.env
+.dayboard-public-snapshot
+# The publisher's Google sign-in client is added at build time, never committed (see assets/google-oauth.example.json).
+assets/google-oauth.json
