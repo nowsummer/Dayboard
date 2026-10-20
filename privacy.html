@@ -25,16 +25,16 @@
 <body>
 <main>
   <h1>Dayboard 개인정보처리방침</h1>
-  <p class="meta">시행일 2026-10-19 · 운영자(개발자): 이재하 · 문의 <a href="mailto:zaeha0520@gmail.com">zaeha0520@gmail.com</a></p>
+  <p class="meta">시행일 2026-10-21 · 운영자(개발자): 이재하</p>
 
   <p>Dayboard는 Windows용 개인 할 일·달력·메모 앱임. 서버·회원 가입·광고가 없으며, 사용자가 연결한 계정의 데이터는 <strong>사용자의 PC에만</strong> 저장함. 이 문서는 Dayboard가 어떤 정보를 어떤 목적으로 다루는지 설명함.</p>
 
   <h2>1. 다루는 정보</h2>
   <table>
     <tr><th>연결 계정</th><th>가져오는 정보</th><th>용도</th></tr>
-    <tr><td>Google</td><td>계정 이메일·프로필 이름(<code>openid</code>, <code>email</code>, <code>profile</code>), Google Tasks 목록·할 일(<code>tasks</code>, 읽기·편집), Google 캘린더 일정(<code>calendar.readonly</code>, 읽기)</td><td>연결된 계정 표시, 할 일 표시·추가·수정·완료, 일정 표시</td></tr>
-    <tr><td>Microsoft</td><td>계정 정보, Microsoft To Do 목록·할 일(읽기·편집), Outlook 달력(읽기)</td><td>같음</td></tr>
-    <tr><td>Apple(iCloud)</td><td>사용자가 입력한 Apple 계정 이메일과 앱 전용 암호, iCloud 달력 일정(읽기)</td><td>일정 표시</td></tr>
+    <tr><td>Google</td><td>계정 이메일·프로필 이름(<code>openid</code>, <code>email</code>, <code>profile</code>), Google Tasks 목록·할 일(<code>tasks</code>, 읽기·편집), Google 캘린더 달력 목록·일정(<code>calendar.readonly</code>, 읽기 · <code>calendar.events</code>, 일정 추가·수정·삭제)</td><td>연결된 계정 표시, 할 일 표시·추가·수정·완료, 일정 표시·추가·수정·삭제</td></tr>
+    <tr><td>Microsoft</td><td>계정 정보, Microsoft To Do 목록·할 일(읽기·편집), Outlook 달력 일정(읽기·편집)</td><td>같음</td></tr>
+    <tr><td>Apple(iCloud)</td><td>사용자가 입력한 Apple 계정 이메일과 앱 전용 암호, iCloud 달력 일정(읽기·편집)</td><td>일정 표시·추가·수정·삭제</td></tr>
   </table>
   <p>계정을 연결하지 않으면 어떤 계정 정보도 다루지 않음. 사용자가 앱에 직접 적은 할 일·메모도 PC에만 저장됨.</p>
 
@@ -43,6 +43,7 @@
     <li>로그인 토큰과 앱 전용 암호는 사용자 PC의 Windows 암호화 저장소(앱 데이터 폴더의 암호화 파일)에만 저장하고, 가져온 할 일·일정은 같은 PC의 앱 데이터 폴더에 저장함.</li>
     <li>Dayboard는 서버를 운영하지 않으며, 이 정보를 개발자나 제3자에게 전송·판매·공유하지 않음. 분석·광고 목적으로도 쓰지 않음.</li>
     <li>정보는 각 서비스(Google·Microsoft·Apple)와 사용자 PC 사이에서만 오가며, 통신은 각 서비스의 공식 API와 HTTPS를 사용함.</li>
+    <li>업데이트 확인 때는 GitHub의 Dayboard 릴리스에서 새 버전 정보와 설치 파일만 받아 오며, 사용자 데이터는 보내지 않음.</li>
     <li>앱에서 계정 연결을 해제하면 그 계정의 로그인 정보를 즉시 삭제함. 가져왔던 목록·일정은 로컬 보관본으로 남으며 앱에서 삭제할 수 있음.</li>
   </ul>
 
@@ -50,7 +51,7 @@
   <ul>
     <li>앱의 <strong>계정 연결</strong> 화면에서 언제든 연결을 해제할 수 있음.</li>
     <li>Google 계정 권한은 <a href="https://myaccount.google.com/permissions" rel="noopener">Google 계정 → 보안 → 타사 앱 액세스</a>에서, Microsoft는 <a href="https://account.live.com/consent/Manage" rel="noopener">Microsoft 계정의 앱 및 서비스</a>에서, Apple 앱 전용 암호는 <a href="https://account.apple.com/" rel="noopener">account.apple.com</a>에서 철회·삭제할 수 있음.</li>
-    <li>앱을 삭제하고 앱 데이터 폴더를 지우면 PC의 모든 저장 정보가 삭제됨.</li>
+    <li>앱을 제거해도 앱 데이터 폴더(<code>%APPDATA%\Dayboard</code>)는 남음. 이 폴더까지 지우면 PC의 모든 저장 정보가 삭제됨.</li>
   </ul>
 
   <h2>4. Google API 서비스 사용자 데이터 정책 준수</h2>
@@ -58,13 +59,17 @@
 
   <h2>5. 변경</h2>
   <p>이 방침이 바뀌면 이 페이지를 갱신하고 시행일을 고침.</p>
+  <ul>
+    <li>2026-10-21: 연결한 달력에 일정을 추가·수정·삭제하는 권한과 업데이트 확인을 반영함.</li>
+    <li>2026-10-19: 처음 시행.</li>
+  </ul>
 
   <div class="en" lang="en">
     <h2>Privacy Policy (English summary)</h2>
-    <p>Dayboard is a personal Windows desktop app for tasks, calendar and notes made by an individual developer (Jaeha Lee, zaeha0520@gmail.com). It has no server, no sign-up and no ads.</p>
+    <p>Dayboard is a personal Windows desktop app for tasks, calendar and notes made by an individual developer (Jaeha Lee). It has no server, no sign-up and no ads.</p>
     <ul>
-      <li>With your consent it reads your Google account email/profile, reads and edits Google Tasks, and reads Google Calendar events; likewise Microsoft To Do / Outlook calendar and iCloud calendar if you connect them.</li>
-      <li>All tokens and data are stored only on your PC (Windows encrypted storage and the app data folder). Nothing is sent to the developer or any third party, and nothing is used for analytics or advertising.</li>
+      <li>With your consent it reads your Google account email/profile, reads and edits Google Tasks, and reads, adds, edits and deletes Google Calendar events; likewise Microsoft To Do / Outlook calendar and iCloud calendar if you connect them.</li>
+      <li>All tokens and data are stored only on your PC (Windows encrypted storage and the app data folder). Nothing is sent to the developer or any third party, and nothing is used for analytics or advertising. Update checks only download version information and installers from GitHub; no user data is sent.</li>
       <li>Disconnecting an account in the app deletes its credentials immediately. You can also revoke access at <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a>.</li>
       <li>Dayboard&#39;s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</li>
     </ul>
