@@ -23,6 +23,11 @@ test('public release notes need a title and 3–6 bullets, and never carry perso
   assert.throws(() => readPublicReleaseNotes(notesProject(t, null), '9.9.9'), /Add the public release notes/);
   assert.throws(() => readPublicReleaseNotes(notesProject(t, '- 하나\n- 둘\n- 셋'), '9.9.9'), /title/);
   assert.throws(() => readPublicReleaseNotes(notesProject(t, '## T\n- 하나\n- 둘'), '9.9.9'), /3–6/);
+  // An English part under "### English" has its own 3–6 bullets.
+  const both = '## Dayboard 9.9.9\n\n- 하나\n- 둘\n- 셋\n\n### English\n\n- One\n- Two\n- Three\n';
+  assert.equal(readPublicReleaseNotes(notesProject(t, both), '9.9.9'), both.trim());
+  assert.throws(() => readPublicReleaseNotes(notesProject(t, '## T\n- 하나\n- 둘\n- 셋\n\n### English\n\n- One\n- Two'), '9.9.9'), /3–6/);
+  assert.throws(() => readPublicReleaseNotes(notesProject(t, '## T\n- 하나\n- 둘\n- 셋\n- 넷\n- 다섯\n- 여섯\n- 일곱\n\n### English\n\n- One\n- Two\n- Three'), '9.9.9'), /3–6/);
   // Secret-shaped samples are built from pieces so this file itself never looks like it carries a secret.
   const samples = ['C:\\Users\\someone\\a', 'c:/users/' + 'jane/x', 'HOME=/c/Users/' + 'jane', '- OneDrive 경로', 'someone' + '@gmail.com', 'C%3A%5CUsers%5C' + 'jane',
     'AIza' + 'SyA1234567890abcdefghijklmnopqrstu', 'GOCSPX' + '-abcdefgh', 'gh' + 'p_' + 'a'.repeat(36), '123456789012-' + 'b'.repeat(32) + '.apps.googleusercontent.com'];

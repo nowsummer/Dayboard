@@ -5,15 +5,16 @@
 // written to widgets-hold.json makes images/widgets.png. Close the user's own Dayboard first so only these widgets show.
 // (2026-10-21: the earlier picture pasted whole widget windows on a pastel background, which showed each window's
 // invisible 14px shadow margin as a pale band; that band never exists on a real desktop.)
-// Run from 개발 자료/:  node_modules/.bin/electron.cmd scripts/readme-widgets.cjs
-// Output: %TEMP%/dayboard-readme-shots/widgets-hold.json (or DAYBOARD_SHOTS_OUT); holds DAYBOARD_WIDGETS_HOLD ms (60000).
+// Run from 개발 자료/:  node_modules/.bin/electron.cmd scripts/readme-widgets.cjs   (DAYBOARD_SHOTS_LANG=en for English)
+// Output: %TEMP%/dayboard-readme-shots/<ko|en>/widgets-hold.json (or DAYBOARD_SHOTS_OUT); holds DAYBOARD_WIDGETS_HOLD ms (60000).
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample } = require('./readme-sample.cjs');
+const { seedSample, shotsLanguage } = require('./readme-sample.cjs');
 
+const LANG = shotsLanguage();
 const APP_DIR = path.resolve(__dirname, '..');
-const OUT = process.env.DAYBOARD_SHOTS_OUT ? path.resolve(process.env.DAYBOARD_SHOTS_OUT) : path.join(os.tmpdir(), 'dayboard-readme-shots');
+const OUT = process.env.DAYBOARD_SHOTS_OUT ? path.resolve(process.env.DAYBOARD_SHOTS_OUT) : path.join(os.tmpdir(), 'dayboard-readme-shots', LANG);
 const HOLD = Math.min(180000, Number(process.env.DAYBOARD_WIDGETS_HOLD) || 60000);
 fs.mkdirSync(OUT, { recursive: true });
 fs.rmSync(path.join(OUT, 'widgets-hold.json'), { force: true });
@@ -24,6 +25,7 @@ process.env.DAYBOARD_USER_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'dayboard
 process.chdir(APP_DIR);
 
 const { app, BrowserWindow, screen } = require('electron');
+app.commandLine.appendSwitch('lang', LANG === 'en' ? 'en-US' : 'ko-KR'); // the built-in list and calendar get names in that language
 require(path.join(APP_DIR, 'main.cjs'));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -37,8 +39,8 @@ app.whenReady().then(async () => {
     }
     if (!main) throw new Error('main window not ready');
     const invoke = (name, payload = {}) => main.webContents.executeJavaScript(`window.dayboard.invoke(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
-    await invoke('settings:update', { language: 'ko', timeFormat: '12h', theme: 'light', widgetMode: 'desktop', glassLevel: 0.5 });
-    const { focusNote } = await seedSample(invoke);
+    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', widgetMode: 'desktop', glassLevel: 0.5 });
+    const { focusNote } = await seedSample(invoke, new Date(), LANG);
     main.hide();
     // The calendar is made tall enough to show today's events in full before the others take the free spots around it.
     const calendar = await invoke('widget:open', { type: 'calendar' });

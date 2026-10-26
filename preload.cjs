@@ -10,7 +10,7 @@ ipcRenderer.on('dayboard:flush', async (_event, payload) => {
   if (!token) return;
   let error = null;
   // reason 'notes': before another PC's note version is applied (note drafts only); 'all': before a close, quit or update.
-  try { if (flushHandler) await flushHandler(payload.reason === 'notes' ? 'notes' : 'all'); }
+  try { if (flushHandler) await flushHandler(payload.reason === 'notes' ? 'notes' : payload.reason === 'close' ? 'close' : 'all'); }
   catch (failure) { error = String(failure?.message || failure || '변경 사항을 저장하지 못했습니다.').slice(0, 1000); }
   ipcRenderer.send('dayboard:flushed', { token, error });
 });

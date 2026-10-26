@@ -20,7 +20,7 @@ const shownNote = note => { const { past, trashSeenAt, storedAt, textKey, pinned
 const textIdOf = value => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z~[0-9a-f]{16}$/.test(value) ? value : null);
 // Widgets of notes moved to the trash, so 되돌리기 brings them back where they were (2026-10-21 review round 4).
 const trashedWidgets = new Map();
-const { LIST_ICONS, parseRRule, buildRRule, expandEvent, seriesPosition, untilBefore, dayOffset, shiftRule, instanceId, dateKey, defaultCalendarId, sectionKey, visibleState, builtInList, keepOneVisible, hidingRefusal } = require('./renderer/domain.js');
+const { LIST_ICONS, parseRRule, buildRRule, expandEvent, seriesPosition, untilBefore, dayOffset, shiftRule, instanceId, dateKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal } = require('./renderer/domain.js');
 const { createWallpaper, backdropPayload } = require('./lib/wallpaper.cjs');
 const { providerStatus } = require('./lib/providers/oauth.cjs');
 const i18n = require('./lib/i18n.cjs');
@@ -85,7 +85,9 @@ function flushWindow(win, reason = 'all') {
   if (!readyWindows.has(win) || win.webContents.isCrashed() || hungWindows.has(win)) return Promise.resolve();
   // 'notes': note drafts only, before another PC's note version is applied (an open event card stays as it is); 'all':
   // note drafts and the event card, before a window closes or the app quits or updates (2026-10-21 review).
-  const kind = reason === 'notes' ? 'notes' : 'all';
+  // 'close' (a window hidden to the tray): as 'all', but new events kept for 「다시 시도」 do not hold the window (they stay in
+  // memory with the app); a quit or an update must not drop them (2026-10-26 review).
+  const kind = reason === 'notes' ? 'notes' : reason === 'close' ? 'close' : 'all';
   const slot = win.id + ':' + kind;
   if (flushingWindows.has(slot)) return flushingWindows.get(slot);
   const token = randomUUID();
@@ -101,7 +103,7 @@ async function closeWindow(win) {
   if (!win || win.isDestroyed()) return true;
   if (closingWindows.has(win.id)) return closingWindows.get(win.id);
   const pending = (async () => {
-    await flushWindow(win);
+    await flushWindow(win, 'close');
     if (win.isDestroyed()) return true;
     const entry = [...widgetWindows].find(([, candidate]) => candidate === win);
     if (entry) { commit(state => { state.widgets = state.widgets.filter(widget => widget.id !== entry[0]); }); win.destroy(); }
@@ -1027,16 +1029,30 @@ async function command(commandName, payload, sourceWindow) {
       const calendar = lookup('calendars', payload.calendarId || defaultCalendarId(store.get()));
       if (calendar.readOnly) throw new Error(tr('이 달력은 읽기 전용입니다. 다른 달력을 선택해 주세요.'));
       const allDay = payload.allDay === undefined ? false : boolean(payload.allDay, tr('하루 종일'));
-      const event = { id: randomUUID(), calendarId: calendar.id, title: text(payload.title, tr('일정 제목'), 500),
+      // The card's key (32 hex digits) makes a resend of the same add harmless: the same local id, or the provider finds the
+      // first one on the service (2026-10-26 review — 「다시 시도」 and the closing flush could add an event twice).
+      const key = typeof payload.key === 'string' && /^[0-9a-f]{32}$/.test(payload.key) ? payload.key : '';
+      const event = { id: key ? `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}` : randomUUID(), calendarId: calendar.id, title: text(payload.title, tr('일정 제목'), 500),
         start: dateTime(payload.start, allDay), end: dateTime(payload.end, allDay), allDay,
         location: text(payload.location ?? '', tr('장소'), 1000, true), provider: calendar.provider };
       const colorValue = eventColor(payload.color); if (colorValue) event.color = colorValue;
       const rule = rruleText(payload.rrule); if (rule) event.rrule = rule;
       if (event.end <= event.start) throw new Error(allDay ? tr('하루 종일 일정의 종료 날짜는 마지막 날의 다음 날로 입력해 주세요.') : tr('종료 시간은 시작 시간보다 늦어야 합니다.'));
-      if (calendar.provider === 'local') { commit(state => state.events.push(event)); return event; }
-      // Connected calendar: the service stores it first; what it returns (instances for a series) is kept locally.
-      const created = await writeRemoteEvent('add', event, calendar, {});
-      return created[0] || store.publicState();
+      // A resend of the same key returns the first event; only a card sent again with other values (revise) updates it
+      // (2026-10-26 recheck: an edit made before 「다시 시도」 was dropped; a kept add resent later overwrote edits made since).
+      const revise = payload.revise === true;
+      if (calendar.provider === 'local') { const earlier = key ? store.peek('events', event.id) : undefined; if (earlier && !revise) return earlier; commit(state => { const at = earlier ? state.events.findIndex(item => item.id === event.id) : -1; if (at >= 0) state.events[at] = event; else state.events.push(event); }); return event; }
+      // Connected calendar: the service stores it first; what it returns (instances for a series) is kept locally. A kept add
+      // that fails again while the window is hidden is told by a Windows notification (its toast is in the hidden window).
+      try {
+        const created = await writeRemoteEvent('add', key ? { ...event, key, ...(revise ? { revise } : {}) } : event, calendar, {});
+        return created[0] || store.publicState();
+      } catch (error) {
+        if (payload.kept === true && (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) && Notification.isSupported()) {
+          try { const note = new Notification({ title: tr('「{0}」 일정을 저장하지 못했어요.', [event.title.slice(0, 40)]), body: tr('창을 닫거나 종료할 때 다시 보내요.'), icon: path.join(__dirname, 'assets', 'toast.png') }); note.on('click', showMain); note.show(); } catch { /* informational only */ }
+        }
+        throw error;
+      }
     }
     case 'event:update': {
       const { event: previous, recurrenceId } = resolveEvent(payload.id);
@@ -1261,7 +1277,11 @@ async function command(commandName, payload, sourceWindow) {
         settings.language = payload.language;
       }
       const languageChanged = settings.language !== store.get().settings.language;
-      if ('defaultListId' in payload) settings.defaultListId = payload.defaultListId ? lookup('lists', payload.defaultListId).id : null;
+      if ('defaultListId' in payload) {
+        const list = payload.defaultListId ? lookup('lists', payload.defaultListId) : null;
+        if (list && !taskList(list)) throw new Error(tr('플래그 지정된 메일 목록에는 할 일을 넣을 수 없어요.'));
+        settings.defaultListId = list ? list.id : null;
+      }
       if ('defaultCalendarId' in payload) {
         const calendar = payload.defaultCalendarId ? lookup('calendars', payload.defaultCalendarId) : null;
         if (calendar?.readOnly) throw new Error(tr('읽기 전용 달력은 새 일정 기본 달력으로 고를 수 없습니다.'));
@@ -1658,11 +1678,16 @@ async function runSmokeTest() {
   app.exit(report.ok ? 0 : 1);
 }
 
+// The installer (build/installer.nsh) starts Dayboard with --quit-for-install to close a running copy: that copy quits the
+// normal way (drafts and open event cards saved, the 「저장하지 못한 변경」 question when something cannot be), instead of
+// being killed with unsaved changes (Codex review 2026-10-26). Started with it while nothing runs, it just ends.
+const QUIT_FOR_INSTALL = '--quit-for-install';
 if (!app.requestSingleInstanceLock()) app.quit();
+else if (process.argv.includes(QUIT_FOR_INSTALL)) app.exit(0);
 else {
   // 'second-instance' comes synchronously from Chromium's WM_COPYDATA handler, which can run inside
   // a native call that pumps messages; creating the window there would nest koffi calls (crash).
-  app.on('second-instance', () => setImmediate(showMain));
+  app.on('second-instance', (_event, argv) => setImmediate(() => { if (Array.isArray(argv) && argv.includes(QUIT_FOR_INSTALL)) app.quit(); else showMain(); }));
   app.whenReady().then(async () => {
     if (startupError) throw startupError;
     applyLanguage();

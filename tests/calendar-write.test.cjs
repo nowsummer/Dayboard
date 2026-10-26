@@ -157,7 +157,14 @@ test('Microsoft insert posts to the chosen calendar, deletes excluded occurrence
 // ---- iCloud ----
 test('iCloud: a new event becomes a valid .ics that reads back the same, including RRULE and EXDATE', () => {
   const ics = icloud.buildEventIcs({ ...timed, provider: 'icloud', rrule: 'FREQ=DAILY;COUNT=3', exdates: ['2026-10-22T01:00:00.000Z'] }, 'uid-1', ICAL);
-  assert.match(ics, /BEGIN:VCALENDAR[\s\S]*VERSION:2\.0[\s\S]*BEGIN:VEVENT[\s\S]*UID:uid-1[\s\S]*DTSTART:20261021T010000Z[\s\S]*DTEND:20261021T020000Z[\s\S]*RRULE:FREQ=DAILY;COUNT=3[\s\S]*EXDATE:20261022T010000Z[\s\S]*END:VEVENT/);
+  // Written in this PC's zone with its VTIMEZONE: a UTC DTSTART repeated on UTC weekdays and dates (2026-10-27).
+  const wall = value => { const p = zonedParts(value); return `${p.date.replace(/-/g, '')}T${p.time.replace(/:/g, '')}`; };
+  if (LOCAL_ZONE === 'UTC') assert.match(ics, /DTSTART:20261021T010000Z[\s\S]*DTEND:20261021T020000Z[\s\S]*RRULE:FREQ=DAILY;COUNT=3[\s\S]*EXDATE:20261022T010000Z/);
+  else {
+    assert.ok(ics.indexOf('BEGIN:VTIMEZONE') > 0 && ics.indexOf('BEGIN:VTIMEZONE') < ics.indexOf('BEGIN:VEVENT') && ics.includes(`TZID:${LOCAL_ZONE}`), 'this PC\'s zone goes along');
+    for (const line of [`DTSTART;TZID=${LOCAL_ZONE}:${wall('2026-10-21T01:00:00.000Z')}`, `DTEND;TZID=${LOCAL_ZONE}:${wall('2026-10-21T02:00:00.000Z')}`, 'RRULE:FREQ=DAILY;COUNT=3', `EXDATE;TZID=${LOCAL_ZONE}:${wall('2026-10-22T01:00:00.000Z')}`]) assert.ok(ics.includes(line), line);
+  }
+  assert.match(ics, /BEGIN:VCALENDAR[\s\S]*VERSION:2\.0[\s\S]*BEGIN:VEVENT[\s\S]*UID:uid-1[\s\S]*END:VEVENT/);
   assert.match(ics, /SUMMARY:회의/); assert.match(ics, /LOCATION:회의실/); assert.match(ics, /DTSTAMP:\d{8}T\d{6}Z/);
   const parsed = icloud.parseCalendarObject(ics, { ...calendar, provider: 'icloud', remoteId: 'https://p1-caldav.icloud.com/1/calendars/home/' }, { start: '2026-10-01T00:00:00Z', end: '2026-12-01T00:00:00Z' }, ICAL, { href: 'https://p1-caldav.icloud.com/1/calendars/home/uid-1.ics', etag: '"1"' });
   assert.deepEqual(parsed.map(item => item.start), ['2026-10-21T01:00:00.000Z', '2026-10-23T01:00:00.000Z'], 'the excluded day is gone');
@@ -317,9 +324,9 @@ test('Google split: master gets UNTIL before the cut, EXDATEs are divided, the n
   const instance = { id: 'i', remoteId: 'm_20261022T010000Z', seriesId: 'm', recurring: true, recurrenceAt: '2026-10-22T01:00:00.000Z', calendarId: 'cal-1', title: '요가 수업', start: '2026-10-22T01:00:00.000Z', end: '2026-10-22T02:00:00.000Z', allDay: false, location: '', provider: 'google' };
   const { provider, calls } = googleStub((url, method, body) => {
     if (method === 'GET' && url.endsWith('/events/m')) return master;
-    if (method === 'GET' && url.includes('/events/m/instances') && url.includes('timeMin=2026-10-22T01')) return { items: Array.from({ length: 6 }, (_, i) => ({ id: 'm_' + i, summary: '요가 수업', start: { dateTime: '2026-10-22T10:00:00+09:00' }, end: { dateTime: '2026-10-22T11:00:00+09:00' }, recurringEventId: 'm' })) };
+    if (method === 'GET' && url.includes('/events/m/instances') && url.includes('timeMin=2026-10-22T01')) return { items: ['10-22', '10-29', '11-05', '11-19', '11-26', '12-03'].map(d => ({ id: 'm_' + d, summary: '요가 수업', start: { dateTime: `2026-${d}T10:00:00+09:00` }, end: { dateTime: `2026-${d}T11:00:00+09:00` }, originalStartTime: { dateTime: `2026-${d}T10:00:00+09:00` }, recurringEventId: 'm' })) };
     if (method === 'GET' && url.includes('/events/m/instances')) return { items: [{ id: 'm_a', summary: '요가 수업', start: { dateTime: '2026-10-01T10:00:00+09:00' }, end: { dateTime: '2026-10-01T11:00:00+09:00' }, recurringEventId: 'm' }] };
-    if (method === 'GET' && url.includes('/events/n/instances')) return { items: [{ id: 'n_a', summary: '요가 수업 (저녁)', start: { dateTime: '2026-10-22T19:00:00+09:00' }, end: { dateTime: '2026-10-22T20:00:00+09:00' }, recurringEventId: 'n' }] };
+    if (method === 'GET' && /\/events\/[0-9a-v]{32}\/instances/.test(url)) { const id = url.match(/\/events\/([0-9a-v]{32})\//)[1]; return { items: [{ id: id + '_a', summary: '요가 수업 (저녁)', start: { dateTime: '2026-10-22T19:00:00+09:00' }, end: { dateTime: '2026-10-22T20:00:00+09:00' }, recurringEventId: id }] }; }
     if (method === 'PATCH') return { ...master, recurrence: body.recurrence };
     if (method === 'POST') return { id: 'n', ...body };
     return null;
@@ -330,11 +337,14 @@ test('Google split: master gets UNTIL before the cut, EXDATEs are divided, the n
   assert.ok(patch.url.endsWith('/events/m'));
   assert.deepEqual(patch.body, { recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=TH;UNTIL=20261022T005959Z', 'EXDATE:20261015T010000Z'] });
   const post = calls.find(call => call.method === 'POST');
-  assert.deepEqual(post.body.recurrence, ['RRULE:FREQ=WEEKLY;BYDAY=TH;COUNT=6', 'EXDATE:20261112T100000Z'], 'the later EXDATE moves to the new series and follows the 9-hour time change');
+  // COUNT becomes the last occurrence shown (12-03, at the new time): COUNT=6 with the 11-12 exclusion carried over ended on
+  // 11-26 (Codex review 2026-10-26). The later EXDATE moves to the new series and follows the 9-hour time change.
+  assert.deepEqual(post.body.recurrence, ['RRULE:FREQ=WEEKLY;BYDAY=TH;UNTIL=20261203T100000Z', 'EXDATE:20261112T100000Z']);
+  assert.ok(calls.findIndex(call => call.method === 'POST') < calls.findIndex(call => call.method === 'PATCH'), 'the new series first, then the old one shortened');
   assert.equal(post.body.summary, '요가 수업 (저녁)'); assert.equal(post.body.description, '메모'); assert.equal(post.body.colorId, '7');
   assert.deepEqual(post.body.start, { dateTime: '2026-10-22T10:00:00.000Z', timeZone: LOCAL_ZONE, date: null });
   assert.equal(result.series, true);
-  assert.deepEqual(result.events.map(item => item.seriesId), ['m', 'n'], 'instances of both series come back');
+  assert.deepEqual(result.events.map(item => item.seriesId), ['m', post.body.id], 'instances of both series come back');
   assert.equal(result.events[1].recurrenceAt, '2026-10-22T10:00:00.000Z');
   // Delete this and future: only the master is shortened.
   calls.length = 0;
@@ -362,13 +372,14 @@ test('Google split: master gets UNTIL before the cut, EXDATEs are divided, the n
 
 test('Microsoft split: the master range ends the day before, the new series keeps the pattern with the remaining count', async () => {
   const calls = [];
-  const remoteMaster = { id: 'M', subject: '요가 수업', type: 'seriesMaster', isAllDay: false, start: { dateTime: '2026-10-01T01:00:00.0000000', timeZone: 'UTC' }, end: { dateTime: '2026-10-01T02:00:00.0000000', timeZone: 'UTC' }, recurrence: { pattern: { type: 'weekly', interval: 1, daysOfWeek: ['thursday'], firstDayOfWeek: 'sunday' }, range: { type: 'numbered', startDate: '2026-10-01', numberOfOccurrences: 10, recurrenceTimeZone: 'Korea Standard Time' } }, body: { contentType: 'text', content: '메모' }, isReminderOn: true, reminderMinutesBeforeStart: 15 };
+  const remoteMaster = { id: 'M', subject: '요가 수업', type: 'seriesMaster', isAllDay: false, originalStartTimeZone: 'UTC', start: { dateTime: '2026-10-01T01:00:00.0000000', timeZone: 'UTC' }, end: { dateTime: '2026-10-01T02:00:00.0000000', timeZone: 'UTC' }, recurrence: { pattern: { type: 'weekly', interval: 1, daysOfWeek: ['thursday'], firstDayOfWeek: 'sunday' }, range: { type: 'numbered', startDate: '2026-10-01', numberOfOccurrences: 10, recurrenceTimeZone: 'Korea Standard Time' } }, body: { contentType: 'text', content: '메모' }, isReminderOn: true, reminderMinutesBeforeStart: 15 };
   const occurrence = (id, start, seriesMasterId) => ({ id, subject: '요가 수업', type: 'occurrence', seriesMasterId, isAllDay: false, start: { dateTime: start, timeZone: 'UTC' }, end: { dateTime: start.replace('T01:00', 'T02:00'), timeZone: 'UTC' } });
   const laterStarts = ['2026-10-22T01:00:00.0000000', '2026-10-29T01:00:00.0000000', '2026-11-05T01:00:00.0000000', '2026-11-12T01:00:00.0000000', '2026-11-19T01:00:00.0000000', '2026-11-26T01:00:00.0000000'];
   const provider = microsoft.createMicrosoft({ request: async (url, options = {}) => {
     const method = options.method || 'GET'; const body = options.body ? JSON.parse(options.body) : undefined; calls.push({ url, method, body });
     if (method === 'GET' && url.endsWith('/me/events/M')) return remoteMaster;
-    if (method === 'GET' && url.includes('/me/events/M/instances') && url.includes('startDateTime=2026-10-22T01')) return { value: laterStarts.map((start, i) => occurrence('M' + i, start, 'M')) };
+    if (method === 'GET' && url.endsWith('/me/events/M3')) return occurrence('M3', '2026-10-22T01:00:00.0000000', 'M');
+    if (method === 'GET' && url.includes('/me/events/M/instances') && url.includes('startDateTime=2026-10-14T00')) return { value: laterStarts.map((start, i) => occurrence('M' + i, start, 'M')) };
     if (method === 'GET' && url.includes('/me/events/M/instances')) return { value: [occurrence('Ma', '2026-10-01T01:00:00.0000000', 'M')] };
     if (method === 'GET' && url.includes('/me/events/N/instances')) return { value: [occurrence('Na', '2026-10-22T10:00:00.0000000', 'N')] };
     if (method === 'PATCH') return { ...remoteMaster, recurrence: body.recurrence };
@@ -385,7 +396,9 @@ test('Microsoft split: the master range ends the day before, the new series keep
   const post = calls.find(call => call.method === 'POST');
   assert.ok(post.url.endsWith('/me/calendars/CAL/events'));
   assert.equal(post.body.subject, '요가 수업 (저녁)'); assert.equal(post.body.reminderMinutesBeforeStart, 15); assert.deepEqual(post.body.body, { contentType: 'text', content: '메모' });
-  assert.deepEqual(post.body.recurrence.range, { type: 'numbered', numberOfOccurrences: 6, startDate: zonedParts('2026-10-22T10:00:00.000Z').date, recurrenceTimeZone: LOCAL_ZONE });
+  assert.deepEqual(post.body.recurrence.range, { type: 'endDate', endDate: '2026-11-26', startDate: '2026-10-22', recurrenceTimeZone: 'Korea Standard Time' }, 'ends at the last date shown (Codex review 2026-10-26), in the series\' own zone');
+  assert.equal(post.body.singleValueExtendedProperties[0].value, post.body.transactionId);
+  assert.ok(calls.findIndex(call => call.method === 'POST') < calls.findIndex(call => call.method === 'PATCH'), 'the new series first, then the old one shortened');
   assert.equal(result.series, true); assert.deepEqual(result.events.map(item => item.seriesId), ['M', 'N']);
   calls.length = 0;
   await provider.mutateEvent('delete', instance, msCalendar, { scope: 'future' });

@@ -163,11 +163,31 @@
   const calendarWritable=c=>Boolean(c)&&!c.readOnly;
   // Calendar for a new event: the user's choice while it exists and is writable, else the connected account's
   // primary calendar (Google primary / Outlook default calendar), else any writable account calendar, else this PC.
+  // Connected accounts in the order they were connected (state.accounts), then any other, then this PC. The automatic list and
+  // calendar follow it: by place in state.lists/calendars they moved to the other account each time a sync re-read one
+  // account (2026-10-27 check).
+  function accountRank(accounts){
+    const order=new Map((accounts||[]).map((a,i)=>[a.id,i]));
+    return item=>item?.provider==='local'?2e9:order.has(item?.accountId)?order.get(item.accountId):1e9;
+  }
+  const byRank=(items,rank)=>items.map((item,i)=>[item,i]).sort((a,b)=>rank(a[0])-rank(b[0])||a[1]-b[1]).map(([item])=>item);
+  // A list a new task can go to: not Outlook's flagged-mail list, which only gathers flagged mail (its archive copy can).
+  function taskList(list){return Boolean(list)&&!(list.kind==='flaggedEmails'&&list.provider==='microsoft');}
+  // Where a new task goes when no list is chosen: the To Do 「Tasks」 list of the first Microsoft account, else this PC's
+  // first list, else the first list that can hold tasks.
+  function autoListId(lists,accounts){
+    const all=lists||[];
+    const microsoft=byRank(all.filter(l=>l.kind==='defaultList'&&l.provider==='microsoft'),accountRank(accounts))[0];
+    return (microsoft||all.find(l=>l.provider==='local')||all.find(taskList))?.id||null;
+  }
+  // How many connected accounts hold these lists or calendars (this PC not counted).
+  function accountCount(items){return new Set((items||[]).filter(i=>i.provider!=='local').map(i=>String(i.accountId||i.provider))).size;}
   function defaultCalendarId(state){
     const calendars=state.calendars||[];
     const chosen=calendars.find(c=>c.id===state.settings?.defaultCalendarId);
     if(calendarWritable(chosen))return chosen.id;
-    const account=calendars.find(c=>c.provider!=='local'&&c.primary&&calendarWritable(c))||calendars.find(c=>c.provider!=='local'&&calendarWritable(c));
+    const writable=byRank(calendars.filter(c=>c.provider!=='local'&&calendarWritable(c)),accountRank(state.accounts));
+    const account=writable.find(c=>c.primary)||writable[0];
     if(account)return account.id;
     return (calendars.find(c=>c.id==='local-calendar')||calendars.find(c=>c.provider==='local'))?.id||'local-calendar';
   }
@@ -451,7 +471,7 @@
   }
   // The recurrence id of a series' instance by its place in the series (EXDATEs counted, as COUNT counts them), or null.
   function instanceId(event,index){let found=null;if(index<0)return null;walkRRule(event,(o,i)=>{if(i===index){found=event.allDay?dateKey(o):o.toISOString();return false;}return i<index;});return found;}
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn};
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

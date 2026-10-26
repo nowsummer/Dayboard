@@ -3,15 +3,16 @@
 // Runs this source app in a brand-new temporary profile (DAYBOARD_USER_DATA), fills it with the invented sample data
 // of scripts/readme-sample.cjs, captures the main screens at 2x, quits. The user's real profile and accounts are never
 // touched. The desktop widget picture is taken separately on the real desktop: scripts/readme-widgets.cjs.
-// Run from 개발 자료/:  node_modules/.bin/electron.cmd scripts/readme-shots.cjs
-// Output: %TEMP%/dayboard-readme-shots (or DAYBOARD_SHOTS_OUT). The main window briefly appears at the top-left.
+// Run from 개발 자료/:  node_modules/.bin/electron.cmd scripts/readme-shots.cjs   (DAYBOARD_SHOTS_LANG=en for English)
+// Output: %TEMP%/dayboard-readme-shots/<ko|en> (or DAYBOARD_SHOTS_OUT). The main window briefly appears at the top-left.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample } = require('./readme-sample.cjs');
+const { seedSample, shotsLanguage } = require('./readme-sample.cjs');
 
+const LANG = shotsLanguage();
 const APP_DIR = path.resolve(__dirname, '..');
-const OUT = process.env.DAYBOARD_SHOTS_OUT ? path.resolve(process.env.DAYBOARD_SHOTS_OUT) : path.join(os.tmpdir(), 'dayboard-readme-shots');
+const OUT = process.env.DAYBOARD_SHOTS_OUT ? path.resolve(process.env.DAYBOARD_SHOTS_OUT) : path.join(os.tmpdir(), 'dayboard-readme-shots', LANG);
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 // Profiles from earlier runs stay locked until the process exits, so they are removed on the next run.
@@ -24,6 +25,7 @@ process.chdir(APP_DIR);
 
 const { app, BrowserWindow } = require('electron');
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
+app.commandLine.appendSwitch('lang', LANG === 'en' ? 'en-US' : 'ko-KR'); // the built-in list and calendar get names in that language
 require(path.join(APP_DIR, 'main.cjs'));
 
 const log = (...a) => console.log('[shots]', ...a);
@@ -50,8 +52,8 @@ app.whenReady().then(async () => {
     // The real mouse pointer may rest over the window; clear hover so no cell or row is highlighted.
     const shot = async (win, name) => { win.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 }); await run('document.activeElement?.blur?.()'); await settle(win); const img = await win.webContents.capturePage(); fs.writeFileSync(path.join(OUT, `${name}.png`), img.toPNG()); log('saved', name, img.getSize()); };
 
-    await invoke('settings:update', { language: 'ko', timeFormat: '12h', theme: 'light', tourDone: true });
-    const { work, focusNote } = await seedSample(invoke);
+    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true });
+    const { work, focusNote } = await seedSample(invoke, new Date(), LANG);
 
     main.setBounds({ x: 0, y: 0, width: 1240, height: 820 });
     await wait(600);
@@ -61,7 +63,8 @@ app.whenReady().then(async () => {
     await shot(main, 'tasks-list');
     await run(`document.querySelector('.main-nav .nav-item:nth-child(2)').click();`);
     await shot(main, 'calendar');
-    await run(`setCalMode('week');`);
+    // The morning in view: the week opens at the current time, which at night shows only the small hours.
+    await run(`setCalMode('week');await new Promise(r => requestAnimationFrame(r));const s = document.querySelector('.time-scroll');if (s) { s.scrollTop = 6.6 * calHour; s.dispatchEvent(new Event('scroll')); }`);
     await shot(main, 'calendar-week');
     await run(`setCalMode('month');`);
     await invoke('note:pin', { id: focusNote.id, pinned: true });

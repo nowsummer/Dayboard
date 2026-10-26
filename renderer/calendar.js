@@ -26,7 +26,7 @@ const calFieldFocused=()=>{const a=document.activeElement;return Boolean(a&&(['I
 function calSyncMonth(){const d=D.fromDate(selectedDate);month=new Date(d.getFullYear(),d.getMonth(),1);calTop=null;}
 
 // ---- Views and navigation ----
-function setCalMode(mode,day){if(!['month','week','day'].includes(mode))return;closeCard(true);if(day){selectedDate=day;calSyncMonth();}if(mode!=='month'&&calMode()==='month'&&!day){const visible=D.cellsFrom(calStart());if(!visible.some(c=>c.key===selectedDate))selectedDate=visible.find(c=>!c.outside).key;}state.settings.calendarView=mode;render();run('settings:update',{calendarView:mode}).catch(()=>{});}
+function setCalMode(mode,day){if(!['month','week','day'].includes(mode))return;if(!closeCard(true))return;if(day){selectedDate=day;calSyncMonth();}if(mode!=='month'&&calMode()==='month'&&!day){const visible=D.cellsFrom(calStart());if(!visible.some(c=>c.key===selectedDate))selectedDate=visible.find(c=>!c.outside).key;}state.settings.calendarView=mode;render();run('settings:update',{calendarView:mode}).catch(()=>{});}
 function calendarStep(n){closeCard(true);const mode=calMode();if(mode==='month'){month=new Date(month.getFullYear(),month.getMonth()+n,1);calTop=null;render();return;}selectedDate=D.dayOffset(selectedDate,(mode==='week'?7:1)*n);calSyncMonth();render();}
 // Month view rows: a rolling run of six weeks that the wheel moves a week at a time; month (the title) follows the rows.
 function calStart(){const aligned=D.monthStart(month);if(!calTop)return aligned;const focus=D.cellsFrom(calTop).find(c=>!c.outside).key.slice(0,7);return focus===calMonthKey(month)?calTop:aligned;}
@@ -95,7 +95,7 @@ function monthBoard(){
 // A month chip: the shared chip plus dragging to another day.
 function calChip(e,day){const chip=eventChip(e,day);chip.dataset.eventKey=e.id;chip.addEventListener('pointerdown',ev=>calPointerDown(ev,{kind:'month',event:e,day}));if(!canEditEvent(e))chip.classList.add('readonly');if(calPast(e))chip.classList.add('past');return chip;}
 // "+N개": the day's events in a small list beside the cell; a row opens the event card.
-function calDayList(day,anchor){const events=eventsOn(day);closeCard(true);calCard={mode:'list',day,key:null,node:null,anchor};const node=h('div',{class:'event-card day-list',role:'dialog','aria-label':koreanDate(day),tabindex:-1},h('header',{class:'card-head'},h('strong',{},koreanDate(day)),ib('close',tr('닫기'),()=>closeCard(true))),h('div',{class:'agenda'},events.map(e=>h('button',{type:'button',class:'event-row','data-event-key':e.id,onclick:ev=>{const rect=calCard?.node?.getBoundingClientRect()||ev.currentTarget.getBoundingClientRect();closeCard(true);openEventCard(e,null,rect);}},h('span',{class:'event-line',style:{background:eventColor(e)}}),h('div',{},h('strong',{},e.title),h('span',{},timeLabel(e)))))));calCard.node=node;calCardRoot().replaceChildren(node);calPlaceCard(anchor.getBoundingClientRect());node.focus({preventScroll:true});}
+function calDayList(day,anchor){const events=eventsOn(day);if(!closeCard(true))return;calCard={mode:'list',day,key:null,node:null,anchor};const node=h('div',{class:'event-card day-list',role:'dialog','aria-label':koreanDate(day),tabindex:-1},h('header',{class:'card-head'},h('strong',{},koreanDate(day)),ib('close',tr('닫기'),()=>closeCard(true))),h('div',{class:'agenda'},events.map(e=>h('button',{type:'button',class:'event-row','data-event-key':e.id,onclick:ev=>{const rect=calCard?.node?.getBoundingClientRect()||ev.currentTarget.getBoundingClientRect();closeCard(true);openEventCard(e,null,rect);}},h('span',{class:'event-line',style:{background:eventColor(e)}}),h('div',{},h('strong',{},e.title),h('span',{},timeLabel(e)))))));calCard.node=node;calCardRoot().replaceChildren(node);calPlaceCard(anchor.getBoundingClientRect());node.focus({preventScroll:true});}
 // Wheel and trackpad: one week per 50px; within one gesture the rows stop when a month's 1st reaches the top (Notion).
 let calWheelAcc=0,calWheelIdle=null,calWheelLast=0,calWheelHold=false;
 function calMonthWheel(e){if(e.ctrlKey||Math.abs(e.deltaX)>Math.abs(e.deltaY))return;e.preventDefault();const dy=e.deltaMode===1?e.deltaY*40:e.deltaMode===2?e.deltaY*innerHeight:e.deltaY;clearTimeout(calWheelIdle);calWheelIdle=setTimeout(()=>{calWheelAcc=0;calWheelHold=false;},200);if(calWheelHold)return;calWheelAcc+=dy;if(Math.abs(calWheelAcc)<50)return;const now=performance.now();if(now-calWheelLast<60)return;calWheelLast=now;const dir=Math.sign(calWheelAcc);calWheelAcc-=dir*50;const top=calWeekStep(dir);if(D.cellsFrom(top).slice(0,7).some(c=>c.day===1)){calWheelHold=true;calWheelAcc=0;}}
@@ -248,14 +248,17 @@ async function calCommitChange(e,change,kind){
 // ---- New events: a draft on the grid (or a day cell) with the card in create mode ----
 function calNewEvent(day,anchor){
   if(!writableCalendars().length)return false;
+  // A repeating event's card waiting on its scope question keeps the screen (Codex review 2026-10-26: Ctrl+N opened a new card
+  // over it, and cancelling the question lost the edit). true: handled, the caller opens nothing else.
+  if(!closeCard(true))return true;
   const [s,e]=D.defaultEventTimes(day);const draft={start:new Date(s).toISOString(),end:new Date(e).toISOString(),allDay:false};
   if(view==='calendar'&&calMode()!=='month'){if(!calDays().includes(day)){selectedDate=day;calSyncMonth();}calCreateDraft(draft);return true;}
   let target=anchor||(view==='calendar'?document.querySelector('#app .calendar-day[data-day="'+day+'"]'):null);
   if(!target&&view==='calendar'){selectedDate=day;calSyncMonth();render();target=document.querySelector('#app .calendar-day[data-day="'+day+'"]');}
   if(!target)return false;
-  closeCard(true);calOpenCard({mode:'create',draft},target.getBoundingClientRect());return true;
+  if(!closeCard(true))return true;calOpenCard({mode:'create',draft},target.getBoundingClientRect());return true;
 }
-function calCreateDraft(draft){closeCard(true);calDraft={...draft};render();const anchor=document.querySelector('#app [data-event-key="draft"]');anchor?.scrollIntoView?.({block:'nearest'});calOpenCard({mode:'create',draft},anchor?anchor.getBoundingClientRect():null);}
+function calCreateDraft(draft){if(!closeCard(true))return;calDraft={...draft};render();const anchor=document.querySelector('#app [data-event-key="draft"]');anchor?.scrollIntoView?.({block:'nearest'});calOpenCard({mode:'create',draft},anchor?anchor.getBoundingClientRect():null);}
 
 // ---- The event card (Notion's floating event panel): opens beside the event, saves as you go ----
 function calCardRoot(){let root=document.getElementById('card-root');if(!root){root=h('div',{id:'card-root'});document.body.append(root);}return root;}
@@ -327,7 +330,7 @@ function calSetDate(which,key){const v=calCard.v;const was=v.start;if(which==='s
 // The repeat moves its weekdays with the start date: a new card's, a repeat chosen and not sent yet, and a card that holds
 // the series itself (main moves that one's stored rule too) — 2026-10-21 review: the rule stayed on the old weekday.
 function calFollowRule(was){const c=calCard;if(!c||!c.v.rrule)return;const waiting=c.mode==='edit'&&('rrule' in c.pending);const master=c.mode==='edit'&&Boolean(c.event?.rrule&&!c.event.masterId);if(c.mode!=='create'&&!waiting&&!master)return;const next=D.shiftRule(c.v.rrule,was,c.v.start);if(next&&next!==c.v.rrule){c.v.rrule=next;if(waiting)c.pending.rrule=next;}}
-function calSetAllDay(on){const c=calCard,v=c.v;if(on===v.allDay)return;if(on){const startKey=v.start.slice(0,10);let endKey=v.end.slice(0,10);if(v.end.slice(11)==='00:00'&&endKey>startKey)endKey=D.dayOffset(endKey,-1);v.start=startKey;v.end=endKey<startKey?startKey:endKey;}else{const day=v.start.slice(0,10);const times=c.mode==='create'?D.defaultEventTimes(day):[day+'T09:00',day+'T10:00'];v.start=times[0];v.end=times[1];}v.allDay=on;calWhenChanged();}
+function calSetAllDay(on){const c=calCard,v=c.v;if(on===v.allDay)return;if(on){const startKey=v.start.slice(0,10);let endKey=v.end.slice(0,10);if(v.end.slice(11)==='00:00'&&endKey>startKey)endKey=D.dayOffset(endKey,-1);v.start=startKey;v.end=endKey<startKey?startKey:endKey;}else{const day=v.start.slice(0,10);const last=String(v.end||day).slice(0,10);const lastDay=last>day?last:day;/* v.end is the last day itself while all-day (calValuesOf); a several-day event keeps its days (Codex review 2026-10-26) */const times=c.mode==='create'&&lastDay===day?D.defaultEventTimes(day):[day+'T09:00',lastDay+'T10:00'];v.start=times[0];v.end=times[1];}v.allDay=on;calWhenChanged();}
 function calWhenChanged(){const c=calCard;if(!c)return;if(c.soft){if(c.mode==='create')calDraft=calTimes(c.v);else calCardChange(calTimes(c.v));calSyncWhen(c);return;}if(c.mode==='create'){calDraft=calTimes(c.v);calRenderCard();render();return;}calCardChange(calTimes(c.v));calRenderCard();}
 // The time fields and date labels shown again from the values, without rebuilding the card.
 function calSyncWhen(c){const v=c.v;if(v.allDay||!c.node)return;for(const which of ['start','end']){const input=c.node.querySelector('[data-card-focus="time-'+which+'"]');if(input&&document.activeElement!==input)input.value=fmtTime(new Date(which==='start'?v.start:v.end));}}
@@ -336,7 +339,7 @@ function calRepeatOptions(day,current){const d=D.fromDate(day);const wd=I.weekda
 function calSameRule(a,b){if(!a||!b)return !a&&!b;const x=D.parseRRule(a),y=D.parseRRule(b);if(!x||!y)return a===b;const days=r=>r.byDay.map(d=>d.ord+':'+d.day).sort().join();return x.freq===y.freq&&x.interval===y.interval&&days(x)===days(y)&&x.byMonthDay===y.byMonthDay&&x.count===y.count&&x.until===y.until;}
 function calRepeatControl(){const c=calCard,v=c.v,e=c.event;if(e&&e.masterId&&!e.rrule&&isLocalEvent(e))return null;if(e&&!isLocalEvent(e)&&e.recurring)return h('span',{class:'card-chip static',title:tr('반복 규칙은 원래 달력 앱에서 바꿀 수 있어요.')},icon('repeat',13),tr('반복 일정'));const {list,value}=calRepeatOptions(v.start.slice(0,10),v.rrule);return h('select',{class:'card-repeat','aria-label':tr('반복'),'data-card-focus':'repeat',onchange:ev=>{const next=ev.target.value;if(next==='custom'){ev.target.value=value;calCustomRepeat();return;}v.rrule=next;if(c.mode==='edit')calCardChange({rrule:next});calRenderCard();}},list.map(([val,label])=>h('option',{value:val,selected:val===value?'':null},label)));}
 function calCustomRepeat(){const c=calCard;const v=c.v;const start=h('input',{type:'hidden',value:v.allDay?v.start:v.start});const picker=repeatPicker(v.rrule,start);modal(tr('반복'),h('form',{class:'dialog-body',onsubmit:ev=>{ev.preventDefault();const next=picker.value();closeModal();if(calCard!==c)return;v.rrule=next;if(c.mode==='edit')calCardChange({rrule:next});calRenderCard();}},picker.node,actionFooter(()=>closeModal(),tr('확인'))),false,{stack:true});}
-function calCardMenu(anchor){const c=calCard;const e=c.event;const r=anchor.getBoundingClientRect();contextMenu(r.left,r.bottom+4,{items:[{label:tr('복제'),icon:'copy',hint:isRecurring(e)?tr('이 일정만'):'',onClick:()=>{if(calCard!==c)return;const copy={...e,title:c.v.title.trim()||e.title,location:c.v.location,...(c.v.color?{color:c.v.color}:{}),...calTimes(c.v)};if(!c.v.color)delete copy.color;closeCard(true);duplicateEvent(copy);}},c.mode==='edit'?'-':null,c.mode==='edit'?{label:tr('삭제'),icon:'trash',danger:true,onClick:()=>{if(calCard===c)calCardDelete();}}:null]});menuRoot?.classList.add('card-menu');}
+function calCardMenu(anchor){const c=calCard;const e=c.event;const r=anchor.getBoundingClientRect();contextMenu(r.left,r.bottom+4,{items:[{label:tr('복제'),icon:'copy',hint:isRecurring(e)?tr('이 일정만'):'',onClick:()=>{if(calCard!==c)return;const copy={...e,title:c.v.title.trim()||e.title,location:c.v.location,...(c.v.color?{color:c.v.color}:{}),...calTimes(c.v)};if(!c.v.color)delete copy.color;if(!closeCard(true))return;duplicateEvent(copy);}},c.mode==='edit'?'-':null,c.mode==='edit'?{label:tr('삭제'),icon:'trash',danger:true,onClick:()=>{if(calCard===c)calCardDelete();}}:null]});menuRoot?.classList.add('card-menu');}
 function calCardDelete(){const c=calCard;if(!c||c.mode!=='edit')return;deleteEventFlow(c.event);}
 // Saving: one change of a plain event goes out after 400ms; a repeating event keeps its changes until the card closes and
 // then asks once how far they apply (Notion's pending changes).
@@ -348,7 +351,30 @@ function calCardChange(fields){const c=calCard;if(!c||c.mode!=='edit')return;Obj
 const calWrites=new Set();
 async function calCardFlush(c,strict){if(!c||c.series)return;clearTimeout(c.timer);c.timer=null;if(c.flushing)await c.flushing.catch(()=>{});const pending=c.pending;if(!Object.keys(pending).length)return;c.pending={};const job=run('event:update',{id:c.event.id,...pending});c.flushing=job;calWrites.add(job);try{const r=await job;if(calCard===c&&r&&r.id){c.event=r;c.key=r.id;const series=calSeries(r);if(series!==c.series){c.series=series;calRenderCard();}calMarkAnchor();}}catch(error){if(strict||c.strict){c.pending={...pending,...c.pending};job.requeued=true;throw error;}if(calCard===c){const back=calValuesOf(c.event);const keys=Object.keys(pending);if(keys.includes('title'))c.v.title=back.title;if(keys.includes('location'))c.v.location=back.location;if(keys.includes('color'))c.v.color=back.color;if(keys.includes('rrule'))c.v.rrule=back.rrule;if(keys.some(k=>['start','end','allDay'].includes(k))){c.v.start=back.start;c.v.end=back.end;c.v.allDay=back.allDay;}c.original={...c.original,...Object.fromEntries(keys.filter(k=>k in back).map(k=>[k,back[k]]))};if(!(c.node&&c.node.contains(document.activeElement)&&calFieldFocused()))calRenderCard();}}finally{calWrites.delete(job);if(c.flushing===job)c.flushing=null;}}
 function calCommitTyped(c){const a=document.activeElement;if(c?.node?.contains(a)&&a.classList.contains('card-time'))calTypedTime(a.getAttribute('data-card-focus')==='time-end'?'end':'start',a,true);}
-function calSaveNew(explicit){const c=calCard;if(!c||c.mode!=='create'||c.saving)return;calCommitTyped(c);const title=c.v.title.trim()||(explicit?tr('새 일정'):'');if(!title){calCard=null;calCardRoot().replaceChildren();calDraft=null;render();return;}c.saving=true;const payload={calendarId:c.calendarId,title,...calTimes(c.v),location:c.v.location,...(c.v.color?{color:c.v.color}:{}),...(c.v.rrule?{rrule:c.v.rrule}:{})};c.savePromise=run('event:add',payload);c.savePromise.then(created=>{if(calCard===c){calCard=null;calCardRoot().replaceChildren();}calDraft=null;render();const day=calLocal(payload.start);if(day!==selectedDate&&view==='calendar'&&calMode()==='month'){selectedDate=day;render();}const id=payload.calendarId;const cal=state.calendars.find(x=>x.id===id);if(cal&&(state.settings.hiddenCalendars||[]).includes(id))toast(tr('숨긴 달력 「{0}」에 저장했어요.',[cal.name]),false,{label:tr('달력 표시'),undo:false,onClick:()=>run('settings:update',{hiddenCalendars:(state.settings.hiddenCalendars||[]).filter(x=>x!==id)}).catch(()=>{})});void created;},()=>{c.saving=false;});}
+// New events whose save failed after their card was gone (another card opened meanwhile): kept for 「다시 시도」 and sent
+// again by the closing flush, so a quit never drops them silently (Codex review 2026-10-26).
+// Each new event carries a key (main makes a resend of it harmless), and one add of a payload runs at a time: the retry
+// button, the closing flush and the card share the job (2026-10-26 review: a retry still on its way was sent again).
+const calFailedAdds=[];const calAddJobs=new Map();
+const calNewKey=()=>crypto.randomUUID().replace(/-/g,'');
+// A kept add that a sync shows after all (stored, its answer lost) is done and never sent again: a resend once brought back
+// an event deleted since (2026-10-26 recheck). Google keeps the key as the event's id (its series' instances as id_time),
+// iCloud as its UID, and a local event's id is made from it. Checked on every state the app receives (app.js).
+const calKeyId=key=>`${key.slice(0,8)}-${key.slice(8,12)}-${key.slice(12,16)}-${key.slice(16,20)}-${key.slice(20)}`;
+const calAddShown=payload=>Boolean(payload.key)&&state.events.some(e=>{const id=String(e.remoteId||'');return id===payload.key||id.startsWith(payload.key+':')||id.startsWith(payload.key+'_')||e.id===calKeyId(payload.key);});
+// A kept add asking for an edit (revise) still has to reach the service, shown or not (2026-10-27 recheck: it was dropped).
+function calPruneFailedAdds(){for(const payload of [...calFailedAdds])if(!payload.revise&&!calAddJobs.has(payload)&&calAddShown(payload))calFailedAdds.splice(calFailedAdds.indexOf(payload),1);}
+// A kept add goes out marked (main tells a failure by a Windows notification while the window is hidden); track=false sends
+// it in the background, with nothing waiting for it (2026-10-26 recheck: the next window X waited for the last one).
+function calSendAdd(payload,viaRun,track=true){if(calAddJobs.has(payload))return calAddJobs.get(payload);if(calFailedAdds.includes(payload)&&!payload.revise&&calAddShown(payload)){calFailedAdds.splice(calFailedAdds.indexOf(payload),1);return Promise.resolve(null);}const body=!track&&calFailedAdds.includes(payload)?{...payload,kept:true}:payload;const job=(viaRun?run('event:add',body):api.invoke('event:add',body)).then(r=>{const at=calFailedAdds.indexOf(payload);if(at>=0)calFailedAdds.splice(at,1);return r;});job.requeued=true;/* its values stay in the card or in calFailedAdds */calAddJobs.set(payload,job);if(track)calWrites.add(job);job.catch(()=>{}).finally(()=>{calAddJobs.delete(payload);calWrites.delete(job);});return job;}
+// A new event's payload. Sent again from the same card with other values (the first try may have been stored with its
+// answer lost) it asks the stored one to take them (revise), and keeps asking until it is saved; the same values, or a
+// kept add resent later, never overwrite (2026-10-26 recheck: a resend replaced edits made since).
+function calAddPayload(c,title){const payload={calendarId:c.calendarId,title,...calTimes(c.v),location:c.v.location,...(c.v.color?{color:c.v.color}:{}),...(c.v.rrule?{rrule:c.v.rrule}:{}),key:c.addKey};if(c.sentPayload&&JSON.stringify(c.sentPayload)!==JSON.stringify(payload))c.revise=true;c.sentPayload={...payload};if(c.revise)payload.revise=true;return payload;}
+function calAddFailed(payload){if(!calFailedAdds.includes(payload))calFailedAdds.push(payload);toast(tr('「{0}」 일정을 저장하지 못했어요.',[shortTitle(payload.title)]),true,{label:tr('다시 시도'),undo:false,onClick:()=>{if(calFailedAdds.includes(payload))calSendAdd(payload,true).catch(()=>calAddFailed(payload));}});}
+// Only this card's ghost block goes: a new draft opened since then keeps its own.
+const calDropDraft=c=>{if(!(calCard&&calCard!==c&&calCard.mode==='create'))calDraft=null;};
+function calSaveNew(explicit){const c=calCard;if(!c||c.mode!=='create'||c.saving)return;calCommitTyped(c);const title=c.v.title.trim()||(explicit?tr('새 일정'):'');if(!title){calCard=null;calCardRoot().replaceChildren();calDraft=null;render();return;}c.saving=true;c.addKey||=calNewKey();const payload=calAddPayload(c,title);c.savePayload=payload;const job=calSendAdd(payload,true);c.savePromise=job;job.then(created=>{if(calCard===c){calCard=null;calCardRoot().replaceChildren();}calDropDraft(c);render();const day=calLocal(payload.start);if(day!==selectedDate&&view==='calendar'&&calMode()==='month'){selectedDate=day;render();}const id=payload.calendarId;const cal=state.calendars.find(x=>x.id===id);if(cal&&(state.settings.hiddenCalendars||[]).includes(id))toast(tr('숨긴 달력 「{0}」에 저장했어요.',[cal.name]),false,{label:tr('달력 표시'),undo:false,onClick:()=>run('settings:update',{hiddenCalendars:(state.settings.hiddenCalendars||[]).filter(x=>x!==id)}).catch(()=>{})});void created;},()=>{c.saving=false;if(calCard===c)return;/* the card is still open: its values stay for another try */calDropDraft(c);render();calAddFailed(payload);});}
 // Closing: Esc, an outside click, another event, a view change. Returns false when the card stays (a scope question is open).
 function closeCard(commit=true){
   const c=calCard;if(!c)return true;if(c.closing)return false;
@@ -377,26 +403,61 @@ document.addEventListener('pointerdown',ev=>{const c=calCard;if(!c||!c.node)retu
 // A new event already being saved (the window's X pressed right after the card closed) is awaited, not added again; every
 // card write still on its way (`calWrites`: a card the X closed, the scope answer, one the 0.4-second timer started) is
 // awaited, and a failure stops the close or the quit with main's dialog (2026-10-21 reviews).
-async function calFlushCard(){
+// The closing flush gathers every failure and goes on, so one failed new event never hides an open card's change from
+// the quit question (2026-10-26 review). The open card and the writes under way come first, new events that failed earlier
+// last: a slow resend held the card's change and the window (2026-10-26 recheck). reason: 'all' (quit, update — they are
+// sent again and each failure is told), 'close' (a window hidden to the tray — they are sent without waiting and stay for
+// 「다시 시도」), none (before an undo — they are left alone).
+async function calFlushCard(reason){
+  const errors=[];
+  const tried=new Set();
+  const failedLine=(payload,error)=>tr('「{0}」 일정을 저장하지 못했어요.',[shortTitle(payload.title)])+' '+error.message;
+  const stillLine=payload=>tr('「{0}」 일정을 저장하지 못했어요.',[shortTitle(payload.title)])+' '+tr('아직 응답이 없어요.');
+  // New events on their way get 3.5 s in all (main gives the whole flush 5): one still going is named and keeps its values,
+  // instead of the quit ending on main's bare timeout (2026-10-26 recheck).
+  const started=Date.now();const deadline=started+3500;
+  // Only quitting has a deadline: hiding the window waits for the card's own save, so a failure is never swallowed by a
+  // window that has gone (2026-10-27 recheck).
+  const within=(job,until=deadline)=>reason!=='all'?job.then(()=>({ok:true}),error=>({error})):Promise.race([job.then(()=>({ok:true}),error=>({error})),new Promise(resolve=>setTimeout(()=>resolve({slow:true}),Math.max(0,until-Date.now())))]);
   const c=calCard;
   if(c&&c.mode==='create'){
-    if(c.saving)await c.savePromise;
-    else{calCommitTyped(c);if(c.v.title.trim()){const payload={calendarId:c.calendarId,title:c.v.title.trim(),...calTimes(c.v),location:c.v.location,...(c.v.color?{color:c.v.color}:{}),...(c.v.rrule?{rrule:c.v.rrule}:{})};c.saving=true;c.savePromise=api.invoke('event:add',payload);try{await c.savePromise;}catch(error){c.saving=false;throw new Error(tr('새 일정을 저장하지 못했어요. {0}',[error.message]));}if(calCard===c){calCard=null;calCardRoot().replaceChildren();}calDraft=null;}}
+    // A save under way: if another card opened meanwhile, it is a kept failure (told once, not sent again in this flush).
+    if(c.saving){if(c.savePayload)tried.add(c.savePayload);const r=await within(c.savePromise);if(r.error){if(calCard===c)errors.push(tr('새 일정을 저장하지 못했어요. {0}',[r.error.message]));else if(c.savePayload&&reason==='all')errors.push(failedLine(c.savePayload,r.error));}else if(r.slow&&reason==='all'&&c.savePayload)errors.push(stillLine(c.savePayload));}
+    else{calCommitTyped(c);if(c.v.title.trim()){c.addKey||=calNewKey();const payload=calAddPayload(c,c.v.title.trim());c.saving=true;c.savePayload=payload;tried.add(payload);const job=calSendAdd(payload,false);c.savePromise=job;
+      // Its outcome is handled when it comes, also after the 3.5 s (the card closes, or keeps it for 「다시 시도」).
+      const done=job.then(()=>{if(calCard===c){calCard=null;calCardRoot().replaceChildren();}calDropDraft(c);render();},error=>{c.saving=false;if(calCard!==c){calDropDraft(c);render();calAddFailed(payload);/* another card opened meanwhile: kept for 「다시 시도」 */}throw error;});
+      const r=await within(done);
+      if(r.error){if(calCard!==c){if(reason!=='close')errors.push(failedLine(payload,r.error));}else errors.push(tr('새 일정을 저장하지 못했어요. {0}',[r.error.message]));}
+      else if(r.slow&&reason==='all')errors.push(stillLine(payload));}}
   }else if(c&&c.mode==='edit'){
     const a=document.activeElement;if(c.node&&c.node.contains(a)&&calFieldFocused())a.blur();
-    if(c.series&&Object.keys(c.pending).length)throw new Error(tr('반복 일정 카드에 저장하지 않은 변경이 있어요. 카드를 닫아 저장한 뒤 종료해 주세요.'));
-    // Until nothing waits: a write the 0.4-second timer started meanwhile is awaited and, if it failed, sent again.
-    c.strict=true;
-    try{for(let round=0;round<5;round++){await calCardFlush(c,true);if(!c.flushing&&!Object.keys(c.pending).length)break;if(c.flushing)await c.flushing.catch(()=>{});}}
-    catch(error){throw new Error(tr('일정 변경을 저장하지 못했어요. {0}',[error.message]));}
-    finally{c.strict=false;}
+    if(c.series&&Object.keys(c.pending).length)errors.push(tr('반복 일정 카드에 저장하지 않은 변경이 있어요. 카드를 닫아 저장한 뒤 종료해 주세요.'));
+    else{
+      // Until nothing waits: a write the 0.4-second timer started meanwhile is awaited and, if it failed, sent again.
+      c.strict=true;
+      try{for(let round=0;round<5;round++){await calCardFlush(c,true);if(!c.flushing&&!Object.keys(c.pending).length)break;if(c.flushing)await c.flushing.catch(()=>{});}}
+      catch(error){errors.push(tr('일정 변경을 저장하지 못했어요. {0}',[error.message]));}
+      finally{c.strict=false;}
+    }
   }
-  const waiting=[...calWrites];if(!waiting.length)return;
-  const results=await Promise.allSettled(waiting);
-  const failed=results.find((r,i)=>r.status==='rejected'&&!waiting[i].requeued);
-  if(failed)throw new Error(tr('일정 변경을 저장하지 못했어요. {0}',[failed.reason?.message||'']));
+  // Writes under way are waited for; adds are not here (their values are kept): a slow one held the window, and on quit
+  // they are given what is left of the 3.5 s below (2026-10-26 recheck).
+  const adds=new Set(calAddJobs.values());
+  const waiting=[...calWrites].filter(job=>!adds.has(job));
+  if(waiting.length){const results=await Promise.allSettled(waiting);const failed=results.find((r,i)=>r.status==='rejected'&&!waiting[i].requeued);if(failed)errors.push(tr('일정 변경을 저장하지 못했어요. {0}',[failed.reason?.message||'']));}
+  await new Promise(resolve=>setTimeout(resolve,0));/* settled adds leave calAddJobs first */
+  calPruneFailedAdds();
+  const kept=reason?calFailedAdds.filter(payload=>!tried.has(payload)):[];
+  if(reason==='close')for(const payload of kept)calSendAdd(payload,false,false).catch(()=>calAddFailed(payload));
+  else if(reason==='all'){
+    // Kept adds are sent again together with those already on their way (a 「다시 시도」), all within the deadline.
+    const going=[...new Set([...kept,...[...calAddJobs.keys()].filter(payload=>!tried.has(payload))])];
+    const until=Math.min(Math.max(deadline,Date.now()+1000),started+4300);/* a slow edit card above leaves them a second, inside main's 5 s */
+    const results=await Promise.all(going.map(payload=>within(calSendAdd(payload,false),until).then(r=>[payload,r])));
+    for(const [payload,r] of results){if(r.error)errors.push(failedLine(payload,r.error));else if(r.slow)errors.push(stillLine(payload));}
+  }
+  if(errors.length)throw new Error(errors.join('\n'));
 }
-
 // ---- Keys (Notion, Google): D/W/M views, T today, J/K or ←/→ periods, C new event, \ panel, Esc. Matched on e.code so
 // they work in 한글 input mode; never while typing or with a dialog or menu open. Returns true when the key was used.
 function calendarKey(e){

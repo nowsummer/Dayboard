@@ -85,27 +85,29 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.querySelector('.main-nav .nav-item:nth-child(1)').click();
     await wait(120);
     const title = () => document.querySelector('.context-note .context-heading h3')?.textContent || null;
+    // Each change is waited for (up to 3 s) instead of a fixed pause: a busy PC applied the hide later than 200 ms.
+    const until = async ok => { for (let i = 0; i < 60 && !ok(); i++) await wait(50); };
     const auto = title();
     document.querySelector('.context-note [aria-label="표시할 메모"]').click();
     await wait(80);
     const items = [...document.querySelectorAll('.context-menu .menu-item')];
     const first = items[0]?.textContent || '';
     items.find(node => node.textContent === '스모크 메모').click();
-    await wait(200);
+    await until(() => title() === '스모크 메모');
     const picked = title();
     document.querySelector('.context-note [aria-label="표시할 메모"]').click();
     await wait(80);
     [...document.querySelectorAll('.context-menu .menu-item')].find(node => node.textContent === '메모 숨기기').click();
-    await wait(200);
+    await until(() => !document.querySelector('.context-note') && state.settings.sideNote === 'off');
     const hidden = !document.querySelector('.context-note');
     document.querySelector('[aria-label="설정"]')?.click();
     await wait(150);
     const select = [...document.querySelectorAll('#modal-root .field')].find(node => node.textContent.startsWith('할 일 화면 메모'))?.querySelector('select');
     const settingsValue = select ? select.value : 'missing';
     if (select) { select.value = 'auto'; select.dispatchEvent(new Event('change', { bubbles: true })); }
-    await wait(200);
+    await until(() => state.settings.sideNote === 'auto');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    await wait(100);
+    await until(() => title() === '스모크 오른쪽 메모');
     return { auto, first, picked, hidden, settingsValue, back: title() };`);
   expect(side.auto === '스모크 오른쪽 메모' && side.first === '자동 (고정·최근 메모)' && side.picked === '스모크 메모' && side.hidden && side.settingsValue === 'off' && side.back === '스모크 오른쪽 메모', `할 일 화면 메모 고르기·숨기기 ${JSON.stringify(side)}`);
   await invoke('settings:update', { sideNote: sideOther.id });
@@ -1413,15 +1415,20 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   expect(viaDefault.calendarId === 'local-calendar', `기본 달력으로 추가 ${JSON.stringify(viaDefault)}`);
   await invoke('calendar:move', { id: 'local-calendar', to: 'local-calendar' }).then(() => { throw new Error('로컬→로컬 옮기기가 통과했습니다.'); }, error => expect(/계정 달력/.test(error.message), `옮기기 검증: ${error.message}`));
   await invoke('event:delete', { id: viaDefault.id });
-  await invoke('settings:update', { defaultCalendarId: null });
-  const settingsLabels = await run(mainWindow, `
+  // Where new tasks and events go is asked in Settings only with two or more accounts to choose from, or once a choice was
+  // made (2026-10-27 user: 「각 기능별 계정이 하나만 설정된 경우에는 굳이 안 보이도록」). This profile has no account.
+  const settingsLabels = () => run(mainWindow, `
     document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
     await new Promise(resolve => setTimeout(resolve, 30));
     const dialog = document.querySelector('#modal-root .dialog');
     const labels = dialog ? [...dialog.querySelectorAll('.field > span')].map(node => node.textContent) : [];
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     return labels;`);
-  expect(settingsLabels.includes('새 일정 기본 달력'), `설정의 기본 달력 항목 ${JSON.stringify(settingsLabels)}`);
+  const chosen = await settingsLabels();
+  expect(chosen.includes('새 일정 기본 달력') && !chosen.includes('새 할 일 기본 목록'), `고른 기본 달력은 설정에 보임 ${JSON.stringify(chosen)}`);
+  await invoke('settings:update', { defaultCalendarId: null });
+  const automatic = await settingsLabels();
+  expect(!automatic.includes('새 일정 기본 달력') && !automatic.includes('새 할 일 기본 목록'), `계정이 없으면 기본 목록·달력 항목 없음 ${JSON.stringify(automatic)}`);
   checks.push('calendar-default-and-move');
 
   // Hidden account sections: hiding every section is refused; a key without lists changes nothing on screen.
@@ -1464,7 +1471,27 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const result = { items, title: dialog?.querySelector('h2')?.textContent || '', hide: [...(dialog?.querySelectorAll('button') || [])].some(node => node.textContent.includes('Dayboard에서 숨기기')) };
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     return result;`);
-  expect(['목록 편집', '목록 숨기기', '목록 삭제'].every(item => listMenu.items.includes(item)) && /삭제할 수 없어요/.test(listMenu.title) && listMenu.hide, `목록 메뉴 ${JSON.stringify(listMenu)}`);
+  expect(['목록 편집', '목록 숨기기', '목록 삭제', '새 할 일 기본 목록으로'].every(item => listMenu.items.includes(item)) && /삭제할 수 없어요/.test(listMenu.title) && listMenu.hide, `목록 메뉴 ${JSON.stringify(listMenu)}`);
+  // 「새 할 일 기본 목록으로」 on the built-in 「내 할 일」 (the first version left built-in lists out) saves the choice, and
+  // Settings then shows its row with that list selected, one of its own options (2026-10-27 review).
+  const pickDefault = await run(mainWindow, `
+    const row = [...document.querySelectorAll('.list-nav')].find(node => node.querySelector('.list-name')?.textContent === ${JSON.stringify(inboxName)});
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 300 }));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    const item = [...document.querySelectorAll('.context-menu .menu-item')].find(node => node.textContent.includes('새 할 일 기본 목록으로'));
+    item?.click();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
+    await new Promise(resolve => setTimeout(resolve, 60));
+    const dialog = document.querySelector('#modal-root .dialog');
+    const field = [...(dialog?.querySelectorAll('.field') || [])].find(node => node.querySelector(':scope > span')?.textContent === '새 할 일 기본 목록');
+    const select = field?.querySelector('select');
+    const result = { offered: Boolean(item), row: Boolean(field), value: select?.value || '', options: select ? [...select.options].map(option => option.value) : [] };
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return result;`);
+  const picked = await invoke('state:get');
+  expect(pickDefault.offered && picked.settings.defaultListId === 'local-inbox' && pickDefault.row && pickDefault.value === 'local-inbox' && pickDefault.options.includes('local-inbox'), `기본 목록 메뉴 ${JSON.stringify(pickDefault)}`);
+  await invoke('settings:update', { defaultListId: null });
   const afterListDelete = await invoke('list:delete', { id: hideList.id });
   expect(!afterListDelete.lists.some(list => list.id === hideList.id) && !afterListDelete.settings.hiddenLists.includes(hideList.id), '숨긴 목록을 지우면 숨김 설정도 정리');
   checks.push('list-hide-delete-menu');
