@@ -301,7 +301,7 @@ test('the store validates and publishes defaultCalendarId', () => {
   state.settings.defaultCalendarId = 'g';
   validateState(state);
   state.settings.defaultCalendarId = 5;
-  assert.throws(() => validateState(state), /기본 달력/);
+  assert.equal(validateState(state).settings.defaultCalendarId, null); // a wrong shape on disk heals to 자동 (2026-10-26 review)
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dayboard-calwrite-store-'));
   try {
     const store = createStore(directory);

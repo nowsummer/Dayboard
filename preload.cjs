@@ -9,8 +9,9 @@ ipcRenderer.on('dayboard:flush', async (_event, payload) => {
   const token = payload && typeof payload.token === 'string' ? payload.token : null;
   if (!token) return;
   let error = null;
-  try { if (flushHandler) await flushHandler(); }
-  catch (failure) { error = String(failure?.message || failure || '메모를 저장하지 못했습니다.').slice(0, 1000); }
+  // reason 'notes': before another PC's note version is applied (note drafts only); 'all': before a close, quit or update.
+  try { if (flushHandler) await flushHandler(payload.reason === 'notes' ? 'notes' : 'all'); }
+  catch (failure) { error = String(failure?.message || failure || '변경 사항을 저장하지 못했습니다.').slice(0, 1000); }
   ipcRenderer.send('dayboard:flushed', { token, error });
 });
 
@@ -29,6 +30,13 @@ contextBridge.exposeInMainWorld('dayboard', Object.freeze({
     const listener = (_event, state) => callback(state);
     ipcRenderer.on('dayboard:state', listener);
     return () => ipcRenderer.removeListener('dayboard:state', listener);
+  },
+  // The main window's maximized state (the middle window button shows restore while maximized).
+  onWindowState(callback) {
+    if (typeof callback !== 'function') throw new TypeError('창 상태 함수가 필요합니다.');
+    const listener = (_event, windowState) => callback(windowState);
+    ipcRenderer.on('dayboard:window', listener);
+    return () => ipcRenderer.removeListener('dayboard:window', listener);
   },
   // Desktop widgets: the piece of wallpaper behind the window (or null to drop it).
   onBackdrop(callback) {

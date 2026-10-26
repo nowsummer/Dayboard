@@ -1,5 +1,5 @@
 'use strict';
-// Screenshots of the main screens for the public page repository nowsummer/dayboard (README.md, index.html, images/).
+// Screenshots of the main screens for the public page repository nowsummer/Dayboard (README.md, index.html, images/).
 // Runs this source app in a brand-new temporary profile (DAYBOARD_USER_DATA), fills it with the invented sample data
 // of scripts/readme-sample.cjs, captures the main screens at 2x, quits. The user's real profile and accounts are never
 // touched. The desktop widget picture is taken separately on the real desktop: scripts/readme-widgets.cjs.
@@ -50,8 +50,8 @@ app.whenReady().then(async () => {
     // The real mouse pointer may rest over the window; clear hover so no cell or row is highlighted.
     const shot = async (win, name) => { win.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 }); await run('document.activeElement?.blur?.()'); await settle(win); const img = await win.webContents.capturePage(); fs.writeFileSync(path.join(OUT, `${name}.png`), img.toPNG()); log('saved', name, img.getSize()); };
 
-    await invoke('settings:update', { language: 'ko', timeFormat: '12h', theme: 'light' });
-    const { work } = await seedSample(invoke);
+    await invoke('settings:update', { language: 'ko', timeFormat: '12h', theme: 'light', tourDone: true });
+    const { work, focusNote } = await seedSample(invoke);
 
     main.setBounds({ x: 0, y: 0, width: 1240, height: 820 });
     await wait(600);
@@ -61,8 +61,15 @@ app.whenReady().then(async () => {
     await shot(main, 'tasks-list');
     await run(`document.querySelector('.main-nav .nav-item:nth-child(2)').click();`);
     await shot(main, 'calendar');
+    await run(`setCalMode('week');`);
+    await shot(main, 'calendar-week');
+    await run(`setCalMode('month');`);
+    await invoke('note:pin', { id: focusNote.id, pinned: true });
     await run(`document.querySelector('.main-nav .nav-item:nth-child(3)').click();`);
     await shot(main, 'notes');
+    await run(`goto('today');helpOpen(true);`);
+    await shot(main, 'help');
+    await run(`helpClose();`);
     await invoke('settings:update', { theme: 'dark' });
     await run(`goto('today');`);
     await shot(main, 'tasks-today-dark');

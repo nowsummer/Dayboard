@@ -1,16 +1,16 @@
 {
   "name": "dayboard-desktop",
   "productName": "Dayboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A quiet place for your day. Windows tasks, calendar and desktop widgets.",
   "main": "main.cjs",
   "private": true,
   "author": "Dayboard",
   "license": "MIT",
-  "homepage": "https://nowsummer.github.io/dayboard/",
+  "homepage": "https://nowsummer.github.io/Dayboard/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nowsummer/dayboard.git"
+    "url": "https://github.com/nowsummer/Dayboard.git"
   },
   "scripts": {
     "start": "electron .",
@@ -66,7 +66,7 @@
       {
         "provider": "github",
         "owner": "nowsummer",
-        "repo": "dayboard",
+        "repo": "Dayboard",
         "releaseType": "release"
       }
     ]

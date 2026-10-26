@@ -51,29 +51,97 @@ test('hidden lists leave every screen with their tasks, combine with hidden sect
   assert.equal(D.visibleState({ ...state, settings: {} }).lists.length, 3);
 });
 
-test('glass level 0.5 is the previous adaptive tint; clearer levels tint less, tinted levels more', () => {
-  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-  for (const L of [0.02, 0.15, 0.4, 0.7, 0.95]) {
-    const g = D.glassTint(0.5, L);
-    assert.equal(g.a, +clamp((0.93 - L) / Math.max(0.05, 1 - L), 0.42, 0.93).toFixed(3), `light tint at L=${L}`);
-    assert.equal(g.da, +clamp(L > 0.17 ? (L - 0.17) / Math.max(0.05, L - 0.12) : 0.4, 0.4, 0.86).toFixed(3), `dark tint at L=${L}`);
-    assert.equal(g.blur, 26); assert.equal(g.sat, 175); assert.equal(g.alpha, 0.94);
+test('liquid glass tint keeps text readable at every level; clearer levels tint and blur less', () => {
+  // The tint is applied in the filter before the saturation (renderer/glass.js), so the composite luma of the glass
+  // is a + (1 - a) * L for light cards and (1 - da) * L + da * slate for dark ones (slate luma about .155).
+  for (const L of [0, 0.02, 0.08, 0.15, 0.3, 0.4, 0.55, 0.7, 0.85, 0.95, 1]) {
     let previous = null;
     for (const level of [0, 0.25, 0.5, 0.75, 1]) {
-      const current = D.glassTint(level, L);
+      const g = D.glassTint(level, L);
+      assert.ok(g.a + (1 - g.a) * L >= 0.639, `light glass stays light enough for dark text at L=${L}, level ${level}`);
+      assert.ok((1 - g.da) * L + g.da * 0.155 <= 0.45, `dark glass stays dark enough for white text at L=${L}, level ${level}`);
       if (previous) {
-        assert.ok(current.a >= previous.a && current.da >= previous.da, `tint grows with the level at L=${L}`);
-        assert.ok(current.blur >= previous.blur && current.alpha >= previous.alpha, 'blur and solid alpha grow with the level');
+        assert.ok(g.a >= previous.a && g.da >= previous.da, `tint grows with the level at L=${L}`);
+        assert.ok(g.blur >= previous.blur && g.alpha >= previous.alpha && g.sat <= previous.sat, 'blur and solid alpha grow, vibrancy eases with the level');
       }
-      previous = current;
+      previous = g;
     }
   }
-  // Clear glass on a dark wallpaper still leaves a light card for dark text (composite luminance about .73).
-  const clear = D.glassTint(0, 0.05);
-  assert.ok(clear.a * 1 + (1 - clear.a) * 0.05 > 0.7);
-  assert.deepEqual(Object.keys(D.glassTint(0.5, null)).sort(), ['alpha', 'blur', 'sat'], 'no wallpaper: only blur and solid alpha');
-  assert.equal(D.glassTint(Number.NaN, 0.5).blur, 26, 'an invalid level falls back to the default');
+  // The default on a dark wallpaper lets it show through (the 2026-10-20 tint of .92 looked like a plain white card).
+  const mid = D.glassTint(0.5, 0.08);
+  assert.ok(mid.a < 0.8 && mid.a > 0.7, `default light tint on a dark wallpaper: ${mid.a}`);
+  assert.deepEqual([mid.blur, mid.sat, mid.alpha], [13, 200, 0.94]);
+  assert.deepEqual([D.glassTint(0, 0.5).blur, D.glassTint(1, 0.5).blur], [7, 24]);
+  assert.deepEqual(Object.keys(D.glassTint(0.5, null)).sort(), ['alpha', 'blur', 'dsat', 'sat', 'solid'], 'no wallpaper: only blur, saturations and solid alpha');
+  // The opaque end is a plain card (2026-10-26 user): only the very end, so the slider's last step is the switch.
+  assert.deepEqual([D.glassTint(1, 0.3).solid, D.glassTint(0.995, 0.3).solid, D.glassTint(0.95, 0.3).solid, D.glassTint(0.5, null).solid], [true, true, false, false]);
+  assert.equal(D.glassTint(Number.NaN, 0.5).blur, 13, 'an invalid level falls back to the default');
   assert.equal(D.glassTint(7, 0.5).alpha, 1);
+});
+
+test('glass on the wallpaper follows its brightness, with a little hysteresis (2026-10-21 user choice)', () => {
+  assert.equal(D.glassTone(null, null), null, 'nothing painted: the app theme decides');
+  assert.equal(D.glassTone(Number.NaN, 'dark'), null);
+  assert.equal(D.glassTone(0.08, null), 'dark', 'a dark wallpaper (this PC: blue bloom on navy) gets dark glass with white text');
+  assert.equal(D.glassTone(0.82, null), 'light');
+  assert.equal(D.glassTone(0.49, null), 'dark'); assert.equal(D.glassTone(0.5, null), 'light');
+  // Near the middle the current tone stays until the wallpaper is clearly brighter or darker.
+  assert.equal(D.glassTone(0.53, 'dark'), 'dark'); assert.equal(D.glassTone(0.55, 'dark'), 'light');
+  assert.equal(D.glassTone(0.47, 'light'), 'light'); assert.equal(D.glassTone(0.45, 'light'), 'dark');
+  // Whatever the tone, the tint keeps its text readable (dark glass below .54, light glass above .46).
+  for (const level of [0, 0.5, 1]) {
+    for (const L of [0, 0.2, 0.4, 0.54]) { const g = D.glassTint(level, L); assert.ok((1 - g.da) * L + g.da * 0.155 <= 0.45, `dark glass at L=${L}`); }
+    for (const L of [0.46, 0.6, 0.8, 1]) { const g = D.glassTint(level, L); assert.ok(g.a + (1 - g.a) * L >= 0.639, `light glass at L=${L}`); }
+  }
+});
+
+// renderer/glass.js's filter as arithmetic: per-channel tint, then the SVG saturate matrix in sRGB, clamped. The 2026-10-21
+// review measured text sinking into a blue wallpaper (white text 3.2:1, secondary 2.3:1) where the luma checks above passed,
+// so these check WCAG contrast on the filtered glass itself, over flat and two-tone wallpapers, at every level.
+const glassFilterSim = (rgb, g, dark) => {
+  const t = dark ? g.da : g.a, s = (dark ? g.dsat : g.sat) / 100, slate = [0.145, 0.153, 0.18];
+  const c = rgb.map((v, i) => v / 255 * (1 - t) + (dark ? t * slate[i] : t));
+  const m = [[0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s], [0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s], [0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s]];
+  return m.map(row => Math.min(1, Math.max(0, row[0] * c[0] + row[1] * c[1] + row[2] * c[2])));
+};
+const wcagLin = v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+const wcagLum = c => 0.2126 * wcagLin(c[0]) + 0.7152 * wcagLin(c[1]) + 0.0722 * wcagLin(c[2]);
+const wcag = (a, b) => { const x = wcagLum(a), y = wcagLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const hexRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+
+test('glass text stays readable on the filtered glass over flat and two-tone wallpapers (2026-10-21 review)', () => {
+  const walls = { navy: [[10, 20, 40]], bloom: [[30, 100, 255]], windowsBlue: [[0, 120, 212]], blue: [[47, 107, 216]], grey: [[136, 136, 136]], light: [[230, 236, 245]], sand: [[220, 200, 160]], forest: [[29, 43, 26]], white: [[255, 255, 255]], black: [[0, 0, 0]], red: [[200, 40, 40]], green: [[40, 160, 80]], yellow: [[240, 210, 60]],
+    skyForest: [[207, 230, 255], [29, 43, 26]], whiteBlack: [[255, 255, 255], [0, 0, 0]], navyBloom: [[10, 20, 40], [30, 100, 255]], sandNight: [[220, 200, 160], [20, 30, 60]] };
+  const luma = rgb => (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+  for (const [name, parts] of Object.entries(walls)) {
+    const Ls = parts.map(luma), mean = Ls.reduce((s, v) => s + v, 0) / Ls.length;
+    const dark = D.glassTone(mean, null) === 'dark';
+    for (const level of [0, 0.25, 0.5, 0.75, 1]) {
+      // app.js glassBasis: the brighter part under dark glass, the darker part under light glass.
+      const g = D.glassTint(level, dark ? Math.max(...Ls) : Math.min(...Ls));
+      for (const part of parts) {
+        const bg = glassFilterSim(part, g, dark);
+        const text = dark ? [243, 244, 247].map(v => v / 255) : [28, 29, 34].map(v => v / 255);
+        const second = dark ? [236, 238, 245].map(v => v / 255) : [44, 48, 60].map(v => v / 255), alpha = dark ? 0.84 : 0.82;
+        const secondOnGlass = second.map((v, i) => alpha * v + (1 - alpha) * bg[i]);
+        const title = hexRgb(D.inkOn('#3478f6', dark ? 'dark' : 'light'));
+        const where = `${name} at level ${level}`;
+        assert.ok(wcag(text, bg) >= 4.5, `text on ${where}: ${wcag(text, bg).toFixed(2)}`);
+        assert.ok(wcag(secondOnGlass, bg) >= (level >= 0.5 ? 4.5 : 3.5), `secondary text on ${where}: ${wcag(secondOnGlass, bg).toFixed(2)}`);
+        assert.ok(wcag(title, bg) >= 3, `list title on ${where}: ${wcag(title, bg).toFixed(2)}`);
+      }
+    }
+  }
+});
+
+test('list colours as text on glass are mixed only as far as they need (inkOn)', () => {
+  for (const color of [...D.LIST_PALETTE, '#3478f6', '#ec5e67', '#5e6573', '#ef9b21', '#a57a06']) {
+    assert.ok(wcagLum(hexRgb(D.inkOn(color, 'light'))) <= 0.1, `${color} on light glass`);
+    assert.ok(wcagLum(hexRgb(D.inkOn(color, 'dark'))) >= 0.55, `${color} on dark glass`);
+  }
+  assert.equal(D.inkOn('#3478f6', null), '#3478f6', 'no wallpaper: the colour as it is');
+  assert.equal(D.inkOn('var(--accent)', 'dark'), 'var(--accent)');
+  assert.equal(D.inkOn('#20307a', 'light'), '#20307a', 'a deep colour needs no mixing on light glass');
 });
 
 test('settings keep hidden lists and the glass level; a changed old opacity carries over', t => {
@@ -95,9 +163,11 @@ test('settings keep hidden lists and the glass level; a changed old opacity carr
     assert.equal(migrated, level, 'opacity ' + opacity);
     if (opacity >= 0.78) assert.ok(Math.abs(D.glassTint(migrated, null).alpha - opacity) <= 0.005, 'the same always-on-top alpha comes back for ' + opacity);
   }
-  for (const bad of [{ glassLevel: 2 }, { glassLevel: '0.5' }, { hiddenLists: 'x' }, { hiddenLists: [1] }]) {
+  // Out-of-range cosmetic values heal instead of refusing the file (2026-10-26 review).
+  for (const [bad, healed] of [[{ glassLevel: 2 }, { glassLevel: 1 }], [{ glassLevel: '0.5' }, { glassLevel: 0.5 }], [{ hiddenLists: 'x' }, { hiddenLists: [] }], [{ hiddenLists: [1, 'a'] }, { hiddenLists: ['a'] }]]) {
     const broken = initialState(); Object.assign(broken.settings, bad);
-    assert.throws(() => validateState(broken), /설정이 올바르지 않습니다/);
+    const fixed = validateState(broken);
+    for (const [key, value] of Object.entries(healed)) assert.deepEqual(fixed.settings[key], value, JSON.stringify(bad));
   }
 });
 

@@ -230,11 +230,15 @@ test('Korean quick add weeks start on Monday, so on a Sunday 다음 주 is the c
 });
 
 test('Korean quick add leaves words that are not dates in the title', () => {
-  for (const text of ['오늘의집 주문', '2월 30일 테스트', '13월 1일 테스트', '월요일마다 운동', '3시간 운동', '3시 치과', '오후 13시 테스트']) {
+  for (const text of ['오늘의집 주문', '2월 30일 테스트', '13월 1일 테스트', '월요일마다 운동', '3시간 운동', '오후 13시 테스트']) {
     assert.deepEqual(quickKo(text), { title: text, dueDate: '', reminderAt: '' }, text);
   }
   assert.equal(quickKo('2월 29일 윤일', '2028-03-01', new Date('2028-03-01T10:00:00')).dueDate, '');
   assert.equal(quickKo('2월 29일 윤일', '2028-02-01', new Date('2028-02-01T10:00:00')).dueDate, '2028-02-29');
+  // M/D is a date; a date word may touch the time (2026-10-26 review).
+  assert.deepEqual(quickKo('11/3 회의'), { title: '회의', dueDate: '2026-11-03', reminderAt: '' });
+  assert.equal(quickKo('13/1 테스트').dueDate, '');
+  assert.equal(quickKo('내일3시 치과').dueDate, '2026-10-21');
 });
 
 test('Korean quick add turns 오전/오후 N시 and HH:MM into a reminder on that day', () => {
@@ -242,6 +246,13 @@ test('Korean quick add turns 오전/오후 N시 and HH:MM into a reminder on tha
     ['내일 오후 3시 치과', '치과', '2026-10-21', '2026-10-21 15:00'],
     ['오후 3시 반 회의', '회의', '2026-10-20', '2026-10-20 15:30'],
     ['내일 오후 3시 30분 미팅', '미팅', '2026-10-21', '2026-10-21 15:30'],
+    // A bare N시 (2026-10-26 review): 13–23 is 24-hour, 1–11 follows the bare-clock rule, no space needed after the date word.
+    ['내일 15시 치과', '치과', '2026-10-21', '2026-10-21 15:00'],
+    ['3시 치과', '치과', '2026-10-20', '2026-10-20 15:00'],
+    ['내일오후3시 치과', '치과', '2026-10-21', '2026-10-21 15:00'],
+    ['내일 9시 회의', '회의', '2026-10-21', '2026-10-21 09:00'],
+    ['12시 점심', '점심', '2026-10-20', '2026-10-20 12:00'],
+    ['10시반 통화', '통화', '2026-10-20', '2026-10-20 10:30'],
     ['15:30 통화', '통화', '2026-10-20', '2026-10-20 15:30'],
     ['오후 12시 점심', '점심', '2026-10-20', '2026-10-20 12:00'],
     ['오전 9시 산책', '산책', '2026-10-21', '2026-10-21 09:00'],
@@ -327,4 +338,88 @@ test('typing a year segment by segment never blanks the end or loses the length'
   let prevDay = '2026-10-20', endDay = '2026-10-22';
   for (const start of ['0002-10-20', '0020-10-20', '0202-10-20', '2027-10-20']) { endDay = R.followStart(prevDay, start, endDay, true); prevDay = start; }
   assert.equal(endDay, '2027-10-22');
+});
+
+// ---- Week and day views, dragging, the rolling month grid (2026-10-21) ----
+const W = require('../renderer/domain.js');
+const at = (day, clock) => new Date(`${day}T${clock}:00`).toISOString();
+const timed = (id, day, from, to, extra = {}) => ({ id, title: id, start: at(day, from), end: at(day, to), allDay: false, ...extra });
+
+test('weeks start on Sunday like the month grid', () => {
+  assert.deepEqual(W.weekDays('2026-10-21'), ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24']);
+  assert.equal(W.weekStart('2026-10-18'), '2026-10-18');
+  assert.equal(W.weekStart('2027-01-01'), '2026-12-27');
+});
+
+test('dayLayout packs overlapping events into shared columns and clips events from other days', () => {
+  const layout = W.dayLayout([
+    timed('a', '2026-10-21', '09:00', '10:00'), timed('b', '2026-10-21', '09:30', '11:00'), timed('c', '2026-10-21', '10:00', '10:30'),
+    timed('d', '2026-10-21', '12:00', '12:05'), { id: 'e', title: 'e', start: at('2026-10-20', '23:00'), end: at('2026-10-21', '01:00') },
+    timed('f', '2026-10-21', '11:00', '12:00')], '2026-10-21');
+  const by = Object.fromEntries(layout.map(item => [item.event.id, item]));
+  assert.deepEqual([by.a.col, by.b.col, by.c.col], [0, 1, 0], 'c reuses the column a left at 10:00');
+  assert.equal(by.a.cols, 2); assert.equal(by.c.cols, 2, 'every event in a cluster shares its column count');
+  assert.equal(by.f.cols, 1, '11:00 does not overlap an event ending at 11:00');
+  assert.deepEqual([by.e.top, by.e.end], [0, 60], 'the part after midnight');
+  assert.deepEqual([by.d.top, by.d.bottom], [720, 740], 'short events keep a clickable height');
+  const wide = Object.fromEntries(W.dayLayout([timed('x', '2026-10-21', '09:00', '12:00'), timed('y', '2026-10-21', '09:00', '10:00'), timed('w', '2026-10-21', '09:00', '09:30'), timed('v', '2026-10-21', '10:00', '11:00')], '2026-10-21').map(item => [item.event.id, item]));
+  assert.deepEqual([wide.v.col, wide.v.cols, wide.v.span, wide.y.span, wide.w.span], [1, 3, 2, 1, 1], 'v takes the free third column too');
+  const late = W.dayLayout([timed('g', '2026-10-21', '23:50', '23:55')], '2026-10-21')[0];
+  assert.equal(late.bottom, 1440, 'the minimum height never runs past midnight');
+});
+
+test('spanLayout lays all-day and multi-day bars across the visible days in lanes', () => {
+  const days = W.weekDays('2026-10-21');
+  const { bars, lanes } = W.spanLayout([
+    { id: 'trip', title: 'trip', allDay: true, start: '2026-10-17', end: '2026-10-20' },
+    { id: 'mon', title: 'mon', allDay: true, start: '2026-10-19', end: '2026-10-20' },
+    { id: 'conf', title: 'conf', start: at('2026-10-20', '10:00'), end: at('2026-10-22', '10:00') },
+    { id: 'next', title: 'next', allDay: true, start: '2026-10-25', end: '2026-10-26' },
+    { id: 'midnight', title: 'midnight', start: at('2026-10-23', '00:00'), end: at('2026-10-24', '00:00') }], days);
+  const by = Object.fromEntries(bars.map(bar => [bar.event.id, bar]));
+  assert.deepEqual([by.trip.from, by.trip.to, by.trip.before, by.trip.after], [0, 1, true, false]);
+  assert.equal(by.mon.lane, 1, 'Monday is taken by the trip in lane 0');
+  assert.deepEqual([by.conf.from, by.conf.to, by.conf.lane], [2, 4, 0]);
+  assert.deepEqual([by.midnight.from, by.midnight.to], [5, 5], 'an event ending at midnight does not reach the next day');
+  assert.equal(by.next, undefined);
+  assert.equal(lanes, 2);
+});
+
+test('spansDays sends all-day and 24-hour events to the all-day row', () => {
+  assert.equal(W.spansDays({ allDay: true, start: '2026-10-21', end: '2026-10-22' }), true);
+  assert.equal(W.spansDays(timed('x', '2026-10-21', '09:00', '10:00')), false);
+  assert.equal(W.spansDays({ start: at('2026-10-21', '09:00'), end: at('2026-10-22', '09:00') }), true);
+  assert.equal(W.spansDays({ start: at('2026-10-21', '22:00'), end: at('2026-10-22', '02:00') }), false, 'crossing midnight is not enough');
+});
+
+test('moving and shifting keep the length and the clock time', () => {
+  assert.deepEqual(W.movedTimes(timed('m', '2026-10-21', '09:00', '10:30'), '2026-10-23', 14 * 60 + 15), { start: at('2026-10-23', '14:15'), end: at('2026-10-23', '15:45') });
+  assert.deepEqual(W.shiftedDays({ allDay: true, start: '2026-10-21', end: '2026-10-23' }, 2), { start: '2026-10-23', end: '2026-10-25' });
+  assert.deepEqual(W.shiftedDays(timed('t', '2026-10-21', '09:00', '10:00'), -1), { start: at('2026-10-20', '09:00'), end: at('2026-10-20', '10:00') });
+  assert.equal(W.snapMinutes(52), 45); assert.equal(W.snapMinutes(53), 60);
+  assert.equal(W.atWall('2026-10-21', 90).toISOString(), at('2026-10-21', '01:30'));
+  assert.equal(W.wallMinutes(at('2026-10-21', '13:20'), '2026-10-21'), 800);
+  assert.equal(W.wallMinutes(at('2026-10-20', '13:20'), '2026-10-21'), 0);
+  assert.equal(W.wallMinutes(at('2026-10-22', '00:00'), '2026-10-21'), 1440);
+});
+
+test('the rolling month grid starts on the Sunday before the 1st and names its month by the middle week', () => {
+  assert.equal(W.monthStart(new Date(2026, 9, 15)), '2026-09-27');
+  const cells = W.cellsFrom('2026-09-27');
+  assert.equal(cells.length, 42);
+  assert.deepEqual([cells[0].outside, cells[4].key, cells[4].outside], [true, '2026-10-01', false]);
+  assert.equal(W.cellsFrom('2026-10-25').find(cell => !cell.outside).key, '2026-11-01', 'scrolled down: November is the month on screen');
+});
+
+test('shiftRule moves a series rule with its start', () => {
+  assert.equal(W.shiftRule('FREQ=WEEKLY;BYDAY=WE;WKST=SU', '2026-10-21', '2026-10-22'), 'FREQ=WEEKLY;BYDAY=TH;WKST=SU');
+  assert.equal(W.shiftRule('FREQ=WEEKLY;BYDAY=MO,WE', '2026-10-21', '2026-10-19'), 'FREQ=WEEKLY;BYDAY=SA,MO');
+  assert.equal(W.shiftRule('FREQ=MONTHLY;BYDAY=3WE', '2026-10-21', '2026-10-29'), 'FREQ=MONTHLY;BYDAY=-1TH', 'the 5th Thursday is the last one');
+  assert.equal(W.shiftRule('FREQ=MONTHLY;BYDAY=-1FR', '2026-10-30', '2026-10-23'), 'FREQ=MONTHLY;BYDAY=4FR');
+  assert.equal(W.shiftRule('FREQ=MONTHLY;BYDAY=-1FR', '2026-10-30', '2026-10-29'), 'FREQ=MONTHLY;BYDAY=-1TH');
+  assert.equal(W.shiftRule('FREQ=MONTHLY;BYMONTHDAY=21', '2026-10-21', '2026-10-25'), 'FREQ=MONTHLY;BYMONTHDAY=25');
+  assert.equal(W.shiftRule('FREQ=DAILY', '2026-10-21', '2026-10-29'), 'FREQ=DAILY');
+  assert.equal(W.shiftRule('FREQ=WEEKLY;BYDAY=WE', at('2026-10-21', '09:00'), at('2026-10-21', '14:00')), 'FREQ=WEEKLY;BYDAY=WE', 'a time change on the same day keeps the rule');
+  const moved = { id: 's', allDay: true, start: '2026-10-22', end: '2026-10-23', rrule: W.shiftRule('FREQ=WEEKLY;BYDAY=WE;WKST=SU', '2026-10-21', '2026-10-22') };
+  assert.deepEqual(W.expandEvent(moved, '2026-10-18', '2026-11-08').map(item => item.start), ['2026-10-22', '2026-10-29', '2026-11-05'], 'the moved series repeats on its new day');
 });

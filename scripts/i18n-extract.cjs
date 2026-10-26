@@ -7,7 +7,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SOURCE_FILES = ['renderer/app.js', 'main.cjs', 'lib/store.cjs', 'lib/sync.cjs', 'lib/desktop.cjs',
+const SOURCE_FILES = ['renderer/app.js', 'renderer/calendar.js', 'renderer/notefind.js', 'main.cjs', 'lib/store.cjs', 'lib/sync.cjs', 'lib/notesync.cjs', 'lib/desktop.cjs',
   'lib/providers/common.cjs', 'lib/providers/google.cjs', 'lib/providers/icloud.cjs', 'lib/providers/microsoft.cjs', 'lib/providers/oauth.cjs'];
 const HANGUL = /[가-힣]/;
 

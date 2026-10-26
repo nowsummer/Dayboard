@@ -226,19 +226,46 @@
   // Widget glass strength, settings.glassLevel: 0 = clear … 1 = frosted (like iOS 26's Liquid Glass Clear/Tinted).
   // L is the measured luminance (0–1) of the wallpaper behind the card, or null when none is painted.
   // Returns the white tint of light cards (a), the dark tint of dark cards (da), blur (px), saturation (%) and
-  // the solid alpha used without a wallpaper (always-on-top widgets). Level 0.5 is exactly the 2026-10-20 look;
-  // every level keeps dark text readable because the tint is solved from the wallpaper's brightness.
+  // the solid alpha used without a wallpaper (always-on-top widgets). Liquid Glass (2026-10-21 user request): less
+  // frost and tint than the 2026-10-20 look so the wallpaper shows through the bent rim (renderer/glass.js applies
+  // the tint before the saturation, dsat for dark glass, and blurs the lens with half of `blur` so the bent wallpaper
+  // stays crisp enough to read as glass; the CSS fallback uses the full value); every level keeps text readable because
+  // the tint is solved from the wallpaper's brightness (the caller passes the darker tail of the wallpaper for light
+  // glass, the brighter tail for dark glass): light glass ends at luma >= .7 for dark text, dark glass darkens at
+  // least 40% toward slate. 2026-10-21 review: floors raised after measured contrast on blue and two-tone wallpapers.
   function glassTint(level,L){
     const g=typeof level==='number'&&Number.isFinite(level)?Math.min(1,Math.max(0,level)):0.5;
     const mix=(clear,mid,frost)=>g<=0.5?clear+(mid-clear)*(g/0.5):mid+(frost-mid)*((g-0.5)/0.5);
     const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
-    const out={blur:Math.round(mix(14,26,34)),sat:Math.round(mix(190,175,150)),alpha:+mix(0.78,0.94,1).toFixed(3)};
+    // At the opaque end the glass is gone: a plain solid card in the app's own theme, as the first widgets were (2026-10-26 user:
+    // 「불투명 끝단으로 가서 아예 없어지면 처음 너가 만들어준 위젯처럼 되어야 하는 거 아닐까?」).
+    const out={blur:Math.round(mix(7,13,24)),sat:Math.round(mix(220,200,160)),dsat:Math.round(mix(160,150,135)),alpha:+mix(0.78,0.94,1).toFixed(3),solid:g>=0.995};
     if(typeof L!=='number'||!Number.isFinite(L))return out;
-    const target=mix(0.74,0.93,0.97),lo=mix(0.14,0.42,0.8),hi=mix(0.72,0.93,0.97);
+    const target=mix(0.7,0.8,0.93),lo=mix(0.15,0.32,0.75),hi=mix(0.7,0.82,0.95);
     out.a=+clamp((target-L)/Math.max(0.05,1-L),lo,hi).toFixed(3);
-    const dark=mix(0.32,0.17,0.15),dlo=mix(0.16,0.4,0.72),dhi=mix(0.66,0.86,0.94);
+    const dark=mix(0.38,0.24,0.15),dlo=mix(0.4,0.45,0.7),dhi=mix(0.72,0.84,0.92);
     out.da=+clamp(L>dark?(L-dark)/Math.max(0.05,L-0.12):dlo,dlo,dhi).toFixed(3);
     return out;
+  }
+  // A list colour as text on tinted glass (2026-10-21 review): mixed toward white on dark glass, toward black on light glass,
+  // only as far as it needs for about 3:1 there (yellow and green need more than blue). Other values pass through.
+  function inkOn(color,tone){
+    if((tone!=='dark'&&tone!=='light')||!/^#[0-9a-f]{6}$/i.test(color||''))return color;
+    const n=parseInt(color.slice(1),16),c=[n>>16&255,n>>8&255,n&255];
+    const lin=v=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;};
+    const lum=k=>0.2126*lin(k[0])+0.7152*lin(k[1])+0.0722*lin(k[2]);
+    const dark=tone==='dark',to=dark?255:0;
+    for(let p=1;p>=0.2;p-=0.05){const m=c.map(v=>Math.round(p*v+(1-p)*to));if(dark?lum(m)>=0.55:lum(m)<=0.1)return '#'+m.map(v=>v.toString(16).padStart(2,'0')).join('');}
+    return dark?'#ffffff':'#1c1d22';
+  }
+  // Glass on the wallpaper follows its brightness, like Apple's clear look (2026-10-21 user choice: dark glass with white text
+  // on a dark wallpaper, light glass on a light one). L is the measured luminance or null (nothing painted: the app theme
+  // decides). A little hysteresis keeps a widget near the middle from flipping while it moves.
+  function glassTone(L,previous){
+    if(typeof L!=='number'||!Number.isFinite(L))return null;
+    if(previous==='dark')return L>0.54?'light':'dark';
+    if(previous==='light')return L<0.46?'dark':'light';
+    return L<0.5?'dark':'light';
   }
   function localCalendarHidden(state){
     if(!(state.calendars||[]).some(c=>c.provider!=='local'&&calendarWritable(c)))return false;
@@ -283,7 +310,8 @@
   const QUICK_WEEK_KO='일월화수목금토';
   function parseQuickKo(raw,today=dateKey(),now=new Date()){
     const text=String(raw||'').trim();let result={title:text,dueDate:'',reminderAt:''};
-    const m=text.match(/(^|\s)((다음|이번|담)\s?주\s?([월화수목금토일])요일|오늘|내일|모레|다음\s?주|담주|([월화수목금토일])요일|(\d{1,2})월\s?(\d{1,2})일)(?:까지|에는|에|엔)?(?=\s|$)/);
+    // A date word may run straight into the time or a digit (「내일오후3시」, 「내일3시」) and M/D is a date too (2026-10-26 usability review).
+    const m=text.match(/(^|\s)((다음|이번|담)\s?주\s?([월화수목금토일])요일|오늘|내일|모레|다음\s?주|담주|([월화수목금토일])요일|(\d{1,2})월\s?(\d{1,2})일|(\d{1,2})\/(\d{1,2}))(?:까지|에는|에|엔)?(?=\s|$|오전|오후|\d)/);
     if(m){
       const token=m[2].replace(/\s/g,'');let date='';
       if(m[4])date=quickWeekDay(today,m[3]==='이번'?0:1,QUICK_WEEK_KO.indexOf(m[4]));
@@ -293,16 +321,23 @@
       else if(token==='다음주'||token==='담주')date=dayOffset(today,7);
       else if(m[5])date=quickNextDay(today,QUICK_WEEK_KO.indexOf(m[5]));
       else if(m[6])date=quickMonthDay(today,Number(m[6]),Number(m[7]));
+      else if(m[8])date=quickMonthDay(today,Number(m[8]),Number(m[9]));
       if(date)result={title:quickStrip(text,m)||text,dueDate:date,reminderAt:''};
     }
-    const t=result.title.match(/(^|\s)(?:(오전|오후)\s?(\d{1,2})시(?:\s?(반|\d{1,2}분))?|([01]?\d|2[0-3]):([0-5]\d))(?:까지|에)?(?=\s|$)/);
+    // 「15시」 is 24-hour; a bare 「3시」 reads like a bare 「3:00」 (quickClock) — the event card accepts both, so quick add does too
+    // (2026-10-26 usability review; 「3시간」 stays a word).
+    const t=result.title.match(/(^|\s)(?:(오전|오후)\s?(\d{1,2})시(?:\s?(반|\d{1,2}분))?|(\d{1,2})시(?:\s?(반|\d{1,2}분))?|([01]?\d|2[0-3]):([0-5]\d))(?:까지|에)?(?=\s|$)/);
     if(!t)return result;
+    const mins=v=>!v?0:v==='반'?30:parseInt(v,10);
     if(t[2]){
       const h12=Number(t[3]);if(h12<1||h12>12)return result;
-      const minute=!t[4]?0:t[4]==='반'?30:parseInt(t[4],10);
-      return quickTime(result,t,(h12%12)+(t[2]==='오후'?12:0),minute,today,now);
+      return quickTime(result,t,(h12%12)+(t[2]==='오후'?12:0),mins(t[4]),today,now);
     }
-    return quickClock(result,t,t[5],Number(t[5]),Number(t[6]),today,now);
+    if(t[5]){
+      const hour=Number(t[5]);if(hour>23)return result;
+      return hour>=13||hour===0||/^0/.test(t[5])?quickTime(result,t,hour,mins(t[6]),today,now):quickClock(result,t,t[5],hour,mins(t[6]),today,now);
+    }
+    return quickClock(result,t,t[7],Number(t[7]),Number(t[8]),today,now);
   }
   const QUICK_WEEK_EN=['sun','mon','tue','wed','thu','fri','sat'];
   const QUICK_MONTHS_EN=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
@@ -354,7 +389,69 @@
     if(!/^\d{4}-/.test(iso))return null;
     return allDay?iso.slice(0,10):iso.slice(0,16);
   }
-  const api={dateKey,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn};
+  // ---- Week and day views, dragging, the rolling month grid (2026-10-21) ----
+  // Weeks start on Sunday like the month grid. Positions are wall-clock minutes of one day (0–1440): an event that starts the
+  // day before or ends the day after is clipped to the day, and a DST day keeps its clock labels.
+  const weekStart=key=>dayOffset(key,-fromDate(key).getDay());
+  const weekDays=key=>{const s=weekStart(key);return Array.from({length:7},(_,i)=>dayOffset(s,i));};
+  const localKey=v=>{const t=String(v||'');return t.length===10?t:dateKey(new Date(t));};
+  function wallMinutes(value,key){const d=new Date(value);const k=dateKey(d);if(k<key)return 0;if(k>key)return 1440;return d.getHours()*60+d.getMinutes()+d.getSeconds()/60;}
+  function atWall(key,minutes){const d=startOfLocalDay(key);d.setMinutes(Math.round(minutes));return d;}
+  const snapMinutes=(minutes,step=15)=>Math.round(minutes/step)*step;
+  // The all-day row holds all-day events and timed ones of 24 hours or more (Google, Apple, Notion); the rest go in the grid.
+  const spansDays=e=>{if(e.allDay)return true;const s=new Date(e.start),en=new Date(e.end||e.start);const days=Math.round((fromDate(dateKey(en))-fromDate(dateKey(s)))/86400000);return days*1440+(en.getHours()*60+en.getMinutes())-(s.getHours()*60+s.getMinutes())>=1440;};
+  // Timed events of one day (from eventsOn) as blocks: top/bottom in minutes, at least minHeight tall so a short event stays clickable, and
+  // overlapping events side by side — each cluster of overlaps shares the width in as few columns as fit, and an event widens
+  // into the columns to its right that are free for its whole time (Google, Notion).
+  function dayLayout(events,key,minHeight=20){
+    const items=events.map(e=>{const top=wallMinutes(e.start,key),end=wallMinutes(e.end||e.start,key);return {event:e,top,end,bottom:Math.min(1440,Math.max(end,top+minHeight))};}).filter(x=>x.top<1440).sort((a,b)=>a.top-b.top||b.bottom-a.bottom);
+    const out=[];let cluster=[],reach=-1;
+    const flush=()=>{const cols=[];for(const it of cluster){let c=cols.findIndex(end=>end<=it.top);if(c<0){c=cols.length;cols.push(0);}cols[c]=it.bottom;it.col=c;}for(const it of cluster){it.cols=cols.length;it.span=1;for(let c=it.col+1;c<cols.length;c++){if(cluster.some(o=>o.col===c&&o.top<it.bottom&&o.bottom>it.top))break;it.span++;}}out.push(...cluster);cluster=[];reach=-1;};
+    for(const it of items){if(cluster.length&&it.top>=reach)flush();cluster.push(it);reach=Math.max(reach,it.bottom);}
+    if(cluster.length)flush();
+    return out;
+  }
+  // Events of the all-day row across a run of days as bars: first and last column, whether the bar goes on before or after
+  // the run, and a lane; longer bars take the upper lanes, as in Google and Apple.
+  function spanLayout(events,days){
+    const first=days[0],last=days[days.length-1];
+    const bars=events.map(e=>{const s=localKey(e.start);const end=e.allDay?(String(e.end||'').slice(0,10)||dayOffset(s,1)):dateKey(new Date(new Date(e.end||e.start).getTime()-1));const lastDay=e.allDay?dayOffset(end,-1):end;if(lastDay<first||s>last)return null;const from=s<first?first:s,to=lastDay>last?last:lastDay;return {event:e,from:days.indexOf(from),to:days.indexOf(to),before:s<first,after:lastDay>last};}).filter(b=>b&&b.from>=0&&b.to>=b.from);
+    bars.sort((a,b)=>a.from-b.from||(b.to-b.from)-(a.to-a.from)||String(a.event.title||'').localeCompare(String(b.event.title||'')));
+    const lanes=[];for(const b of bars){let lane=lanes.findIndex(end=>end<b.from);if(lane<0){lane=lanes.length;lanes.push(-1);}lanes[lane]=b.to;b.lane=lane;}
+    return {bars,lanes:lanes.length};
+  }
+  // A timed event moved to start at key + minutes keeps its length.
+  function movedTimes(event,key,minutes){const s=new Date(event.start),e=new Date(event.end||event.start);const start=atWall(key,minutes);return {start:start.toISOString(),end:new Date(start.getTime()+Math.max(0,e-s)).toISOString()};}
+  // Dropped on another day (month grid, all-day row): the same clock time (timed) or the same number of days (all-day).
+  function shiftedDays(event,days){
+    if(event.allDay){const s=String(event.start).slice(0,10),e=String(event.end||'').slice(0,10)||dayOffset(s,1);return {start:dayOffset(s,days),end:dayOffset(e,days)};}
+    const move=v=>{const d=new Date(v);d.setDate(d.getDate()+days);return d.toISOString();};
+    return {start:move(event.start),end:move(event.end||event.start)};
+  }
+  // 42 days from a Sunday; outside marks days not in the month being looked at (the month of the grid's middle week).
+  function cellsFrom(startKey){const focus=dayOffset(startKey,20).slice(0,7);return Array.from({length:42},(_,i)=>{const key=dayOffset(startKey,i);return {key,day:Number(key.slice(8)),outside:key.slice(0,7)!==focus};});}
+  const monthStart=date=>{const first=dateKey(new Date(date.getFullYear(),date.getMonth(),1));return weekStart(first);};
+  // Moving a whole repeating series to another day moves its days too (Google, Apple): weekly days shift by the same number
+  // of days (and so does the week start of a rule every 2+ weeks, or days would cross into the other week), "the 2nd Tuesday"
+  // becomes the new date's place in its month, a fixed day of the month becomes the new day, and an end date moves with the
+  // series (2026-10-21 calendar review: the last instance fell past UNTIL). Daily and yearly days follow the start by
+  // themselves. Returns the rule text unchanged when nothing has to move.
+  function shiftRule(text,fromStart,toStart){
+    const rule=parseRRule(text);if(!rule)return text;
+    const from=localKey(fromStart),to=localKey(toStart);
+    const delta=Math.round((fromDate(to)-fromDate(from))/86400000);if(!delta)return text;
+    const d=fromDate(to);
+    if(rule.until)rule.until=rule.until.length===8?dayOffset(`${rule.until.slice(0,4)}-${rule.until.slice(4,6)}-${rule.until.slice(6,8)}`,delta).replace(/-/g,''):new Date(untilBound(rule.until,false).getTime()+delta*86400000).toISOString().replace(/[-:]|\.\d{3}/g,'');
+    if(rule.freq==='WEEKLY'&&rule.byDay.length){rule.byDay=rule.byDay.map(x=>({ord:x.ord,day:((x.day+delta)%7+7)%7}));if(rule.interval>1)rule.wkst=((rule.wkst+delta)%7+7)%7;}
+    else if(rule.freq==='MONTHLY'&&rule.byDay.some(x=>x.ord)){const nth=Math.ceil(d.getDate()/7),isLast=d.getDate()+7>daysInMonth(d.getFullYear(),d.getMonth());const wasLast=rule.byDay.some(x=>x.ord===-1);rule.byDay=[{ord:(wasLast&&isLast)||nth===5?-1:nth,day:d.getDay()}];}
+    else if(rule.freq==='MONTHLY'&&rule.byDay.length){rule.byDay=rule.byDay.map(x=>({ord:0,day:((x.day+delta)%7+7)%7}));}
+    else if(rule.freq==='MONTHLY'&&rule.byMonthDay){rule.byMonthDay=d.getDate();}
+    else if(!rule.until)return text;
+    return buildRRule(rule);
+  }
+  // The recurrence id of a series' instance by its place in the series (EXDATEs counted, as COUNT counts them), or null.
+  function instanceId(event,index){let found=null;if(index<0)return null;walkRRule(event,(o,i)=>{if(i===index){found=event.allDay?dateKey(o):o.toISOString();return false;}return i<index;});return found;}
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

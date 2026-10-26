@@ -76,7 +76,7 @@
 /* Month chips: all-day = filled band in the event/calendar colour (Notion), timed = colour bar + time + title (Apple). Right-click opens the colour/action menu. */
 .day-event{display:flex;align-items:center;gap:5px;min-width:0;line-height:1.35;padding:2px 5px 2px 4px;border-radius:4px;font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden}
 .day-event.allday{background:color-mix(in srgb,var(--cal-color) 26%,var(--bg));color:color-mix(in srgb,var(--cal-color) 55%,#1e2230);font-weight:500;padding-left:6px}.day-event.allday:hover{background:color-mix(in srgb,var(--cal-color) 38%,var(--bg))}
-.day-event.timed{background:transparent;color:var(--text)}.day-event.timed:hover{background:var(--hover)}.day-event.timed .chip-time{color:var(--secondary);font-weight:400}.day-event.timed .chip-title{font-weight:600}
+.day-event.timed{background:transparent;color:var(--text)}.day-event.timed:hover{background:var(--hover)}.day-event.timed .chip-time{color:var(--secondary);font-weight:400}.day-event.timed .chip-title{font-weight:500;color:color-mix(in srgb,var(--text) 88%,var(--secondary))}
 .chip-bar{width:3px;height:13px;border-radius:2px;background:var(--cal-color);flex-shrink:0}.chip-time{color:var(--secondary);font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:500}.chip-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}.chip-repeat{display:inline-flex;color:var(--muted);flex-shrink:0;margin-left:3px;vertical-align:middle}
 [data-theme=dark] .day-event.allday{background:color-mix(in srgb,var(--cal-color) 34%,var(--bg));color:color-mix(in srgb,var(--cal-color) 70%,#fff)}[data-theme=dark] .day-event.timed{background:transparent;color:var(--text)}[data-theme=dark] .day-event.timed:hover{background:var(--hover)}
 .event-row strong{display:flex;align-items:center;gap:2px}
@@ -276,9 +276,13 @@
 .quick-add:focus-within{border-color:color-mix(in srgb,var(--blue,#3478f6) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue,#3478f6) 16%,transparent)}
 .widget-body .widget-task-content .quick-add:focus-within{box-shadow:none}
 /* Icon buttons (2026-10-20 user: 「+ 일정 추가」 looked shifted right): text-sized 16px icons pulled in by the
-   transparent margin inside the 24px icon box, so the visible ink has the same gap on both sides. */
+   transparent margin inside the 24px icon box. 2026-10-21 (user: the + should sit further left; design review): a thin
+   plus reads further in than its ink, and its 5/24 empty sides (other icons ~2/24) left it floating apart from the label,
+   so only the plus gets 1px more pull and a 1px tighter gap; leading icons use stroke 2.3 (1.53px at 16px) to match the
+   600-weight label stems (1.54px), as Apple's SF Symbols guidance asks (symbol weight = adjacent text weight). */
 .button>svg{width:16px;height:16px;flex-shrink:0}
-.button>svg:first-child{margin-left:-3px}
+.button>svg:first-child{margin-left:-3px;stroke-width:2.3}
+.button>svg[data-icon="plus"]:first-child{margin-left:-4px;margin-right:-1px}
 .widget-gallery .button>svg{width:15px;height:15px}
 /* Task screens: list title, date and count in the top bar (as 달력·메모), the list starts right below. */
 .topbar-count{font-size:19px;font-weight:500;letter-spacing:-.3px;line-height:1.2;font-variant-numeric:tabular-nums;opacity:.85}
@@ -303,7 +307,7 @@
 .update-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px}
 .update-status{font-size:13px;line-height:1.5;color:var(--secondary)}
 .update-block .checkbox-field{margin:0}
-.update-block .text-button{font-size:12px;flex-shrink:0}
+.update-block .text-button{font-size:12px;flex-shrink:0;padding:5px 14px} /* same right edge as the 업데이트 확인 button's text (2026-10-21 user; 14px like the 32px buttons since the 2026-10-26 design review) */
 .update-block .button{flex-shrink:0}
 /* Calendar widget: event dots in the event's (or calendar's) colour, up to 3 per day (renderer/app.js dayDots). */
 .widget-calendar-content .event-dot.colored{background:var(--dot)}
@@ -311,3 +315,412 @@
 /* Widgets: scrollbars only while the pointer is over the card (as the sidebar, and Apple overlay scrollbars). */
 .widget-body ::-webkit-scrollbar-thumb{background:transparent}
 .widget-body .widget-surface:hover ::-webkit-scrollbar-thumb{background:#9199ab40}
+/* Notes: 「최근 삭제한 메모」 (link under the notes, list, read-only note) and the earlier-versions dialog (2026-10-21). */
+.trash-link{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;color:var(--secondary);font-size:13px;flex-shrink:0;margin-top:auto}
+.trash-link:hover{background:var(--hover)}
+.trash-link small{margin-left:auto;font-size:12px;color:var(--muted)}
+.trash-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0}
+.trash-head .button{font-size:12px;padding:6px 10px;min-height:30px}
+.in-trash .note-card.selected{background:var(--field);border-color:var(--line)}
+.note-editor.trashed{background:var(--field);border-color:var(--line)}
+.trash-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;margin-bottom:16px;border-radius:10px;background:var(--bg);font-size:13px;color:var(--secondary)}
+.trash-banner .button{font-size:12px;padding:6px 12px;min-height:30px}
+.note-editor.trashed .note-title-input{padding-bottom:12px}
+.note-body.readonly{overflow:auto;user-select:text}
+.history-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:16px;min-height:260px;max-height:55vh}
+.history-list{display:flex;flex-direction:column;gap:4px;overflow:auto}
+.history-row{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:9px 10px;border-radius:9px;text-align:left;width:100%}
+.history-row:hover{background:var(--hover)}
+.history-row.selected{background:var(--field)}
+.history-row strong{font-size:13px}
+.history-row span{font-size:12px;color:var(--secondary);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
+.history-preview{overflow:auto;padding:14px 16px;border-radius:10px;background:var(--note);font-size:14px;line-height:1.8}
+.history-preview strong{display:block;font-size:16px;margin-bottom:8px}
+.history-preview p{white-space:pre-wrap;color:var(--secondary)}
+@media(max-width:650px){.history-layout{grid-template-columns:1fr;max-height:none}.trash-link{margin-top:0}}
+/* 2026-10-21 user requests: note fields show focus by the caret only (no blue ring), note cards keep the note's line breaks,
+   weekend columns lightly shaded (Notion Calendar). */
+.note-title-input:focus-visible,.note-body:focus-visible{outline:none}
+.note-card p{white-space:pre-line}
+:root{--weekend:rgba(70,80,105,.035)}
+[data-theme=dark]{--weekend:rgba(255,255,255,.028)}
+.calendar-grid.large .calendar-day.weekend,.calendar-grid.large .weekday.weekend{background:var(--weekend)}
+.calendar-grid.large .calendar-day.weekend.is-selected{background:color-mix(in srgb,var(--weekend) 50%,rgba(52,120,246,.05))}
+/* Notes list: pinned mark, drag targets, character count (2026-10-21). */
+.note-card strong{display:flex;align-items:center;gap:5px;min-width:0}
+.note-card strong>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note-card.pinned strong svg{color:#e0a020;flex-shrink:0}
+.note-card.drop-before{box-shadow:inset 0 3px 0 var(--blue)}
+.note-cards.drop-end{box-shadow:inset 0 -3px 0 var(--blue)}
+.note-footer-status{display:flex;align-items:center;gap:12px;min-width:0}
+.note-count{color:var(--muted);font-variant-numeric:tabular-nums}
+.note-footer .icon-button.active{color:#e0a020}
+/* The note beside the tasks: a menu to pick it, long titles cut (2026-10-21). */
+.context-note .context-heading h3{display:flex;align-items:center;gap:6px;min-width:0}
+.context-note .context-heading h3>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.context-note .context-heading .inline-actions{display:flex;gap:2px;flex-shrink:0}
+.menu-item>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.context-menu{max-width:320px}
+/* Tasks widget header on one row: icon, list name, count (2026-10-21). The name gives way (ellipsis) to the count. */
+.widget-head.task-head{gap:10px;padding:14px 16px 8px;min-height:54px}
+.widget-head.task-head .widget-title-block{flex:1;min-width:0;gap:9px}
+.widget-head.task-head .widget-title{flex:0 1 auto;min-width:0;font-size:18px;letter-spacing:-.4px}
+.widget-head.task-head .widget-count{flex-shrink:0;font-size:24px;font-weight:700}
+.preview-head .preview-name{flex:1;min-width:0;margin:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* ---- Calendar: month/week/day views, dragging, event card, folding panel (2026-10-21, renderer/calendar.js) ---- */
+/* Weekend shading a little stronger than before so it reads (Notion: barely visible), also in week and day views. */
+:root{--weekend:rgba(70,80,105,.05);--half-line:color-mix(in srgb,var(--line) 50%,transparent)}
+[data-theme=dark]{--weekend:rgba(255,255,255,.035)}
+/* View switch 일 | 주 | 월 and the panel toggle in the top bar. */
+.view-switch{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:var(--field);-webkit-app-region:no-drag}
+.view-switch-item{min-width:34px;height:28px;padding:0 10px;border-radius:7px;font-size:12px;font-weight:600;color:var(--secondary);text-align:center;display:inline-flex;align-items:center;justify-content:center}
+.view-switch-item:hover{color:var(--text)}
+.view-switch-item.on{background:var(--bg);color:var(--text);box-shadow:0 1px 2px rgba(20,30,50,.12)}
+[data-theme=dark] .view-switch-item.on{background:#3a3e48}
+.icon-button.panel-toggle.active{color:var(--text);background:var(--hover)}
+/* The panel folds away: the calendar takes the whole width; on a narrow window it opens as a drawer over the calendar. */
+.calendar-view{position:relative}
+.calendar-view.panel-hidden{grid-template-columns:minmax(0,1fr);column-gap:0}
+.day-panel.drawer{position:absolute;top:0;right:0;bottom:0;width:300px;max-width:calc(100% - 24px);z-index:12;background:var(--bg);border-left:1px solid var(--line);box-shadow:0 8px 32px rgba(0,0,0,.16);padding:var(--content-top) 20px var(--content-bottom);overflow:auto;animation:drawer-in .16s ease-out}
+.drawer-scrim{position:absolute;inset:0;z-index:11}
+@keyframes drawer-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+@media(max-width:930px){.calendar-view{grid-template-rows:none;overflow:hidden}.calendar-main{min-height:0}.day-panel.drawer{padding-left:20px;padding-top:var(--content-top);border-left:1px solid var(--line);overflow:auto}}
+/* Month view: the date number opens the day; the 1st of a month names its month; '+N개' and '할 일 N개' are buttons. */
+.calendar-grid.rolling .calendar-day{cursor:default}
+.calendar-grid.rolling .day-number{border-radius:14px;cursor:pointer}
+.calendar-grid.rolling .calendar-day:not(.is-today) .day-number:hover{background:var(--hover)}
+.calendar-grid.rolling .day-number.first{width:auto;min-width:27px;padding:0 8px;font-weight:600}
+.calendar-grid.rolling .day-more{align-self:flex-start;font-size:12px;color:var(--secondary);padding:1px 5px;border-radius:4px;min-height:0;height:auto;width:auto}
+.calendar-grid.rolling .day-more:hover,.calendar-grid.rolling .day-tasks:hover{background:var(--hover)}
+.calendar-grid.rolling .day-tasks{align-self:flex-start;padding:1px 5px;border-radius:4px;min-height:0;height:auto;width:auto;text-align:left}
+.calendar-day.drop-target{box-shadow:inset 0 0 0 2px var(--blue);background:rgba(52,120,246,.06)}
+.day-event.past,.allday-bar.past{opacity:.6}
+.day-event.drag-source,.allday-bar.drag-source,.time-event.drag-source{opacity:.35}
+.drag-chip{position:fixed;z-index:70;pointer-events:none;transform:translate(-30%,-50%);opacity:.92;filter:drop-shadow(0 6px 14px rgba(0,0,0,.18));max-width:220px}
+.drag-chip .day-event{background:var(--bg);border-radius:5px}
+body.cal-dragging,body.cal-dragging *{cursor:grabbing!important;user-select:none}
+body.cal-resizing,body.cal-resizing *{cursor:ns-resize!important}
+body.cal-denied,body.cal-denied *{cursor:not-allowed!important}
+/* Week and day views: a sticky day header and all-day row over a 24-hour grid that scrolls; 12 hours fill the screen. */
+.time-view{flex:1;min-height:0;display:flex;flex-direction:column;--gut:60px}
+.time-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;position:relative}
+.time-sticky{position:sticky;top:0;z-index:6;background:var(--bg);box-shadow:0 1px 0 var(--line)}
+.time-head{display:grid;grid-template-columns:var(--gut) repeat(var(--days),minmax(0,1fr))}
+.time-day{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 0 6px;color:var(--secondary);border-radius:0;min-width:0}
+.time-view.day .time-day{align-items:flex-start;padding-left:10px}
+.time-weekday{font-size:12px;font-weight:500}
+.time-date{font-size:18px;font-weight:600;color:var(--text);min-width:32px;height:32px;padding:0 4px;display:grid;place-items:center;border-radius:16px;font-variant-numeric:tabular-nums}
+.time-view.week .time-day:not(.is-today):hover .time-date{background:var(--hover)}
+.time-day.is-today .time-weekday{color:var(--blue);font-weight:600}
+.time-day.is-today .time-date{background:var(--blue);color:#fff}
+.time-day.sunday:not(.is-today) .time-weekday{color:#e5534b}
+.time-day.weekend,.time-col.weekend,.allday-cell.weekend{background-color:var(--weekend)}
+.time-gutter-cell{min-width:0}
+.time-allday{display:grid;grid-template-columns:var(--gut) minmax(0,1fr);border-top:1px solid var(--line)}
+.allday-label{display:flex;justify-content:flex-end;align-items:flex-start;padding:5px 8px 0 0;font-size:12px;color:var(--muted)}
+.allday-label .icon-button{width:24px;height:24px}
+.allday-grid{display:grid;grid-template-columns:repeat(var(--days),minmax(0,1fr));grid-auto-rows:22px;row-gap:2px;padding:3px 0;min-height:30px;position:relative}
+.allday-cell{border-left:1px solid var(--line);margin:-3px 0;pointer-events:none;z-index:0}
+.allday-bar{position:relative;z-index:1;margin:0 3px;height:22px;display:flex;align-items:center;gap:5px;padding:0 7px;min-width:0;overflow:hidden;white-space:nowrap;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;background:color-mix(in srgb,var(--cal-color,var(--blue)) 24%,var(--bg));color:color-mix(in srgb,var(--cal-color,var(--blue)) 55%,#1e2230)}
+[data-theme=dark] .allday-bar{background:color-mix(in srgb,var(--cal-color,var(--blue)) 34%,var(--bg));color:color-mix(in srgb,var(--cal-color,var(--blue)) 70%,#fff)}
+.allday-bar:hover{filter:brightness(.97)}
+.allday-bar.cont-before{margin-left:0;border-top-left-radius:0;border-bottom-left-radius:0}
+.allday-bar.cont-after{margin-right:0;border-top-right-radius:0;border-bottom-right-radius:0}
+.allday-bar .chip-title{overflow:hidden;text-overflow:ellipsis}
+.allday-bar .chip-time{font-weight:500;flex-shrink:0}
+.allday-bar.draft,.allday-bar.ghost.draft{background:color-mix(in srgb,var(--blue) 22%,var(--bg));color:var(--blue)}
+.allday-bar.ghost{z-index:3;opacity:.92;box-shadow:0 4px 12px rgba(0,0,0,.16);pointer-events:none}
+.allday-bar.card-open{box-shadow:0 0 0 2px var(--cal-color,var(--blue))}
+.allday-more,.allday-tasks{position:relative;z-index:1;margin:0 3px;height:22px;min-height:0;padding:0 6px;border-radius:5px;font-size:12px;color:var(--secondary);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.allday-tasks{color:var(--blue)}
+.allday-more:hover,.allday-tasks:hover{background:var(--hover)}
+.time-body{display:grid;grid-template-columns:var(--gut) minmax(0,1fr);height:calc(var(--hour) * 24);position:relative}
+.time-gutter{position:relative}
+.hour-label{position:absolute;right:8px;top:calc(var(--at) * var(--hour));transform:translateY(-50%);font-size:12px;line-height:1;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.hour-label.covered{visibility:hidden}
+.now-pill{position:absolute;right:4px;top:calc(var(--now,0) * var(--hour));transform:translateY(-50%);z-index:5;background:#ff3b30;color:#fff;font-size:12px;font-weight:600;line-height:18px;padding:0 6px;border-radius:9px;white-space:nowrap;pointer-events:none}
+.time-cols{display:grid;grid-template-columns:repeat(var(--days),minmax(0,1fr));position:relative;background-image:linear-gradient(to bottom,var(--line) 0,var(--line) 1px,transparent 1px),linear-gradient(to bottom,transparent calc(50% - .5px),var(--half-line) calc(50% - .5px),var(--half-line) calc(50% + .5px),transparent calc(50% + .5px));background-size:100% var(--hour)}
+.time-col{position:relative;border-left:1px solid var(--line);min-width:0}
+.time-event{position:absolute;z-index:1;top:calc(var(--top) * var(--hour) + 1px);height:max(20px,calc(var(--len) * var(--hour) - 2px));left:calc((100% - 8px) * var(--col) / var(--cols) + 1px);width:calc((100% - 8px) * var(--span) / var(--cols) - 2px);display:flex;flex-direction:column;gap:0;padding:2px 6px 2px 7px;overflow:hidden;border-radius:5px;border-left:3px solid var(--cal-color,var(--blue));background:color-mix(in srgb,var(--cal-color,var(--blue)) 18%,var(--bg));box-shadow:0 0 0 1px var(--bg);font-size:12px;line-height:16px;cursor:pointer;text-align:left}
+[data-theme=dark] .time-event{background:color-mix(in srgb,var(--cal-color,var(--blue)) 30%,var(--bg))}
+.time-event:hover{filter:brightness(.98)}
+.time-event-title{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.time-event.one-line{flex-direction:row;align-items:center;padding-top:0;padding-bottom:0}
+.time-event.one-line .time-event-title{display:block;white-space:nowrap}
+.time-event-inline,.time-event-title .cont{font-weight:400;color:var(--secondary)}
+.time-event-time,.time-event-place{color:var(--secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.time-event .chip-repeat{display:inline-flex;vertical-align:-2px;margin-left:4px;color:var(--secondary)}
+.time-event.past{opacity:.6}
+.time-event.card-open{z-index:3;box-shadow:0 0 0 2px var(--cal-color,var(--blue)),0 6px 16px rgba(0,0,0,.14)}
+.time-event:focus-visible,.allday-bar:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.time-event.ghost{z-index:5;opacity:.92;box-shadow:0 8px 20px rgba(0,0,0,.18);pointer-events:none}
+.time-event.draft,.time-event.ghost.draft{--cal-color:var(--blue);z-index:4;background:color-mix(in srgb,var(--blue) 20%,var(--bg))}
+.resize-handle{position:absolute;left:0;right:0;height:6px;cursor:ns-resize;z-index:2}
+.resize-handle.top{top:0;height:4px}
+.resize-handle.bottom{bottom:0}
+.now-line{position:absolute;left:0;right:0;top:calc(var(--now,0) * var(--hour));height:2px;margin-top:-1px;background:#ff3b30;z-index:4;pointer-events:none}
+.now-line::before{content:'';position:absolute;left:-5px;top:-3px;width:8px;height:8px;border-radius:50%;background:#ff3b30}
+.now-dim{position:absolute;left:0;right:0;top:calc(var(--now,0) * var(--hour));height:1px;background:rgba(255,59,48,.35);pointer-events:none;z-index:0}
+/* The event card: floats beside its event (Notion), translucent glass, saves as you go. Below dialogs (z 20), above the panel drawer. */
+#card-root{position:relative}
+.event-card{position:fixed;z-index:15;width:min(360px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;padding:0 16px 14px;border-radius:12px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(20px) saturate(140%);box-shadow:0 12px 32px rgba(0,0,0,.18);animation:reveal .12s ease-out;color:var(--text);outline:none}
+[data-theme=dark] .event-card{box-shadow:0 12px 36px rgba(0,0,0,.5)}
+@media(prefers-reduced-transparency:reduce){.event-card{background:var(--bg);backdrop-filter:none}}
+.card-head{height:44px;display:flex;align-items:center;gap:4px;margin:0 -6px 0 0}
+.card-head .icon-button{width:28px;height:28px}
+.card-spacer{flex:1}
+.card-color{width:16px;height:16px;min-height:0;padding:0;border-radius:5px;background:var(--dot);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.card-color:hover{transform:scale(1.12)}
+.card-title{display:block;width:100%;margin:0 0 6px;padding:2px 0;border:0;outline:none;resize:none;overflow:hidden;background:transparent;font:inherit;font-size:18px;font-weight:650;line-height:24px;color:var(--text)}
+.card-title::placeholder{color:var(--muted);font-weight:500}
+.card-title.static{overflow-wrap:anywhere}
+.card-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;min-height:34px;font-size:13px}
+.card-row>svg{color:var(--muted);flex-shrink:0;margin-right:4px}
+.card-when{row-gap:2px}
+.card-date-wrap{position:relative;display:inline-flex}
+.card-date-wrap input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}
+.card-date,.card-time{min-height:0;height:28px;padding:0 7px;border:0;border-radius:6px;background:transparent;font:inherit;font-size:13px;color:var(--text);cursor:pointer}
+.card-time{width:88px;text-align:center}
+.card-date:hover,.card-time:hover,.card-time:focus{background:var(--hover);outline:none}
+.card-dash{color:var(--muted)}
+.card-chips{gap:6px}
+.card-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;background:var(--field);font-size:12px;font-weight:500;color:var(--secondary);cursor:pointer}
+.card-chip.on{color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,var(--bg))}
+.card-chip input{margin:0;accent-color:var(--blue)}
+.card-chip.static{cursor:default}
+.card-repeat,.card-select{height:28px;max-width:100%;padding:0 8px;border:0;border-radius:14px;background:var(--field);font:inherit;font-size:12px;font-weight:500;color:var(--secondary);cursor:pointer}
+.card-select{border-radius:7px;max-width:calc(100% - 30px)}
+.card-input{flex:1;min-width:0;height:28px;padding:0 7px;border:0;border-radius:6px;background:transparent;font:inherit;font-size:13px;color:var(--text)}
+.card-input:hover,.card-input:focus{background:var(--hover);outline:none}
+.card-input::placeholder{color:var(--muted)}
+.card-cal{display:inline-flex;align-items:center;gap:8px;color:var(--secondary);min-width:0}
+.card-cal i{width:10px;height:10px;border-radius:3px;background:var(--dot);flex-shrink:0}
+.card-swatches{padding:6px 0 2px}
+.card-note{margin:6px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
+.card-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.event-card.day-list{padding-bottom:10px}
+.event-card.day-list .card-head strong{flex:1;font-size:14px}
+.event-card.day-list .agenda{max-height:320px;overflow:auto}
+.context-menu.time-menu{min-width:150px;max-height:280px}
+.context-menu .menu-item.current{background:var(--hover);font-weight:600}
+@media(prefers-reduced-motion:reduce){.day-panel.drawer,.event-card{animation:none}}
+/* The card's text fields show focus with their own tint, not the global 3px ring (Notion). */
+.event-card:focus,.event-card:focus-visible,.event-card .card-title:focus-visible,.event-card .card-input:focus-visible,.event-card .card-time:focus-visible{outline:none}
+.event-card .card-title:focus{box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--blue) 45%,transparent)}
+/* ---- Finding (2026-10-21, renderer/notefind.js): the note's find bar and marks, list marks, compact notes, event search ---- */
+mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1px;margin:0 -1px}
+[data-theme=dark] mark{background:rgba(255,196,0,.35)}
+.note-find{display:flex;align-items:center;gap:6px;margin:0 0 10px;padding:4px 6px 4px 10px;border-radius:10px;background:color-mix(in srgb,var(--bg) 70%,transparent);box-shadow:inset 0 0 0 1px var(--line);color:var(--secondary)}
+.note-find-input{flex:1;min-width:0;height:28px;border:0;background:transparent;font:inherit;font-size:13px;color:var(--text);outline:none}
+.note-find-input:focus-visible{outline:none}
+.note-find-count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.note-find .icon-button{width:26px;height:26px}
+.note-body-wrap{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
+.note-body-wrap .note-body{position:relative;z-index:1;background:transparent}
+.note-body-wrap.finding .note-body,.note-highlights{overflow-y:scroll}
+.note-highlights{position:absolute;inset:0;z-index:0;color:transparent;pointer-events:none;margin:0;white-space:pre-wrap}
+.note-highlights::-webkit-scrollbar-thumb{background:transparent}
+.note-highlights mark{color:transparent;background:rgba(255,204,0,.5);border-radius:2px;padding:0;margin:0}
+.note-highlights mark.current{background:rgba(255,149,0,.75);box-shadow:0 0 0 1px rgba(255,149,0,.9)}
+/* Compact notes list (Apple Notes): the title, then the date and a line of the text, one row each. */
+.note-cards.compact{gap:2px}
+.note-card.compact{min-height:0;padding:9px 12px;border-radius:9px;background:transparent;display:flex;flex-direction:column;gap:2px;text-align:left}
+.note-card.compact:hover{background:var(--hover)}
+.note-card.compact.selected{background:var(--field);border-color:transparent}
+.note-card.compact strong{font-size:13px}
+.note-card-meta{display:flex;gap:8px;min-width:0;font-size:12px;line-height:1.5}
+.note-card-meta time{flex-shrink:0;color:var(--text);font-weight:500;opacity:.75}
+.note-card-line{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--secondary)}
+/* Event search on the calendar screen: by day, upcoming first. */
+.calendar-search{flex:1;min-height:0;overflow:auto;padding:4px 2px 24px}
+.search-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.search-head strong{font-size:15px}
+.calendar-search h3{font-size:12px;font-weight:650;color:var(--muted);margin:18px 0 4px;text-transform:none}
+.search-day{font-size:12px;font-weight:600;color:var(--secondary);margin:12px 0 2px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.search-hit{display:grid;grid-template-columns:4px 128px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;min-height:36px;padding:6px 10px 6px 6px;border-radius:8px;text-align:left;font-size:13px}
+.search-hit:hover{background:var(--hover)}
+.search-hit-bar{width:4px;height:20px;border-radius:2px}
+.search-hit-time{font-size:12px;color:var(--secondary);white-space:nowrap}
+.search-hit strong{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-hit-place{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.search-hit.past{opacity:.65}
+/* Compact rows: the date and the line sit side by side (the card's own `>span` rule would stack them). */
+.note-card.compact>.note-card-meta{display:flex;gap:8px;margin-top:0;font-size:12px;color:var(--secondary);min-width:0}
+.note-card.compact>.note-card-meta>time{flex-shrink:0}
+
+.search-more{margin:8px 0 0 6px}
+
+/* ---- Notes list (2026-10-21 user: 「크기가 일정해야 보기 좋잖아. 각각이 너무 큰 거 아니야?」 with an iPhone Notes picture) ----
+   Default: rows of one height in rounded groups (title, then date and the first line), headed 고정됨 · 오늘 · 어제 · 이전 7일 ·
+   이전 30일 · month. The card view keeps one height too. */
+.note-cards.compact{gap:0;width:226px}
+.note-group-head{font-size:13px;font-weight:700;color:var(--text);margin:16px 4px 6px;flex-shrink:0}
+.note-group-head:first-child{margin-top:0}
+.note-group{background:var(--field);border-radius:12px;overflow:hidden;flex-shrink:0;display:flex;flex-direction:column}
+.note-group+.note-group{margin-top:12px}
+.note-group .note-card.compact{position:relative;border-radius:0;height:54px;padding:8px 12px 8px 14px;justify-content:center;gap:3px;border:0}
+.note-group .note-card.compact+.note-card.compact::before{content:'';position:absolute;left:14px;right:0;top:0;border-top:1px solid var(--line)}
+.note-group .note-card.compact:hover{background:var(--hover)}
+.note-group .note-card.compact.selected{background:color-mix(in srgb,#f5c242 30%,var(--field))}
+.note-group .note-card.compact.selected::before,.note-group .note-card.compact.selected+.note-card.compact::before{border-top-color:transparent}
+[data-theme=dark] .note-group .note-card.compact.selected{background:color-mix(in srgb,#f5c242 24%,var(--field))}
+.note-group .note-card.compact strong{font-size:13px;font-weight:650}
+.note-group .note-card-meta time{font-weight:500;color:var(--secondary);opacity:1}
+.note-cards.compact .trash-link{margin-top:12px}
+@media(min-width:651px){
+  .note-cards:not(.compact) .note-card{height:120px;min-height:0;display:flex;flex-direction:column;padding:14px 15px}
+  .note-cards:not(.compact) .note-card p{-webkit-line-clamp:2;line-height:1.6;flex:0 1 auto;min-height:0}
+  .note-cards:not(.compact) .note-card>span{margin-top:auto;padding-top:6px}
+}
+@media(max-width:650px){
+  .note-cards.compact{flex-direction:column;width:auto;min-height:0;max-height:210px}
+  .note-cards.compact .note-card{width:auto}
+  .note-cards.compact .note-card>span{display:flex}
+}
+
+/* ---- Help (renderer/help.js, 2026-10-21 user requests): the ? at the foot of the sidebar, its shortcut card, every
+   shortcut, and the tour for a new user ---- */
+.sidebar-tools{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.help-button.active{background:var(--hover);color:var(--text)}
+.help-pop{position:fixed;z-index:70;width:276px;padding:12px 10px 8px;border-radius:14px;background:var(--glass);border:1px solid rgba(255,255,255,.7);box-shadow:0 12px 40px rgba(25,35,60,.22),0 0 0 1px rgba(30,36,50,.06);backdrop-filter:blur(30px) saturate(130%);animation:reveal .12s ease-out;-webkit-app-region:no-drag}
+[data-theme=dark] .help-pop{border-color:#ffffff14}
+.help-pop h3{font-size:13px;font-weight:700;margin:0 6px 6px;color:var(--text)}
+.help-rows{list-style:none;margin:0;padding:0}
+.help-rows li{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:30px;padding:0 6px;font-size:13px;color:var(--text)}
+.keys{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;white-space:nowrap}
+.keys kbd{font-family:inherit;font-size:12px;font-weight:600;line-height:1;min-width:22px;height:22px;padding:0 6px;display:inline-grid;place-items:center;border-radius:6px;background:var(--field);color:var(--secondary);box-shadow:inset 0 -1px 0 var(--line)}
+.keys-or{font-size:12px;color:var(--muted)}
+.help-pop hr{border:0;border-top:1px solid var(--line);margin:6px 6px}
+.help-link{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:32px;padding:0 6px;border-radius:8px;font-size:13px;color:var(--text);text-align:left}
+.help-link:hover,.help-link:focus-visible{background:var(--hover)}
+.dialog.wide:has(.shortcuts-body){width:640px}
+.shortcuts-body{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;align-items:start}
+.shortcut-group h3{font-size:13px;font-weight:700;margin:6px 0 4px;color:var(--text)}
+.shortcut-group dl{margin:0}
+.shortcut-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:32px;font-size:13px;border-bottom:1px solid var(--line)}
+.shortcut-row:last-child{border-bottom:0}
+.shortcut-row dt{color:var(--text);min-width:0}
+.shortcut-row dd{margin:0}
+@media(max-width:720px){.shortcuts-body{grid-template-columns:1fr}}
+#tour-root{position:fixed;inset:0;z-index:80}
+#tour-root[hidden]{display:none}
+.tour-shade{position:absolute;inset:0;background:rgba(15,20,30,.42)}
+.tour-shade.clear{background:transparent}
+.tour-hole{position:absolute;border-radius:12px;box-shadow:0 0 0 9999px rgba(15,20,30,.42),0 0 0 2px rgba(255,255,255,.85);pointer-events:none;transition:left .2s ease,top .2s ease,width .2s ease,height .2s ease}
+.tour-card{position:absolute;width:300px;max-width:calc(100vw - 24px);padding:18px 18px 14px;border-radius:16px;background:var(--glass);border:1px solid rgba(255,255,255,.7);box-shadow:0 20px 60px rgba(15,20,40,.28);backdrop-filter:blur(30px) saturate(130%);animation:reveal .14s ease-out;color:var(--text)}
+[data-theme=dark] .tour-card{border-color:#ffffff14}
+.tour-card.welcome{width:340px;text-align:center;padding:24px 22px 16px}
+.tour-mark{display:block;margin:0 auto 12px;border-radius:13px}
+.tour-count{font-size:12px;font-weight:600;color:var(--muted);margin:0 0 4px}
+.tour-card h2{font-size:16px;font-weight:700;margin:0 0 6px}
+.tour-text{font-size:13px;line-height:1.55;color:var(--secondary);margin:0}
+.tour-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:16px}
+.tour-nav{display:flex;gap:6px}
+.tour-skip{padding:5px 6px;color:var(--secondary)}
+
+/* ===== Liquid Glass (2026-10-21 user request: 「애플 iOS 27처럼 리퀴드 글라스」, not only more or less transparent) =====
+   renderer/glass.js bends the wallpaper at the rim (backdrop-filter: url(#lg-…), the tint inside the filter before the
+   saturation) and draws the specular rim at device pixels (--lg-spec). Without the filter the old CSS tint is the fallback;
+   always-on-top widgets (nothing behind them to bend) get the rim only (.lg-rim). */
+.widget-body,.widget-stage{--lg-sheen:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0) 38%);--lg-spec-o:.9;--lg-edge:inset 0 0 0 .5px rgba(255,255,255,.2);--lg-outline:0 0 0 .5px rgba(16,24,40,.08)}
+[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage{--lg-sheen:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0) 38%);--lg-spec-o:.62;--lg-edge:inset 0 0 0 .5px rgba(255,255,255,.08);--lg-outline:0 0 0 .5px rgba(0,0,0,.32)}
+.widget-body.has-backdrop .widget-surface.lg,.widget-preview.lg{background:var(--lg-sheen);backdrop-filter:var(--lg-filter);box-shadow:var(--w-shadow),var(--lg-outline)}
+.widget-body .widget-surface.lg::before,.widget-body .widget-surface.lg-rim::before,.widget-preview.lg::before{box-shadow:var(--lg-edge);background:var(--lg-spec) 0 0/100% 100% no-repeat;opacity:var(--lg-spec-o)}
+@media(prefers-reduced-transparency:reduce){.widget-body.has-backdrop .widget-surface.lg,.widget-preview.lg{background:var(--bg)!important;backdrop-filter:none!important}}
+/* Gallery stages: soft shapes with crisp edges under the previews so the bent rim shows (a smooth gradient bends invisibly). */
+.widget-stage{background:radial-gradient(circle at 14% 118%,#93b9ff 0 33%,rgba(147,185,255,0) 33.6%),radial-gradient(circle at 96% -14%,#c7b6ff 0 27%,rgba(199,182,255,0) 27.6%),linear-gradient(155deg,#e0eaf5,#d1dde9 40%,#ebdee2)}
+.widget-gallery-item:nth-child(2) .widget-stage{background:radial-gradient(circle at 88% 116%,#8fd6bd 0 32%,rgba(143,214,189,0) 32.6%),radial-gradient(circle at 4% -10%,#b9d7ff 0 26%,rgba(185,215,255,0) 26.6%),linear-gradient(150deg,#dfe9e4,#cddedd,#e2e4e9)}
+.widget-gallery-item:nth-child(3) .widget-stage{background:radial-gradient(circle at 10% -12%,#ffd08f 0 30%,rgba(255,208,143,0) 30.6%),radial-gradient(circle at 94% 114%,#f4a9c0 0 31%,rgba(244,169,192,0) 31.6%),linear-gradient(160deg,#efe7de,#e6d8cf,#e5dfe6)}
+/* Help review fixes (2026-10-21): the foot keeps the account label whole (footerFit in help.js), stacks at 450px; the tour card
+   takes focus without a ring for mouse users; gray 「건너뛰기」 in both themes; a focused note row shows its ring inside the row
+   (the group clips outside rings); the selected row in 최근 삭제한 메모 stays neutral like its editor. */
+.sidebar-tools{gap:0}
+@media(max-width:450px){body:not(.widget-body) .sidebar-bottom{flex-direction:column;align-items:center;gap:2px}body:not(.widget-body) .sidebar-tools{flex-direction:column}}
+.tour-card:focus{outline:none}
+.tour-card .tour-skip,[data-theme=dark] .tour-card .tour-skip{color:var(--secondary)}
+.note-group .note-card.compact:focus-visible{outline-offset:-3px}
+.in-trash .note-group .note-card.compact.selected,[data-theme=dark] .in-trash .note-group .note-card.compact.selected{background:color-mix(in srgb,var(--secondary) 16%,var(--field))}
+/* Glass review fixes (2026-10-21): accents follow the glass tone (blue +, rings, dots and reds sank into a blue wallpaper under
+   dark glass; light glass needs them a little deeper), secondary text a step stronger on glass, placeholders themed, and the
+   gallery stage shapes moved under the cards so the preview headers sit on a calm part of the stage. */
+.widget-body.tone-dark{--w-red:#ff8f84;--w-secondary:rgba(236,238,245,.84);--w-tertiary:rgba(236,238,245,.72)}
+.widget-body.tone-light{--w-red:#c4372b;--w-secondary:rgba(44,48,60,.82);--w-tertiary:rgba(44,48,60,.7)}
+.widget-body.tone-dark .widget-task-content .quick-plus{color:color-mix(in srgb,var(--accent,#3478f6) 45%,#fff)}
+.widget-body.tone-light .widget-task-content .quick-plus{color:color-mix(in srgb,var(--accent,#3478f6) 70%,#000)}
+.widget-body.tone-dark .widget-tasks .task-check{border-color:color-mix(in srgb,var(--task-color) 45%,#fff)}
+.widget-body.tone-light .widget-tasks .task-check{border-color:color-mix(in srgb,var(--task-color) 65%,#3a3f4a)}
+.widget-body.tone-dark .widget-calendar-content .task-dot{background:#9dbdff}
+.widget-body.tone-light .widget-calendar-content .task-dot{background:#2a5fc4}
+.widget-body.tone-dark .widget-calendar-content .is-today .day-number{background:#e5483b}
+.widget-body.tone-dark.note-widget .widget-title{color:#f6cf5c}
+.widget-body.tone-light.note-widget .widget-title{color:#8a6604}
+.note-body::placeholder{color:var(--muted)}
+.widget-body.note-widget .note-body::placeholder,.widget-body.note-widget .note-title-input::placeholder{color:var(--w-tertiary)}
+[data-theme=dark] .preview-note-label{color:#f3c64e}
+.widget-stage{background:radial-gradient(circle at 10% 118%,#93b9ff 0 33%,rgba(147,185,255,0) 33.6%),radial-gradient(circle at 94% 114%,#c7b6ff 0 26%,rgba(199,182,255,0) 26.6%),linear-gradient(155deg,#e0eaf5,#d1dde9 40%,#ebdee2)}
+.widget-gallery-item:nth-child(2) .widget-stage{background:radial-gradient(circle at 90% 118%,#8fd6bd 0 32%,rgba(143,214,189,0) 32.6%),radial-gradient(circle at 6% 114%,#b9d7ff 0 25%,rgba(185,215,255,0) 25.6%),linear-gradient(150deg,#dfe9e4,#cddedd,#e2e4e9)}
+.widget-gallery-item:nth-child(3) .widget-stage{background:radial-gradient(circle at 8% 116%,#ffd08f 0 30%,rgba(255,208,143,0) 30.6%),radial-gradient(circle at 94% 118%,#f4a9c0 0 31%,rgba(244,169,192,0) 31.6%),linear-gradient(160deg,#efe7de,#e6d8cf,#e5dfe6)}
+/* Sidebar foot (2026-10-26): the account button is an icon like ? and the gear; its badge shows only while syncing or on an error. */
+.sidebar-bottom .account-button{position:relative;width:32px;height:32px;padding:0;gap:0;justify-content:center;color:var(--muted)}
+.sidebar-bottom .account-button:hover{color:var(--text)}
+.sidebar-bottom .account-button .status-dot{position:absolute;right:5px;top:5px;width:7px;height:7px;box-shadow:0 0 0 2px var(--side)}
+.sidebar-bottom .account-button.error{color:#de5960}
+/* The opaque end of the glass slider (2026-10-26 user): the glass is gone — a solid card in the app theme, as the first widgets were. */
+.widget-body.glass-solid .widget-surface,.widget-body.has-backdrop.glass-solid .widget-surface{background:var(--w-solid);backdrop-filter:none;box-shadow:var(--w-shadow)}
+.widget-body.glass-solid .widget-surface::after{display:none}
+.widget-gallery.solid .widget-preview{background:var(--w-solid);backdrop-filter:none}
+.widget-gallery.solid .widget-preview::after{display:none}
+
+/* ===== Apple-design review (2026-10-26): one radius per tier, one control size, a soft focus ring, quieter chrome ===== */
+:root{--r-sheet:16px;--r-pop:12px;--r-card:12px}
+.dialog,.tour-card{border-radius:var(--r-sheet)}
+.help-pop,.event-card,.context-menu,#toast{border-radius:var(--r-pop)}
+.quick-add,.context-note,.note-editor,.glass-control,.update-block,.widget-tip{border-radius:var(--r-card)}
+.widget-stage{border-radius:30px}
+/* Buttons: one height and one label size wherever they sit (the top bar already is 32/13). */
+.button,.widget-gallery .button,.trash-head .button,.trash-banner .button,.account-notice .button{min-height:32px;padding:6px 14px;font-size:13px}
+.button.wide{min-height:32px;font-size:13px}
+/* Text fields: a soft ring tight to the field (the same recipe as the quick-add box), never the 3px offset outline. */
+.form-input:focus,.form-input:focus-visible{outline:none;border-color:color-mix(in srgb,var(--blue) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent)}
+/* Boolean settings are switches, at the right of their label; the 하루 종일 chip is the toggle itself. */
+.checkbox-field input[type=checkbox]{appearance:none;-webkit-appearance:none;order:2;margin:0 0 0 auto;width:34px;height:20px;border-radius:10px;background:#d9dce3;position:relative;flex-shrink:0;transition:background .15s;cursor:pointer}
+.checkbox-field input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .15s}
+.checkbox-field input[type=checkbox]:checked{background:var(--blue)}
+.checkbox-field input[type=checkbox]:checked::after{left:16px}
+.checkbox-field input[type=checkbox]:disabled{opacity:.45;cursor:default}
+[data-theme=dark] .checkbox-field input[type=checkbox]{background:#4a4f5b}
+.card-chip input{position:absolute;width:0;height:0;margin:0;opacity:0;pointer-events:none}
+.card-chip{position:relative}
+/* Colour marks are circles everywhere. */
+.card-color{width:14px;height:14px;border-radius:50%}
+.card-cal i{border-radius:50%}
+/* Sibling icon buttons share one size and one glyph size. */
+.sidebar-tools .icon-button,.sidebar-bottom .account-button{width:32px;height:32px;border-radius:8px}
+.sidebar-tools .icon-button svg,.sidebar-bottom .account-button svg{width:18px;height:18px}
+.month-heading .icon-button{width:28px;height:28px}.month-heading svg{width:16px;height:16px}
+.context-heading .icon-button{width:28px;height:28px}.context-heading .icon-button svg{width:16px;height:16px}
+/* One quiet accent in a month cell: the task count is secondary text with a small dot. */
+.calendar-grid.rolling .day-tasks,.allday-tasks{color:var(--secondary)}
+.calendar-grid.rolling .day-tasks::before,.allday-tasks::before{content:"";display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--blue);margin:0 5px 2px 0}
+/* Flat controls: the quick-add box is a field, the update card an outline, the empty-state symbol plain. */
+.quick-add{background:var(--field);border:1px solid transparent;box-shadow:none}
+.update-block{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.empty-symbol,[data-theme=dark] .empty-symbol{background:none;border:0;width:auto;height:auto;color:var(--muted);margin-bottom:4px;border-radius:0}
+.empty-symbol svg{width:44px;height:44px;stroke-width:1.5}
+/* Dark notes: a neutral surface, yellow stays a small accent. */
+[data-theme=dark]{--note:#2b2d33}
+[data-theme=dark] .note-editor{border-color:var(--line)}
+[data-theme=dark] .note-group .note-card.compact.selected{background:color-mix(in srgb,#f5c242 14%,var(--field))}
+/* Sheets separate by spacing: the header rule appears only once the body has scrolled under it; shortcut rows have no hairlines. */
+.dialog-header{border-bottom:0;padding:22px 24px 6px}
+@container dialog scroll-state(scrollable: top){.dialog-header{box-shadow:0 1px 0 var(--line)}}
+.shortcut-row{border-bottom:0;min-height:30px}
+.note-group-head{font-weight:600;color:var(--secondary)}
+/* Week and day blocks keep Korean words whole. */
+.time-event-title{word-break:keep-all;overflow-wrap:anywhere}
+/* The window title keeps its full text at the 900px minimum: the tools give first. */
+@media(max-width:930px){.topbar-main{gap:6px}.topbar .button{padding:6px 11px}.view-switch-item{min-width:30px;padding:0 8px}}
+@media(min-width:700px){.topbar-main h1{flex-shrink:0}.topbar-spacer{flex:1 1 0;min-width:0}}
+
+/* 2026-10-26 usability review: the gallery button while its widget window comes up. */
+.button.opening{opacity:.72;cursor:progress}

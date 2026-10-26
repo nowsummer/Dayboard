@@ -51,7 +51,7 @@ test('the installer is per user, keeps user data, and publishes to the public da
   assert.equal(build.nsis.perMachine, false);
   assert.equal(build.nsis.deleteAppDataOnUninstall, false);
   assert.equal(build.nsis.createStartMenuShortcut, false, 'lib/startmenu.cjs owns Dayboard.lnk');
-  assert.deepEqual(build.publish.map(item => [item.provider, item.owner, item.repo]), [['github', 'nowsummer', 'dayboard']]);
+  assert.deepEqual(build.publish.map(item => [item.provider, item.owner, item.repo]), [['github', 'nowsummer', 'Dayboard']]);
   assert.equal(build.nsis.artifactName, 'Dayboard-${version}.${ext}');
   assert.ok(pkg.dependencies['electron-updater'], 'the update engine ships with the app');
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.cjs'), 'utf8');

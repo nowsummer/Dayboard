@@ -1,5 +1,5 @@
 'use strict';
-// Publishes the verified installer of the current version as a GitHub Release of nowsummer/dayboard, so every
+// Publishes the verified installer of the current version as a GitHub Release of nowsummer/Dayboard, so every
 // installed copy updates itself and the release page keeps the update history. Ported from Limit Tracker.
 //
 //   npm run release -- --dry     check everything, upload nothing (always run this first)

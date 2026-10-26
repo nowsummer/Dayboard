@@ -7,13 +7,20 @@ const os = require('node:os');
 const { randomUUID } = require('node:crypto');
 const { fileURLToPath } = require('node:url');
 const { spawn } = require('node:child_process');
-const { UpdateManager, releasePage, releasesPage, STAGING_ID } = require('./lib/updater.cjs');
-const { createStore, resolveUserDataDirectory } = require('./lib/store.cjs');
+const { UpdateManager, releasePage, releasesPage, releaseTag, STAGING_ID } = require('./lib/updater.cjs');
+const { createStore, resolveUserDataDirectory, TRASH_DAYS, purgeAtOf } = require('./lib/store.cjs');
 const { createDesktopManager, clampBounds, onScreen } = require('./lib/desktop.cjs');
 const { createTaskbarIcon } = require('./lib/windowicon.cjs');
 const { createStartMenu } = require('./lib/startmenu.cjs');
 const { createSync, seriesKey, dropSeriesColors } = require('./lib/sync.cjs');
-const { LIST_ICONS, parseRRule, buildRRule, expandEvent, seriesPosition, untilBefore, dayOffset, defaultCalendarId, sectionKey, visibleState, builtInList, keepOneVisible, hidingRefusal } = require('./renderer/domain.js');
+const { recordNoteDeletion, copyOf, sameContent, noteKey, noteRev, laterThan, cleanPast, archiveText, NOTE_ID, pastKey } = require('./lib/notesync.cjs');
+// A note as the renderer gets it from a note command: no earlier versions (note:history), its rev (which version it is).
+const shownNote = note => { const { past, trashSeenAt, storedAt, textKey, pinnedAt, ...rest } = note; return { ...rest, rev: noteRev(note), textId: textKey || noteKey(note), ...(note.trashedAt ? { purgeAt: purgeAtOf(note) } : {}) }; };
+// The text identity a draft or the 「이전 버전」 dialog started from (store publicState textId), when it is one.
+const textIdOf = value => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z~[0-9a-f]{16}$/.test(value) ? value : null);
+// Widgets of notes moved to the trash, so 되돌리기 brings them back where they were (2026-10-21 review round 4).
+const trashedWidgets = new Map();
+const { LIST_ICONS, parseRRule, buildRRule, expandEvent, seriesPosition, untilBefore, dayOffset, shiftRule, instanceId, dateKey, defaultCalendarId, sectionKey, visibleState, builtInList, keepOneVisible, hidingRefusal } = require('./renderer/domain.js');
 const { createWallpaper, backdropPayload } = require('./lib/wallpaper.cjs');
 const { providerStatus } = require('./lib/providers/oauth.cjs');
 const i18n = require('./lib/i18n.cjs');
@@ -48,19 +55,46 @@ let store, sync, mainWindow, tray, quitting = false, queue = Promise.resolve(), 
 let quitInFlight = false;
 let updater = null, trayUpdateStatus = null;
 
-function flushWindow(win) {
+// A hung renderer (2026-10-26 usability review: three freezes in twelve runs, none recovering on its own): a widget reloads
+// itself, the main window asks first. Flushing skips a hung window at once instead of waiting five seconds for nothing.
+const hungWindows = new Set();
+function watchResponsive(win, onHang) {
+  win.webContents.on('unresponsive', () => { if (smoke || quitting || win.isDestroyed()) return; hungWindows.add(win); onHang(); });
+  win.webContents.on('responsive', () => hungWindows.delete(win));
+  win.on('closed', () => hungWindows.delete(win));
+}
+function reloadHung(win) {
+  if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+  hungWindows.delete(win);
+  win.webContents.forcefullyCrashRenderer();
+  win.webContents.reload();
+}
+async function askReloadHung(win) {
+  const abort = new AbortController();
+  const back = () => abort.abort(); // the renderer came back: the question closes as if cancelled
+  win.webContents.once('responsive', back);
+  try {
+    const { response } = await dialog.showMessageBox(win, { type: 'warning', title: 'Dayboard', message: tr('화면이 응답하지 않아요'), detail: tr('다시 불러오면 저장하지 않은 입력이 사라질 수 있어요.'), buttons: [tr('기다리기'), tr('다시 불러오기')], defaultId: 0, cancelId: 0, noLink: true, signal: abort.signal });
+    if (response === 1 && !win.isDestroyed()) reloadHung(win);
+  } finally { if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.removeListener('responsive', back); }
+}
+function flushWindow(win, reason = 'all') {
   if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return Promise.resolve();
   // A renderer that never finished loading or has crashed holds no drafts and
   // cannot answer; waiting on it would only make the window impossible to close.
-  if (!readyWindows.has(win) || win.webContents.isCrashed()) return Promise.resolve();
-  if (flushingWindows.has(win.id)) return flushingWindows.get(win.id);
+  if (!readyWindows.has(win) || win.webContents.isCrashed() || hungWindows.has(win)) return Promise.resolve();
+  // 'notes': note drafts only, before another PC's note version is applied (an open event card stays as it is); 'all':
+  // note drafts and the event card, before a window closes or the app quits or updates (2026-10-21 review).
+  const kind = reason === 'notes' ? 'notes' : 'all';
+  const slot = win.id + ':' + kind;
+  if (flushingWindows.has(slot)) return flushingWindows.get(slot);
   const token = randomUUID();
   const pending = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => { pendingFlushes.delete(token); reject(new Error(tr('메모 저장 응답을 받지 못했습니다. 잠시 후 다시 닫아 주세요.'))); }, 5000);
+    const timeout = setTimeout(() => { pendingFlushes.delete(token); reject(new Error(tr('저장 응답을 받지 못했습니다. 잠시 후 다시 닫아 주세요.'))); }, 5000);
     pendingFlushes.set(token, { sender: win.webContents, finish(error) { clearTimeout(timeout); pendingFlushes.delete(token); error ? reject(new Error(error)) : resolve(); } });
-    win.webContents.send('dayboard:flush', { token });
-  }).finally(() => flushingWindows.delete(win.id));
-  flushingWindows.set(win.id, pending);
+    win.webContents.send('dayboard:flush', { token, reason: kind });
+  }).finally(() => flushingWindows.delete(slot));
+  flushingWindows.set(slot, pending);
   return pending;
 }
 async function closeWindow(win) {
@@ -129,7 +163,7 @@ function rawText(value, label, max) {
 }
 function identifier(value) { return text(value, tr('항목 ID'), 400); }
 function lookup(collection, id) {
-  const item = store.get()[collection].find(entry => entry.id === identifier(id));
+  const item = store.peek(collection, identifier(id)); // one record, not a clone of the whole state (2026-10-26 performance review)
   if (!item) throw new Error(tr('항목이 없거나 이미 삭제되었습니다. 화면을 새로 열어 주세요.'));
   return item;
 }
@@ -268,10 +302,16 @@ function showMain() {
     };
     mainWindow.on('resize', remember);
     mainWindow.on('move', remember);
+    // The middle window button shows restore (two squares) while maximized, as Windows does.
+    const windowState = () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dayboard:window', { maximized: mainWindow.isMaximized() }); };
+    for (const name of ['maximize', 'unmaximize', 'restore']) mainWindow.on(name, windowState);
+    mainWindow.webContents.on('did-finish-load', windowState);
     mainWindow.on('close', event => {
-      if (!quitting) { event.preventDefault(); closeWindow(mainWindow).catch(error => dialog.showErrorBox(tr('메모를 저장하지 못했습니다'), error.message)); }
+      if (!quitting) { event.preventDefault(); closeWindow(mainWindow).catch(error => dialog.showErrorBox(tr('변경 사항을 저장하지 못했습니다'), error.message)); }
     });
     mainWindow.on('closed', () => { mainWindow = null; });
+    const main = mainWindow;
+    watchResponsive(main, () => { askReloadHung(main).catch(() => {}); });
     mainWindow.loadFile(rendererFile);
   } else { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); }
   return mainWindow;
@@ -294,6 +334,7 @@ function freeSlot(size, area) {
 }
 async function openWidget(widget) {
   if (widgetWindows.has(widget.id)) { widgetWindows.get(widget.id).show(); return widget; }
+  if (quitting) { const cancelled = new Error(tr('위젯을 여는 중에 닫혔어요.')); cancelled.cancelled = true; throw cancelled; } // no new window once the quit began
   const area = screen.getPrimaryDisplay().workArea;
   const size = { width: 360, height: widget.type === 'calendar' ? 440 : widget.type === 'note' ? 330 : 450 };
   const minimum = WIDGET_MIN[widget.type] || WIDGET_MIN.note;
@@ -318,6 +359,7 @@ async function openWidget(widget) {
   widgetWindows.set(widget.id, win);
   secureWindow(win);
   win.on('system-context-menu', event => event.preventDefault());
+  watchResponsive(win, () => reloadHung(win));
   const persistBounds = (attempt = 0) => {
     clearTimeout(boundsTimers.get(widget.id));
     boundsTimers.set(widget.id, setTimeout(() => {
@@ -347,7 +389,7 @@ async function openWidget(widget) {
     if (desktop.isAttached(win)) queued(() => revealOnDesktop(win, { hide: true }).then(backdrop => setWidgetBackdrop(widget.id, backdrop))).catch(() => {});
   });
   win.on('close', event => {
-    if (!quitting) { event.preventDefault(); closeWindow(win).catch(error => dialog.showErrorBox(tr('메모를 저장하지 못했습니다'), error.message)); }
+    if (!quitting) { event.preventDefault(); closeWindow(win).catch(error => dialog.showErrorBox(tr('변경 사항을 저장하지 못했습니다'), error.message)); }
   });
   win.on('closed', () => {
     clearTimeout(boundsTimers.get(widget.id));
@@ -364,7 +406,10 @@ async function openWidget(widget) {
       if (current) queued(() => openWidget(current)).catch(() => {});
     }, 4000);
   });
-  await win.loadFile(rendererFile, { query: { widget: widget.type, id: widget.id } });
+  // A load cut short by a quit or by a close that came first is not a failure of the widget (2026-10-26 review: the startup loop
+  // took the abort for a window that cannot be created and deleted saved widgets from the layout).
+  try { await win.loadFile(rendererFile, { query: { widget: widget.type, id: widget.id } }); }
+  catch (error) { if (quitting || win.isDestroyed()) { const cancelled = new Error(tr('위젯을 여는 중에 닫혔어요.')); cancelled.cancelled = true; throw cancelled; } throw error; }
   const status = await placeWidget(win, widget.mode, widget.id);
   commit(state => {
     const current = state.widgets.find(item => item.id === widget.id);
@@ -546,6 +591,27 @@ function rehomeWidgets() {
     } catch (error) { console.error('widget not moved after a display change:', error.message); }
   }
 }
+// A note a widget can show: not one in 「최근 삭제한 메모」.
+function liveNote(id) {
+  const note = lookup('notes', id);
+  if (note.trashedAt) throw new Error(tr('최근 삭제한 메모는 위젯으로 열 수 없어요.'));
+  return note;
+}
+// Notes in 「최근 삭제한 메모」 for 30 days are deleted for good; the deletion reaches the other PCs like any other. The 30
+// days run on this PC's clock from when this PC first saw the note there (trashSeenAt), never against another PC's clock
+// (2026-10-21 review).
+function purgeTrash() {
+  const cutoff = Date.now() - TRASH_DAYS * 86400000;
+  const old = store.get().notes.filter(note => note.trashedAt && Date.parse(note.trashSeenAt || note.trashedAt) < cutoff);
+  if (!old.length) return;
+  const at = new Date().toISOString();
+  commit(state => {
+    state.notes = state.notes.filter(note => !old.some(item => item.id === note.id));
+    for (const note of old) recordNoteDeletion(state, note, at);
+  });
+  for (const note of old) trashedWidgets.delete(note.id);
+  sync?.scheduleNotes();
+}
 function newNote(state) {
   const note = { id: randomUUID(), title: '', body: '', color: 'yellow', updatedAt: new Date().toISOString() };
   state.notes.push(note);
@@ -609,7 +675,61 @@ function eventFields(payload, base, allDay) {
   return event;
 }
 const exceptionsOf = (state, masterId) => state.events.filter(item => item.masterId === masterId);
-const onOrAfter = (recurrenceId, from) => String(recurrenceId).slice(0, 10) >= String(from).slice(0, 10);
+// A series that moves from one start to another (same all-day kind): the same instance of the series lands on its old local
+// date plus the day difference, at the new start's clock time (as walkRRule builds occurrences). Used for EXDATEs and the
+// exceptions' recurrence ids so they keep naming the instance they named before.
+const localDay = value => String(value).length === 10 ? String(value) : dateKey(new Date(value));
+function seriesShift(fromStart, toStart, allDay) {
+  const days = Math.round((Date.parse(localDay(toStart) + 'T12:00:00') - Date.parse(localDay(fromStart) + 'T12:00:00')) / 86400000);
+  const clock = new Date(toStart);
+  if (!days && (allDay || String(fromStart) === String(toStart))) return null;
+  return id => {
+    const text = String(id);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return dayOffset(text, days);
+    const at = new Date(text); if (!Number.isFinite(at.getTime())) return text;
+    if (allDay) return dayOffset(dateKey(at), days);
+    return new Date(at.getFullYear(), at.getMonth(), at.getDate() + days, clock.getHours(), clock.getMinutes(), clock.getSeconds(), clock.getMilliseconds()).toISOString();
+  };
+}
+// Two timed ids compare as instants, else as local days (2026-10-21 review: UTC date prefixes put the evening before a DST
+// change on the wrong side of a cut).
+const onOrAfter = (recurrenceId, from) => (String(recurrenceId).length > 10 && String(from).length > 10 ? Date.parse(recurrenceId) >= Date.parse(from) : localDay(recurrenceId) >= localDay(from));
+// EXDATEs and the exceptions' recurrence ids of an old series, mapped onto a new one by their place in the series — the
+// same instance whatever the rule did with its date (2026-10-21 review: a day offset missed "the 2nd Tuesday" rules and
+// the clock part of a move made with a new rule). `from` is the place where the new series starts (the cut of "this and
+// future"). With a new rule a place means nothing: the id moves with the start instead. null: the new series has no such
+// instance (the EXDATE goes, the exception becomes an event of its own).
+function seriesMapper(oldSeries, newSeries, { from = 0, move = null, byPlace = true } = {}) {
+  const plain = { ...oldSeries, exdates: [] }; const target = { ...newSeries, exdates: [] };
+  return id => {
+    if (!byPlace) return move ? move(id) : id;
+    const position = seriesPosition(plain, id);
+    if (!position) return move ? move(id) : id;
+    return instanceId(target, position.index - from);
+  };
+}
+const detach = item => { delete item.masterId; delete item.recurrenceId; };
+// A new colour saved for 「이후 모든 일정」/「모든 일정」 colours the occurrences edited on their own too, as 「모든 반복 일정」
+// (event:color 'all') does; an unchanged colour (the old edit window always sends one) leaves their own colours alone
+// (2026-10-21 review round 7). undefined: no change.
+const seriesColour = (payload, previous) => ('color' in payload && eventColor(payload.color) !== (previous.color || '') ? eventColor(payload.color) : undefined);
+const paint = (item, colour) => { if (colour) item.color = colour; else delete item.color; };
+// A series that stops repeating keeps one event, at its first occurrence still shown: an occurrence the user skipped or edited
+// on its own (that one is now an event of its own) is not shown twice (2026-10-21 review round 6). `always` (「모든 일정」)
+// also moves it off a start the rule never showed (a Saturday start of 「평일마다」); the series held in a card right after
+// 반복 was chosen goes back to its own day (review round 7).
+function toFirstShown(event, series, always = false) {
+  const skipped = new Set(series.exdates || []);
+  if (!skipped.size && !always) return;
+  const plain = { ...series, exdates: [] };
+  let first = null;
+  for (let index = 0; index < 1000; index++) { const id = instanceId(plain, index); if (!id) break; if (!skipped.has(id)) { first = id; break; } }
+  if (!first) return;
+  const days = Math.round((Date.parse(localDay(first) + 'T12:00:00') - Date.parse(localDay(series.start) + 'T12:00:00')) / 86400000);
+  if (!days) return;
+  const shift = value => { if (String(value).length === 10) return dayOffset(value, days); const at = new Date(value); at.setDate(at.getDate() + days); return at.toISOString(); };
+  event.start = shift(event.start); event.end = shift(event.end);
+}
 // Shift an edited occurrence's new start/end back onto the master so "all events" keeps the series dates and changes the time and duration.
 function shiftedForMaster(payload, master, occurrence) {
   if (!('start' in payload) && !('end' in payload)) return payload;
@@ -622,8 +742,8 @@ function shiftedForMaster(payload, master, occurrence) {
     const start = dayOffset(master.start, deltaDays);
     return { ...payload, start, end: dayOffset(start, lengthDays) };
   }
-  const delta = Date.parse(newStart) - Date.parse(occurrence.start);
-  const start = new Date(Date.parse(master.start) + delta).toISOString();
+  const wall = seriesShift(occurrence.start, newStart, false);
+  const start = wall ? wall(master.start) : master.start;
   return { ...payload, start, end: new Date(Date.parse(start) + (Date.parse(newEnd) - Date.parse(newStart))).toISOString() };
 }
 // Truncate a series before one occurrence (Apple's "this and future" split). Returns the rule text for the kept part, or null when nothing stays.
@@ -631,7 +751,8 @@ function truncatedRule(master, recurrenceId) {
   const position = seriesPosition(master, recurrenceId);
   if (!position || position.index === 0) return null;
   const rule = parseRRule(master.rrule);
-  return { kept: buildRRule({ ...rule, count: null, until: untilBefore(occurrenceOf(master, recurrenceId).start, master.allDay) }), rest: buildRRule({ ...rule, until: null, count: rule.count ? position.remaining : null }) };
+  // The new part keeps the series' own end: its remaining COUNT, or its UNTIL (2026-10-21 review: it went on forever).
+  return { kept: buildRRule({ ...rule, count: null, until: untilBefore(occurrenceOf(master, recurrenceId).start, master.allDay) }), rest: buildRRule({ ...rule, count: rule.count ? position.remaining : null, until: rule.count ? null : rule.until }) };
 }
 
 // Send an event change to a connected calendar and mirror the answer locally. The provider returns the events that
@@ -762,16 +883,144 @@ async function command(commandName, payload, sourceWindow) {
       return store.publicState();
     }
     case 'note:save': {
-      const previous = payload.id ? lookup('notes', payload.id) : null;
-      const note = { id: previous?.id || randomUUID(), title: rawText(payload.title ?? previous?.title ?? tr('메모'), tr('메모 제목'), 200),
+      // revive: a draft whose note was deleted (on another PC) while it was typed in comes back under its own id —
+      // an edit beats a deletion (lib/notesync.cjs).
+      const revive = payload.revive === true && typeof payload.id === 'string' && NOTE_ID.test(payload.id) && !store.get().notes.some(item => item.id === payload.id);
+      const previous = payload.id && !revive ? lookup('notes', payload.id) : null;
+      const note = { id: previous?.id || (revive ? payload.id : randomUUID()), title: rawText(payload.title ?? previous?.title ?? tr('메모'), tr('메모 제목'), 200),
         body: rawText(payload.body ?? previous?.body ?? '', tr('메모 본문'), 100000), color: color(payload.color, previous?.color || 'yellow'), updatedAt: now() };
-      commit(state => { if (previous) state.notes = state.notes.map(item => item.id === note.id ? note : item); else state.notes.push(note); }); return note;
+      // The time shown and sorted by: this PC's own clock, never forced later (updatedAt may be, see below).
+      note.editedAt = note.updatedAt;
+      // baseUpdatedAt + baseRev: the version the draft started from. If a sync brought another PC's text meanwhile, the draft
+      // (what is on screen) stays the note and the other text is kept as a 「<title> (2)」 note instead of being overwritten.
+      // The rev tells two versions apart that share an updatedAt (2026-10-21 review: clocks ahead make that routine).
+      const base = typeof payload.baseUpdatedAt === 'string' ? payload.baseUpdatedAt : null;
+      const baseRev = typeof payload.baseRev === 'string' ? payload.baseRev : null;
+      // A version is always later than the one it was built on, whatever this PC's clock says (lib/notesync.cjs: "replaced"
+      // links then never form a circle between PCs).
+      const after = previous?.updatedAt || (revive ? base : null);
+      if (after) note.updatedAt = laterThan(note.updatedAt, after);
+      const moved = Boolean(previous && base) && (previous.updatedAt !== base || (baseRev !== null && baseRev !== noteRev(previous)));
+      const baseKey = base && baseRev ? `${base}~${baseRev}` : null;
+      // Compared by text identity: a pin, trash or merged version of the very text the draft started from is no other text
+      // (2026-10-21 review: the draft's own starting text became a 「(2)」 copy). A copy is named by its text, as the sync's.
+      const sameText = Boolean(baseKey) && (previous?.textKey || (previous && noteKey(previous))) === (textIdOf(payload.baseTextId) || baseKey);
+      const copy = moved && !sameText && !sameContent(previous, note) ? copyOf(previous, previous.id, previous.textKey || noteKey(previous), previous.updatedAt) : null;
+      // Earlier versions: the text it replaces is kept when it had settled (lib/notesync.cjs archiveText). Saving a note in
+      // 「최근 삭제한 메모」 (typed into while another PC moved it there) brings it back: an edit beats a deletion.
+      note.past = previous ? archiveText(previous.past, previous, now(), { next: note }) : [];
+      // A pin stays through typing (2026-10-21 review round 4: the first autosave unpinned the note on every PC).
+      if (previous?.pinned) note.pinned = true;
+      if (previous?.pinnedAt) note.pinnedAt = previous.pinnedAt; // when the pin last changed (lib/notesync.cjs merges by it)
+      // The version that brought this text (lib/notesync.cjs textKey): kept while the text stays, new text is its own.
+      if (previous && sameContent(previous, note)) note.textKey = previous.textKey || noteKey(previous);
+      // When this PC stored the text (local only): earlier versions count "settled" from it, never from a forced time.
+      if (previous && sameContent(previous, note)) { if (previous.storedAt) note.storedAt = previous.storedAt; } else note.storedAt = note.editedAt;
+      commit(state => {
+        if (previous) state.notes = state.notes.map(item => item.id === note.id ? note : item); else state.notes.push(note);
+        if (copy && !state.notes.some(item => item.id === copy.id)) state.notes.push(copy);
+      });
+      sync?.scheduleNotes(); // other PCs get it a few seconds later (notes sync through Google, when on)
+      return shownNote(note);
+    }
+    // 「최근 삭제한 메모」: deleting moves a note there for 30 days (purgeTrash); every PC sees it there and can restore it.
+    case 'note:trash': {
+      // Typing still waiting in the note's widget windows is saved first: the trash keeps what was on screen.
+      const open = store.get().widgets.filter(w => w.noteId === payload.id).map(w => w.id);
+      await Promise.all(open.map(id => flushWindow(widgetWindows.get(id), 'notes').catch(() => {})));
+      const previous = lookup('notes', payload.id);
+      if (previous.trashedAt) return shownNote(previous);
+      const at = now();
+      const note = { ...previous, trashedAt: at, trashSeenAt: at, updatedAt: laterThan(at, previous.updatedAt), textKey: previous.textKey || noteKey(previous) };
+      const ids = store.get().widgets.filter(w => w.noteId === note.id).map(w => w.id);
+      trashedWidgets.set(note.id, store.get().widgets.filter(w => w.noteId === note.id).map(w => structuredClone(w)));
+      commit(state => { state.notes = state.notes.map(item => item.id === note.id ? note : item); state.widgets = state.widgets.filter(w => w.noteId !== note.id); });
+      for (const id of ids) widgetWindows.get(id)?.destroy();
+      sync?.scheduleNotes();
+      return shownNote(note);
+    }
+    case 'note:restore': {
+      const previous = lookup('notes', payload.id);
+      if (!previous.trashedAt) return shownNote(previous);
+      const note = { ...previous, updatedAt: laterThan(now(), previous.updatedAt), textKey: previous.textKey || noteKey(previous) };
+      delete note.trashedAt; delete note.trashSeenAt;
+      const widgets = (trashedWidgets.get(note.id) || []).filter(widget => !store.get().widgets.some(item => item.id === widget.id));
+      trashedWidgets.delete(note.id);
+      commit(state => { state.notes = state.notes.map(item => item.id === note.id ? note : item); state.widgets.push(...widgets); });
+      for (const widget of widgets) openWidget(widget).catch(() => {});
+      sync?.scheduleNotes();
+      return shownNote(note);
+    }
+    // Pinned notes stay at the top of the list on every PC (a note property, synced like an edit; the text's time is kept).
+    case 'note:pin': {
+      const previous = lookup('notes', payload.id);
+      const pinned = boolean(payload.pinned, tr('메모 고정'));
+      if (Boolean(previous.pinned) === pinned) return shownNote(previous);
+      const note = { ...previous, updatedAt: laterThan(now(), previous.updatedAt), textKey: previous.textKey || noteKey(previous) };
+      if (pinned) note.pinned = true; else delete note.pinned;
+      note.pinnedAt = laterThan(now(), previous.pinnedAt); // the newest pin change wins over an edit that kept an old one
+      commit(state => { state.notes = state.notes.map(item => item.id === note.id ? note : item); });
+      sync?.scheduleNotes();
+      return shownNote(note);
+    }
+    // A new note with the same text, right after the original in a hand-made order.
+    case 'note:duplicate': {
+      const source = lookup('notes', payload.id);
+      const at = now();
+      // 「제목 사본」 within the title limit: a long title is shortened so the suffix fits (2026-10-21 review: 복제 failed).
+      const room = 200 - tr('{0} 사본', ['']).length;
+      const head = String(source.title || tr('메모'));
+      const note = { id: randomUUID(), title: rawText(tr('{0} 사본', [head.length > room ? head.slice(0, room).replace(/[\uD800-\uDBFF]$/, '') : head]), tr('메모 제목'), 200), body: source.body, color: source.color, updatedAt: at, editedAt: at, storedAt: at, past: [] };
+      commit(state => {
+        state.notes.push(note);
+        const order = state.settings.noteOrder || [];
+        const index = order.indexOf(source.id);
+        if (index >= 0) state.settings.noteOrder = [...order.slice(0, index + 1), note.id, ...order.slice(index + 1)];
+      });
+      sync?.scheduleNotes();
+      return shownNote(note);
+    }
+    // Earlier versions of a note, newest first (they are not in the broadcast state: only when the user opens them).
+    case 'note:history': {
+      const note = lookup('notes', payload.id);
+      return cleanPast(note.past).map(({ title, body, color, updatedAt, editedAt, archivedAt }) => ({ key: pastKey({ title, body, color, updatedAt }), title, body, color, updatedAt, ...(editedAt ? { editedAt } : {}), archivedAt }));
+    }
+    // Back to an earlier version: a new edit with that text; the text it replaces is kept as an earlier version too.
+    case 'note:revert': {
+      const previous = lookup('notes', payload.id);
+      // By the row's key (two texts can share an updatedAt — 2026-10-21 review round 4); updatedAt alone only when unique.
+      const entries = cleanPast(previous.past);
+      const byTime = entries.filter(item => item.updatedAt === payload.updatedAt);
+      const entry = typeof payload.key === 'string' ? entries.find(item => pastKey(item) === payload.key) : byTime.length === 1 ? byTime[0] : null;
+      if (!entry) throw new Error(tr('그 이전 버전을 찾을 수 없어요.'));
+      // Another PC's text that arrived while the dialog was open stays as a 「(2)」 note, as a draft's does in note:save.
+      const base = typeof payload.baseUpdatedAt === 'string' ? payload.baseUpdatedAt : null;
+      const baseRev = typeof payload.baseRev === 'string' ? payload.baseRev : null;
+      const moved = Boolean(base) && (previous.updatedAt !== base || (baseRev !== null && baseRev !== noteRev(previous)));
+      // Only another text counts: a pin or trash of the text the dialog opened on is not kept twice (2026-10-21 review).
+      const baseKey = base && baseRev ? `${base}~${baseRev}` : null;
+      const sameText = Boolean(textIdOf(payload.baseTextId) || baseKey) && (previous.textKey || noteKey(previous)) === (textIdOf(payload.baseTextId) || baseKey);
+      const copy = moved && !sameText && !sameContent(previous, entry) ? copyOf(previous, previous.id, previous.textKey || noteKey(previous), previous.updatedAt) : null;
+      const at = now();
+      const note = { ...previous, title: entry.title, body: entry.body, color: entry.color, updatedAt: laterThan(at, previous.updatedAt), editedAt: at, storedAt: at, past: archiveText(previous.past, previous, at, { next: entry, force: true }) };
+      delete note.trashedAt; delete note.trashSeenAt; delete note.textKey;
+      commit(state => {
+        state.notes = state.notes.map(item => item.id === note.id ? note : item);
+        if (copy && !state.notes.some(item => item.id === copy.id)) state.notes.push({ ...copy, storedAt: at });
+      });
+      sync?.scheduleNotes();
+      return shownNote(note);
     }
     case 'note:delete': {
       const note = lookup('notes', payload.id);
+      if (typeof payload.rev === 'string' && (!note.trashedAt || payload.rev !== noteRev(note))) throw new Error(tr('그사이 다른 PC에서 바뀐 메모라 지우지 않았어요.'));
+      trashedWidgets.delete(note.id);
       const ids = store.get().widgets.filter(w => w.noteId === note.id).map(w => w.id);
-      commit(state => { state.notes = state.notes.filter(item => item.id !== note.id); state.widgets = state.widgets.filter(w => w.noteId !== note.id); });
-      for (const id of ids) widgetWindows.get(id)?.destroy(); return store.publicState();
+      // A note other PCs have keeps a deletion mark until they have seen it (lib/notesync.cjs).
+      commit(state => { state.notes = state.notes.filter(item => item.id !== note.id); state.widgets = state.widgets.filter(w => w.noteId !== note.id); recordNoteDeletion(state, note, now()); });
+      for (const id of ids) widgetWindows.get(id)?.destroy();
+      sync?.scheduleNotes();
+      return store.publicState();
     }
     case 'event:add': {
       // No calendar given: the default calendar (settings, else the connected account's primary calendar, else this PC).
@@ -799,6 +1048,8 @@ async function command(commandName, payload, sourceWindow) {
         // Notion/Apple scopes for a series instance: 'one' patches the instance, 'future' splits the series, 'all' patches the master.
         const scope = previous.recurring ? scopeOf(payload.scope) : 'one';
         if ('rrule' in payload && previous.recurring) throw new Error(tr('연결된 달력의 반복 규칙은 원래 달력 앱에서 바꿔 주세요. 제목·시간·장소는 여기서 고칠 수 있습니다.'));
+        // Another day or 하루 종일 for the whole series would keep the service's weekdays on a moved start (2026-10-21 review).
+        if (previous.recurring && scope !== 'one' && ((('allDay' in payload) && Boolean(allDay) !== Boolean(previous.allDay)) || (('start' in payload) && localDay(dateTime(payload.start, allDay)) !== localDay(previous.start)))) throw new Error(tr('연결된 달력의 반복 일정을 다른 날로 옮기거나 하루 종일을 바꿀 때는 「이 일정만」으로 저장해 주세요.'));
         const desired = eventFields(payload, previous, allDay);
         const updated = await writeRemoteEvent('update', desired, calendar, { scope, previous, color: 'color' in payload ? (desired.color || null) : undefined });
         return updated.find(item => item.id === previous.id) || updated[0] || store.publicState();
@@ -806,10 +1057,28 @@ async function command(commandName, payload, sourceWindow) {
       // A plain event, an exception, or a master edited as a whole: update in place.
       if (!recurrenceId || !previous.rrule) {
         const event = eventFields(payload, previous, allDay);
-        commit(state => { state.events = state.events.map(item => item.id === event.id ? event : item); }); return event;
+        // The series itself (a card holds it right after 반복 was chosen): another day or time moves its weekdays, skipped
+        // days and edited occurrences along, as 「모든 일정」 does, and no repeat any more leaves the edited occurrences as
+        // events of their own (2026-10-21 review: the rule stayed on the old weekday; edited occurrences were dropped).
+        const master = Boolean(previous.rrule && !previous.masterId);
+        const move = master && event.rrule && !('rrule' in payload) && Boolean(event.allDay) === Boolean(previous.allDay) ? seriesShift(previous.start, event.start, event.allDay) : null;
+        if (move) event.rrule = shiftRule(event.rrule, previous.start, event.start);
+        const map = move ? seriesMapper(previous, event, { move, byPlace: true }) : null;
+        if (map && event.exdates) event.exdates = event.exdates.map(map).filter(Boolean);
+        if (master && !event.rrule) toFirstShown(event, previous);
+        commit(state => {
+          if (master) for (const item of exceptionsOf(state, previous.id)) { if (!event.rrule) detach(item); else if (map && item.recurrenceId) { const id = map(item.recurrenceId); if (id) item.recurrenceId = id; else detach(item); } }
+          state.events = state.events.map(item => item.id === event.id ? event : item);
+        });
+        return event;
       }
       const scope = scopeOf(payload.scope);
+      if ((previous.exdates || []).includes(recurrenceId)) throw new Error(tr('이미 지웠거나 따로 고친 반복 일정이에요. 화면을 새로 열어 주세요.'));
       const occurrence = occurrenceOf(previous, recurrenceId);
+      // 하루 종일 on or off applies to one occurrence only, and a monthly or yearly series moves to another day only from here
+      // on (its days would be recomputed from the first one's month) — 2026-10-21 review.
+      if (scope !== 'one' && ('allDay' in payload) && Boolean(allDay) !== Boolean(previous.allDay)) throw new Error(tr('하루 종일로 바꾸거나 되돌리는 변경은 이 일정에만 적용할 수 있어요.'));
+      if (scope === 'all' && !('rrule' in payload) && ('start' in payload) && localDay(dateTime(payload.start, allDay)) !== localDay(occurrence.start) && ['MONTHLY', 'YEARLY'].includes(parseRRule(previous.rrule)?.freq)) throw new Error(tr('매월·매년 반복 일정을 다른 날로 옮길 때는 「이 일정만」이나 「이후 모든 일정」을 골라 주세요.'));
       const inherited = { calendarId: previous.calendarId, title: previous.title, start: occurrence.start, end: occurrence.end, allDay: previous.allDay, location: previous.location || '', provider: previous.provider, ...(previous.color ? { color: previous.color } : {}) };
       if (scope === 'one') {
         // This occurrence only: exclude it from the series and store the edited copy as an exception that still belongs to the master.
@@ -826,21 +1095,42 @@ async function command(commandName, payload, sourceWindow) {
       if (scope === 'future' && split) {
         // This and future: the old series ends before this occurrence; a new master starts here with the edited values.
         const next = eventFields({ ...payload, rrule: 'rrule' in payload ? payload.rrule : split.rest }, { ...inherited, id: randomUUID(), exdates: (previous.exdates || []).filter(item => onOrAfter(item, recurrenceId)) }, allDay);
+        const move = Boolean(next.allDay) === Boolean(previous.allDay) ? seriesShift(occurrence.start, next.start, next.allDay) : null;
+        if (move && !('rrule' in payload)) next.rrule = shiftRule(next.rrule, occurrence.start, next.start);
+        const cut = seriesPosition({ ...previous, exdates: [] }, recurrenceId)?.index || 0;
+        const colour = seriesColour(payload, previous);
+        const map = next.rrule ? seriesMapper(previous, next, { from: cut, move, byPlace: !('rrule' in payload) }) : null;
+        if (next.rrule && next.exdates) next.exdates = next.exdates.map(map).filter(Boolean);
         if (!next.rrule) delete next.exdates;
         commit(state => {
           const master = state.events.find(item => item.id === previous.id);
           if (master) { master.rrule = split.kept; master.exdates = (master.exdates || []).filter(item => !onOrAfter(item, recurrenceId)); }
-          for (const item of exceptionsOf(state, previous.id)) if (onOrAfter(item.recurrenceId, recurrenceId)) item.masterId = next.id;
+          // Edited occurrences from here on go with the new series, or become events of their own when it does not repeat
+          // (2026-10-21 review: they hung on a plain event and went with it when it was deleted).
+          for (const item of exceptionsOf(state, previous.id)) {
+            if (!onOrAfter(item.recurrenceId, recurrenceId)) continue;
+            if (colour !== undefined) paint(item, colour);
+            const id = map ? map(item.recurrenceId) : null;
+            if (id) { item.masterId = next.id; item.recurrenceId = id; } else detach(item);
+          }
           state.events.push(next);
         });
         return next;
       }
       // All events (or "future" from the first occurrence): the master changes; a moved time applies as a shift so every date stays.
       const event = eventFields(shiftedForMaster(payload, previous, occurrence), previous, allDay);
-      if (!event.rrule) delete event.exdates;
+      const move = event.rrule && Boolean(event.allDay) === Boolean(previous.allDay) ? seriesShift(previous.start, event.start, event.allDay) : null;
+      if (move && !('rrule' in payload)) event.rrule = shiftRule(event.rrule, previous.start, event.start);
+      const map = event.rrule ? seriesMapper(previous, event, { move, byPlace: !('rrule' in payload) }) : null;
+      if (map && event.exdates) event.exdates = event.exdates.map(map).filter(Boolean);
+      if (!event.rrule) { delete event.exdates; toFirstShown(event, previous, true); }
+      const colour = seriesColour(payload, previous);
       commit(state => {
+        if (colour !== undefined) for (const item of exceptionsOf(state, previous.id)) paint(item, colour);
+        if (map) for (const item of exceptionsOf(state, previous.id)) { if (!item.recurrenceId) continue; const id = map(item.recurrenceId); if (id) item.recurrenceId = id; else detach(item); }
         state.events = state.events.map(item => item.id === event.id ? event : item);
-        if (!event.rrule) state.events = state.events.filter(item => item.masterId !== event.id);
+        // No repeat any more: edited occurrences stay as events of their own, as from 「이후 모든 일정」 (2026-10-21 review).
+        if (!event.rrule) for (const item of exceptionsOf(state, previous.id)) detach(item);
       });
       return event;
     }
@@ -977,6 +1267,37 @@ async function command(commandName, payload, sourceWindow) {
         if (calendar?.readOnly) throw new Error(tr('읽기 전용 달력은 새 일정 기본 달력으로 고를 수 없습니다.'));
         settings.defaultCalendarId = calendar ? calendar.id : null;
       }
+      // Notes list order (this PC): edited time, title, or the order the user dragged (2026-10-21).
+      if ('noteSort' in payload) {
+        if (!['edited', 'title', 'manual'].includes(payload.noteSort)) throw new Error(tr('지원하지 않는 메모 정렬입니다.'));
+        settings.noteSort = payload.noteSort;
+      }
+      // The note beside the tasks (this PC): automatic, one note, or none. A note id must be a note that is not in the trash.
+      if ('sideNote' in payload) {
+        const value = payload.sideNote;
+        if (value !== 'auto' && value !== 'off' && !store.get().notes.some(note => note.id === value && !note.trashedAt)) throw new Error(tr('표시할 메모를 찾을 수 없습니다.'));
+        settings.sideNote = value;
+      }
+      if ('tourDone' in payload) settings.tourDone = boolean(payload.tourDone, tr('둘러보기'));
+      if ('noteListStyle' in payload) {
+        if (!['cards', 'compact'].includes(payload.noteListStyle)) throw new Error(tr('지원하지 않는 메모 목록 모양입니다.'));
+        settings.noteListStyle = payload.noteListStyle;
+        settings.noteListChosen = true; // the user's own choice: the default may change without overriding it
+      }
+      if ('noteOrder' in payload) {
+        const value = payload.noteOrder;
+        if (!Array.isArray(value) || value.length > 2000 || value.some(item => typeof item !== 'string' || !item || item.length > 400)) throw new Error(tr('메모 순서가 올바르지 않습니다.'));
+        settings.noteOrder = [...new Set(value)];
+      }
+      // Calendar view (month, week, day) and the right panel (auto: open when the window is wide enough).
+      if ('calendarView' in payload) {
+        if (!['month', 'week', 'day'].includes(payload.calendarView)) throw new Error(tr('지원하지 않는 달력 보기입니다.'));
+        settings.calendarView = payload.calendarView;
+      }
+      if ('calendarPanel' in payload) {
+        if (!['auto', 'open', 'closed'].includes(payload.calendarPanel)) throw new Error(tr('지원하지 않는 패널 설정입니다.'));
+        settings.calendarPanel = payload.calendarPanel;
+      }
       if ('listOrder' in payload) {
         const value = payload.listOrder;
         if (!Array.isArray(value) || value.length > 500 || value.some(item => typeof item !== 'string' || !item || item.length > 400)) throw new Error(tr('목록 순서가 올바르지 않습니다.'));
@@ -1024,7 +1345,9 @@ async function command(commandName, payload, sourceWindow) {
       if (!['microsoft', 'google', 'icloud'].includes(payload.provider)) throw new Error(tr('지원하지 않는 계정입니다.'));
       // accountId: sign in again for an existing account (grants newly requested scopes such as calendar writing).
       if (payload.accountId !== undefined && payload.accountId !== null) lookup('accounts', payload.accountId);
-      return await sync.connect(payload);
+      const connected = await sync.connect(payload);
+      if (!connected?.cancelled) sync.syncNotes().catch(() => {}); // a new grant may turn notes sync on
+      return connected;
     }
     case 'account:update': {
       const account = lookup('accounts', payload.id);
@@ -1032,27 +1355,49 @@ async function command(commandName, payload, sourceWindow) {
       if ('syncTasks' in payload) flags.syncTasks = boolean(payload.syncTasks, tr('할 일 동기화'));
       if ('syncCalendar' in payload) flags.syncCalendar = boolean(payload.syncCalendar, tr('달력 동기화'));
       if (account.provider === 'icloud') flags.syncTasks = false;
-      commit(state => { state.accounts = state.accounts.map(item => item.id === account.id ? { ...item, ...flags } : item); });
-      // Re-sync in the background so the lists or calendars appear or disappear right away.
-      sync.sync().catch(() => {});
+      // 「메모」: one Google account holds the notes (settings.notesAccountId). Turning it on chooses this account (it takes
+      // effect once this sign-in has the notes grant); turning it off stops notes sync — it never moves to another account.
+      let notesChoice;
+      if ('syncNotes' in payload) {
+        if (account.provider !== 'google') throw new Error(tr('메모 동기화는 Google 계정으로만 할 수 있어요.'));
+        notesChoice = boolean(payload.syncNotes, tr('메모 동기화'));
+      }
+      commit(state => {
+        state.accounts = state.accounts.map(item => item.id === account.id ? { ...item, ...flags } : item);
+        if (notesChoice !== undefined) {
+          const was = state.settings.notesAccountId;
+          if (notesChoice) state.settings.notesAccountId = account.id;
+          else if (state.settings.notesAccountId === account.id) state.settings.notesAccountId = null;
+          state.settings.notesAutoDone = true;
+          // Another account (or none): what the footer said about the old one no longer holds.
+          if (state.settings.notesAccountId !== was) Object.assign(state.noteSync.status, { lastSync: null, error: null, pending: false });
+        }
+      });
+      // Re-sync in the background so the lists, calendars or notes appear or disappear right away.
+      if ('syncTasks' in payload || 'syncCalendar' in payload) sync.sync().catch(() => {});
+      if ('syncNotes' in payload) sync.syncNotes().catch(() => {});
       return store.publicState();
     }
     case 'account:disconnect': return await sync.disconnect(identifier(payload.id));
-    case 'sync:run': return await sync.sync();
+    // 「지금 동기화」: accounts, then notes (a notes problem shows on the notes, not as a failed sync).
+    case 'sync:run': try { return await sync.sync(); } finally { await sync.syncNotes().catch(() => {}); }
     case 'widget:open': {
       if (!['tasks', 'calendar', 'note'].includes(payload.type)) throw new Error(tr('지원하지 않는 위젯입니다.'));
       if (store.get().widgets.length >= 12) throw new Error(tr('위젯은 최대 12개까지 열 수 있습니다.'));
       const widget = { id: randomUUID(), type: payload.type, mode: store.get().settings.widgetMode };
       if (widget.type === 'tasks') widget.listId = widgetList(payload.listId);
-      if (widget.type === 'note' && payload.noteId) widget.noteId = lookup('notes', payload.noteId).id;
+      if (widget.type === 'note' && payload.noteId) widget.noteId = liveNote(payload.noteId).id;
       commit(state => { if (widget.type === 'note' && !widget.noteId) widget.noteId = newNote(state).id; state.widgets.push(widget); });
       try { return await openWidget(widget); }
-      catch (error) { widgetWindows.get(widget.id)?.destroy(); commit(state => { state.widgets = state.widgets.filter(w => w.id !== widget.id); }); throw error; }
+      catch (error) {
+        if (error.cancelled) return null; // a quit keeps the record; a close during the load already removed it
+        widgetWindows.get(widget.id)?.destroy(); commit(state => { state.widgets = state.widgets.filter(w => w.id !== widget.id); }); throw error;
+      }
     }
     case 'widget:update': {
       const widget = lookup('widgets', payload.id);
       if ('listId' in payload) widget.listId = widgetList(payload.listId);
-      if ('noteId' in payload) widget.noteId = lookup('notes', payload.noteId).id;
+      if ('noteId' in payload) widget.noteId = liveNote(payload.noteId).id;
       if ('mode' in payload) {
         if (!['desktop', 'top'].includes(payload.mode)) throw new Error(tr('지원하지 않는 위젯 모드입니다.'));
         widget.mode = payload.mode;
@@ -1141,14 +1486,14 @@ function updateMode() {
   return fs.existsSync(path.join(path.dirname(app.getPath('exe')), 'Uninstall Dayboard.exe')) ? 'installed' : 'dev';
 }
 // One notification per key (version), across restarts.
-function announceOnce(key, title, body) {
+function announceOnce(key, title, body, onClick = showMain) {
   const file = path.join(userData, 'update-alerts.json');
   let seen = [];
   try { seen = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { seen = []; }
   if (!Array.isArray(seen) || seen.includes(key)) return;
   try { fs.writeFileSync(file, JSON.stringify([...seen, key].slice(-50))); } catch { return; }
   if (!Notification.isSupported()) return;
-  try { const note = new Notification({ title, body, icon: path.join(__dirname, 'assets', 'toast.png') }); note.on('click', showMain); note.show(); } catch { /* notifications are optional */ }
+  try { const note = new Notification({ title, body, icon: path.join(__dirname, 'assets', 'toast.png') }); note.on('click', onClick); note.show(); } catch { /* notifications are optional */ }
 }
 function createUpdater() {
   const mode = updateMode();
@@ -1198,7 +1543,7 @@ function createUpdater() {
     }
     try { fs.rmSync(path.join(userData, '.updaterId'), { force: true }); } catch { /* next start */ }
   }, 60000).unref?.();
-  if (process.argv.includes('--updated')) announceOnce(`updated:${app.getVersion()}`, tr("Dayboard {0}(으)로 업데이트했어요", [app.getVersion()]), tr('설정에서 변경 내용을 볼 수 있어요.'));
+  if (process.argv.includes('--updated')) announceOnce(`updated:${app.getVersion()}`, tr("Dayboard {0}(으)로 업데이트했어요", [app.getVersion()]), tr('눌러서 새 기능을 볼 수 있어요.'), () => shell.openExternal(releaseTag(app.getVersion())).catch(() => {})); // Settings no longer lists the history (2026-10-21)
 }
 // The startup entry follows the copy that runs now (the installed copy replaces a portable bundle), unless the user
 // turned Dayboard off in Task Manager's startup list.
@@ -1322,8 +1667,13 @@ else {
     if (startupError) throw startupError;
     applyLanguage();
     store = createStore(userData);
+    if (smoke) store.mutate(state => { state.settings.tourDone = true; }); // the tour for new users would cover the checks
     applyLanguage();
-    sync = createSync({ store, safeStorage, shell, userData, onChange: broadcast });
+    // A note deleted on another PC also closes the widgets showing it (their records are already gone).
+    // Before a sync replaces or removes notes here, every window saves its unsaved typing, so nothing typed is overwritten.
+    sync = createSync({ store, safeStorage, shell, userData, onChange: broadcast,
+      beforeNotesApply: () => Promise.all(BrowserWindow.getAllWindows().map(win => flushWindow(win, 'notes'))),
+      onNotesRemoved: ({ widgetIds }) => { for (const id of widgetIds) widgetWindows.get(id)?.destroy(); } });
     ensureStartMenu();
     ipcMain.handle('dayboard:invoke', (event, name, payload) => {
       if (!trusted(event)) throw new Error(tr('이 화면에서는 앱 데이터에 접근할 수 없습니다.'));
@@ -1348,7 +1698,12 @@ else {
     // An update restart (--updated) comes back like a login start: widgets on the desktop, the window in the tray.
     if ((!process.argv.includes('--hidden') && !process.argv.includes('--updated')) || smoke) showMain();
     for (const widget of store.get().widgets) {
+      if (quitting) break; // a quit during the start-up opens: the rest stay saved for the next launch
+      // A note widget whose note is gone or in the trash (another PC, while this one was off) is not reopened: its card
+      // would only offer 「메모 추가」 and create stray notes (2026-10-26 review).
+      if (widget.type === 'note') { const note = store.get().notes.find(item => item.id === widget.noteId); if (!note || note.trashedAt) { commit(state => { state.widgets = state.widgets.filter(item => item.id !== widget.id); }); continue; } }
       await openWidget(widget).catch(error => {
+        if (error.cancelled || quitting) return; // the window was cut short, not broken: the record stays for the next launch
         if (smoke) { smokeErrors.push(error.message); return; }
         // A widget whose window cannot be created would otherwise stay listed forever.
         widgetWindows.get(widget.id)?.destroy();
@@ -1358,11 +1713,19 @@ else {
     }
     if (smoke) await runSmokeTest();
     else {
-      timer = setInterval(() => {
-        if (store.get().accounts.length) sync.sync().catch(() => {});
-      }, 5 * 60 * 1000);
+      // Accounts, then notes, every 5 minutes and at start; notes also when Dayboard comes back to the front (at most once a
+      // minute), so the other PC's notes are there when the user sits down at this one.
+      const syncAll = () => { if (store.get().accounts.length) sync.sync().catch(() => {}).then(() => sync.syncNotes()).catch(() => {}); };
+      timer = setInterval(syncAll, 5 * 60 * 1000);
       timer.unref();
-      if (store.get().accounts.length) sync.sync().catch(() => {});
+      syncAll();
+      let notesFocusAt = 0;
+      // A moment later, so a redraw never lands under the click that brought the window to the front.
+      app.on('browser-window-focus', () => { if (Date.now() - notesFocusAt < 60000) return; notesFocusAt = Date.now(); setTimeout(() => sync?.syncNotes().catch(() => {}), 1500).unref?.(); });
+      // 「최근 삭제한 메모」 past 30 days: at start and every hour.
+      const purge = () => { try { purgeTrash(); } catch (error) { console.error('trash purge failed:', error.message); } };
+      setInterval(purge, 60 * 60 * 1000).unref();
+      purge();
       const reminderTimer = setInterval(() => { try { checkReminders(); } catch (error) { console.error('reminder check failed:', error.message); } }, 30 * 1000);
       reminderTimer.unref();
       checkReminders();
@@ -1381,12 +1744,15 @@ app.on('before-quit', event => {
   event.preventDefault();
   if (quitInFlight) return;
   quitInFlight = true;
-  Promise.all(BrowserWindow.getAllWindows().map(flushWindow)).then(() => {
+  Promise.all(BrowserWindow.getAllWindows().map(flushWindow)).then(async () => {
     try { persistWidgetBounds(); } catch (error) { console.error('widget bounds not saved on quit:', error.message); }
+    await sync?.flushNotes(3000).catch(() => {}); // an edit still waiting goes to the other PCs now
     quitting = true;
     app.quit();
   }).catch(async error => {
-    const { response } = await dialog.showMessageBox({ type: 'warning', title: 'Dayboard', message: tr('메모를 저장하지 못했습니다'), detail: tr("{0}\n\n다시 시도하거나, 저장되지 않은 메모 변경을 버리고 종료할 수 있습니다.", [error.message]), buttons: [tr('다시 시도'), tr('저장하지 않고 종료')], defaultId: 0, cancelId: 0, noLink: true });
+    // What could not be saved may be an event card or a note: the window is shown before the question (2026-10-21 review).
+    if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); }
+    const { response } = await dialog.showMessageBox({ type: 'warning', title: 'Dayboard', message: tr('저장하지 못한 변경이 있습니다'), detail: tr("{0}\n\n다시 시도하거나, 저장되지 않은 변경을 버리고 종료할 수 있습니다.", [error.message]), buttons: [tr('다시 시도'), tr('저장하지 않고 종료')], defaultId: 0, cancelId: 0, noLink: true });
     if (response === 1) { quitting = true; app.quit(); }
   }).finally(() => { quitInFlight = false; });
 });

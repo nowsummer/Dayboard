@@ -52,7 +52,7 @@ function assertRegularFile(filename) {
 function verifyBundle(directory) {
   const appDir = path.join(directory, 'resources', 'app');
   const executable = path.join(directory, 'Dayboard.exe');
-  for (const relative of ['main.cjs', 'preload.cjs', 'renderer/index.html', 'renderer/app.js', 'renderer/domain.js', 'renderer/i18n.js', 'lib/i18n.cjs',
+  for (const relative of ['main.cjs', 'preload.cjs', 'renderer/index.html', 'renderer/app.js', 'renderer/calendar.js', 'renderer/notefind.js', 'renderer/domain.js', 'renderer/i18n.js', 'lib/i18n.cjs',
     'renderer/styles.css', 'renderer/fonts/PretendardVariable.woff2', 'renderer/fonts/OFL.txt',
     'assets/icon.png', 'assets/toast.png', 'assets/icon.ico', 'tests/desktop-smoke.cjs', 'tests/ui-smoke.cjs']) {
     assertRegularFile(path.join(appDir, relative));

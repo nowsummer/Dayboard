@@ -77,11 +77,52 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   checks.push('note-flush-on-close');
   await shot(mainWindow, 'notes');
 
+  // The note beside the tasks (2026-10-21): automatic shows the top of the notes list; the ⋯ menu picks one note or hides it
+  // (the day's events take the room), the settings bring it back, and a chosen note that goes to the trash falls back.
+  const sideOther = await invoke('note:save', { title: '스모크 오른쪽 메모', body: '오른쪽 확인', color: 'yellow' });
+  const side = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.querySelector('.main-nav .nav-item:nth-child(1)').click();
+    await wait(120);
+    const title = () => document.querySelector('.context-note .context-heading h3')?.textContent || null;
+    const auto = title();
+    document.querySelector('.context-note [aria-label="표시할 메모"]').click();
+    await wait(80);
+    const items = [...document.querySelectorAll('.context-menu .menu-item')];
+    const first = items[0]?.textContent || '';
+    items.find(node => node.textContent === '스모크 메모').click();
+    await wait(200);
+    const picked = title();
+    document.querySelector('.context-note [aria-label="표시할 메모"]').click();
+    await wait(80);
+    [...document.querySelectorAll('.context-menu .menu-item')].find(node => node.textContent === '메모 숨기기').click();
+    await wait(200);
+    const hidden = !document.querySelector('.context-note');
+    document.querySelector('[aria-label="설정"]')?.click();
+    await wait(150);
+    const select = [...document.querySelectorAll('#modal-root .field')].find(node => node.textContent.startsWith('할 일 화면 메모'))?.querySelector('select');
+    const settingsValue = select ? select.value : 'missing';
+    if (select) { select.value = 'auto'; select.dispatchEvent(new Event('change', { bubbles: true })); }
+    await wait(200);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await wait(100);
+    return { auto, first, picked, hidden, settingsValue, back: title() };`);
+  expect(side.auto === '스모크 오른쪽 메모' && side.first === '자동 (고정·최근 메모)' && side.picked === '스모크 메모' && side.hidden && side.settingsValue === 'off' && side.back === '스모크 오른쪽 메모', `할 일 화면 메모 고르기·숨기기 ${JSON.stringify(side)}`);
+  await invoke('settings:update', { sideNote: sideOther.id });
+  await invoke('note:trash', { id: sideOther.id });
+  const fallback = await run(mainWindow, `await new Promise(resolve => setTimeout(resolve, 150)); return document.querySelector('.context-note .context-heading h3')?.textContent || null;`);
+  const refused = await invoke('settings:update', { sideNote: sideOther.id }).then(() => 'accepted', error => error.message);
+  await invoke('note:restore', { id: sideOther.id });
+  await invoke('note:delete', { id: sideOther.id });
+  await invoke('settings:update', { sideNote: 'auto' });
+  expect(fallback === '스모크 메모' && /찾을 수 없습니다/.test(refused), `휴지통 메모는 자동으로 ${fallback} / ${refused}`);
+  checks.push('tasks-side-note-choice');
+
   // Dialogs open, receive focus and close with Escape without leaving overlays.
   const dialogs = await run(mainWindow, `
     const results = [];
     const openers = [
-      ['settings', () => document.querySelector('.sidebar-bottom .icon-button').click()],
+      ['settings', () => document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click()],
       ['accounts', () => document.querySelector('.account-button').click()],
       ['add-list', () => document.querySelector('.sidebar-section-head .icon-button').click()]];
     for (const [name, open] of openers) {
@@ -105,7 +146,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   // no 저장 button, closes on an outside click without an unsaved warning, and 계정 관리 stacks on it (Esc returns).
   const clockBefore = (await invoke('state:get')).settings.timeFormat || '12h';
   const live = await run(mainWindow, `
-    document.querySelector('.sidebar-bottom .icon-button').click();
+    document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
     await new Promise(resolve => setTimeout(resolve, 30));
     const dialog = document.querySelector('#modal-root .dialog');
     const result = { sheetFocus: document.activeElement === dialog, inert: document.getElementById('app').inert === true, save: [...dialog.querySelectorAll('button')].some(node => node.textContent.trim() === '저장') };
@@ -114,7 +155,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     clock.dispatchEvent(new Event('change', { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 250));
     result.stillOpen = document.querySelector('#modal-root .dialog') === dialog;
-    [...dialog.querySelectorAll('.settings-links button')].find(node => node.textContent.includes('계정 관리')).click();
+    [...dialog.querySelectorAll('.settings-links button')].find(node => node.textContent.trim() === '계정').click();
     await new Promise(resolve => setTimeout(resolve, 30));
     result.accounts = document.querySelector('#modal-root .dialog h2')?.textContent || '';
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -129,19 +170,21 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     return result;`);
   const clockApplied = (await invoke('state:get')).settings.timeFormat;
   await invoke('settings:update', { timeFormat: clockBefore });
-  expect(live.sheetFocus && live.inert && !live.save && live.stillOpen && live.accounts === '연결된 계정' && live.back === '설정' && live.closed && !live.warned && live.released && clockApplied !== clockBefore, `설정 즉시 적용·계정 관리 쌓기 ${JSON.stringify({ ...live, clockApplied })}`);
+  expect(live.sheetFocus && live.inert && !live.save && live.stillOpen && live.accounts === '계정' && live.back === '설정' && live.closed && !live.warned && live.released && clockApplied !== clockBefore, `설정 즉시 적용·계정 관리 쌓기 ${JSON.stringify({ ...live, clockApplied })}`);
   checks.push('settings-live-stacked-accounts');
 
-  // Settings shows the version and the update block (the smoke run has no updater: only the history link).
+  // Settings shows the version; the update block only with an updater (none in the smoke run), and no standing
+  // 「업데이트 기록」 link (2026-10-21 user: only 「업데이트 확인」 is needed).
   const updateInfo = await run(mainWindow, `
-    document.querySelector('.sidebar-bottom .icon-button[aria-label="설정"]').click();
+    document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
     await new Promise(resolve => setTimeout(resolve, 60));
     const dialog = document.querySelector('#modal-root .dialog');
     const result = { version: dialog?.querySelector('.settings-brand small')?.textContent || '', block: Boolean(dialog?.querySelector('#update-block')), history: [...(dialog?.querySelectorAll('#update-block button') || [])].map(node => node.textContent) };
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     return result;`);
   const appVersion = (await invoke('state:get')).app?.version;
-  expect(appVersion && updateInfo.version === `버전 ${appVersion}` && updateInfo.block && updateInfo.history.includes('업데이트 기록'), `설정의 버전·업데이트 ${JSON.stringify({ appVersion, updateInfo })}`);
+  const hasUpdater = Boolean((await invoke('state:get')).app?.update);
+  expect(appVersion && updateInfo.version === `버전 ${appVersion}` && updateInfo.block === hasUpdater && !updateInfo.history.includes('업데이트 기록'), `설정의 버전·업데이트 ${JSON.stringify({ appVersion, hasUpdater, updateInfo })}`);
   checks.push('settings-version-update-block');
 
   // The toast's 되돌리기 is really clickable (the toast used to be pointer-events:none) and Ctrl+Z runs it exactly once.
@@ -295,31 +338,36 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => requestAnimationFrame(resolve));
     const card = document.querySelector('.note-card');
     card.click(); card.focus();
+    const id = activeNote;
     await new Promise(resolve => setTimeout(resolve, 30));
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
-    await new Promise(resolve => setTimeout(resolve, 30));
-    const dialog = document.querySelector('#modal-root .dialog');
-    const opened = Boolean(dialog) && dialog.textContent.includes('삭제');
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    return opened;`);
-  expect(deleteFlow === true, '메모 Delete 키 삭제 확인창');
+    await new Promise(resolve => setTimeout(resolve, 150));
+    // 2026-10-21: Delete moves the note to 「최근 삭제한 메모」 at once (no question); it is restored for the checks below.
+    const result = { dialog: Boolean(document.querySelector('#modal-root .dialog')), trashed: Boolean(state.notes.find(n => n.id === id)?.trashedAt) };
+    await window.dayboard.invoke('note:restore', { id });
+    await new Promise(resolve => setTimeout(resolve, 60));
+    return result;`);
+  expect(deleteFlow.trashed && !deleteFlow.dialog, `메모 Delete 키로 최근 삭제한 메모로 ${JSON.stringify(deleteFlow)}`);
   await invoke('account:update', { id: 'missing', syncTasks: false }).then(() => { throw new Error('없는 계정 수정이 통과했습니다.'); }, error => expect(/항목이 없거나/.test(error.message), `계정 범위 검증: ${error.message}`));
   checks.push('reminder-default-list-order-notes-delete');
 
   // Calendar: double-click a day opens the add dialog prefilled; local events can be edited; auth status exposes one-click providers.
   const status = await invoke('auth:status');
   expect(status.microsoft?.builtIn === true && typeof status.google?.builtIn === 'boolean', `auth:status ${JSON.stringify(status)}`);
+  // 2026-10-21: double-clicking a day opens the event card beside it (Notion) with the title ready; Esc drops the draft.
   const dblclick = await run(mainWindow, `
     document.querySelector('.main-nav .nav-item:nth-child(2)').click();
     await new Promise(resolve => requestAnimationFrame(resolve));
     const day = document.querySelector('.calendar-grid.large .calendar-day.is-today');
     day.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
-    await new Promise(resolve => setTimeout(resolve, 40));
-    const dialog = document.querySelector('#modal-root .dialog');
-    const result = { open: Boolean(dialog), title: dialog ? dialog.querySelector('h2')?.textContent : '', start: dialog ? dialog.querySelector('input[name=start]')?.value : '' };
+    await new Promise(resolve => setTimeout(resolve, 60));
+    const card = document.querySelector('.event-card');
+    const result = { open: Boolean(card), placeholder: card?.querySelector('textarea.card-title')?.placeholder || '', focused: Boolean(document.activeElement?.classList.contains('card-title')), times: card ? [...card.querySelectorAll('.card-time')].map(node => node.value) : [], dialog: Boolean(document.querySelector('#modal-root .dialog')) };
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 40));
+    result.closed = !document.querySelector('.event-card');
     return result;`);
-  expect(dblclick.open && dblclick.title === '일정 추가' && dblclick.start.startsWith(new Date().toISOString().slice(0, 4)), `달력 더블클릭 ${JSON.stringify(dblclick)}`);
+  expect(dblclick.open && dblclick.placeholder === '새 일정' && dblclick.focused && dblclick.times.length === 2 && dblclick.times.every(Boolean) && !dblclick.dialog && dblclick.closed, `달력 더블클릭 → 일정 카드 ${JSON.stringify(dblclick)}`);
   const localEvent = await invoke('event:add', { title: '편집 전', calendarId: 'local-calendar', start: '2026-10-21T01:00:00.000Z', end: '2026-10-21T02:00:00.000Z', allDay: false, location: '' });
   const edited = await invoke('event:update', { id: localEvent.id, title: '편집 후', allDay: true, start: '2026-10-22', end: '2026-10-23' });
   expect(edited.title === '편집 후' && edited.allDay === true && edited.start === '2026-10-22', `일정 편집 ${JSON.stringify(edited)}`);
@@ -348,7 +396,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const guarded = await run(mainWindow, `
     document.querySelector('.main-nav .nav-item:nth-child(2)').click();
     await new Promise(resolve => requestAnimationFrame(resolve));
-    document.querySelector('.calendar-grid.large .calendar-day.is-today').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    eventDialog(null, window.DayboardDates.dateKey());
     await new Promise(resolve => setTimeout(resolve, 40));
     document.querySelector('#modal-root input[name=title]').value = '단축키 보호';
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }));
@@ -426,7 +474,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   // Edit sheet of an occurrence shows the repeat picker in custom mode with a readable summary.
   const sheet = await run(mainWindow, `
     const chip = [...document.querySelectorAll('.calendar-grid.large .day-event')].find(node => node.textContent.includes('스모크 반복'));
-    chip.click();
+    eventDialog(eventsBetween(D.dayOffset(D.dateKey(), -1), D.dayOffset(D.dateKey(), 60)).find(item => item.id === chip.dataset.eventKey), D.dateKey());
     await new Promise(resolve => setTimeout(resolve, 40));
     const dialog = document.querySelector('#modal-root .dialog');
     const selects = dialog ? [...dialog.querySelectorAll('.field select')] : [];
@@ -441,7 +489,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const eventsBefore = (await invoke('state:get')).events.length;
   const untouched = await run(mainWindow, `
     const chip = [...document.querySelectorAll('.calendar-grid.large .day-event')].find(node => node.textContent.includes('스모크 반복'));
-    chip.click();
+    eventDialog(eventsBetween(D.dayOffset(D.dateKey(), -1), D.dayOffset(D.dateKey(), 60)).find(item => item.id === chip.dataset.eventKey), D.dateKey());
     await new Promise(resolve => setTimeout(resolve, 60));
     const dialog = document.querySelector('#modal-root .dialog');
     const footer = dialog.querySelector('.dialog-body > .dialog-footer');
@@ -457,7 +505,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   expect(untouched.inside && (!untouched.scrolls || untouched.line !== 'none') && !untouched.dialog && !untouched.scope && state.events.length === eventsBefore && !untouchedMaster.exdates?.length && untouchedMaster.rrule === 'FREQ=WEEKLY;COUNT=4', `바꾸지 않은 반복 일정 저장·고정 단추 ${JSON.stringify({ untouched, rrule: untouchedMaster.rrule, exdates: untouchedMaster.exdates })}`);
   const titleOnly = await run(mainWindow, `
     const chip = [...document.querySelectorAll('.calendar-grid.large .day-event')].find(node => node.textContent.includes('스모크 반복'));
-    chip.click();
+    eventDialog(eventsBetween(D.dayOffset(D.dateKey(), -1), D.dayOffset(D.dateKey(), 60)).find(item => item.id === chip.dataset.eventKey), D.dateKey());
     await new Promise(resolve => setTimeout(resolve, 60));
     document.querySelector('#modal-root input[name=title]').value = '스모크 반복 바뀜';
     document.querySelector('#modal-root .dialog button[type=submit]').click();
@@ -524,7 +572,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => requestAnimationFrame(resolve));
     document.querySelector('[data-focus-key="month-today"]').click();
     await new Promise(resolve => setTimeout(resolve, 30));
-    const open = async key => { document.querySelector('.calendar-grid.large [data-focus-key="day-' + key + '"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 40)); return document.querySelector('#modal-root .dialog'); };
+    const open = async key => { eventDialog(null, key); await new Promise(resolve => setTimeout(resolve, 40)); return document.querySelector('#modal-root .dialog'); };
     const close = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 30)); };
     let dialog = await open(today);
     const result = { today: dialog.querySelector('input[name=start]').value + '/' + dialog.querySelector('input[name=end]').value, expected: D.defaultEventTimes(today).join('/') };
@@ -555,7 +603,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const later = new Date(new Date().getFullYear(), new Date().getMonth() + 2, 10);
   const laterKey = D.dateKey(later);
   const movedSave = await run(mainWindow, `
-    document.querySelector('.calendar-grid.large .calendar-day.is-today').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    eventDialog(null, window.DayboardDates.dateKey());
     await new Promise(resolve => setTimeout(resolve, 40));
     const dialog = document.querySelector('#modal-root .dialog');
     dialog.querySelector('input[name=title]').value = '스모크 다른 달';
@@ -571,7 +619,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   expect(movedSave.closed && movedSave.title === laterTitle && movedSave.selected === `day-${laterKey}` && movedSave.chip, `다른 달에 저장한 일정으로 이동 ${JSON.stringify(movedSave)} (${laterTitle})`);
   await invoke('settings:update', { hiddenCalendars: ['local-calendar'] });
   const hiddenSave = await run(mainWindow, `
-    document.querySelector('.calendar-grid.large .calendar-day.is-today').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    eventDialog(null, window.DayboardDates.dateKey());
     await new Promise(resolve => setTimeout(resolve, 40));
     const dialog = document.querySelector('#modal-root .dialog');
     dialog.querySelector('input[name=title]').value = '스모크 숨긴 달력';
@@ -614,15 +662,534 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const chip = [...document.querySelectorAll('.calendar-grid.large .day-event')].find(node => node.textContent.includes('스모크 삭제키'));
     chip.focus();
     await press(chip, { key: 'Delete', code: 'Delete' });
-    result.confirm = document.querySelector('#modal-root .dialog h2')?.textContent || '';
-    await press(document, { key: 'Escape' });
-    result.closed = !document.querySelector('#modal-root .dialog');
+    result.dialog = Boolean(document.querySelector('#modal-root .dialog'));
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const toastNode = document.getElementById('toast');
+    result.toast = toastNode.textContent; result.gone = !document.querySelector('.calendar-grid.large [data-event-key="' + chip.dataset.eventKey + '"]');
+    toastNode.querySelector('.toast-action')?.click();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    result.undone = [...document.querySelectorAll('.calendar-grid.large .day-event')].some(node => node.textContent.includes('스모크 삭제키'));
     return result;`);
-  expect(keys.kept && keys.arrow && keys.nextMonth && keys.back && keys.closed && keys.confirm === '「스모크 삭제키」 일정을 삭제할까요?' && ['이전 달 (Ctrl+←)', '다음 달 (Ctrl+→)', '오늘 (Ctrl+T)', '일정 추가 (Ctrl+N)'].every(tip => keys.tips.includes(tip)), `달력 키보드 ${JSON.stringify(keys)}`);
+  expect(keys.kept && keys.arrow && keys.nextMonth && keys.back && !keys.dialog && /일정을 삭제했어요/.test(keys.toast) && keys.gone && keys.undone && ['이전 달 (Ctrl+←)', '다음 달 (Ctrl+→)', '오늘 (T)', '일정 추가 (C)', '월간 보기 (M)', '오른쪽 패널 숨기기 (\\)'].every(tip => keys.tips.includes(tip)), `달력 키보드 ${JSON.stringify(keys)}`);
   state = await invoke('state:get');
-  expect(state.events.some(item => item.id === keyEvent.id), 'Delete 확인창을 닫으면 일정 유지');
-  await invoke('event:delete', { id: keyEvent.id });
+  const restored = state.events.filter(item => item.title === '스모크 삭제키');
+  expect(restored.length === 1 && restored[0].start === keyEvent.start && restored[0].end === keyEvent.end && !state.events.some(item => item.id === keyEvent.id), 'Delete 뒤 실행 취소로 일정 되돌림');
+  await invoke('event:delete', { id: restored[0].id });
   checks.push('calendar-keyboard');
+
+  // Week and day views (2026-10-21, renderer/calendar.js): the 일|주|월 switch and D/W/M keys, a timed event as a block at its
+  // hour, the current-time line, dragging a block to another day and hour (Undo puts it back), stretching its bottom edge,
+  // drawing a new event, the event card beside a block (a title change saves), a repeating event asking how far a drag
+  // applies, dragging a month chip to another day, the panel toggle and the month wheel.
+  const weekEvent = await invoke('event:add', { title: '스모크 주간', calendarId: 'local-calendar', start: localIso(today, 10), end: localIso(today, 11), allDay: false, location: '' });
+  const weekly = await invoke('event:add', { title: '스모크 주간 반복', calendarId: 'local-calendar', start: localIso(today, 14), end: localIso(today, 15), allDay: false, location: '', rrule: 'FREQ=WEEKLY;COUNT=3' });
+  const pointerKit = `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const D = window.DayboardDates; const today = D.dateKey();
+    const fire = (type, x, y, node = window) => node.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1, pointerId: 7, pointerType: 'mouse', isPrimary: true }));
+    const block = key => document.querySelector('.time-event[data-event-key="' + key + '"]');`;
+  const week = await run(mainWindow, `${pointerKit}
+    document.querySelector('.main-nav .nav-item:nth-child(2)').click(); await wait(60);
+    document.querySelector('[data-focus-key="month-today"]').click(); await wait(40);
+    document.querySelector('.view-switch [data-focus-key="view-week"]').click(); await wait(150);
+    const result = { cols: document.querySelectorAll('.time-view.week .time-col').length, today: Boolean(document.querySelector('.time-day.is-today')), now: Boolean(document.querySelector('.time-col.is-today .now-line')), labels: document.querySelectorAll('.hour-label').length, panel: Boolean(document.querySelector('.day-panel:not(.drawer)')) };
+    const node = block(${JSON.stringify(weekEvent.id)});
+    result.top = node ? Math.round((node.getBoundingClientRect().top - node.closest('.time-col').getBoundingClientRect().top) / calHour * 60) : -1;
+    result.hour = calHour;
+    return result;`);
+  state = await invoke('state:get');
+  expect(week.cols === 7 && week.today && week.now && week.labels === 23 && week.panel && Math.abs(week.top - 600) <= 2 && week.hour >= 40 && state.settings.calendarView === 'week', `주간 보기 ${JSON.stringify(week)} ${state.settings.calendarView}`);
+  await shot(mainWindow, 'calendar-week');
+  const dragged = await run(mainWindow, `${pointerKit}
+    const node = block(${JSON.stringify(weekEvent.id)}); node.scrollIntoView({ block: 'center' }); await wait(40);
+    const r = node.getBoundingClientRect();
+    const cols = [...document.querySelectorAll('.time-col')]; const i = cols.findIndex(c => c.dataset.day === today); const target = cols[i === cols.length - 1 ? i - 1 : i + 1];
+    const tx = target.getBoundingClientRect().left + 20, x0 = r.left + 10, y0 = r.top + 8;
+    fire('pointerdown', x0, y0, node); fire('pointermove', x0 + 3, y0 + 2); fire('pointermove', tx, y0 + calHour); await wait(30);
+    const ghost = document.querySelector('.time-event.ghost')?.textContent || '';
+    fire('pointerup', tx, y0 + calHour); await wait(300);
+    const toastNode = document.getElementById('toast');
+    return { day: target.dataset.day, ghost, toast: toastNode.textContent, action: toastNode.querySelector('.toast-action')?.textContent || '', card: Boolean(document.querySelector('.event-card')) };`);
+  state = await invoke('state:get');
+  let weekNow = state.events.find(item => item.id === weekEvent.id);
+  expect(D.dateKey(new Date(weekNow.start)) === dragged.day && new Date(weekNow.start).getHours() === 11 && new Date(weekNow.start).getMinutes() === 0 && new Date(weekNow.end).getHours() === 12 && /일정을 옮겼어요/.test(dragged.toast) && dragged.action === '되돌리기' && /11:00/.test(dragged.ghost) && !dragged.card, `일정 끌어 옮기기 ${JSON.stringify(dragged)} ${weekNow.start}`);
+  await run(mainWindow, `document.querySelector('#toast .toast-action').click(); await new Promise(resolve => setTimeout(resolve, 300)); return true;`);
+  state = await invoke('state:get');
+  weekNow = state.events.find(item => item.id === weekEvent.id);
+  expect(weekNow.start === weekEvent.start && weekNow.end === weekEvent.end, `옮기기 실행 취소 ${weekNow.start}`);
+  const stretched = await run(mainWindow, `${pointerKit}
+    const node = block(${JSON.stringify(weekEvent.id)}); node.scrollIntoView({ block: 'center' }); await wait(40);
+    const handle = node.querySelector('.resize-handle.bottom'); const r = handle.getBoundingClientRect();
+    fire('pointerdown', r.left + 10, r.top + 3, handle); fire('pointermove', r.left + 10, r.top + 6); fire('pointermove', r.left + 10, r.top + 3 + calHour / 2); await wait(30);
+    const ghost = document.querySelector('.time-event.ghost')?.textContent || '';
+    fire('pointerup', r.left + 10, r.top + 3 + calHour / 2); await wait(300);
+    return { ghost, toast: document.getElementById('toast').textContent };`);
+  state = await invoke('state:get');
+  weekNow = state.events.find(item => item.id === weekEvent.id);
+  expect(weekNow.start === weekEvent.start && new Date(weekNow.end).getHours() === 11 && new Date(weekNow.end).getMinutes() === 30 && /1시간 30분/.test(stretched.ghost) && /일정 시간을 바꿨어요/.test(stretched.toast), `아래쪽 끌어 늘리기 ${JSON.stringify(stretched)} ${weekNow.end}`);
+  const drawn = await run(mainWindow, `${pointerKit}
+    const col = [...document.querySelectorAll('.time-col')].find(c => c.dataset.day !== today);
+    const cr = col.getBoundingClientRect(); document.querySelector('.time-scroll').scrollTop = 15 * calHour; await wait(40);
+    const top = col.getBoundingClientRect().top;
+    fire('pointerdown', cr.left + 20, top + 16 * calHour + 2, col); fire('pointermove', cr.left + 20, top + 16 * calHour + 8); fire('pointermove', cr.left + 20, top + 17 * calHour - 4); await wait(30);
+    fire('pointerup', cr.left + 20, top + 17 * calHour - 4); await wait(150);
+    const card = document.querySelector('.event-card');
+    const result = { day: col.dataset.day, card: Boolean(card), draft: Boolean(document.querySelector('.time-event.draft')), focused: document.activeElement?.classList.contains('card-title'), times: card ? [...card.querySelectorAll('.card-time')].map(n => n.value) : [] };
+    const title = card.querySelector('textarea.card-title');
+    title.value = '스모크 그린 일정'; title.dispatchEvent(new Event('input', { bubbles: true }));
+    title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(300);
+    result.closed = !document.querySelector('.event-card'); result.draftGone = !document.querySelector('.time-event.draft');
+    return result;`);
+  state = await invoke('state:get');
+  const drawnEvent = state.events.find(item => item.title === '스모크 그린 일정');
+  expect(drawn.card && drawn.draft && drawn.focused && drawn.closed && drawn.draftGone && drawnEvent && D.dateKey(new Date(drawnEvent.start)) === drawn.day && new Date(drawnEvent.start).getHours() === 16 && new Date(drawnEvent.end).getHours() === 17 && new Date(drawnEvent.end).getMinutes() === 0, `빈 곳 끌어 새 일정 ${JSON.stringify(drawn)} ${JSON.stringify(drawnEvent)}`);
+  const card = await run(mainWindow, `${pointerKit}
+    const node = block(${JSON.stringify(weekEvent.id)}); node.scrollIntoView({ block: 'center' }); await wait(40);
+    node.click(); await wait(80);
+    const card = document.querySelector('.event-card'); const c = card.getBoundingClientRect(), b = node.getBoundingClientRect();
+    const result = { open: Boolean(card), beside: c.left >= b.right - 1 || c.right <= b.left + 1, ring: node.classList.contains('card-open') || Boolean(document.querySelector('.time-event.card-open')), fields: [...card.querySelectorAll('.card-time')].length, repeat: card.querySelector('select.card-repeat')?.value ?? null };
+    const title = card.querySelector('textarea.card-title'); title.focus(); title.value = '스모크 주간 바뀜'; title.dispatchEvent(new Event('input', { bubbles: true })); title.blur();
+    // The card saves 0.4 s after the edit; on a busy PC the write may take longer, so wait for it rather than a fixed 700 ms.
+    for (let tries = 0; tries < 40 && state.events.find(item => item.id === ${JSON.stringify(weekEvent.id)})?.title !== '스모크 주간 바뀜'; tries++) await wait(100);
+    return result;`);
+  await shot(mainWindow, 'calendar-card');
+  card.closed = await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 60)); return !document.querySelector('.event-card');`);
+  state = await invoke('state:get');
+  expect(card.open && card.beside && card.ring && card.fields === 2 && card.repeat === '' && card.closed && state.events.find(item => item.id === weekEvent.id)?.title === '스모크 주간 바뀜', `일정 카드 ${JSON.stringify(card)}`);
+  const seriesDrag = await run(mainWindow, `${pointerKit}
+    const node = block(${JSON.stringify(`${weekly.id}@${weekly.start}`)}); node.scrollIntoView({ block: 'center' }); await wait(40);
+    const r = node.getBoundingClientRect();
+    fire('pointerdown', r.left + 10, r.top + 8, node); fire('pointermove', r.left + 12, r.top + 12); fire('pointermove', r.left + 10, r.top + 8 + calHour); fire('pointerup', r.left + 10, r.top + 8 + calHour); await wait(120);
+    const options = [...document.querySelectorAll('.scope-options .button')].map(n => n.textContent.trim());
+    const ghost = Boolean(document.querySelector('.time-event.ghost'));
+    [...document.querySelectorAll('#modal-root .dialog-footer .button')].find(n => n.textContent.trim() === '취소')?.click(); await wait(150);
+    return { options, ghost, back: !document.querySelector('.time-event.ghost') && !document.querySelector('#modal-root .dialog') };`);
+  state = await invoke('state:get');
+  const weeklyNow = state.events.find(item => item.id === weekly.id);
+  expect(seriesDrag.options.join('|') === '이 일정만|이후 모든 일정|모든 일정' && seriesDrag.ghost && seriesDrag.back && weeklyNow.start === weekly.start && !weeklyNow.exdates?.length, `반복 일정 끌기 범위 선택 ${JSON.stringify(seriesDrag)}`);
+  const views = await run(mainWindow, `${pointerKit}
+    document.querySelector('.time-day[data-day="' + today + '"]').click(); await wait(120);
+    const result = { day: document.querySelectorAll('.time-view.day .time-col').length, title: document.querySelector('.topbar h1').textContent };
+    document.body.focus(); document.activeElement?.blur?.();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', bubbles: true, cancelable: true })); await wait(120);
+    result.week = document.querySelectorAll('.time-view.week .time-col').length;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ㅡ', code: 'KeyM', bubbles: true, cancelable: true })); await wait(120);
+    result.month = Boolean(document.querySelector('.calendar-grid.large.rolling'));
+    return result;`);
+  expect(views.day === 1 && /\d+일/.test(views.title) && views.week === 7 && views.month, `일·주·월 전환 ${JSON.stringify(views)}`);
+  const monthDrag = await run(mainWindow, `${pointerKit}
+    const chip = document.querySelector('.calendar-grid.large .day-event[data-event-key="${weekEvent.id}"]');
+    const cells = [...document.querySelectorAll('.calendar-grid.large .calendar-day')]; const i = cells.findIndex(c => c.dataset.day === today);
+    const target = cells[i % 7 === 6 ? i - 1 : i + 1]; const t = target.getBoundingClientRect(), r = chip.getBoundingClientRect();
+    fire('pointerdown', r.left + 8, r.top + 6, chip); fire('pointermove', r.left + 14, r.top + 8); fire('pointermove', t.left + t.width / 2, t.top + t.height / 2); await wait(30);
+    const marked = target.classList.contains('drop-target') || Boolean(document.querySelector('.calendar-day.drop-target'));
+    fire('pointerup', t.left + t.width / 2, t.top + t.height / 2); await wait(300);
+    return { day: target.dataset.day, marked, toast: document.getElementById('toast').textContent };`);
+  state = await invoke('state:get');
+  weekNow = state.events.find(item => item.id === weekEvent.id);
+  expect(D.dateKey(new Date(weekNow.start)) === monthDrag.day && new Date(weekNow.start).getHours() === 10 && new Date(weekNow.end).getMinutes() === 30 && monthDrag.marked && /일정을 옮겼어요/.test(monthDrag.toast), `월간 보기에서 다른 날로 끌기 ${JSON.stringify(monthDrag)} ${weekNow.start}`);
+  const panelWheel = await run(mainWindow, `${pointerKit}
+    const toggle = document.querySelector('[data-focus-key="panel-toggle"]');
+    toggle.click(); await wait(150);
+    const result = { hidden: !document.querySelector('.day-panel'), wide: document.querySelector('.calendar-view').classList.contains('panel-hidden') };
+    document.querySelector('[data-focus-key="panel-toggle"]').click(); await wait(150);
+    result.shown = Boolean(document.querySelector('.day-panel'));
+    const first = document.querySelector('.calendar-grid.large .calendar-day').dataset.day;
+    document.querySelector('.calendar-grid.large').dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })); await wait(120);
+    result.scrolled = document.querySelector('.calendar-grid.large .calendar-day').dataset.day === D.dayOffset(first, 7);
+    document.querySelector('[data-focus-key="month-today"]').click(); await wait(60);
+    result.back = document.querySelector('.calendar-grid.large .calendar-day').dataset.day === first;
+    return result;`);
+  state = await invoke('state:get');
+  expect(panelWheel.hidden && panelWheel.wide && panelWheel.shown && panelWheel.scrolled && panelWheel.back && state.settings.calendarPanel === 'auto', `오른쪽 패널 접기·월간 휠 ${JSON.stringify(panelWheel)} ${state.settings.calendarPanel}`);
+  for (const item of state.events.filter(event => ['스모크 그린 일정'].includes(event.title) || event.id === weekEvent.id)) await invoke('event:delete', { id: item.id });
+  await invoke('event:delete', { id: weekly.id, scope: 'all' });
+  await invoke('settings:update', { calendarView: 'month', calendarPanel: 'auto' });
+  checks.push('calendar-week-day-drag-card-panel');
+
+  // Finding (2026-10-21 requests): Ctrl+F in 메모 opens the find bar on the open note — every match marked, n/m, Enter to the
+  // next, Esc selects it in the text; the list's search marks its words; the list can be compact rows; on the calendar the
+  // search lists events (upcoming first) and a row opens that day with the event's card.
+  const findNote = await invoke('note:save', { title: '스모크 찾기', body: '사과 바나나\n둘째 줄 사과\n셋째 줄 귤 사과', color: 'yellow' });
+  const found = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.querySelector('.main-nav .nav-item:nth-child(3)').click(); await wait(80);
+    [...document.querySelectorAll('.note-card')].find(node => node.textContent.includes('스모크 찾기')).click(); await wait(80);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', ctrlKey: true, bubbles: true, cancelable: true })); await wait(80);
+    const input = document.querySelector('.note-find-input');
+    const result = { bar: Boolean(input), focused: document.activeElement === input };
+    input.value = '사과'; input.dispatchEvent(new Event('input', { bubbles: true })); await wait(40);
+    result.marks = document.querySelectorAll('.note-highlights mark').length;
+    result.count = document.querySelector('.note-find-count').textContent;
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(40);
+    result.second = document.querySelector('.note-find-count').textContent;
+    const body = document.querySelector('.note-body');
+    const mark = document.querySelector('.note-highlights mark.current'); const box = body.getBoundingClientRect(), m = mark.getBoundingClientRect();
+    result.inside = m.left >= box.left - 1 && m.right <= box.right + 1;
+    document.querySelector('.note-find-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(80);
+    const text = document.querySelector('.note-body');
+    result.closed = !document.querySelector('.note-find'); result.selected = text.value.slice(text.selectionStart, text.selectionEnd); result.at = text.selectionStart;
+    // The list search marks its words and opening a note from it starts the find bar on them.
+    const search = document.querySelector('.search input'); result.placeholder = search.placeholder;
+    search.focus(); search.value = '귤'; search.dispatchEvent(new Event('input', { bubbles: true })); await wait(80);
+    const card = [...document.querySelectorAll('.note-card')].find(node => node.textContent.includes('스모크 찾기'));
+    result.listMark = card?.querySelector('mark')?.textContent || '';
+    card.click(); await wait(100);
+    result.fromSearch = document.querySelector('.note-find-input')?.value || '';
+    document.querySelector('.note-find-input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(40);
+    search.value = ''; search.dispatchEvent(new Event('input', { bubbles: true })); await wait(60);
+    return result;`);
+  expect(found.bar && found.focused && found.marks === 3 && found.count === '1/3' && found.second === '2/3' && found.inside && found.closed && found.selected === '사과' && found.at === 12 && found.placeholder === '메모 검색' && found.listMark === '귤' && found.fromSearch === '귤', `메모 찾기 ${JSON.stringify(found)}`);
+  await invoke('settings:update', { noteListStyle: 'compact' });
+  const compact = await run(mainWindow, `await new Promise(resolve => setTimeout(resolve, 80)); const card = [...document.querySelectorAll('.note-card')].find(node => node.textContent.includes('스모크 찾기')); return { compact: Boolean(card?.classList.contains('compact')), line: card?.querySelector('.note-card-line')?.textContent || '', height: Math.round(card?.getBoundingClientRect().height || 0) };`);
+  await shot(mainWindow, 'notes-compact');
+  await invoke('settings:update', { noteListStyle: 'oops' }).then(() => { throw new Error('잘못된 목록 모양이 통과했습니다.'); }, error => expect(/메모 목록 모양/.test(error.message), `목록 모양 검증: ${error.message}`));
+  await invoke('settings:update', { noteListStyle: 'cards' });
+  expect(compact.compact && compact.line === '사과 바나나' && compact.height > 0 && compact.height <= 60, `메모 목록 간단히 보기 ${JSON.stringify(compact)}`);
+  await invoke('note:delete', { id: findNote.id });
+  const searchEvent = await invoke('event:add', { title: '스모크 검색 치과', calendarId: 'local-calendar', start: localIso(D.dayOffset(today, 3), 15), end: localIso(D.dayOffset(today, 3), 16), allDay: false, location: '강남' });
+  const calendarSearch = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.querySelector('.main-nav .nav-item:nth-child(2)').click(); await wait(80);
+    const search = document.querySelector('.search input'); const result = { placeholder: search.placeholder };
+    search.focus(); search.value = '치과'; search.dispatchEvent(new Event('input', { bubbles: true })); await wait(120);
+    const hits = [...document.querySelectorAll('.calendar-search .search-hit')];
+    result.hits = hits.length; result.mark = hits[0]?.querySelector('mark')?.textContent || ''; result.head = document.querySelector('.calendar-search .search-head strong')?.textContent || '';
+    result.view = document.querySelector('.view-switch .on')?.textContent || '';
+    hits[0]?.click(); await wait(200);
+    result.cleared = !document.querySelector('.calendar-search') && (document.querySelector('.search input')?.value || '') === '';
+    result.card = document.querySelector('.event-card textarea.card-title')?.value || '';
+    result.selected = document.querySelector('.calendar-grid.large .is-selected')?.dataset.day || '';
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(60);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(60);
+    document.body.focus(); document.activeElement?.blur?.();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', ctrlKey: true, bubbles: true, cancelable: true })); await wait(40);
+    result.ctrlF = document.activeElement === document.querySelector('.search input');
+    document.activeElement?.blur?.();
+    return result;`);
+  await invoke('event:delete', { id: searchEvent.id });
+  expect(calendarSearch.placeholder === '일정 검색' && calendarSearch.hits === 1 && calendarSearch.mark === '치과' && /치과/.test(calendarSearch.head) && calendarSearch.cleared && calendarSearch.card === '스모크 검색 치과' && calendarSearch.selected === D.dayOffset(today, 3) && calendarSearch.ctrlF, `달력 일정 검색 ${JSON.stringify(calendarSearch)}`);
+  checks.push('find-notes-calendar-search');
+
+  // Review round 5 (2026-10-21): a series moved as a whole through its own id takes its weekday along; 「반복 안 함」 for all
+  // keeps the separately edited occurrences as events; Ctrl+Z after the note changed elsewhere does not write the old text
+  // back; the find bar's Enter after Korean input steps; Esc in the search box clears the search and keeps a new event's
+  // card; calendar keys wait while search results show; 「n개 더 보기」 lists more matches.
+  let monday = D.dayOffset(today, 1); while (D.fromDate(monday).getDay() !== 1) monday = D.dayOffset(monday, 1);
+  const mondays = await invoke('event:add', { title: '스모크 월요일', calendarId: 'local-calendar', start: localIso(monday, 10), end: localIso(monday, 11), allDay: false, location: '', rrule: 'FREQ=WEEKLY;BYDAY=MO;WKST=SU' });
+  const movedSeries = await invoke('event:update', { id: mondays.id, start: localIso(D.dayOffset(monday, 2), 10), end: localIso(D.dayOffset(monday, 2), 11) });
+  state = await invoke('state:get');
+  const movedDays = D.eventsInRange(state.events, monday, D.dayOffset(monday, 15)).filter(event => event.title === '스모크 월요일').map(event => D.dateKey(new Date(event.start)));
+  await invoke('event:delete', { id: mondays.id, scope: 'all' });
+  expect(/BYDAY=WE/.test(movedSeries.rrule) && movedDays.length >= 2 && movedDays.every(day => D.fromDate(day).getDay() === 3), `시리즈 자체를 다른 날로 옮기기 ${movedSeries.rrule} ${movedDays}`);
+  const daily = await invoke('event:add', { title: '스모크 매일', calendarId: 'local-calendar', start: localIso(D.dayOffset(today, 1), 7), end: localIso(D.dayOffset(today, 1), 8), allDay: false, location: '', rrule: 'FREQ=DAILY;COUNT=5' });
+  const dailyRuns = D.expandEvent(daily, today, D.dayOffset(today, 10));
+  const separateEdit = await invoke('event:update', { id: dailyRuns[2].id, scope: 'one', title: '스모크 매일 (따로 고침)' });
+  await invoke('event:update', { id: dailyRuns[1].id, scope: 'all', rrule: '' });
+  state = await invoke('state:get');
+  const keptEdit = state.events.find(event => event.id === separateEdit.id);
+  const plain = state.events.find(event => event.id === daily.id);
+  await invoke('event:delete', { id: daily.id }); if (keptEdit) await invoke('event:delete', { id: keptEdit.id });
+  expect(keptEdit && !keptEdit.masterId && !keptEdit.recurrenceId && keptEdit.title === '스모크 매일 (따로 고침)' && plain && !plain.rrule, `반복 안 함(모든 일정)에서 따로 고친 회차 유지 ${JSON.stringify(keptEdit)}`);
+
+  const undoNote = await invoke('note:save', { title: '스모크 되돌리기', body: '처음 글', color: 'yellow' });
+  const typedUndo = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.querySelector('.main-nav .nav-item:nth-child(3)').click(); await wait(80);
+    [...document.querySelectorAll('.note-card')].find(node => node.textContent.includes('스모크 되돌리기')).click(); await wait(80);
+    const body = document.querySelector('.note-body'); body.focus(); body.value = '처음 글 이어서'; body.setSelectionRange(body.value.length, body.value.length);
+    body.dispatchEvent(new Event('input', { bubbles: true })); await wait(900);
+    return body.value;`);
+  await invoke('note:save', { id: undoNote.id, title: '스모크 되돌리기', body: '다른 곳에서 바꾼 글' });
+  const undone = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms)); await wait(150);
+    const body = document.querySelector('.note-body'); const before = body.value; body.focus();
+    body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })); await wait(900);
+    return { before, after: document.querySelector('.note-body').value };`);
+  state = await invoke('state:get');
+  const undoStored = state.notes.find(note => note.id === undoNote.id)?.body;
+  expect(typedUndo === '처음 글 이어서' && undone.before === '다른 곳에서 바꾼 글' && undone.after === '다른 곳에서 바꾼 글' && undoStored === '다른 곳에서 바꾼 글', `다른 곳에서 바뀐 뒤 Ctrl+Z ${JSON.stringify({ typedUndo, undone, undoStored })}`);
+  await invoke('note:delete', { id: undoNote.id });
+
+  const imeNote = await invoke('note:save', { title: '스모크 한글 찾기', body: '사과\n사과\n사과', color: 'yellow' });
+  const imeFind = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    [...document.querySelectorAll('.note-card')].find(node => node.textContent.includes('스모크 한글 찾기')).click(); await wait(80);
+    document.querySelector('.note-body').focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', ctrlKey: true, bubbles: true, cancelable: true })); await wait(80);
+    const input = document.querySelector('.note-find-input'); input.value = '사과'; input.dispatchEvent(new Event('input', { bubbles: true })); await wait(40);
+    const first = document.querySelector('.note-find-count').textContent;
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '과' })); await wait(120);
+    const second = document.querySelector('.note-find-count').textContent;
+    input.value = '없는 말'; input.dispatchEvent(new Event('input', { bubbles: true })); await wait(40);
+    const none = document.querySelector('.note-find-count').textContent;
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(60);
+    return { first, second, none };`);
+  await invoke('note:delete', { id: imeNote.id });
+  expect(imeFind.first === '1/3' && imeFind.second === '2/3' && imeFind.none === '결과 없음', `한글 입력 뒤 찾기 Enter ${JSON.stringify(imeFind)}`);
+
+  const standup = await invoke('event:add', { title: '스모크 아침 회의', calendarId: 'local-calendar', start: localIso(D.dayOffset(today, 1), 9), end: localIso(D.dayOffset(today, 1), 10), allDay: false, location: '', rrule: 'FREQ=DAILY' });
+  const searchKeys = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.querySelector('.main-nav .nav-item:nth-child(2)').click(); await wait(100);
+    const result = {};
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', bubbles: true, cancelable: true })); await wait(120);
+    const title = document.querySelector('.event-card textarea.card-title'); result.card = Boolean(title);
+    if (title) { title.value = '스모크 카드 유지'; title.dispatchEvent(new Event('input', { bubbles: true })); }
+    const search = document.querySelector('.search input'); search.focus(); search.value = '아침 회의'; search.dispatchEvent(new Event('input', { bubbles: true })); await wait(150);
+    result.rows = document.querySelectorAll('.calendar-search .search-hit').length;
+    const more = document.querySelector('.calendar-search .search-more'); result.more = more?.textContent || '';
+    more?.click(); await wait(150);
+    result.focusRow = Boolean(document.activeElement?.classList?.contains('search-hit'));
+    result.rowsAfter = document.querySelectorAll('.calendar-search .search-hit').length;
+    const view = document.querySelector('.view-switch .on')?.textContent || '';
+    document.activeElement?.blur?.();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', bubbles: true, cancelable: true })); await wait(60);
+    result.viewKept = (document.querySelector('.view-switch .on')?.textContent || '') === view;
+    search.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(100);
+    result.cleared = !document.querySelector('.calendar-search') && search.value === '';
+    result.cardKept = document.querySelector('.event-card textarea.card-title')?.value || '';
+    const keptTitle = document.querySelector('.event-card textarea.card-title');
+    if (keptTitle) { keptTitle.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(80); }
+    result.closed = !document.querySelector('.event-card');
+    return result;`);
+  await invoke('event:delete', { id: standup.id, scope: 'all' });
+  state = await invoke('state:get');
+  expect(searchKeys.card && searchKeys.rows === 150 && /^\d[\d,]*개 더 보기$/.test(searchKeys.more) && searchKeys.rowsAfter === 300 && searchKeys.focusRow && searchKeys.viewKept && searchKeys.cleared && searchKeys.cardKept === '스모크 카드 유지' && searchKeys.closed && !state.events.some(event => event.title === '스모크 카드 유지'), `검색 중 Esc·단축키·더 보기 ${JSON.stringify(searchKeys)}`);
+  checks.push('review5-series-undo-find-search');
+
+  // Review round 6 (2026-10-21): a colour picked on a series card while a repeat change waits goes with it to the scope
+  // question; a card write still on its way when the window closes is awaited and its failure stops the close; 「반복 안 함」
+  // keeps one event per occurrence (the first one edited on its own is not shown twice); Ctrl+F from a selection inside
+  // repeated text gives the selection back on Esc, and a selection cut inside an emoji still finds it.
+  const colourSeries = await invoke('event:add', { title: '스모크 색 반복', calendarId: 'local-calendar', start: localIso(D.dayOffset(today, 1), 11), end: localIso(D.dayOffset(today, 1), 12), allDay: false, location: '', rrule: 'FREQ=DAILY;COUNT=4' });
+  const colourCard = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.querySelector('.main-nav .nav-item:nth-child(2)').click(); await wait(100);
+    const e = eventsBetween(D.dayOffset(D.dateKey(), 0), D.dayOffset(D.dateKey(), 6)).find(x => x.title === '스모크 색 반복' && x.masterId);
+    openEventCard(e, null, { left: 300, top: 200, right: 400, bottom: 220, width: 100, height: 20 }); await wait(60);
+    calCardChange({ rrule: 'FREQ=WEEKLY;BYDAY=FR;WKST=SU' });
+    calSeriesColor(calCard, '#ff3b30'); await wait(60);
+    const result = { pending: Object.keys(calCard.pending).sort().join(','), dialog: Boolean(document.querySelector('#modal-root .dialog')) };
+    closeCard(true); await wait(80);
+    const all = [...document.querySelectorAll('#modal-root .dialog button')].find(b => b.textContent.trim() === '모든 일정');
+    result.allOffered = Boolean(all); all?.click(); await wait(250);
+    return result;`);
+  state = await invoke('state:get');
+  const colouredMaster = state.events.find(event => event.id === colourSeries.id);
+  await invoke('event:delete', { id: colourSeries.id, scope: 'all' });
+  expect(colourCard.pending === 'color,rrule' && !colourCard.dialog && colourCard.allOffered && /BYDAY=FR/.test(colouredMaster?.rrule || '') && colouredMaster?.color === '#ff3b30', `반복 변경 대기 중 색 고르기 ${JSON.stringify({ colourCard, rrule: colouredMaster?.rrule, color: colouredMaster?.color })}`);
+
+  const closeEvent = await invoke('event:add', { title: '스모크 닫기 저장', calendarId: 'local-calendar', start: localIso(D.dayOffset(today, 2), 9), end: localIso(D.dayOffset(today, 2), 10), allDay: false, location: '' });
+  const closeFlush = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const realRun = window.run;
+    window.run = async (command, payload, success) => { if (command === 'event:update') { await wait(300); throw new Error('스모크 실패'); } return realRun(command, payload, success); };
+    try {
+      const e = state.events.find(x => x.title === '스모크 닫기 저장');
+      openEventCard(e, null, { left: 300, top: 200, right: 400, bottom: 220, width: 100, height: 20 }); await wait(60);
+      calCardChange({ title: '스모크 닫기 저장 바뀜' }); await wait(450);     // the 0.4-second write is on its way
+      closeCard(true);                                                        // the window's X closes the card first
+      const result = { closed: !calCard };
+      try { await flushAll('close'); result.flushed = 'ok'; } catch (error) { result.flushed = String(error.message); }
+      const again = await flushAll('close').then(() => 'ok', error => String(error.message));
+      result.again = again;
+      return result;
+    } finally { window.run = realRun; }`);
+  await invoke('event:delete', { id: closeEvent.id });
+  expect(closeFlush.closed && /일정 변경을 저장하지 못했어요/.test(closeFlush.flushed) && closeFlush.again === 'ok', `창 닫기 때 카드 저장 기다림 ${JSON.stringify(closeFlush)}`);
+
+  const ghost = await invoke('event:add', { title: '스모크 반복 없애기', calendarId: 'local-calendar', start: localIso(D.dayOffset(today, 3), 8), end: localIso(D.dayOffset(today, 3), 9), allDay: false, location: '', rrule: 'FREQ=DAILY;COUNT=5' });
+  const ghostRuns = D.expandEvent(ghost, today, D.dayOffset(today, 12));
+  const firstEdit = await invoke('event:update', { id: ghostRuns[0].id, scope: 'one', title: '스모크 반복 없애기 (첫날 고침)', start: localIso(D.dayOffset(today, 3), 10), end: localIso(D.dayOffset(today, 3), 11) });
+  await invoke('event:update', { id: ghostRuns[2].id, scope: 'all', rrule: '' });
+  state = await invoke('state:get');
+  const dayOne = D.eventsInRange(state.events, D.dayOffset(today, 3), D.dayOffset(today, 4)).filter(event => event.title.startsWith('스모크 반복 없애기'));
+  const plainGhost = state.events.find(event => event.id === ghost.id);
+  await invoke('event:delete', { id: ghost.id }); await invoke('event:delete', { id: firstEdit.id });
+  expect(dayOne.length === 1 && dayOne[0].title === '스모크 반복 없애기 (첫날 고침)' && plainGhost && !plainGhost.rrule && D.dateKey(new Date(plainGhost.start)) === D.dayOffset(today, 4), `반복 안 함 뒤 첫 회차 중복 없음 ${JSON.stringify({ dayOne: dayOne.map(e => e.title), start: plainGhost?.start })}`);
+
+  const repeatNote = await invoke('note:save', { title: '스모크 반복 글', body: '하하하 끝', color: 'yellow' });
+  const emojiNote = await invoke('note:save', { title: '스모크 이모지', body: 'x'.repeat(199) + '😀' + ' 꼬리 말', color: 'yellow' });
+  const keepFind = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.querySelector('.main-nav .nav-item:nth-child(3)').click(); await wait(80);
+    const open = async title => { [...document.querySelectorAll('.note-card')].find(node => node.textContent.includes(title)).click(); await wait(80); return document.querySelector('.note-body'); };
+    const ctrlF = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', ctrlKey: true, bubbles: true, cancelable: true }));
+    let body = await open('스모크 반복 글'); body.focus(); body.setSelectionRange(1, 3); ctrlF(); await wait(80);
+    document.querySelector('.note-find-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(80);
+    body = document.querySelector('.note-body');
+    const result = { kept: [body.selectionStart, body.selectionEnd].join('-') };
+    body = await open('스모크 이모지'); body.focus(); body.setSelectionRange(0, 205); ctrlF(); await wait(80);
+    result.emoji = document.querySelector('.note-find-count')?.textContent || '';
+    document.querySelector('.note-find-input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(60);
+    return result;`);
+  await invoke('note:delete', { id: repeatNote.id }); await invoke('note:delete', { id: emojiNote.id });
+  expect(keepFind.kept === '1-3' && keepFind.emoji === '1/1', `찾기 선택 유지·이모지 ${JSON.stringify(keepFind)}`);
+  checks.push('review6-colour-close-ghost-find');
+
+  // Review round 7 (2026-10-21): a colour saved with a waiting repeat change for 「모든 일정」 colours the occurrences edited on
+  // their own too; 「반복 안 함」 for all moves the event off a start its rule never showed; the find bar gives a selection
+  // back only to the note it came from.
+  const paintSeries = await invoke('event:add', { title: '스모크 색 예외', calendarId: 'local-calendar', start: localIso(D.dayOffset(today, 1), 13), end: localIso(D.dayOffset(today, 1), 14), allDay: false, location: '', rrule: 'FREQ=DAILY;COUNT=6' });
+  const paintRuns = D.expandEvent(paintSeries, today, D.dayOffset(today, 10));
+  const paintException = await invoke('event:update', { id: paintRuns[1].id, scope: 'one', title: '스모크 색 예외 (따로)' });
+  await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const e = eventsBetween(D.dateKey(), D.dayOffset(D.dateKey(), 8)).find(x => x.id === ${JSON.stringify(paintRuns[2].id)});
+    openEventCard(e, null, { left: 300, top: 200, right: 400, bottom: 220, width: 100, height: 20 }); await wait(60);
+    calCardChange({ rrule: 'FREQ=DAILY;COUNT=8' }); calSeriesColor(calCard, '#ff3b30'); await wait(40);
+    closeCard(true); await wait(80);
+    [...document.querySelectorAll('#modal-root .dialog button')].find(b => b.textContent.trim() === '모든 일정')?.click(); await wait(250);
+    return true;`);
+  state = await invoke('state:get');
+  const paintedException = state.events.find(event => event.id === paintException.id);
+  await invoke('event:delete', { id: paintSeries.id, scope: 'all' });
+  expect(paintedException?.color === '#ff3b30', `모든 일정 색이 따로 고친 회차에도 ${JSON.stringify(paintedException)}`);
+
+  let saturday = D.dayOffset(today, 1); while (D.fromDate(saturday).getDay() !== 6) saturday = D.dayOffset(saturday, 1);
+  const weekdays = await invoke('event:add', { title: '스모크 평일', calendarId: 'local-calendar', start: localIso(saturday, 9), end: localIso(saturday, 10), allDay: false, location: '', rrule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;WKST=SU' });
+  const weekdayRuns = D.expandEvent(weekdays, saturday, D.dayOffset(saturday, 10));
+  const tuesday = weekdayRuns.find(run => D.fromDate(D.dateKey(new Date(run.start))).getDay() === 2);
+  await invoke('event:update', { id: tuesday.id, scope: 'all', rrule: '' });
+  state = await invoke('state:get');
+  const plainWeekday = state.events.find(event => event.id === weekdays.id);
+  await invoke('event:delete', { id: weekdays.id });
+  expect(plainWeekday && !plainWeekday.rrule && D.dateKey(new Date(plainWeekday.start)) === D.dayOffset(saturday, 2), `반복 안 함 뒤 규칙이 보이던 첫날로 ${plainWeekday?.start}`);
+
+  const keepA = await invoke('note:save', { title: '스모크 선택 가', body: 'ㅋㅋㅋㅋ 끝', color: 'yellow' });
+  const keepB = await invoke('note:save', { title: '스모크 선택 나', body: 'abcdef ghij', color: 'yellow' });
+  const keepOther = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.querySelector('.main-nav .nav-item:nth-child(3)').click(); await wait(80);
+    const open = async title => { [...document.querySelectorAll('.note-card')].find(node => node.textContent.includes(title)).click(); await wait(80); return document.querySelector('.note-body'); };
+    let body = await open('스모크 선택 가'); body.focus(); body.setSelectionRange(1, 3);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', code: 'KeyF', ctrlKey: true, bubbles: true, cancelable: true })); await wait(80);
+    await open('스모크 선택 나');
+    document.querySelector('.note-find-input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(80);
+    body = document.querySelector('.note-body');
+    return { value: body.value, range: [body.selectionStart, body.selectionEnd].join('-') };`);
+  await invoke('note:delete', { id: keepA.id }); await invoke('note:delete', { id: keepB.id });
+  expect(keepOther.value === 'abcdef ghij' && keepOther.range.split('-')[0] === keepOther.range.split('-')[1], `다른 메모로 옮긴 뒤 Esc는 선택을 옮겨 오지 않음 ${JSON.stringify(keepOther)}`);
+  checks.push('review7-series-colour-weekday-find');
+
+  // Help and the notes list (2026-10-21 user requests): the ? at the foot of the sidebar shows the screen's shortcuts on hover
+  // and keeps them on a click; ? opens every shortcut; the tour lights up real parts and is remembered when done; a new user
+  // gets it by itself (tourFresh); the notes list is rows of one height grouped by date; 업데이트 기록 lines up with
+  // 업데이트 확인.
+  const helpNote = await invoke('note:save', { title: '스모크 목록 줄', body: '첫 줄\n둘째 줄', color: 'yellow' });
+  await invoke('settings:update', { noteListStyle: 'compact', tourDone: false });
+  const help = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const result = {};
+    goto('today'); await wait(80);
+    const button = document.querySelector('#app .sidebar-footer .help-button');
+    result.button = Boolean(button) && button.getAttribute('aria-expanded') === 'false';
+    button.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true })); await wait(300);
+    let pop = document.querySelector('.help-pop');
+    result.hoverRows = pop ? [...pop.querySelectorAll('.help-rows li')].map(li => li.firstChild.textContent) : [];
+    result.expanded = document.querySelector('#app .help-button')?.getAttribute('aria-expanded');
+    button.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true })); await wait(400);
+    result.hoverClosed = !document.querySelector('.help-pop');
+    document.querySelector('.main-nav .nav-item:nth-child(2)').click(); await wait(80);
+    document.querySelector('#app .help-button').click(); await wait(120);
+    pop = document.querySelector('.help-pop');
+    result.calendarRows = pop ? [...pop.querySelectorAll('.help-rows li')].map(li => li.firstChild.textContent) : [];
+    result.pinnedFocus = document.activeElement?.classList.contains('help-link') || false;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(80);
+    result.escClosed = !document.querySelector('.help-pop') && document.querySelector('#app .help-button') === document.activeElement;
+    document.activeElement?.blur?.();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '?', code: 'Slash', shiftKey: true, bubbles: true, cancelable: true })); await wait(120);
+    const dialog = document.querySelector('#modal-root .dialog');
+    result.dialog = dialog?.querySelector('#dialog-title')?.textContent || '';
+    result.groups = dialog ? [...dialog.querySelectorAll('.shortcut-group h3')].map(n => n.textContent) : [];
+    result.rows = dialog ? dialog.querySelectorAll('.shortcut-row').length : 0;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(80);
+    result.dialogClosed = !document.querySelector('#modal-root .dialog');
+    // The tour from the card: steps, keys, the app out of reach meanwhile, Esc ends it and remembers it.
+    document.querySelector('#app .help-button').click(); await wait(120);
+    [...document.querySelectorAll('.help-pop .help-link')].at(-1).click(); await wait(200);
+    const card = () => document.querySelector('#tour-root .tour-card');
+    result.tourTitle = card()?.querySelector('h2')?.textContent || '';
+    result.inert = document.getElementById('app').inert === true;
+    result.noNull = !document.getElementById('tour-root').textContent.includes('null');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); await wait(150);
+    result.step1 = card()?.querySelector('h2')?.textContent || '';
+    const hole = document.querySelector('#tour-root .tour-hole').getBoundingClientRect(), grid = document.querySelector('#app .smart-grid').getBoundingClientRect();
+    result.holeAround = hole.left <= grid.left && hole.right >= grid.right && hole.top <= grid.top && hole.bottom >= grid.bottom;
+    card().querySelector('.button.primary').click(); await wait(150);
+    result.step2View = view; result.step2 = card()?.querySelector('h2')?.textContent || '';
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', code: 'KeyD', bubbles: true, cancelable: true })); await wait(60);
+    result.keysHeld = view === 'today' && Boolean(card());
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(200);
+    result.tourClosed = !card() && document.getElementById('app').inert === false;
+    result.fresh = [tourFresh({ accounts: [], tasks: [], notes: [{ trashedAt: '2026-01-01T00:00:00.000Z' }] }), tourFresh(state), tourMaybeStart()];
+    // The notes list: grouped rows of one height.
+    document.querySelector('.main-nav .nav-item:nth-child(3)').click(); await wait(120);
+    result.heads = [...document.querySelectorAll('.note-cards.compact .note-group-head')].map(n => n.textContent);
+    const heights = [...document.querySelectorAll('.note-group .note-card')].map(n => Math.round(n.getBoundingClientRect().height));
+    result.rowHeights = [...new Set(heights)];
+    const row = [...document.querySelectorAll('.note-group .note-card')].find(n => n.textContent.includes('스모크 목록 줄'));
+    result.rowText = row?.querySelector('.note-card-line')?.textContent || '';
+    // Settings: with a new version on its way (renderer memory only) 「새 기능 보기」 ends where 「내려받기」 ends.
+    const realUpdate = state.app?.update; state.app = { ...state.app, update: { status: 'available', selfUpdating: true, canDownload: true, latestVersion: '9.9.9' } };
+    openSettings(); await wait(200);
+    const edge = el => { const r = el.getBoundingClientRect(); return Math.round(r.right - parseFloat(getComputedStyle(el).paddingRight)); };
+    const check = document.querySelector('.update-block .update-row .button'), history = document.querySelector('.update-block .text-button');
+    result.updateEdges = check && history ? [edge(check), edge(history)] : [];
+    result.news = history?.textContent || '';
+    closeModal(true); state.app = { ...state.app, update: realUpdate }; goto('today');
+    return result;`);
+  state = await invoke('state:get');
+  const tourRemembered = state.settings.tourDone === true;
+  await invoke('note:delete', { id: helpNote.id });
+  await invoke('settings:update', { noteListStyle: 'cards' });
+  expect(help.button && help.hoverRows.join('|') === '새 할 일|할 일 검색|고른 할 일 삭제|방금 한 일 되돌리기' && help.expanded === 'true' && help.hoverClosed
+    && help.calendarRows[0] === '오늘로 이동' && help.calendarRows.length === 5 && help.pinnedFocus && help.escClosed
+    && help.dialog === '키보드 단축키' && help.groups.join('|') === '어디서나|할 일|달력|메모' && help.rows >= 20 && help.dialogClosed, `단축키 도움말 ${JSON.stringify(help)}`);
+  expect(help.tourTitle === 'Dayboard에 오신 걸 환영해요' && help.inert && help.noNull && help.step1 === '스마트 목록' && help.holeAround && help.step2 === '빠른 추가' && help.step2View === 'today' && help.keysHeld && help.tourClosed && tourRemembered
+    && help.fresh.join('|') === 'true|false|false', `둘러보기 ${JSON.stringify(help)} tourDone=${state.settings.tourDone}`);
+  expect(help.heads.includes('오늘') && help.rowHeights.length === 1 && help.rowHeights[0] >= 48 && help.rowHeights[0] <= 60 && help.rowText === '첫 줄' && help.updateEdges.length === 2 && Math.abs(help.updateEdges[0] - help.updateEdges[1]) <= 1 && help.news === '새 기능 보기', `메모 목록·설정 맞춤 ${JSON.stringify(help)}`);
+  checks.push('help-shortcuts-tour-notes-list');
+
+  // Redo (2026-10-21 user: 「컨트롤 쉬프트 z 처럼 되돌린걸 취소하는 기능과 단축키」): undo through the toast, then Ctrl+Shift+Z does
+  // it again and offers the undo again; Ctrl+Y does the same; inside a text field the keys stay the field's own.
+  const redoTask = await invoke('task:add', { title: '스모크 다시 실행', listId: 'local-inbox' });
+  const redo = await run(mainWindow, `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const id = ${JSON.stringify(redoTask.id)};
+    const toastText = () => document.getElementById('toast')?.className.includes('show') ? document.getElementById('toast').textContent : '';
+    const done = () => state.tasks.find(t => t.id === id)?.completed;
+    const key = (code, shift) => document.dispatchEvent(new KeyboardEvent('keydown', { key: code === 'KeyY' ? 'y' : shift ? 'Z' : 'z', code, ctrlKey: true, shiftKey: shift, bubbles: true, cancelable: true }));
+    goto('all'); await wait(100);
+    const result = {};
+    document.querySelector('[data-task-id="' + id + '"] .task-check').click(); await wait(300);
+    result.done = toastText(); result.afterDone = done();
+    document.activeElement?.blur?.();
+    key('KeyZ', false); await wait(300);
+    result.undone = toastText(); result.afterUndo = done();
+    result.title = document.querySelector('#toast .toast-action')?.title || '';
+    key('KeyZ', true); await wait(300);
+    result.redone = toastText(); result.afterRedo = done();
+    key('KeyZ', false); await wait(300);
+    result.afterSecondUndo = done();
+    key('KeyY', false); await wait(300);
+    result.afterCtrlY = done();
+    // A toast button does the same as the keys.
+    key('KeyZ', false); await wait(300);
+    document.querySelector('#toast .toast-action')?.click(); await wait(300);
+    result.afterButton = done();
+    // No redo waiting: Ctrl+Shift+Z does nothing.
+    hideToast(); key('KeyZ', true); await wait(200);
+    result.afterIdle = done();
+    goto('today');
+    return result;`);
+  await invoke('task:delete', { id: redoTask.id });
+  expect(redo.done.startsWith('완료했어요.') && redo.afterDone === true && redo.undone.startsWith('되돌렸어요.') && redo.undone.includes('다시 실행') && redo.title === 'Ctrl+Shift+Z' && redo.afterUndo === false
+    && redo.redone.startsWith('완료했어요.') && redo.afterRedo === true && redo.afterSecondUndo === false && redo.afterCtrlY === true && redo.afterButton === true && redo.afterIdle === true, `되돌리기·다시 실행 ${JSON.stringify(redo)}`);
+  checks.push('undo-redo-toast');
 
   // Accounts dialog shows the real brand marks.
   await run(mainWindow, `document.querySelector('.account-button').click(); await new Promise(resolve => setTimeout(resolve, 30));`);
@@ -642,6 +1209,179 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));`);
   checks.push('accounts-google-one-click');
 
+  // Notes sync UI (2026-10-21). Smoke has no real accounts, so a Google account is injected into the renderer's state only
+  // (never into main). Its card has 할 일·달력·메모 switches; 「메모」 follows settings.notesAccountId (on for the first Google
+  // account before any choice, off once switched off) and, without the app-folder grant, asks for a new sign-in. The
+  // footer of an open note tells this PC only / syncing / synced / not synced (with the problem as its tooltip).
+  const syncNote = await invoke('note:save', { title: '스모크 동기화 메모', body: '' });
+  const notesUi = await run(mainWindow, `const saved = state;
+    const google = { id: 'smoke-google', provider: 'google', name: 'smoke@example.com', status: 'connected', calendarWrite: true };
+    const card = async () => {
+      openAccounts(); await new Promise(resolve => setTimeout(resolve, 60));
+      const node = [...document.querySelectorAll('#modal-root .connected-account')].find(item => item.textContent.includes('smoke@example.com'));
+      const toggles = node ? [...node.querySelectorAll('.sync-toggle')] : [];
+      const result = { toggles: toggles.map(item => item.textContent.trim()).join(','), notes: toggles.find(item => item.textContent.trim() === '메모')?.querySelector('input')?.checked, notice: node?.querySelector('.account-notice')?.textContent || '' };
+      closeModal(true); return result;
+    };
+    const footer = () => { const node = document.getElementById('note-save-status'); return node ? node.textContent + (node.title ? ' [' + node.title + ']' : '') : '(no note open)'; };
+    try {
+      const result = {};
+      state = { ...state, accounts: [...state.accounts, { ...google, notesAccess: false }], settings: { ...state.settings, notesAccountId: null, notesAutoDone: false }, noteSync: { accountId: null, busy: false, pending: false, lastSync: null, error: null } };
+      result.before = await card();
+      state = { ...state, settings: { ...state.settings, notesAutoDone: true } };
+      result.off = await card();
+      state = { ...state, accounts: state.accounts.map(item => item.id === 'smoke-google' ? { ...item, notesAccess: true } : item), settings: { ...state.settings, notesAccountId: 'smoke-google' } };
+      result.on = await card();
+      goto('notes'); activeNote = ${JSON.stringify(syncNote.id)}; render(); await new Promise(resolve => setTimeout(resolve, 40));
+      const show = async noteSync => { state = { ...state, noteSync: { accountId: 'smoke-google', busy: false, pending: false, lastSync: new Date().toISOString(), error: null, ...noteSync } }; render(); await new Promise(resolve => setTimeout(resolve, 20)); return footer(); };
+      result.footer = [await show({ accountId: null }), await show({ pending: true }), await show({ lastSync: null }), await show({}), await show({ error: 'Google 드라이브 API가 꺼져 있어 메모를 보관할 수 없어요.' })];
+      return result;
+    } finally { state = saved; render(); }`);
+  expect(notesUi.before.toggles === '할 일,달력,메모' && notesUi.before.notes === true && notesUi.before.notice.includes('다시 로그인해 메모 동기화 허용'), `메모 스위치(처음) ${JSON.stringify(notesUi.before)}`);
+  expect(notesUi.off.notes === false && !notesUi.off.notice.includes('메모'), `메모 스위치(끔) ${JSON.stringify(notesUi.off)}`);
+  expect(notesUi.on.notes === true && !notesUi.on.notice, `메모 스위치(켬) ${JSON.stringify(notesUi.on)}`);
+  expect(JSON.stringify(notesUi.footer) === JSON.stringify(['이 PC에 저장됨', '동기화 중…', '동기화 중…', '다른 PC와 동기화됨', '동기화 안 됨 [Google 드라이브 API가 꺼져 있어 메모를 보관할 수 없어요.]']), `메모 동기화 상태 ${JSON.stringify(notesUi.footer)}`);
+  // main note:save — a draft based on an older version keeps the text another PC synced in meanwhile as a 「<title> (2)」 note;
+  // a draft whose note was deleted elsewhere comes back under its own id (an edit beats a deletion).
+  const v1 = await invoke('note:save', { id: syncNote.id, body: 'one', baseUpdatedAt: syncNote.updatedAt });
+  const v2 = await invoke('note:save', { id: syncNote.id, body: 'two from the other PC', baseUpdatedAt: v1.updatedAt });
+  await invoke('note:save', { id: syncNote.id, body: 'typed here', baseUpdatedAt: v1.updatedAt });
+  state = await invoke('state:get');
+  const kept = state.notes.filter(item => item.title === '스모크 동기화 메모 (2)');
+  expect(state.notes.find(item => item.id === syncNote.id)?.body === 'typed here' && kept.length === 1 && kept[0].body === 'two from the other PC' && kept[0].updatedAt === v2.updatedAt, `초안 저장 시 사본 ${JSON.stringify(state.notes.map(item => [item.title, item.body]))}`);
+  await invoke('note:save', { id: syncNote.id, body: 'typed here again', baseUpdatedAt: v1.updatedAt });
+  state = await invoke('state:get');
+  expect(state.notes.filter(item => item.title === '스모크 동기화 메모 (2)').length === 2, '바뀐 버전마다 사본 하나');
+  await invoke('note:delete', { id: syncNote.id });
+  await invoke('note:save', { id: syncNote.id, body: 'x' }).then(() => { throw new Error('지운 메모 저장이 통과했습니다.'); }, error => expect(/항목이 없거나/.test(error.message), `지운 메모 저장: ${error.message}`));
+  const revived = await invoke('note:save', { id: syncNote.id, title: '스모크 동기화 메모', body: 'revived', revive: true });
+  expect(revived.id === syncNote.id && revived.body === 'revived', `되살리기 ${JSON.stringify(revived)}`);
+  await invoke('note:save', { id: 'bad id!', body: 'x', revive: true }).then(() => { throw new Error('잘못된 id 되살리기가 통과했습니다.'); }, () => {});
+  // Final review (2026-10-21): two versions can share an updatedAt, so a draft also names its version by rev (note:save
+  // returns it, the state carries it); another rev with the same time keeps the stored text as a copy. Results carry no
+  // earlier versions (they could make the next save too large).
+  const revA = await invoke('note:save', { id: syncNote.id, title: '스모크 동기화 메모', body: 'stored text', baseUpdatedAt: revived.updatedAt });
+  expect(typeof revA.rev === 'string' && revA.rev.length === 16 && !('past' in revA) && (await invoke('state:get')).notes.find(n => n.id === syncNote.id)?.rev === revA.rev, `rev 보이기 ${JSON.stringify(Object.keys(revA))}`);
+  await invoke('note:save', { id: syncNote.id, body: 'draft from another version', baseUpdatedAt: revA.updatedAt, baseRev: '0'.repeat(16) });
+  state = await invoke('state:get');
+  expect(state.notes.some(item => item.title === '스모크 동기화 메모 (2)' && item.body === 'stored text'), `같은 시각 다른 버전 초안 → 사본 ${JSON.stringify(state.notes.map(item => [item.title, item.body]))}`);
+  const copiesBefore = state.notes.filter(item => item.title === '스모크 동기화 메모 (2)').length;
+  const current = state.notes.find(n => n.id === syncNote.id);
+  await invoke('note:save', { id: syncNote.id, body: 'draft from this version', baseUpdatedAt: current.updatedAt, baseRev: current.rev });
+  expect((await invoke('state:get')).notes.filter(item => item.title === '스모크 동기화 메모 (2)').length === copiesBefore, '같은 버전 초안은 사본 없음');
+  for (const note of (await invoke('state:get')).notes.filter(item => item.title === '스모크 동기화 메모 (2)')) await invoke('note:delete', { id: note.id });
+  // Renderer: typing in a note that is deleted underneath (as a sync from another PC does) brings it back with the text.
+  const typed = await run(mainWindow, `
+    goto('notes'); activeNote = ${JSON.stringify(syncNote.id)}; render(); await new Promise(resolve => setTimeout(resolve, 40));
+    const body = document.querySelector('.note-body');
+    body.focus(); body.value = 'typed while it was deleted elsewhere'; body.dispatchEvent(new Event('input', { bubbles: true }));
+    return body.getAttribute('data-note-id');`);
+  expect(typed === syncNote.id, `메모 입력란 ${typed}`);
+  await invoke('note:delete', { id: syncNote.id });
+  await new Promise(resolve => setTimeout(resolve, 1200)); // the draft's autosave (600 ms) runs on a note that is gone
+  state = await invoke('state:get');
+  expect(state.notes.find(item => item.id === syncNote.id)?.body === 'typed while it was deleted elsewhere', `입력 중 삭제된 메모 되살림 ${JSON.stringify(state.notes.map(item => [item.id, item.body]))}`);
+  for (const note of state.notes.filter(item => item.title.startsWith('스모크 동기화 메모'))) await invoke('note:delete', { id: note.id });
+  // Second review (2026-10-21): typing Korean with a pause mid-syllable (the autosave runs while the redraw waits) keeps
+  // building on the saved version — no 「(2)」 copy of this PC's own text; a new note within the autosave delay does not
+  // cancel the previous note's save; a redraw while another note has a draft shows the focused note's newest text.
+  const ime = await run(mainWindow, `
+    const created = await window.dayboard.invoke('note:save', { title: '스모크 한글 입력', body: '' });
+    goto('notes'); activeNote = created.id; render(); await new Promise(resolve => setTimeout(resolve, 40));
+    const body = document.querySelector('.note-body'); body.focus();
+    body.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    body.value = '안녕'; body.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    body.value = '안녕하'; body.dispatchEvent(new Event('input', { bubbles: true }));
+    body.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return created.id;`);
+  state = await invoke('state:get');
+  expect(state.notes.find(item => item.id === ime)?.body === '안녕하' && !state.notes.some(item => item.title.startsWith('스모크 한글 입력 (')), `한글 입력 중 저장 ${JSON.stringify(state.notes.filter(item => item.title.startsWith('스모크 한글')).map(item => [item.title, item.body]))}`);
+  const timers = await run(mainWindow, `
+    const x = await window.dayboard.invoke('note:save', { title: '스모크 타이머 X', body: 'original' });
+    goto('notes'); activeNote = x.id; render(); await new Promise(resolve => setTimeout(resolve, 40));
+    const body = document.querySelector('.note-body'); body.focus(); body.value = 'typed in X'; body.dispatchEvent(new Event('input', { bubbles: true }));
+    newNote(); await new Promise(resolve => setTimeout(resolve, 300));
+    const title = document.querySelector('.note-title-input'); title.focus(); title.value = '스모크 타이머 Y'; title.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    return { x: x.id, waiting: noteDrafts.has(x.id) };`);
+  state = await invoke('state:get');
+  expect(state.notes.find(item => item.id === timers.x)?.body === 'typed in X' && !timers.waiting, `새 메모 뒤 이전 메모 저장 ${JSON.stringify(timers)}`);
+  const shown = await run(mainWindow, `
+    const a = await window.dayboard.invoke('note:save', { title: '스모크 남은 초안 A', body: 'a' });
+    const b = await window.dayboard.invoke('note:save', { title: '스모크 포커스 B', body: '' });
+    goto('notes'); activeNote = b.id; render(); await new Promise(resolve => setTimeout(resolve, 40));
+    document.querySelector('.note-body').focus();
+    noteDrafts.set(a.id, { ...a, body: 'leftover' });
+    await window.dayboard.invoke('note:save', { id: b.id, body: 'typed in the widget' });
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const value = document.querySelector('.note-body').value;
+    noteDrafts.delete(a.id);
+    return value;`);
+  expect(shown === 'typed in the widget', `다른 메모 초안이 있을 때 다시 그리기 ${JSON.stringify(shown)}`);
+  for (const note of (await invoke('state:get')).notes.filter(item => /^스모크 (한글 입력|타이머|남은 초안|포커스)/.test(item.title))) await invoke('note:delete', { id: note.id });
+  // 「최근 삭제한 메모」 (2026-10-21): deleting moves a note there at once with 「되돌리기」; from the link under the notes
+  // the trash opens read-only with 「복구」 and 「완전히 삭제」; a trashed note cannot be a widget. Earlier versions: a text
+  // about to lose most of its words is kept, and 「이전 버전」 brings it back.
+  const binned = await invoke('note:save', { title: '스모크 휴지통', body: '버리기 전 글' });
+  const trashUi = await run(mainWindow, `
+    const tick = ms => new Promise(resolve => setTimeout(resolve, ms));
+    goto('notes'); notesTrash = false; activeNote = ${JSON.stringify(binned.id)}; render(); await tick(40);
+    trashNote(${JSON.stringify(binned.id)}); await tick(150);
+    const result = { toast: document.getElementById('toast')?.textContent || '', link: document.querySelector('.trash-link')?.textContent || '' };
+    result.trashed = Boolean(state.notes.find(n => n.id === ${JSON.stringify(binned.id)})?.trashedAt);
+    document.querySelector('#toast .toast-action, #toast button')?.click(); await tick(150);
+    result.undone = !state.notes.find(n => n.id === ${JSON.stringify(binned.id)})?.trashedAt;
+    trashNote(${JSON.stringify(binned.id)}); await tick(150);
+    document.querySelector('.trash-link')?.click(); await tick(60);
+    result.inTrash = Boolean(document.querySelector('.notes-view.in-trash'));
+    result.banner = document.querySelector('.trash-banner span')?.textContent || '';
+    result.editable = Boolean(document.querySelector('.note-editor.trashed textarea, .note-editor.trashed input'));
+    [...document.querySelectorAll('.trash-banner .button')].find(b => b.textContent.trim() === '복구')?.click(); await tick(150);
+    result.restored = !state.notes.find(n => n.id === ${JSON.stringify(binned.id)})?.trashedAt && !notesTrash;
+    return result;`);
+  expect(trashUi.trashed && trashUi.toast.includes('메모를 최근 삭제한 메모로 옮겼어요.') && trashUi.link.includes('최근 삭제한 메모'), `휴지통으로 옮기기 ${JSON.stringify(trashUi)}`);
+  expect(trashUi.undone && trashUi.inTrash && /삭제한 메모예요\. 30일 뒤 완전히 삭제돼요\./.test(trashUi.banner) && !trashUi.editable && trashUi.restored, `최근 삭제한 메모 화면 ${JSON.stringify(trashUi)}`);
+  await invoke('note:trash', { id: binned.id });
+  await invoke('widget:open', { type: 'note', noteId: binned.id }).then(() => { throw new Error('휴지통 메모 위젯이 열렸습니다.'); }, error => expect(/최근 삭제한 메모는 위젯으로/.test(error.message), `휴지통 메모 위젯: ${error.message}`));
+  const erased = await run(mainWindow, `
+    const tick = ms => new Promise(resolve => setTimeout(resolve, ms));
+    goto('notes'); notesTrash = true; activeNote = ${JSON.stringify(binned.id)}; render(); await tick(40);
+    [...document.querySelectorAll('.trash-banner .button')].find(b => b.textContent.trim() === '완전히 삭제')?.click(); await tick(60);
+    const title = document.querySelector('#modal-root .dialog h2')?.textContent || '';
+    [...document.querySelectorAll('#modal-root .button.danger')].at(-1)?.click(); await tick(200);
+    return { title, gone: !state.notes.some(n => n.id === ${JSON.stringify(binned.id)}) };`);
+  expect(erased.title === '「스모크 휴지통」 메모를 완전히 삭제할까요?' && erased.gone, `완전히 삭제 ${JSON.stringify(erased)}`);
+  const long = '처음에 길게 쓴 글입니다. '.repeat(10);
+  const versioned = await invoke('note:save', { title: '스모크 이전 버전', body: long });
+  await invoke('note:save', { id: versioned.id, body: '짧게', baseUpdatedAt: versioned.updatedAt });
+  const pastTexts = await invoke('note:history', { id: versioned.id });
+  expect(pastTexts.length === 1 && pastTexts[0].body === long, `이전 버전 보관 ${JSON.stringify(pastTexts.map(v => v.body.slice(0, 20)))}`);
+  const reverted = await run(mainWindow, `
+    const tick = ms => new Promise(resolve => setTimeout(resolve, ms));
+    goto('notes'); notesTrash = false; activeNote = ${JSON.stringify(versioned.id)}; render(); await tick(40);
+    document.querySelector('.note-footer .icon-button[aria-label="이전 버전"]')?.click(); await tick(200);
+    const rows = document.querySelectorAll('#modal-root .history-row');
+    rows[0]?.click(); await tick(30);
+    const preview = document.querySelector('#modal-root .history-preview p')?.textContent || '';
+    [...document.querySelectorAll('#modal-root .button.primary')].find(b => b.textContent.trim() === '이 버전으로 되돌리기')?.click(); await tick(250);
+    return { rows: rows.length, preview: preview.slice(0, 12), body: state.notes.find(n => n.id === ${JSON.stringify(versioned.id)})?.body.slice(0, 12), open: Boolean(document.querySelector('#modal-root .dialog')) };`);
+  expect(reverted.rows === 1 && reverted.preview === long.slice(0, 12) && reverted.body === long.slice(0, 12) && !reverted.open, `이전 버전으로 되돌리기 ${JSON.stringify(reverted)}`);
+  expect((await invoke('note:history', { id: versioned.id })).some(v => v.body === '짧게'), '되돌린 글도 이전 버전에 남음');
+  // Screens to look at (output folder): the earlier-versions dialog and 「최근 삭제한 메모」.
+  await run(mainWindow, `goto('notes'); notesTrash = false; activeNote = ${JSON.stringify(versioned.id)}; render(); await new Promise(resolve => setTimeout(resolve, 40)); openNoteHistory(${JSON.stringify(versioned.id)}); await new Promise(resolve => setTimeout(resolve, 200)); document.querySelector('#modal-root .history-row')?.click();`);
+  await shot(mainWindow, 'notes-history');
+  await run(mainWindow, `closeModal(true);`);
+  const binSample = await invoke('note:save', { title: '장보기', body: '우유\n달걀\n사과' });
+  await invoke('note:trash', { id: binSample.id });
+  await run(mainWindow, `goto('notes'); notesTrash = true; activeNote = ${JSON.stringify(binSample.id)}; render();`);
+  await shot(mainWindow, 'notes-trash');
+  await run(mainWindow, `notesTrash = false; render();`);
+  await invoke('note:delete', { id: binSample.id });
+  await invoke('note:delete', { id: versioned.id });
+  checks.push('notes-sync-ui');
+
   // Error messages reach the renderer as the Korean text alone, without Electron's English wrapper.
   await invoke('task:update', { id: 'missing-task', title: 'x' })
     .then(() => { throw new Error('없는 할 일 수정이 통과했습니다.'); }, error => expect(!/Error invoking remote method/.test(error.message) && /항목이 없거나/.test(error.message), `오류 문구: ${error.message}`));
@@ -659,8 +1399,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const addDialog = await run(mainWindow, `
     document.querySelector('.main-nav .nav-item:nth-child(2)').click();
     await new Promise(resolve => requestAnimationFrame(resolve));
-    const day = document.querySelector('.calendar-grid.large .calendar-day.is-today');
-    day.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    eventDialog(null, window.DayboardDates.dateKey());
     await new Promise(resolve => setTimeout(resolve, 40));
     const dialog = document.querySelector('#modal-root .dialog');
     const result = { open: Boolean(dialog), select: Boolean(dialog && dialog.querySelector('select[name=calendarId]')), help: dialog ? (dialog.querySelector('.field-help')?.textContent || '') : '', rows: document.querySelectorAll('.calendar-list .calendar-row').length, badge: document.querySelector('.calendar-list .cal-badge')?.textContent || '' };
@@ -676,7 +1415,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await invoke('event:delete', { id: viaDefault.id });
   await invoke('settings:update', { defaultCalendarId: null });
   const settingsLabels = await run(mainWindow, `
-    document.querySelector('.sidebar-bottom .icon-button').click();
+    document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
     await new Promise(resolve => setTimeout(resolve, 30));
     const dialog = document.querySelector('#modal-root .dialog');
     const labels = dialog ? [...dialog.querySelectorAll('.field > span')].map(node => node.textContent) : [];
@@ -701,8 +1440,15 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const hiddenOne = await invoke('settings:update', { hiddenLists: [hideList.id] });
   expect(hiddenOne.settings.hiddenLists.join() === hideList.id, '숨긴 목록 저장');
   await new Promise(resolve => setTimeout(resolve, 80));
-  const listSidebar = await run(mainWindow, `return { row: document.querySelector('.hidden-sections')?.textContent || '', names: [...document.querySelectorAll('.list-nav .list-name')].map(node => node.textContent) };`);
-  expect(/숨긴 목록 1개/.test(listSidebar.row) && !listSidebar.names.includes('스모크 숨김 목록'), `숨긴 목록 사이드바 ${JSON.stringify(listSidebar)}`);
+  const listSidebar = await run(mainWindow, `
+    const result = { row: Boolean(document.querySelector('.hidden-sections')), names: [...document.querySelectorAll('.list-nav .list-name')].map(node => node.textContent) };
+    document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
+    await new Promise(resolve => setTimeout(resolve, 60));
+    result.settings = [...document.querySelectorAll('#modal-root .section-visibility')].map(node => node.textContent).join(' | ');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    return result;`);
+  expect(!listSidebar.row && !listSidebar.names.includes('스모크 숨김 목록') && /숨긴 목록.*스모크 숨김 목록/.test(listSidebar.settings), `숨긴 목록: 사이드바 줄 없음, 설정에서 다시 표시 ${JSON.stringify(listSidebar)}`);
   const everyList = (await invoke('state:get')).lists.map(list => list.id);
   await invoke('settings:update', { hiddenLists: everyList }).then(() => { throw new Error('모든 목록 숨기기가 통과했습니다.'); }, error => expect(/모든 목록을 숨길 수는 없어요/.test(error.message), `목록 숨기기 검증: ${error.message}`));
   const inboxName = (await invoke('state:get')).lists.find(list => list.id === 'local-inbox').name;
@@ -876,17 +1622,34 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const first = (await invoke('state:get')).widgets[0];
     const win = first && widgetWindows.get(first.id);
     expect(win && !win.isDestroyed(), '유리 효과 확인용 위젯');
-    const glassOf = async () => { await new Promise(resolve => setTimeout(resolve, 120)); await settle(win); return win.webContents.executeJavaScript(`(() => { const s = document.body.style; return { blur: s.getPropertyValue('--w-blur'), alpha: s.getPropertyValue('--glass-alpha'), a: s.getPropertyValue('--w-a') }; })()`); };
+    const glassOf = async () => { await new Promise(resolve => setTimeout(resolve, 120)); await settle(win); return win.webContents.executeJavaScript(`(() => { const s = document.body.style; const card = document.querySelector('#app > .widget-surface'); const f = document.getElementById('lg-surface'); return { blur: s.getPropertyValue('--w-blur'), alpha: s.getPropertyValue('--glass-alpha'), a: s.getPropertyValue('--w-a'), backdrop: document.body.classList.contains('has-backdrop'), lg: Boolean(card && card.classList.contains('lg')), rim: Boolean(card && (card.classList.contains('lg') || card.classList.contains('lg-rim')) && card.style.getPropertyValue('--lg-spec').includes('data:image/png')), filter: card ? getComputedStyle(card).backdropFilter : '', lens: Boolean(f && f.querySelector('feDisplacementMap') && (f.querySelector('feImage').getAttribute('href') || '').startsWith('data:image/png')), slope: f ? f.querySelector('feFuncR').getAttribute('slope') : '', tone: document.documentElement.dataset.theme, toneClass: document.body.classList.contains('tone-' + document.documentElement.dataset.theme), solid: document.body.classList.contains('glass-solid'), L: typeof glassL === 'number' ? glassL : null }; })()`); };
     const middle = await glassOf();
     await invoke('settings:update', { glassLevel: 0 }); const clear = await glassOf();
     await invoke('settings:update', { glassLevel: 1 }); const tinted = await glassOf();
     await invoke('settings:update', { glassLevel: 0.5 });
     const levels = { middle, clear, tinted };
-    expect(middle.blur === '26px' && clear.blur === '14px' && tinted.blur === '34px' && Number(clear.alpha) < Number(middle.alpha) && Number(middle.alpha) < Number(tinted.alpha), `유리 효과 단계 ${JSON.stringify(levels)}`);
+    expect(middle.blur === '13px' && clear.blur === '7px' && tinted.blur === '24px' && Number(clear.alpha) < Number(middle.alpha) && Number(middle.alpha) < Number(tinted.alpha), `유리 효과 단계 ${JSON.stringify(levels)}`);
     if (middle.a) expect(Number(clear.a) <= Number(middle.a) && Number(middle.a) <= Number(tinted.a), `유리 색 농도 ${JSON.stringify(levels)}`);
+    // Liquid Glass (2026-10-21): with the wallpaper painted behind it the card bends it at the rim (an SVG lens through
+    // backdrop-filter) and the slider moves the tint inside that filter; without one only the specular rim is drawn.
+    if (middle.backdrop) expect(middle.lg && middle.lens && middle.rim && middle.filter.includes('#lg-surface') && Number(clear.slope) > Number(middle.slope), `리퀴드 글라스 ${JSON.stringify(levels)}`);
+    else expect(middle.rim && !middle.lg, `유리 테두리(바탕화면 없음) ${JSON.stringify(levels)}`);
+    // The opaque end (2026-10-26 user): no glass at all — a solid card in the app theme, like the first widgets.
+    expect(!tinted.lg && !tinted.filter.includes('#lg-surface') && tinted.solid && tinted.tone === 'light', `불투명 끝 = 유리 없는 카드 ${JSON.stringify(levels)}`);
+    // The glass follows the wallpaper (2026-10-21 user choice): dark glass with white text on a dark one, light on a light one.
+    if (middle.backdrop && middle.L !== null) expect(middle.tone === (middle.L < 0.5 ? 'dark' : 'light') && middle.toneClass && clear.tone === middle.tone, `바탕화면 밝기 따라 유리 ${JSON.stringify(levels)}`);
     await invoke('settings:update', { glassLevel: 7 }).then(() => { throw new Error('범위 밖 유리 효과가 통과했습니다.'); }, error => expect(/유리 효과는 0~1/.test(error.message), `유리 효과 검증: ${error.message}`));
     const slider = await run(mainWindow, `document.querySelector('.main-nav .nav-item:nth-child(4)').click(); await new Promise(resolve => setTimeout(resolve, 40)); const range = document.querySelector('.glass-control input[type=range]'); return range ? range.value : '';`);
     expect(slider === '0.5', `위젯 화면 유리 효과 슬라이더 ${slider}`);
+    const flipped = await run(mainWindow, `
+      const range = document.querySelector('.glass-control input[type=range]');
+      const labels = [...document.querySelectorAll('.glass-control .glass-slider > span')].map(node => node.textContent);
+      range.value = '1'; range.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return labels;`);
+    const clearLevel = (await invoke('state:get')).settings.glassLevel;
+    await invoke('settings:update', { glassLevel: 0.5 });
+    expect(flipped.join() === '불투명,투명' && clearLevel === 0, `유리 효과 슬라이더: 오른쪽이 투명 ${JSON.stringify(flipped)} ${clearLevel}`);
     await shot(mainWindow, 'view-widgets-glass');
     checks.push('widget-glass-level');
   }
@@ -942,6 +1705,14 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       await settle(win);
       expect(overlay.filter === 'none' && overlay.inset >= 11, `위젯 대화상자: 배경 흐림 없음, 카드 안 여백 ${JSON.stringify(overlay)}`);
       checks.push('widget-dialog-no-edge-blur');
+      // One-row header (2026-10-21 user request): icon, list name and count share a row, so the list starts higher.
+      const head = await run(win, `
+        const box = selector => document.querySelector(selector)?.getBoundingClientRect() || null;
+        const glyph = box('.widget-head .widget-title-block > :first-child'), name = box('.widget-head .widget-title'), count = box('.widget-head .widget-count'), list = box('.widget-task-content');
+        const mid = r => r ? r.top + r.height / 2 : -999;
+        return { row: Math.abs(mid(glyph) - mid(name)) < 4 && Math.abs(mid(name) - mid(count)) < 6, gap: list && glyph ? Math.round(list.top - glyph.bottom) : -1, name: document.querySelector('.widget-head .widget-title')?.textContent || '' };`);
+      expect(head.row && head.gap >= 0 && head.gap <= 20 && head.name, `할 일 위젯 머리줄 한 줄 ${JSON.stringify(head)}`);
+      checks.push('widget-tasks-one-row-head');
       await win.webContents.executeJavaScript(`window.dayboard.invoke('widget:resize', { id: ${JSON.stringify(widget.id)}, width: ${original.width}, height: 240 })`);
       await settle(win);
       const widgetMenu = await run(win, `
@@ -1184,7 +1955,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await invoke('task:update', { id: 'missing-task', title: 'x' })
     .then(() => { throw new Error('없는 할 일 수정이 통과했습니다.'); }, error => expect(/no longer exists/.test(error.message), `영어 오류 문구: ${error.message}`));
   const englishSettings = await run(mainWindow, `
-    document.querySelector('.sidebar-bottom .icon-button').click();
+    document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
     await new Promise(resolve => setTimeout(resolve, 30));
     const dialog = document.querySelector('#modal-root .dialog');
     return { title: dialog?.querySelector('h2')?.textContent || '', labels: dialog ? [...dialog.querySelectorAll('.field > span')].map(node => node.textContent) : [] };`);
@@ -1198,7 +1969,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
 
   // Changing 언어 inside the (instant-apply) Settings redraws the open dialog in that language and keeps focus on the menu.
   const relabel = await run(mainWindow, `
-    document.querySelector('.sidebar-bottom .icon-button').click();
+    document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
     await new Promise(resolve => setTimeout(resolve, 30));
     const pick = async value => {
       const select = [...document.querySelectorAll('#modal-root .field select')].find(node => node.querySelector('option[value=en]'));

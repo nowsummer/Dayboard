@@ -137,7 +137,7 @@ test('a download waiting for a click is still checked: kept on failure, replaced
   const auto = new FakeAutoUpdater();
   const manager = new UpdateManager({ currentVersion: '1.5.0', mode: 'installed', autoUpdater: auto, ...fakeTimers() });
   auto.emit('update-downloaded', { version: '1.6.0' });
-  assert.equal(manager.state().releaseUrl, 'https://github.com/nowsummer/dayboard/releases/tag/v1.6.0', 'notes of the version that will be installed');
+  assert.equal(manager.state().releaseUrl, 'https://github.com/nowsummer/Dayboard/releases/tag/v1.6.0', 'notes of the version that will be installed');
   await manager.check({ manual: true });
   assert.equal(auto.checks, 1, 'the feed is asked again');
   assert.equal(manager.pending, null);
