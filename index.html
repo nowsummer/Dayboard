@@ -4,76 +4,121 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dayboard</title>
-<meta name="description" content="Dayboard — Windows용 개인 할 일·달력·메모 바탕화면 위젯 앱">
+<meta name="description" content="Mac·iPhone처럼 깔끔하게, Windows에서 빠릿하게. 할 일·달력·메모 앱과 바탕화면 위젯.">
+<link rel="alternate" hreflang="ko" href="https://nowsummer.github.io/Dayboard/">
+<link rel="alternate" hreflang="en" href="https://nowsummer.github.io/Dayboard/en/">
+<link rel="alternate" hreflang="x-default" href="https://nowsummer.github.io/Dayboard/">
+<link rel="icon" href="assets/icon.png">
 <style>
-  :root { color-scheme: light dark; --bg:#f6f7fb; --card:#ffffff; --text:#1d2230; --muted:#5f6577; --line:#e3e6ee; --accent:#3b6cf6; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#14161c; --card:#1d2029; --text:#eef0f5; --muted:#a3a8b8; --line:#2c3040; --accent:#7ea2ff; } }
+  :root { color-scheme: light dark; --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --muted:#6e6e73; --line:rgba(0,0,0,.08); --accent:#0071e3; --accent-text:#ffffff; --button:#0071e3; --shadow:0 18px 50px rgba(0,0,0,.10); }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f0f11; --card:#1c1c1e; --text:#f5f5f7; --muted:#a1a1a6; --line:rgba(255,255,255,.10); --accent:#2997ff; --accent-text:#ffffff; --button:#0071e3; --shadow:0 18px 50px rgba(0,0,0,.45); } }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font: 16px/1.65 -apple-system, "Segoe UI", "Pretendard", "Malgun Gothic", sans-serif; }
-  main { max-width: 880px; margin: 0 auto; padding: 48px 16px 64px; }
-  header { margin-bottom: 32px; }
-  h1 { font-size: 32px; margin: 0 0 8px; letter-spacing: -0.01em; }
-  .lead { color: var(--muted); margin: 0; font-size: 17px; }
-  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; margin: 16px 0; }
-  h2 { font-size: 18px; margin: 0 0 10px; }
-  ul { margin: 0; padding-left: 20px; }
-  li { margin: 4px 0; }
-  a { color: var(--accent); }
-  footer { color: var(--muted); font-size: 14px; margin-top: 28px; }
-  figure { margin: 20px 0; }
-  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(30, 40, 80, .12); }
-  figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; text-align: center; }
-  .note { color: var(--muted); font-size: 14px; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "Pretendard", "Malgun Gothic", sans-serif; -webkit-font-smoothing: antialiased; word-break: keep-all; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 20px 72px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .lang { display: flex; justify-content: flex-end; gap: 8px; font-size: 14px; color: var(--muted); }
+  .lang strong { color: var(--text); font-weight: 600; }
+  .hero { text-align: center; padding: 40px 0 8px; }
+  .hero img.icon { width: 88px; height: 88px; border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  h1 { font-size: 48px; line-height: 1.1; letter-spacing: -0.02em; margin: 20px 0 10px; }
+  .tagline { font-size: 28px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 10px; }
+  .sub { color: var(--muted); font-size: 19px; margin: 0 0 26px; }
+  .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+  .button { display: inline-block; padding: 11px 22px; border-radius: 999px; font-size: 16px; font-weight: 600; }
+  .button.primary { background: var(--button); color: var(--accent-text); }
+  .button.secondary { color: var(--accent); border: 1px solid var(--accent); }
+  .button:hover { text-decoration: none; filter: brightness(1.06); }
+  .fine { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+  figure { margin: 40px 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 16px; box-shadow: var(--shadow); }
+  figcaption { color: var(--muted); font-size: 14px; text-align: center; margin-top: 12px; }
+  .why { max-width: 680px; margin: 56px auto 8px; text-align: center; }
+  h2 { font-size: 32px; line-height: 1.2; letter-spacing: -0.015em; margin: 0 0 14px; }
+  .why p { font-size: 19px; color: var(--muted); margin: 0; }
+  .why p strong { color: var(--text); }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 36px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 24px 26px; }
+  .card h3 { font-size: 20px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .card p { margin: 0; color: var(--muted); font-size: 16px; }
+  .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 40px 0 0; }
+  .shots figure { margin: 0; }
+  .note { color: var(--muted); font-size: 13px; text-align: center; margin: 14px 0 0; }
+  section.box { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px; margin: 20px 0; }
+  section.box h2 { font-size: 22px; margin-bottom: 10px; }
+  section.box p, section.box li { color: var(--muted); font-size: 16px; }
+  section.box p { margin: 0; }
+  section.box ul { margin: 0; padding-left: 20px; }
+  section.box li { margin: 4px 0; }
+  section.box code { white-space: nowrap; }
+  footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 40px; }
+  footer p { margin: 6px 0; }
+  @media (max-width: 680px) {
+    h1 { font-size: 38px; } .tagline { font-size: 22px; } .sub, .why p { font-size: 17px; } h2 { font-size: 26px; }
+    .grid, .shots { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <header>
+  <nav class="lang" aria-label="언어 / Language">
+    <a href="en/index.html" hreflang="en" lang="en">English</a>
+    <span aria-hidden="true">|</span>
+    <strong aria-current="page">한국어</strong>
+  </nav>
+
+  <header class="hero">
+    <img class="icon" src="assets/icon.png" alt="">
     <h1>Dayboard</h1>
-    <p class="lead">Windows 바탕화면에 두는 개인용 할 일·달력·메모 위젯 앱</p>
+    <p class="tagline">Mac·iPhone처럼 깔끔하게,<br>Windows에서 빠릿하게.</p>
+    <p class="sub">할 일·달력·메모를 한 앱에서, 바탕화면 위젯으로.</p>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/nowsummer/Dayboard/releases/latest">Windows용 내려받기</a>
+      <a class="button secondary" href="https://github.com/nowsummer/Dayboard">GitHub에서 보기</a>
+    </div>
+    <p class="fine">무료 · Windows x64 · 오픈 소스(MIT)</p>
   </header>
 
-  <figure><img src="images/tasks-today.png" alt="Dayboard 할 일 화면" width="1239" height="820"><figcaption>할 일 · 오늘 모아보기와 그날의 일정</figcaption></figure>
+  <figure><img src="images/demo.gif" alt="Dayboard 사용 모습: 할 일 빠른 추가와 완료, 월·주 달력, 일정 카드, 메모" width="960" height="617"></figure>
 
-  <section>
-    <h2>무엇을 하는 앱인가</h2>
+  <section class="why">
+    <h2>만든 이유</h2>
+    <p>Mac·iPhone의 미리 알림·캘린더·메모 앱과 위젯은 보기 좋고 쓰기 편해요. Windows에서도 그렇게 쓰고 싶어서 직접 만들었어요. <strong>화면은 깔끔하게, 움직임은 빠릿하게.</strong> 이 두 가지를 기준으로 다듬고 있어요.</p>
+  </section>
+
+  <div class="grid">
+    <div class="card"><h3>보기 좋게</h3><p>정돈된 화면과 유리처럼 비치는 바탕화면 위젯. 바탕화면이 어두우면 위젯도 어둡게 바뀌어요.</p></div>
+    <div class="card"><h3>빠릿하게</h3><p>데이터가 내 PC에 있어서 화면이 바로 열려요. 「내일 오후 3시 회의」처럼 쓰면 날짜까지 들어가요.</p></div>
+    <div class="card"><h3>한곳에</h3><p>Microsoft To Do·Outlook, Google Tasks·캘린더, iCloud 달력을 함께 봐요. 계정 없이도 쓸 수 있어요.</p></div>
+    <div class="card"><h3>가입·광고 없이</h3><p>서버도, 회원 가입도, 광고도 없어요. 지운 메모는 30일 남고, 메모마다 이전 버전을 되살릴 수 있어요.</p></div>
+  </div>
+
+  <div class="shots">
+    <figure><img src="images/tasks-list.png" alt="Dayboard 할 일 화면" width="2478" height="1640" loading="lazy"><figcaption>할 일</figcaption></figure>
+    <figure><img src="images/calendar-week.png" alt="Dayboard 주간 달력" width="2478" height="1640" loading="lazy"><figcaption>달력</figcaption></figure>
+    <figure><img src="images/notes.png" alt="Dayboard 메모 화면" width="2478" height="1640" loading="lazy"><figcaption>메모</figcaption></figure>
+    <figure><img src="images/tasks-today-dark.png" alt="Dayboard 다크 테마" width="2478" height="1640" loading="lazy"><figcaption>다크 테마</figcaption></figure>
+  </div>
+  <figure><img src="images/widgets.png" alt="바탕화면의 메모·오늘·달력 위젯" width="1465" height="730" loading="lazy"><figcaption>바탕화면 위젯</figcaption></figure>
+  <p class="note">화면의 할 일·일정·메모는 예시 데이터예요.</p>
+
+  <section class="box">
+    <h2>설치</h2>
     <ul>
-      <li>할 일 목록, 일·주·월 달력, 메모를 한 창에서 보고, 바탕화면 위젯으로 고정할 수 있음. 위젯은 Apple 리퀴드 글라스처럼 가장자리에서 바탕화면이 살짝 휘어 보이는 유리 카드이며, 어두운 바탕화면에서는 어두운 유리로 저절로 맞춰짐.</li>
-      <li>Microsoft To Do·Outlook 달력, Google Tasks·Google 캘린더, iCloud 달력을 연결해 같은 할 일과 일정을 Windows에서 보고 고침. iCloud 미리 알림은 지원하지 않음.</li>
-      <li>일정은 끌어서 옮기거나 늘리고 옆에 뜨는 카드에서 바로 고침. 반복 일정, 일정별 색, 방금 한 일 되돌리기·다시 실행, 처음 여는 사람을 위한 둘러보기와 「?」 단축키 도움말이 있음.</li>
-      <li>메모는 Google 계정을 연결하면 Google 드라이브의 Dayboard 전용 숨은 폴더를 거쳐 내 다른 PC의 Dayboard와 맞춰짐(Google Keep 등 다른 앱에는 보이지 않음). 지운 메모는 「최근 삭제한 메모」에 30일 남고, 메모마다 이전 버전을 최대 10개 되살릴 수 있음.</li>
-      <li>개인이 만든 무료 앱이며 광고·회원 가입·서버가 없음. 데이터는 사용자 PC에 저장되고, 메모 동기화를 켰을 때만 그 Google 계정의 드라이브에도 보관됨.</li>
+      <li><a href="https://github.com/nowsummer/Dayboard/releases/latest">최신 릴리스</a>에서 <code>Dayboard-&lt;버전&gt;.exe</code>를 받아 실행하세요. 관리자 권한은 필요 없어요.</li>
+      <li>새 버전은 알아서 받아 두고, 「지금 다시 시작해 적용」을 누를 때 설치해요.</li>
+      <li>아직 서명되지 않은 설치 파일이라 Windows 스마트 앱 컨트롤이 처음에 막을 수 있어요. 잠시 뒤 다시 실행해 주세요.</li>
     </ul>
   </section>
 
-  <section>
-    <h2>내려받기</h2>
-    <ul>
-      <li><a href="https://github.com/nowsummer/Dayboard/releases/latest">최신 릴리스</a>에서 <code>Dayboard-&lt;버전&gt;.exe</code>를 내려받아 실행하면 관리자 권한 없이 설치되고 바로 시작됨.</li>
-      <li>새 버전은 앱이 스스로 내려받아 두고, 설정에서 「지금 다시 시작해 적용」을 누를 때만 설치함. 버전별 변경 내용은 <a href="https://github.com/nowsummer/Dayboard/releases">릴리스</a>에 있음.</li>
-      <li>서명되지 않은 새 설치 파일이라 Windows 스마트 앱 컨트롤이 몇 분 동안 막을 수 있음. 잠시 뒤 다시 실행.</li>
-      <li>앱 소스 코드는 같은 저장소에 MIT 라이선스로 공개되어 있음(<a href="https://github.com/nowsummer/Dayboard">github.com/nowsummer/Dayboard</a>).</li>
-    </ul>
-  </section>
-
-  <figure><img src="images/calendar.png" alt="Dayboard 달력 화면" width="1239" height="820" loading="lazy"><figcaption>달력 · 월 보기, 반복 일정과 일정별 색</figcaption></figure>
-  <figure><img src="images/calendar-week.png" alt="Dayboard 주간 달력" width="1239" height="820" loading="lazy"><figcaption>달력 · 주 보기, 일정을 끌어서 옮기고 늘리기</figcaption></figure>
-  <figure style="max-width:520px;margin-left:auto;margin-right:auto"><img src="images/widgets.png" alt="할 일·달력·메모 바탕화면 위젯" width="800" height="1028" loading="lazy"><figcaption>바탕화면 위젯 · 할 일, 달력, 메모(리퀴드 글라스)</figcaption></figure>
-  <p class="note">화면의 할 일·일정·메모는 예시 데이터임.</p>
-
-  <section>
-    <h2>Google 계정 연결에 대해</h2>
-    <ul>
-      <li>「Google 계정으로 로그인」을 누르면 Google의 공식 로그인 화면이 열리고, Dayboard는 Google Tasks(읽기·편집), Google 캘린더(읽기, 일정 추가·수정·삭제), Google 드라이브의 Dayboard 전용 앱 데이터 폴더(메모 동기화), 계정 이메일·프로필(계정 확인)만 요청함.</li>
-      <li>드라이브는 Dayboard만 쓰는 숨은 앱 데이터 폴더에만 접근하며 메모를 사용자의 다른 PC와 맞추는 데만 씀. 드라이브의 다른 파일은 보거나 바꾸지 않고, 앱의 「메모」 스위치로 끌 수 있음.</li>
-      <li>받은 데이터는 사용자 PC에 보관하고(로그인 정보는 Windows 암호화로 보호) 개발자나 제3자에게 보내지 않음. 자세한 내용은 <a href="privacy.html">개인정보처리방침</a> 참조.</li>
-      <li>연결 해제는 앱의 「계정」 화면에서 하거나, <a href="https://myaccount.google.com/permissions" rel="noopener">Google 계정의 앱 권한 페이지</a>에서 언제든 철회할 수 있음.</li>
-    </ul>
+  <section class="box">
+    <h2>Google 계정 연결</h2>
+    <p>Google의 공식 로그인 화면에서 연결해요. 요청하는 권한은 Google Tasks·캘린더 읽기와 편집, 메모 동기화를 위한 드라이브의 Dayboard 전용 숨은 폴더, 계정 확인용 이메일·프로필뿐이에요. 받은 데이터는 내 PC에만 두고 개발자나 다른 곳으로 보내지 않아요. 앱의 「계정」 화면이나 <a href="https://myaccount.google.com/permissions" rel="noopener">Google 계정 권한 페이지</a>에서 언제든 끊을 수 있어요. 자세한 내용은 <a href="privacy.html">개인정보처리방침</a>에 있어요.</p>
   </section>
 
   <footer>
-    <p><a href="privacy.html">개인정보처리방침</a></p>
-    <p lang="en">Dayboard is a personal Windows desktop widget for tasks, calendar and notes. It stores your data on your PC, connects to Google Tasks / Google Calendar only with your consent, and can keep your notes in step between your own PCs through a Dayboard-only app data folder in your Google Drive. Download the installer from the <a href="https://github.com/nowsummer/Dayboard/releases/latest">latest release</a>; the source code is in the same repository under the MIT License. See the <a href="privacy.html">privacy policy</a>.</p>
+    <p><a href="privacy.html">개인정보처리방침</a> · <a href="https://github.com/nowsummer/Dayboard/blob/main/SECURITY.ko.md">보안</a> · <a href="https://github.com/nowsummer/Dayboard/releases">릴리스</a></p>
+    <p>Microsoft·Google·Apple과 관계없는 개인 프로젝트예요.</p>
   </footer>
 </main>
 </body>

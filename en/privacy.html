@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dayboard Privacy Policy</title>
+<link rel="icon" href="../assets/icon.png">
+<meta name="description" content="Dayboard Privacy Policy — how Dayboard handles data from your Google, Microsoft and Apple accounts">
+<link rel="alternate" hreflang="ko" href="https://nowsummer.github.io/Dayboard/privacy.html">
+<link rel="alternate" hreflang="en" href="https://nowsummer.github.io/Dayboard/en/privacy.html">
+<link rel="alternate" hreflang="x-default" href="https://nowsummer.github.io/Dayboard/privacy.html">
+<style>
+  :root { color-scheme: light dark; --bg:#f6f7fb; --card:#ffffff; --text:#1d2230; --muted:#5f6577; --line:#e3e6ee; --accent:#3b6cf6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14161c; --card:#1d2029; --text:#eef0f5; --muted:#a3a8b8; --line:#2c3040; --accent:#7ea2ff; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font: 16px/1.7 -apple-system, "Segoe UI", "Pretendard", "Malgun Gothic", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 20px 64px; }
+  .lang { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin: -28px 0 16px; font-size: 14px; color: var(--muted); }
+  .lang a { text-decoration: none; }
+  .lang a:hover { text-decoration: underline; }
+  .lang strong { color: var(--text); font-weight: 600; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .meta { color: var(--muted); margin: 0 0 28px; font-size: 15px; }
+  h2 { font-size: 18px; margin: 28px 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  th:first-child, td:first-child { overflow-wrap: normal; word-break: keep-all; }
+  th { background: var(--card); }
+  ul { padding-left: 20px; } li { margin: 4px 0; }
+  a { color: var(--accent); }
+  footer { color: var(--muted); font-size: 14px; margin-top: 36px; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <nav class="lang" aria-label="Language / 언어">
+    <strong aria-current="page">English</strong>
+    <span aria-hidden="true">|</span>
+    <a href="../privacy.html" hreflang="ko" lang="ko">한국어</a>
+  </nav>
+
+  <h1>Dayboard Privacy Policy</h1>
+  <p class="meta">Effective October 26, 2026 · Operator (developer): Jaeha Lee</p>
+
+  <p>Dayboard is a personal tasks, calendar and notes app for Windows. It has no server, no sign-up and no ads. Data from the accounts you connect is stored <strong>on your PC</strong> (and, only when notes sync is on, also in that Google account's Drive). This policy explains what information Dayboard handles and why.</p>
+
+  <h2>1. Information Dayboard handles</h2>
+  <table>
+    <tr><th>Connected account</th><th>What Dayboard gets</th><th>What it's used for</th></tr>
+    <tr><td rowspan="4">Google</td><td>Account email and profile name (<code>openid</code>, <code>email</code>, <code>profile</code>)</td><td>Showing which account is connected</td></tr>
+    <tr><td>Google Tasks lists and tasks (<code>tasks</code>, read and edit)</td><td>Showing, adding, editing and completing tasks</td></tr>
+    <tr><td>Google Calendar calendar list and events (<code>calendar.readonly</code>, read; <code>calendar.events</code>, add, edit and delete events)</td><td>Showing, adding, editing and deleting events</td></tr>
+    <tr><td>Dayboard's own app data folder in Google Drive (<code>drive.appdata</code>, read and write to this folder only)</td><td>Syncing notes (including earlier versions and recently deleted notes) with Dayboard on your other PCs</td></tr>
+    <tr><td>Microsoft</td><td>Account information, Microsoft To Do lists and tasks (read and edit), Outlook calendar events (read and edit)</td><td>Showing, adding, editing and deleting tasks and events</td></tr>
+    <tr><td>Apple (iCloud)</td><td>The Apple Account email and app-specific password you enter, iCloud calendar events (read and edit)</td><td>Showing, adding, editing and deleting events</td></tr>
+  </table>
+  <p>If you don't connect an account, Dayboard handles no account information at all. Tasks and notes you type into the app are likewise stored only on your PC.</p>
+  <ul>
+    <li>Notes sync runs only when a Google account is connected. You can turn it off with the Notes switch on the Accounts screen in the app.</li>
+    <li>Only Dayboard can access its app data folder. The folder doesn't show up in Drive or in other apps.</li>
+    <li>Dayboard never sees or changes any other file in your Drive.</li>
+  </ul>
+
+  <h2>2. Where data is stored and for how long</h2>
+  <ul>
+    <li>Sign-in tokens and app-specific passwords are stored only in Windows encrypted storage on your PC (an encrypted file in the app data folder).</li>
+    <li>Tasks, events and notes Dayboard fetches are stored in the app data folder on the same PC.</li>
+    <li>With notes sync on, your notes (including earlier versions and recently deleted notes) are kept on your PC and also in the app data folder of that Google account's Drive.</li>
+    <li>That folder's contents belong to your Google account. Once you disconnect in the app, or revoke Dayboard's access in your Google Account, Dayboard no longer accesses the folder.</li>
+    <li>Dayboard runs no server. It never sends, sells or shares this information with the developer or any third party, and never uses it for analytics or advertising.</li>
+    <li>Information moves only between each service (Google, Microsoft, Apple) and your PC, using each service's official API over HTTPS.</li>
+    <li>When checking for updates, Dayboard downloads only new-version information and installers from Dayboard's releases on GitHub. No user data is sent.</li>
+    <li>Disconnecting an account in the app deletes that account's sign-in information immediately. Lists and events already fetched stay as a local copy, which you can delete in the app.</li>
+  </ul>
+
+  <h2>3. Your rights and how to revoke access</h2>
+  <ul>
+    <li>Disconnect any time from the <strong>Accounts</strong> screen in the app.</li>
+    <li>Google: revoke permissions at <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a>.</li>
+    <li>Microsoft: revoke permissions under <a href="https://account.live.com/consent/Manage" rel="noopener">Apps and services in your Microsoft account</a>.</li>
+    <li>Apple: delete the app-specific password at <a href="https://account.apple.com/" rel="noopener">account.apple.com</a>.</li>
+    <li>Uninstalling the app leaves its app data folder (<code>%APPDATA%\Dayboard</code>) in place. Deleting that folder too removes all information stored on the PC.</li>
+  </ul>
+
+  <h2>4. Google API Services User Data Policy</h2>
+  <p>Dayboard's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+  <h2>5. Changes</h2>
+  <p>If this policy changes, this page will be updated and its effective date revised.</p>
+  <ul>
+    <li>October 26, 2026: Added notes sync between your own PCs through Dayboard's own app data folder in Google Drive (<code>drive.appdata</code>).</li>
+    <li>October 21, 2026: Added permission to add, edit and delete events in connected calendars. Added update checks.</li>
+    <li>October 19, 2026: Policy first took effect.</li>
+  </ul>
+
+  <footer>
+    <p><a href="index.html">About Dayboard</a></p>
+  </footer>
+</main>
+</body>
+</html>
