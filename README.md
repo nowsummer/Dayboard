@@ -10,7 +10,7 @@ Clean like a Mac or iPhone. Quick on Windows.<br>Tasks, calendar and notes, with
 
 [**Download for Windows**](https://github.com/nowsummer/Dayboard/releases/latest) · [Website](https://nowsummer.github.io/Dayboard/en/) · [Privacy](https://nowsummer.github.io/Dayboard/en/privacy.html)
 
-<img src="images/en/demo.gif" width="860" alt="Adding and completing a task, dragging events in the month and week calendar, and notes in Dayboard">
+<img src="images/en/demo.gif" width="860" alt="Adding and completing a task, dragging events in the month and week calendar, notes, then a widget put on the desktop and its glass adjusted in Dayboard">
 
 </div>
 
@@ -25,13 +25,13 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 
 ## Features
 
-| | |
-|---|---|
-| **Tasks** | Smart lists · lists and groups · repeats and subtasks · drag to reorder · quick add: "tomorrow 3pm" |
-| **Calendar** | Day, week, month · drag to move or resize · edit in a side card · repeats and alerts · go to any date |
-| **Notes** | Grouped by date · pinning · find · earlier versions · synced across PCs via your Google account |
-| **Widgets** | Tasks, calendar and notes on the desktop, in Liquid Glass style |
-| **Everyday** | Search, undo and redo, shortcuts (press <kbd>?</kbd>), light and dark mode, English and Korean |
+<table>
+  <tr><td><b>Tasks</b></td><td>Smart lists · lists and groups · repeats and subtasks · drag to reorder · quick add: "tomorrow 3pm"</td></tr>
+  <tr><td><b>Calendar</b></td><td>Day, week, month · drag to move or resize · edit in a side card · repeats and alerts · go to any date</td></tr>
+  <tr><td><b>Notes</b></td><td>Grouped by date · pinning · find · earlier versions · synced across PCs via your Google account</td></tr>
+  <tr><td><b>Widgets</b></td><td>Tasks, calendar and notes on the desktop, in Liquid Glass style</td></tr>
+  <tr><td><b>Everyday</b></td><td>Search, undo and redo, shortcuts (press <kbd>?</kbd>), light and dark mode, English and Korean</td></tr>
+</table>
 
 ## Screenshots
 

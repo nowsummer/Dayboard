@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample, shotsLanguage } = require('./readme-sample.cjs');
+const { seedSample, shotsLanguage, morningClock } = require('./readme-sample.cjs');
 
 const LANG = shotsLanguage();
 const WIDTH = 1120, HEIGHT = 720;
@@ -93,7 +93,10 @@ app.whenReady().then(async () => {
     const invoke = (name, payload = {}) => js(`window.dayboard.invoke(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
     await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true });
     await seedSample(invoke, new Date(), LANG);
+    await morningClock(main); // 9:41 on the page, so today's events are not drawn as past
     main.setBounds({ x: 0, y: 0, width: WIDTH, height: HEIGHT });
+    // Kept painting while recording: covered by another window, Chromium stopped drawing and a run lost 9 seconds (2026-10-27).
+    main.setAlwaysOnTop(true); main.webContents.setBackgroundThrottling(false);
     await js(`goto('today');`);
     await wait(900);
     await js(PAGE);

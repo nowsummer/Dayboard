@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample, shotsLanguage } = require('./readme-sample.cjs');
+const { seedSample, shotsLanguage, morningClock } = require('./readme-sample.cjs');
 
 const LANG = shotsLanguage();
 const APP_DIR = path.resolve(__dirname, '..');
@@ -55,6 +55,7 @@ app.whenReady().then(async () => {
     await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true });
     const { work, focusNote, planned } = await seedSample(invoke, new Date(), LANG);
 
+    await morningClock(main); // 9:41 on the page, so today's events are not drawn as past
     main.setBounds({ x: 0, y: 0, width: 1240, height: 820 });
     await wait(600);
     await run(`goto('today');`);

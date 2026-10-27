@@ -128,4 +128,28 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
 // The language of a screenshot run: DAYBOARD_SHOTS_LANG=en|ko (Korean when unset).
 function shotsLanguage() { return process.env.DAYBOARD_SHOTS_LANG === 'en' ? 'en' : 'ko'; }
 
-module.exports = { seedSample, dateKey, shotsLanguage };
+// The pictures are taken as if it were 9:41 in the morning: taken in the evening, every event of today was past and drawn faded
+// (2026-10-27 user). Only the window's page clock moves (a script the page runs before its own, through the DevTools protocol);
+// the data and the app's main process keep the real time, and the day stays today.
+const MORNING = `(() => { const Real = Date; const shift = new Real(Real.now()).setHours(9, 41, 0, 0) - Real.now();
+  class Morning extends Real { constructor(...args) { if (args.length) super(...args); else super(Real.now() + shift); } static now() { return Real.now() + shift; } }
+  globalThis.Date = Morning; })();`;
+async function morningClock(win) {
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const page = win.webContents;
+  if (!page.debugger.isAttached()) page.debugger.attach('1.3');
+  await page.debugger.sendCommand('Page.enable');
+  await page.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: MORNING });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    page.reload();
+    for (let i = 0; i < 200; i++) {
+      await wait(100);
+      if (page.isLoading()) continue;
+      if (await page.executeJavaScript('!!window.dayboard && typeof goto === "function" && typeof state !== "undefined" && !!state').catch(() => false)) break;
+    }
+    if (await page.executeJavaScript('new Date().getHours() === 9').catch(() => false)) return;
+  }
+  throw new Error('the morning clock did not take');
+}
+
+module.exports = { seedSample, dateKey, shotsLanguage, morningClock };
