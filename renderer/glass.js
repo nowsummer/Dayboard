@@ -105,16 +105,17 @@ function glassFilter(name, W, H, R) {
   glassBuilt.set(name, { key, tint: null });
   return id;
 }
-// Tint inside the filter: light glass lifts toward white by t, dark glass sinks toward slate by t.
+// Tint inside the filter: the glass moves toward the tint colour by t — white for light glass, slate for dark glass, or a blend of
+// the two while a widget's glass goes from the wallpaper's tone to the app theme's (domain.js glassLook, 2026-10-28).
 function glassTune(name, p) {
   const f = document.getElementById('lg-' + name), built = glassBuilt.get(name);
   if (!f || !built) return;
-  const sig = [p.dark, p.t, p.sat, p.blur].join('|');
+  const tint = Array.isArray(p.tint) ? p.tint : (p.dark ? [0.145, 0.153, 0.18] : [1, 1, 1]);
+  const sig = [tint.join(','), p.t, p.sat, p.blur].join('|');
   if (built.tint === sig) return;
   built.tint = sig;
-  const slate = [0.145, 0.153, 0.18];
   f.querySelector('feGaussianBlur').setAttribute('stdDeviation', String(Math.max(0, p.blur / 2)));
-  [...f.querySelectorAll('feComponentTransfer > *')].forEach((fn, i) => { fn.setAttribute('slope', String(1 - p.t)); fn.setAttribute('intercept', String(p.dark ? p.t * slate[i] : p.t)); });
+  [...f.querySelectorAll('feComponentTransfer > *')].forEach((fn, i) => { fn.setAttribute('slope', String(1 - p.t)); fn.setAttribute('intercept', String(p.t * tint[i])); });
   f.querySelector('feColorMatrix').setAttribute('values', String(p.sat / 100));
 }
 // Filter tint for a glass level over a wallpaper of luminance L (domain.js glassTint: a/da, blur, saturation).
@@ -125,13 +126,13 @@ function glassParams(level, L) {
   return { dark, t: dark ? g.da : g.a, sat: dark ? g.dsat : g.sat, blur: g.blur };
 }
 // Puts the glass on one element (called after every render: the elements are new each time).
-function glassMount(el, name, level, L) {
+function glassMount(el, name, level, L, params) {
   if (!glassOk || !el || !el.isConnected) return false;
   const r = el.getBoundingClientRect(), W = Math.round(r.width), H = Math.round(r.height);
   if (W < 40 || H < 40) return false;
   const R = Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 26);
   const id = glassFilter(name, W, H, Math.min(R, W / 2, H / 2));
-  glassTune(name, glassParams(level, L));
+  glassTune(name, params || glassParams(level, L));
   el.classList.add('lg');
   el.style.setProperty('--lg-filter', `url(#${id})`);
   el.style.setProperty('--lg-spec', `url("${lensSpecular(W, H, Math.min(R, W / 2, H / 2), devicePixelRatio || 1)}")`);
@@ -152,7 +153,7 @@ function glassAfterRender() {
     const surface = document.querySelector('#app > .widget-surface');
     if (!surface) return;
     if (glassSolid()) return; // the opaque end: a plain card, no lens and no rim
-    if (document.body.classList.contains('has-backdrop')) glassMount(surface, 'surface', glassLevel(), glassBasis());
+    if (document.body.classList.contains('has-backdrop')) glassMount(surface, 'surface', glassLevel(), glassBasis(), glassSurfaceParams());
     else glassRim(surface);
     return;
   }
@@ -165,13 +166,18 @@ function glassAfterRender() {
 function glassDropPreviews() {
   for (const name of [...glassBuilt.keys()]) if (name.startsWith('preview-')) { document.getElementById('lg-' + name)?.remove(); glassBuilt.delete(name); }
 }
+// The preview cards follow the widgets' curve (domain glassLook, 2026-10-28 review: they kept the old glassTint curve and still
+// jumped to the solid card at the last step): the stage is the theme's own colour, so the tone never changes there.
 function glassPreviews(gallery, level) {
   const solid = glassSolid(level);
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light', L = theme === 'dark' ? 0.23 : 0.82;
+  const k = DayboardDates.glassLook(level, { mean: L, low: L, high: L }, theme, theme);
+  const params = k ? { tint: k.tint, t: k.t, sat: k.sat, blur: k.blur } : null;
   gallery.classList.toggle('solid', solid);
   for (const el of gallery.querySelectorAll('.widget-preview')) {
     const type = ['tasks', 'calendar', 'note'].find(t => el.classList.contains('preview-' + t)) || 'tasks';
     if (solid) { el.classList.remove('lg'); el.style.removeProperty('--lg-filter'); continue; }
-    glassMount(el, 'preview-' + type, level, null);
+    glassMount(el, 'preview-' + type, level, L, params);
   }
 }
 // While a card changes size (the widget's resize handle, a main-window edge drag) its filter and lens stretch to it on the

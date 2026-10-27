@@ -140,7 +140,8 @@ app.whenReady().then(async () => {
     await wait(900);
     await record(true);
     await wait(1700);
-    // The glass slider: right is clearer, left frosted (app.js glassSlide); let go, the widget on the desktop follows.
+    // The glass slider: right is clearer, left frosted (app.js glassSlide); the widget on the desktop follows step by step while it
+    // moves (1.1.4, widget:glass-preview) and, in light mode, turns white toward the frosted end.
     const slide = async to => {
       const at = await point(`(() => { const s = document.querySelector('.glass-control input[type=range]'); s.scrollIntoView({ block: 'nearest' }); const r = s.getBoundingClientRect(); return { x: Math.round(r.left + 9 + (r.width - 18) * Number(s.value)), y: Math.round(r.top + r.height / 2), left: r.left, width: r.width, value: Number(s.value) }; })()`, 'glass slider');
       await glide(at, 650);
@@ -150,13 +151,13 @@ app.whenReady().then(async () => {
         const value = Math.round((at.value + (to - at.value) * i / steps) * 100) / 100;
         const x = Math.round(at.left + 9 + (at.width - 18) * value);
         await js(`(() => { const s = document.querySelector('.glass-control input[type=range]'); s.value = ${value}; s.dispatchEvent(new Event('input', { bubbles: true })); __scene.move(${x}, ${at.y}, 60); return true; })()`);
-        await wait(70);
+        await wait(110);
       }
       await js(`document.querySelector('.glass-control input[type=range]').dispatchEvent(new Event('change', { bubbles: true })); true`);
       await wait(1900);
     };
     await slide(0.95); // nearly clear
-    await slide(0.1); // frosted
+    await slide(0.05); // frosted: nearly white in light mode
     await record(false);
     await wait(400);
     console.log(`[scene] ${n} frames in ${OUT}`);

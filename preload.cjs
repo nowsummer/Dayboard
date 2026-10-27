@@ -52,6 +52,13 @@ contextBridge.exposeInMainWorld('dayboard', Object.freeze({
     ipcRenderer.on('dayboard:open-day', listener);
     return () => ipcRenderer.removeListener('dayboard:open-day', listener);
   },
+  // The main window's glass slider being dragged (2026-10-28): widgets show the level before it is saved.
+  onGlassPreview(callback) {
+    if (typeof callback !== 'function') throw new TypeError('유리 미리보기 함수가 필요합니다.');
+    const listener = (_event, level) => callback(level);
+    ipcRenderer.on('dayboard:glass-preview', listener);
+    return () => ipcRenderer.removeListener('dayboard:glass-preview', listener);
+  },
   onFlush(callback) {
     if (typeof callback !== 'function') throw new TypeError('저장 함수가 필요합니다.');
     flushHandler = callback;

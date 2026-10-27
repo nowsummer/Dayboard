@@ -196,11 +196,14 @@ test('calendar search: the result list sorts the same hits (start parsed once pe
   const texts = []; const keys = [];
   const walk = n => { if (!n || typeof n !== 'object') { if (typeof n === 'string') texts.push(n); return; } if (n.attrs && n.attrs['data-event-key']) keys.push([n.attrs['data-event-key'], n.parentPart]); for (const c of n.children || []) { if (c && typeof c === 'object' && n.attrs && n.attrs['data-part']) c.parentPart = n.attrs['data-part']; else if (c && typeof c === 'object' && n.parentPart) c.parentPart = n.parentPart; walk(c); } };
   walk(tree);
-  const hits = call(`calSearchHits('회의', TODAY)`);
+  // The list uses this PC's today (calSearchResults: D.dateKey()): the same day here, or the count is a day off once the
+  // seeded TODAY is past (it failed on 2026-10-28).
+  const today = JSON.stringify(D.dateKey());
+  const hits = call(`calSearchHits('회의', ${today})`);
   assert.ok(texts.includes(`「회의」 일정 ${hits.length}개`), 'the head counts the hits');
   const now = Date.now();
-  const expectUp = ids(call(`calSearchHits('회의', TODAY).filter(e => calEndMs(e) >= ${now}).sort((a, b) => calStartMs(a) - calStartMs(b)).slice(0, 150)`));
-  const expectPast = ids(call(`calSearchHits('회의', TODAY).filter(e => calEndMs(e) < ${now}).sort((a, b) => calStartMs(b) - calStartMs(a)).slice(0, 100)`));
+  const expectUp = ids(call(`calSearchHits('회의', ${today}).filter(e => calEndMs(e) >= ${now}).sort((a, b) => calStartMs(a) - calStartMs(b)).slice(0, 150)`));
+  const expectPast = ids(call(`calSearchHits('회의', ${today}).filter(e => calEndMs(e) < ${now}).sort((a, b) => calStartMs(b) - calStartMs(a)).slice(0, 100)`));
   assert.deepEqual(keys.filter(k => k[1] === 'up').map(k => k[0]), expectUp, 'upcoming: soonest first');
   assert.deepEqual(keys.filter(k => k[1] === 'past').map(k => k[0]), expectPast, 'past: latest first');
   assert.ok(expectUp.length > 20 && expectPast.length > 20);

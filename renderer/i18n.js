@@ -230,9 +230,9 @@
   // (the English wording is built in code), language names, developer-only smoke messages.
   const NEUTRAL=new Set(['일월화수목금토','모레','다음주','오전','오후','시','일','주','개월','년','마다','요일','마지막','{0}번째',' {0}일',' {0}월 {1}일',' · {0}회',' · {0}월 {1}일까지','{0}{1}마다','매월 {0}일','매월 {0}번째 {1}','매월 마지막 {0}','한국어',
     '스모크 테스트','할 일 변경 검증 실패','Dayboard 알림 시험','알림 발송 기록 실패','Node가 renderer에 노출되었습니다.','렌더러 화면이 비어 있습니다.',
-    // preload.cjs has no tr(): five are TypeErrors for programmer misuse that never reach the screen, two are fallbacks for a
+    // preload.cjs has no tr(): six are TypeErrors for programmer misuse that never reach the screen, two are fallbacks for a
     // rejection without a message, which main's tr() errors never produce (2026-10-27 review).
-    '변경 사항을 저장하지 못했습니다.','올바른 명령이 필요합니다.','요청을 처리하지 못했습니다.','변경 알림 함수가 필요합니다.','달력 열기 함수가 필요합니다.','창 상태 함수가 필요합니다.','배경 함수가 필요합니다.','저장 함수가 필요합니다.']);
+    '변경 사항을 저장하지 못했습니다.','올바른 명령이 필요합니다.','요청을 처리하지 못했습니다.','변경 알림 함수가 필요합니다.','달력 열기 함수가 필요합니다.','유리 미리보기 함수가 필요합니다.','창 상태 함수가 필요합니다.','배경 함수가 필요합니다.','저장 함수가 필요합니다.']);
   function translate(language,key,params){
     let text=language==='en'&&Object.hasOwn(EN,key)?EN[key]:key;
     // {0} inserts the value; {0|task|tasks} inserts the value and the noun, singular for exactly 1 (English counts; Korean keys never need it).

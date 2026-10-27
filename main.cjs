@@ -709,9 +709,10 @@ async function writeRemoteEvent(kind, event, calendar, { scope = 'one', previous
 // 2. Replies to main's own round-trips to a renderer: note:save answers flushWindow, widget:painted answers revealOnDesktop.
 //    A queued command that awaits one of those (note:trash, widget:update, window:close → flushWindow) would wait behind
 //    itself for the 5 s / 4.5 s timeout, so the reply must come through here. Window controls, widget:close/resize/focus
-//    and update:* only touch windows or the updater and take no time.
+//    and update:* only touch windows or the updater and take no time; widget:glass-preview only passes the slider's level on (a
+//    queued one would lag behind a drag).
 // Every name is a case of command() (tests/commands.test.cjs).
-const DIRECT_COMMANDS = new Set(['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit']);
+const DIRECT_COMMANDS = new Set(['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'widget:glass-preview', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit']);
 async function command(commandName, payload, sourceWindow) {
   const now = () => new Date().toISOString();
   switch (commandName) {
@@ -1413,6 +1414,16 @@ async function command(commandName, payload, sourceWindow) {
       const entry = [...widgetWindows].find(([, win]) => win === sourceWindow);
       if (!entry || !desktop.isAttached(entry[1])) return false;
       try { return desktop.focus(entry[1]); } catch { return false; }
+    }
+    case 'widget:glass-preview': {
+      // A glass slider while it is dragged — the 「바탕화면 위젯」 screen, Settings, a widget's own settings (2026-10-28 user: the widgets
+      // change step by step): the level goes to each widget window to show; nothing is saved (the slider's release saves it,
+      // settings:update, and a failed save sends the saved level back).
+      const level = Number(payload?.level);
+      if (!Number.isFinite(level) || level < 0 || level > 1) return false;
+      // The widget whose own settings dialog moves the slider already shows the level (its dialog applies it): only the others.
+      for (const win of widgetWindows.values()) if (!win.isDestroyed() && win !== sourceWindow) win.webContents.send('dayboard:glass-preview', level);
+      return true;
     }
     case 'widget:painted': {
       const finish = typeof payload.token === 'string' ? pendingPaints.get(payload.token) : null;

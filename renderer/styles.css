@@ -196,7 +196,7 @@
 .widget-body .widget-tasks .task-row.completed .task-title{color:var(--w-tertiary)}
 .widget-body .widget-tasks .task-meta{font-size:12px;color:var(--w-secondary);margin-top:2px}
 .widget-body .widget-tasks .row-more,.widget-body .widget-tasks .task-flag:not(.on){color:var(--w-tertiary)}
-.widget-body .widget-tasks .task-flag.on{color:#ff9500}
+.widget-body .widget-tasks .task-flag.on{color:var(--w-flag,#ff9500)}
 .widget-body .widget-empty{color:var(--w-tertiary);font-size:12px;gap:10px}
 .widget-body .widget-empty svg{color:color-mix(in srgb,var(--accent,#3478f6) 55%,transparent)}
 .widget-body .widget-task-content .quick-add{margin-top:0;border:0;border-radius:0;background:none;box-shadow:none;flex-shrink:0;position:relative}
@@ -652,15 +652,17 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
    gallery stage shapes moved under the cards so the preview headers sit on a calm part of the stage. */
 .widget-body.tone-dark{--w-red:#ff8f84;--w-secondary:rgba(236,238,245,.84);--w-tertiary:rgba(236,238,245,.72)}
 .widget-body.tone-light{--w-red:#c4372b;--w-secondary:rgba(44,48,60,.82);--w-tertiary:rgba(44,48,60,.7)}
-.widget-body.tone-dark .widget-task-content .quick-plus{color:color-mix(in srgb,var(--accent,#3478f6) 45%,#fff)}
-.widget-body.tone-light .widget-task-content .quick-plus{color:color-mix(in srgb,var(--accent,#3478f6) 70%,#000)}
-.widget-body.tone-dark .widget-tasks .task-check{border-color:color-mix(in srgb,var(--task-color) 45%,#fff)}
-.widget-body.tone-light .widget-tasks .task-check{border-color:color-mix(in srgb,var(--task-color) 65%,#3a3f4a)}
-.widget-body.tone-dark .widget-calendar-content .task-dot{background:#9dbdff}
-.widget-body.tone-light .widget-calendar-content .task-dot{background:#2a5fc4}
+/* The text and accents on the wallpaper glass follow its ink strength (domain.js glassInks, set by app.js applyGlass on the body —
+   2026-10-28: they deepen a little per step as the glass nears the change of text colour); the values here are the plain ones. */
+.widget-body.tone-dark .widget-task-content .quick-plus{color:color-mix(in srgb,var(--accent,#3478f6) var(--w-plus-mix,45%),var(--w-plus-with,#fff))}
+.widget-body.tone-light .widget-task-content .quick-plus{color:color-mix(in srgb,var(--accent,#3478f6) var(--w-plus-mix,70%),var(--w-plus-with,#000))}
+.widget-body.tone-dark .widget-tasks .task-check{border-color:color-mix(in srgb,var(--task-color) var(--w-check-mix,45%),var(--w-check-with,#fff))}
+.widget-body.tone-light .widget-tasks .task-check{border-color:color-mix(in srgb,var(--task-color) var(--w-check-mix,65%),var(--w-check-with,#3a3f4a))}
+.widget-body.tone-dark .widget-calendar-content .task-dot{background:var(--w-dot,#9dbdff)}
+.widget-body.tone-light .widget-calendar-content .task-dot{background:var(--w-dot,#2a5fc4)}
 .widget-body.tone-dark .widget-calendar-content .is-today .day-number{background:#e5483b}
-.widget-body.tone-dark.note-widget .widget-title{color:#f6cf5c}
-.widget-body.tone-light.note-widget .widget-title{color:#8a6604}
+.widget-body.tone-dark.note-widget .widget-title{color:var(--w-note,#f6cf5c)}
+.widget-body.tone-light.note-widget .widget-title{color:var(--w-note,#8a6604)}
 .note-body::placeholder{color:var(--muted)}
 .widget-body.note-widget .note-body::placeholder,.widget-body.note-widget .note-title-input::placeholder{color:var(--w-tertiary)}
 [data-theme=dark] .preview-note-label{color:#f3c64e}
