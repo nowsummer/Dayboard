@@ -18,9 +18,9 @@ Clean like a Mac or iPhone. Quick on Windows.<br>Tasks, calendar and notes, with
 
 The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, look good and are a pleasure to use. I wanted the same on Windows, so I built it. Two rules from the start: keep it clean, keep it quick.
 
-- **Clean** — a tidy layout, glassy desktop widgets, light and dark.
-- **Quick** — your data is kept on your PC, so screens open without waiting. Changes from your other devices come in on their own.
-- **All in one place** — Microsoft To Do and Outlook, Google Tasks and Calendar, iCloud Calendar, or no account at all.
+- **Clean** — a tidy layout, glassy desktop widgets, light and dark mode.
+- **Quick** — your data is kept on your PC, so screens open without waiting.
+- **All in one place** — Microsoft To Do and Outlook, Google Tasks and Calendar and iCloud Calendar in one window, in sync with your other PCs and your iPhone or Android phone. Or use it with no account at all.
 - **Private** — no server, no sign-up, no ads.
 
 ## Features
@@ -29,9 +29,9 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 |---|---|
 | **Tasks** | Today, Scheduled and Flagged · lists and groups · quick add that understands "tomorrow 3pm" |
 | **Calendar** | Day, week and month · drag to move or resize · edit in a card beside the event · repeating events |
-| **Notes** | Grouped by date · pinning · find · earlier versions · kept in step across your PCs with Google |
+| **Notes** | Grouped by date · pinning · find · earlier versions · synced across your PCs through your Google account |
 | **Widgets** | Tasks, calendar and notes on the desktop, in Liquid Glass style |
-| **Everyday** | Search, undo and redo, shortcuts (press <kbd>?</kbd>), light and dark, English and Korean |
+| **Everyday** | Search, undo and redo, shortcuts (press <kbd>?</kbd>), light and dark mode, English and Korean |
 
 ## Screenshots
 
@@ -60,7 +60,7 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 ## Install
 
 1. Download `Dayboard-<version>.exe` from the [latest release](https://github.com/nowsummer/Dayboard/releases/latest) and run it. No admin rights needed.
-2. New versions download in the background and install when you choose **Restart now to update**.
+2. The latest version downloads on its own and installs when you choose **Restart now to update**.
 
 > [!NOTE]
 > The installer isn't signed yet, so Windows Smart App Control may block it at first. Wait a moment and run it again. Windows x64 only.
