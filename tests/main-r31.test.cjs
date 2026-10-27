@@ -41,11 +41,11 @@ test('R30-6: a reminder check whose save fails at start-up is logged, not thrown
   const body = blockAfter('    if (smoke) await runSmokeTest();\n    else ');
   assert.ok(body.includes('checkReminders') && body.includes('purge'), 'the right block');
   const errors = [];
-  const run = new Function('store', 'sync', 'app', 'setInterval', 'setTimeout', 'console', 'purgeTrash', 'checkReminders', 'timer', body);
+  const run = new Function('store', 'sync', 'app', 'setInterval', 'setTimeout', 'console', 'purgeTrash', 'checkReminders', 'timer', 'checkEventAlerts', body);
   const timers = [];
   run({ get: () => ({ accounts: [] }) }, { sync: async () => {}, syncNotes: async () => {} }, { on() {} },
     (fn, ms) => { timers.push([fn, ms]); return { unref() {} }; }, () => ({ unref() {} }), { error: (...args) => errors.push(args.join(' ')) },
-    () => {}, () => { throw new Error('EBUSY: dayboard.json is locked'); }, null);
+    () => {}, () => { throw new Error('EBUSY: dayboard.json is locked'); }, null, () => {}); // event alerts (1.1.3) run beside it
   assert.deepEqual(errors, ['reminder check failed: EBUSY: dayboard.json is locked'], 'the start goes on; the failure is logged like the interval\'s');
   const every30s = timers.find(([, ms]) => ms === 30000);
   assert.ok(every30s, 'the 30-second check is still scheduled');

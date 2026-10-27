@@ -728,3 +728,32 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 
 /* 2026-10-26 usability review: the gallery button while its widget window comes up. */
 .button.opening{opacity:.72;cursor:progress}
+
+/* 1.1.3: the calendar title opens 「날짜로 이동」 (Apple Calendar's Go to Date); it looks like the title until hovered. */
+/* The margins give back exactly the padding, so the text keeps the gutter line; the button may be its padding wider than the h1
+   (whose width is the text's), and the h1 lets the hover pill show past its edges (review C1: max-width:100% cut 「2026년 10월」 to 「2026년 ...」). */
+.topbar-main h1:has(>.title-button){overflow:visible;min-width:0}.topbar-main h1 .title-button{font:inherit;letter-spacing:inherit;color:inherit;padding:3px 7px;margin:-3px -7px;border-radius:8px;max-width:calc(100% + 14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.topbar-main h1 .title-button:hover{background:var(--hover)}
+.go-date{gap:8px}.go-date-hint{min-height:18px;margin:2px 2px 0}.go-date-hint.error{color:#de5c62}
+/* 1.1.3: rows of a list are dragged into their own order (Reminders' manual sort), shown as the lists and notes do. */
+.task-row.dragging{opacity:.4}.task-row.drop-before{box-shadow:inset 0 2px 0 var(--blue)}.task-list.drop-end{box-shadow:inset 0 -2px 0 var(--blue)}.task-list.drag-active{padding-bottom:28px}
+/* 1.1.3: a task's repeat and steps in its row, its steps opened under it (Reminders' subtasks), and the steps in its dialog. */
+.repeat-label,.steps-label{display:inline-flex;align-items:center;gap:3px}.steps-label{font-variant-numeric:tabular-nums}
+.steps-toggle{width:26px;height:26px;margin-top:-1px;color:var(--muted)}.steps-toggle svg{width:16px;height:16px}
+.task-row.steps-open{flex-wrap:wrap;row-gap:6px}.task-steps{flex-basis:100%;display:flex;flex-direction:column;padding:0 0 0 33px}
+.task-step{display:flex;align-items:center;gap:10px;min-height:32px}.step-check{width:17px;height:17px;border:1.5px solid #c8ccd3;border-radius:50%;flex-shrink:0;display:grid;place-items:center;color:#fff;transition:background .12s,border-color .12s}.step-check:hover{border-color:var(--task-color,var(--blue))}.task-step.done .step-check,.step-edit-row.done .step-check{background:var(--task-color,var(--blue));border-color:var(--task-color,var(--blue))}
+.step-title{font-size:13px;color:var(--text);overflow-wrap:anywhere;padding:3px 0}.task-step.done .step-title{text-decoration:line-through;color:var(--muted)}
+.step-editor-list{display:flex;flex-direction:column}.step-edit-row{display:flex;align-items:center;gap:9px;min-height:36px}.step-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--line);background:none;font-size:13px;padding:7px 2px;color:var(--text)}.step-input:focus{outline:none;border-bottom-color:var(--blue)}.step-edit-row.done .step-input{color:var(--muted);text-decoration:line-through}.step-add-row{min-height:36px}.step-plus{width:17px;display:grid;place-items:center;color:var(--blue);flex-shrink:0}.step-remove{width:26px;height:26px;opacity:0}.step-edit-row:hover .step-remove,.step-edit-row:focus-within .step-remove{opacity:1}
+.repeat-elsewhere{display:flex;align-items:center;gap:6px;margin:0 0 14px}
+/* 2026-10-27 user choice B (「글 시작 위치는 B안이 좋아」): the captions under each stage start 9px in, where the 30px corner's 45°
+   point is (r(1−1/√2) ≈ 9px), at every window width. The radii stay Apple's (stage 30, inner card 22, widget 26). */
+.widget-gallery-item>:not(.widget-stage){margin-left:9px}
+/* A long title (a list's name) gives way with an ellipsis before the buttons on its right slide under the window's own buttons
+   (2026-10-27 review; it never shrinks below its full width otherwise, the 2026-10-26 rule). */
+@media(min-width:700px){.topbar-main h1{max-width:45%}}
+/* 2026-10-27 recheck: the English calendar bar is wider than the Korean one; below about 1040px its 「New event」 shows its + only, so it
+   never slides under the window's own buttons (the label stays as its name and tooltip). */
+@media(max-width:1040px){html:not(:lang(ko)) .event-add-button .button-label{display:none}html:not(:lang(ko)) .topbar .event-add-button{padding:0;width:32px;justify-content:center}}
+/* 2026-10-27 recheck: the buttons never shrink (「New event」 was squeezed to 11px), and when even they do not fit — a week across two
+   months, 「September – October 2026」, at 900–1160px — the title is cut with an ellipsis instead of the bar sliding under the window's
+   own buttons. Otherwise the title keeps its full text (the 2026-10-26 rule: the tools give first, by their padding). */
+@media(min-width:700px){.topbar-main>:not(h1):not(.topbar-spacer){flex-shrink:0}.topbar-main h1{flex-shrink:1;min-width:0}}

@@ -8,7 +8,7 @@ const { randomUUID } = require('node:crypto');
 const { fileURLToPath } = require('node:url');
 const { spawn } = require('node:child_process');
 const { UpdateManager, releasePage, releasesPage, releaseTag, STAGING_ID } = require('./lib/updater.cjs');
-const { createStore, resolveUserDataDirectory, TRASH_DAYS, publicNote } = require('./lib/store.cjs');
+const { createStore, resolveUserDataDirectory, TRASH_DAYS, publicNote, publicRecord } = require('./lib/store.cjs');
 const { createDesktopManager, clampBounds, onScreen } = require('./lib/desktop.cjs');
 const { createTaskbarIcon } = require('./lib/windowicon.cjs');
 const { createStartMenu } = require('./lib/startmenu.cjs');
@@ -27,8 +27,10 @@ const { providerStatus } = require('./lib/providers/oauth.cjs');
 const i18n = require('./lib/i18n.cjs');
 const { tr } = i18n;
 // Input validators and the local-series helpers live in lib/ since the 2026-10-27 review (tests run them without Electron).
-const { text, rawText, identifier, boolean, color, dateOnly, dateTime, reminderAt, idList, eventColor, rruleText, scopeOf } = require('./lib/validate.cjs');
-const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, toFirstShown, shiftedForMaster, truncatedRule } = require('./lib/series.cjs');
+const { text, rawText, identifier, boolean, color, dateOnly, dateTime, reminderAt, idList, eventColor, rruleText, scopeOf, taskSorts, taskSteps, eventAlert, taskOrders } = require('./lib/validate.cjs');
+const { dueAlerts, alertLine, pruneFired } = require('./lib/alerts.cjs');
+const { setRepeat, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries } = require('./lib/tasks.cjs');
+const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, seriesAlert, ring, alertOtherKind, seriesAllDay, toFirstShown, shiftedForMaster, truncatedRule } = require('./lib/series.cjs');
 
 app.setName('Dayboard');
 app.setAppUserModelId('com.dayboard.desktop');
@@ -179,22 +181,70 @@ function checkReminders() {
   if (!store || quitting) return;
   const now = Date.now();
   // Hidden account sections and hidden lists (settings.hiddenSections / hiddenLists) are left out everywhere, reminders included.
-  const current = store.get();
-  const shown = new Set(visibleState(current).lists.map(list => list.id));
-  const hiddenLists = new Set(current.lists.filter(list => !shown.has(list.id)).map(list => list.id));
-  const due = current.tasks.filter(task => task.reminderAt && !task.completed && !task.reminderFiredAt && !hiddenLists.has(task.listId) && Date.parse(task.reminderAt) <= now && Date.parse(task.reminderAt) > now - 12 * 3600 * 1000);
+  // Read without a copy of the whole state (store.read; 2026-10-27 review: two full copies every 30 s stalled the main process).
+  const due = store.read(current => {
+    const shown = new Set(visibleState(current).lists.map(list => list.id));
+    const hiddenLists = new Set(current.lists.filter(list => !shown.has(list.id)).map(list => list.id));
+    return current.tasks.filter(task => task.reminderAt && !task.completed && !task.reminderFiredAt && !hiddenLists.has(task.listId) && Date.parse(task.reminderAt) <= now && Date.parse(task.reminderAt) > now - 12 * 3600 * 1000)
+      .map(task => ({ id: task.id, title: task.title, dueDate: task.dueDate, listName: current.lists.find(item => item.id === task.listId)?.name || '' }));
+  });
   if (!due.length) return;
   commit(state => { for (const task of state.tasks) if (due.some(item => item.id === task.id)) task.reminderFiredAt = new Date().toISOString(); });
   if (!Notification.isSupported()) return;
   for (const task of due) {
     try {
-      const list = store.get().lists.find(item => item.id === task.listId);
-      const notification = new Notification({ title: task.title, body: [list?.name, task.dueDate ? tr("마감 {0}", [task.dueDate]) : tr('할 일 알림')].filter(Boolean).join(' · '), icon: path.join(__dirname, 'assets', 'toast.png') });
+      const notification = new Notification({ title: task.title, body: [task.listName, task.dueDate ? tr("마감 {0}", [task.dueDate]) : tr('할 일 알림')].filter(Boolean).join(' · '), icon: path.join(__dirname, 'assets', 'toast.png') });
       notification.on('click', showMain);
       notification.show();
     } catch (error) { console.error('reminder notification failed:', error.message); }
   }
 }
+// Event alerts (1.1.3, Apple Calendar 「알림」): a Windows notification when an event's alert comes due while Dayboard runs, once
+// per alert (state.alertsFired, internal — lib/alerts.cjs says which are due). Clicking it opens that day in the calendar. Many at
+// once (a PC that woke up) show the five latest. Off with the 일정 알림 setting.
+function checkEventAlerts() {
+  if (!store || quitting) return;
+  // Read without copying the state; nothing is looked at while 일정 알림 is off (2026-10-27 review).
+  const { due, timeFormat } = store.read(current => current.settings.eventAlerts === false ? { due: [] } : {
+    due: dueAlerts(current).map(item => ({ key: item.key, event: { id: item.event.id, title: item.event.title, start: item.event.start, allDay: Boolean(item.event.allDay), location: item.event.location || '' } })),
+    timeFormat: current.settings.timeFormat,
+  });
+  if (!due.length) return;
+  const at = new Date().toISOString();
+  store.mutate(state => { const fired = pruneFired(state.alertsFired); for (const item of due) fired[item.key] = at; state.alertsFired = fired; });
+  if (!Notification.isSupported()) return;
+  for (const { event } of due.slice(-5)) {
+    try {
+      const notification = new Notification({ title: event.title || tr('(제목 없음)'), body: alertLine(event, { timeFormat }), icon: path.join(__dirname, 'assets', 'toast.png') });
+      const day = event.allDay ? String(event.start).slice(0, 10) : localKey(event.start);
+      // A window made by this click is still loading: the day goes once its page is there (the renderer then waits for its state).
+      notification.on('click', () => {
+        showMain();
+        try {
+          if (!mainWindow || mainWindow.isDestroyed()) return;
+          const send = () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dayboard:open-day', day, event.id); };
+          if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send); else send();
+        } catch { /* the window is closing */ }
+      });
+      notification.show();
+    } catch (error) { console.error('event alert notification failed:', error.message); }
+  }
+}
+// A task written to its service (lib/sync.cjs mutateTask). Written part-way (steps), what the service now has is kept before the
+// error goes on, so a retry does not add the same steps or the same task again (2026-10-27 review).
+async function cloudTask(kind, task, list) {
+  try { return await sync.mutateTask(kind, task, list); }
+  catch (error) {
+    if (error.partial) commit(state => {
+      const { dropped, rolledFrom, resync, ...fields } = error.partial;
+      const kept = { ...task, ...fields, id: task.id, listId: list.id };
+      const at = state.tasks.findIndex(item => item.id === task.id);
+      if (at >= 0) state.tasks[at] = { ...state.tasks[at], ...kept }; else state.tasks.push(kept);
+    });
+    throw error;
+  }
+}
+const todayKey = () => localKey(new Date().toISOString());
 function listIcon(value) {
   if (value === undefined || value === null || value === '') return undefined;
   if (typeof value !== 'string' || !LIST_ICONS.includes(value)) throw new Error(tr('지원하지 않는 목록 아이콘입니다.'));
@@ -671,12 +721,20 @@ async function command(commandName, payload, sourceWindow) {
       let task = { id: randomUUID(), listId: list.id, title: text(payload.title, tr('할 일 제목'), 500),
         notes: rawText(payload.notes ?? '', tr('메모'), 20000), dueDate: dateOnly(payload.dueDate), reminderAt: reminderAt(payload.reminderAt),
         important: payload.important === undefined ? false : boolean(payload.important, tr('중요')), completed: false, createdAt: now(), updatedAt: now() };
-      if (list.provider !== 'local') task = { ...task, ...await sync.mutateTask('add', task, list), id: task.id, listId: list.id };
-      commit(state => state.tasks.push(task)); return task;
+      // A repeat and steps come with a task given back by 되돌리기 (app.js deleteLocalTask), as task:update takes them (lib/tasks.cjs).
+      if (payload.rrule !== undefined) setRepeat(task, payload.rrule, list.provider, todayKey());
+      if (payload.steps !== undefined) { const steps = taskSteps(payload.steps); if (steps.length) task.steps = steps; }
+      if (list.provider !== 'local') task = { ...task, ...await cloudTask('add', task, list), id: task.id, listId: list.id };
+      commit(state => state.tasks.push(task)); return publicRecord('tasks', task);
     }
     case 'task:update': {
       const previous = lookup('tasks', payload.id);
       const list = lookup('lists', previous.listId);
+      // Unticking the completed copy To Do made when it moved a series on is 되돌리기 of that series (lib/tasks.cjs rolledSeries).
+      if (list.provider === 'microsoft' && payload.completed === false && Object.keys(payload).every(key => key === 'id' || key === 'completed')) {
+        const series = store.read(state => rolledSeries(previous, state.tasks, Date.now())?.id);
+        if (series) return command('task:update', { id: series, completed: false });
+      }
       let task = { ...previous, updatedAt: now() };
       if ('title' in payload) task.title = text(payload.title, tr('할 일 제목'), 500);
       if ('notes' in payload) task.notes = rawText(payload.notes, tr('메모'), 20000);
@@ -684,13 +742,62 @@ async function command(commandName, payload, sourceWindow) {
       if ('reminderAt' in payload) { task.reminderAt = reminderAt(payload.reminderAt); if (task.reminderAt !== (previous.reminderAt || '')) delete task.reminderFiredAt; }
       if ('important' in payload) task.important = boolean(payload.important, tr('중요'));
       if ('completed' in payload) task.completed = boolean(payload.completed, tr('완료'));
+      // Steps (To Do's 단계, Google's subtasks): the dialog sends them all; a row's circle sends one step, applied to the steps as they
+      // are now, so two quick ticks both stay (2026-10-27 review: the whole list sent from the screen undid the first tick).
+      if ('steps' in payload) { const steps = taskSteps(payload.steps, previous.steps); if (steps.length) task.steps = steps; else delete task.steps; }
+      if ('step' in payload) {
+        const id = identifier(payload.step?.id); const done = boolean(payload.step?.completed, tr('하위 할 일'));
+        if (!(task.steps || []).some(step => step.id === id)) throw new Error(tr('항목이 없거나 이미 삭제되었습니다. 화면을 새로 열어 주세요.'));
+        task.steps = task.steps.map(step => step.id === id ? { ...step, completed: done } : step);
+      }
+      // Repeat (lib/tasks.cjs setRepeat). Clearing the date takes the repeat away too: Reminders and To Do repeat dated tasks only.
+      // A repeat To Do holds that Dayboard cannot read keeps its date in To Do (its range would have to be sent with the date).
+      if ('rrule' in payload) setRepeat(task, payload.rrule, list.provider, todayKey());
+      else if ('dueDate' in payload && !task.dueDate && task.rrule) delete task.rrule;
+      if (previous.repeatsElsewhere && task.dueDate !== (previous.dueDate || '') && !(task.rrule && 'rrule' in payload)) throw new Error(tr('To Do에서 정한 반복이라 날짜는 To Do 앱에서 바꿔 주세요.'));
       if ('listId' in payload && payload.listId !== previous.listId) {
         const target = lookup('lists', payload.listId);
         if (list.provider !== 'local' || target.provider !== 'local') throw new Error(tr('계정 목록 간 이동은 지원하지 않습니다. 새 목록에 추가해 주세요.'));
         task.listId = target.id;
       }
-      if (list.provider !== 'local') task = { ...task, ...await sync.mutateTask('update', task, list), id: previous.id, listId: previous.listId };
-      commit(state => { state.tasks = state.tasks.map(item => item.id === task.id ? task : item); }); return task;
+      const completing = task.completed && !previous.completed, reopening = !task.completed && previous.completed;
+      let added = null; const dropped = new Set();
+      if (list.provider !== 'local') {
+        // 되돌리기 of a repeating To Do task's completion: what To Do made is looked up in the stored tasks (lib/tasks.cjs cloudUndo).
+        const hints = list.provider === 'microsoft' ? cloudUndo(previous, payload.completed === false, store.read(state => state.tasks.filter(item => item.listId === list.id)), Date.now()) : null;
+        if (hints) Object.assign(task, hints);
+        // What the service answered, or after a failure part-way (steps) what it has now: the same bookkeeping (lib/tasks.cjs
+        // settleAnswer) — hints taken off, a moved reminder rings, a completion can be undone.
+        const settle = answer => settleAnswer(task, previous, answer, { keepsReminder: 'reminderAt' in payload, undone: Boolean(hints) || reopening, completing });
+        let settled;
+        try { settled = settle(await sync.mutateTask('update', task, list)); }
+        catch (error) {
+          if (error.partial) {
+            const kept = settle(error.partial);
+            commit(state => { state.tasks = state.tasks.map(item => item.id === kept.task.id ? kept.task : item).filter(item => item.id === kept.task.id || !(item.listId === list.id && kept.dropped.includes(item.remoteId))); });
+          }
+          throw error;
+        }
+        task = settled.task; for (const remoteId of settled.dropped) dropped.add(remoteId);
+      } else {
+        // This PC (Reminders, To Do): completing a repeating task adds the next one; undoing it takes that back (lib/tasks.cjs). A next
+        // task given back by 되돌리기 of its deletion has a new id: it is found by its title and time (its twin).
+        const twin = done => store.read(state => { const found = state.tasks.find(item => item.id !== done.id && item.listId === done.listId && !item.completed && item.rrule && item.title === done.title && Date.parse(item.createdAt) >= Date.parse(done.repeatAt) - 1000); return found ? structuredClone(found) : null; });
+        const plan = localRepeat(previous, task, id => store.peek('tasks', id) || null, { today: todayKey(), findTwin: twin });
+        task = plan.task; added = plan.added; for (const id of plan.dropped) dropped.add(id);
+      }
+      commit(state => {
+        state.tasks = state.tasks.map(item => item.id === task.id ? task : item).filter(item => item.id === task.id || !(list.provider === 'local' ? dropped.has(item.id) : item.listId === list.id && dropped.has(item.remoteId)));
+        const fresh = added && !state.tasks.some(item => item.id === added.id);
+        if (fresh) state.tasks.push(added);
+        // In a list sorted by hand the next one takes the done one's place, and 되돌리기 gives it back (lib/tasks.cjs placeInOrder).
+        const order = state.settings.taskOrder?.[task.listId];
+        // A next task deleted meanwhile still holds the place in the order: the reopened task takes it (2026-10-27 recheck).
+        const places = new Set(dropped); if (reopening && previous.nextId && !state.tasks.some(item => item.id === previous.nextId)) places.add(previous.nextId);
+        const placed = list.provider === 'local' ? placeInOrder(order, { id: task.id, added: fresh ? added.id : '', dropped: places }) : order;
+        if (placed !== order) state.settings.taskOrder = { ...state.settings.taskOrder, [task.listId]: placed };
+      });
+      return publicRecord('tasks', task);
     }
     case 'task:delete': {
       const task = lookup('tasks', payload.id), list = lookup('lists', task.listId);
@@ -905,7 +1012,7 @@ async function command(commandName, payload, sourceWindow) {
       const key = typeof payload.key === 'string' && /^[0-9a-f]{32}$/.test(payload.key) ? payload.key : '';
       // The same fields, checks and messages as an edit (lib/series.cjs eventFields; 2026-10-27 review: event:add repeated them).
       const id = key ? `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}` : randomUUID();
-      const event = eventFields({ title: payload.title, start: payload.start, end: payload.end, location: payload.location ?? '', color: payload.color, rrule: payload.rrule }, { id, calendarId: calendar.id, provider: calendar.provider }, allDay);
+      const event = eventFields({ title: payload.title, start: payload.start, end: payload.end, location: payload.location ?? '', color: payload.color, rrule: payload.rrule, ...('alert' in payload ? { alert: payload.alert } : {}) }, { id, calendarId: calendar.id, provider: calendar.provider }, allDay);
       // A resend of the same key returns the first event; only a card sent again with other values (revise) updates it
       // (2026-10-26 recheck: an edit made before 「다시 시도」 was dropped; a kept add resent later overwrote edits made since).
       const revise = payload.revise === true;
@@ -935,6 +1042,7 @@ async function command(commandName, payload, sourceWindow) {
         // Another day or 하루 종일 for the whole series would keep the service's weekdays on a moved start (2026-10-21 review). The
         // scopes a change may take are one rule for main, the card and the widget's dialog (renderer/domain.js scopeChoices).
         if (previous.recurring && scope !== 'one' && !scopeChoices(previous, { provider: true, ...scopeFacts(payload, previous, allDay) })[scope]) throw new Error(tr('연결된 달력의 반복 일정을 다른 날로 옮기거나 하루 종일을 바꿀 때는 「이 일정만」으로 저장해 주세요.'));
+        if (previous.recurring && scope !== 'one' && alertOtherKind(payload, previous, store.read(state => seriesAllDay(previous, state.events)))) throw new Error(tr('하루 종일로 바꾼 회차의 알림은 「이 일정만」으로 바꿔 주세요.'));
         const desired = eventFields(payload, previous, allDay);
         const updated = await writeRemoteEvent('update', desired, calendar, { scope, previous, color: 'color' in payload ? (desired.color || null) : undefined });
         return updated.find(item => item.id === previous.id) || updated[0] || store.publicState();
@@ -965,9 +1073,10 @@ async function command(commandName, payload, sourceWindow) {
       // dialog (renderer/domain.js scopeChoices); a moved start is compared with the occurrence's own day.
       if (scope !== 'one') {
         const facts = scopeFacts(payload, occurrence, allDay);
+        if (alertOtherKind(payload, occurrence, previous.allDay)) throw new Error(tr('하루 종일로 바꾼 회차의 알림은 「이 일정만」으로 바꿔 주세요.'));
         if (!scopeChoices(previous, { provider: false, ...facts })[scope]) throw new Error(facts.flip ? tr('하루 종일로 바꾸거나 되돌리는 변경은 이 일정에만 적용할 수 있어요.') : tr('매월·매년 반복 일정을 다른 날로 옮길 때는 「이 일정만」이나 「이후 모든 일정」을 골라 주세요.'));
       }
-      const inherited = { calendarId: previous.calendarId, title: previous.title, start: occurrence.start, end: occurrence.end, allDay: previous.allDay, location: previous.location || '', provider: previous.provider, ...(previous.color ? { color: previous.color } : {}) };
+      const inherited = { calendarId: previous.calendarId, title: previous.title, start: occurrence.start, end: occurrence.end, allDay: previous.allDay, location: previous.location || '', provider: previous.provider, ...(previous.color ? { color: previous.color } : {}), ...(Number.isInteger(previous.alert) ? { alert: previous.alert } : {}) };
       if (scope === 'one') {
         // This occurrence only: exclude it from the series and store the edited copy as an exception that still belongs to the master.
         const { rrule, ...rest } = payload;
@@ -986,7 +1095,7 @@ async function command(commandName, payload, sourceWindow) {
         const move = Boolean(next.allDay) === Boolean(previous.allDay) ? seriesShift(occurrence.start, next.start, next.allDay) : null;
         if (move && !('rrule' in payload)) next.rrule = shiftRule(next.rrule, occurrence.start, next.start);
         const cut = seriesPosition({ ...previous, exdates: [] }, recurrenceId)?.index || 0;
-        const colour = seriesColour(payload, previous);
+        const colour = seriesColour(payload, previous); const alert = seriesAlert(payload, previous);
         const map = next.rrule ? seriesMapper(previous, next, { from: cut, move, byPlace: !('rrule' in payload) }) : null;
         if (next.rrule && next.exdates) next.exdates = next.exdates.map(map).filter(Boolean);
         if (!next.rrule) delete next.exdates;
@@ -998,6 +1107,7 @@ async function command(commandName, payload, sourceWindow) {
           for (const item of exceptionsOf(state, previous.id)) {
             if (!onOrAfter(item.recurrenceId, recurrenceId)) continue;
             if (colour !== undefined) paint(item, colour);
+            if (alert !== undefined) ring(item, alert, next.allDay);
             const id = map ? map(item.recurrenceId) : null;
             if (id) { item.masterId = next.id; item.recurrenceId = id; } else detach(item);
           }
@@ -1012,9 +1122,10 @@ async function command(commandName, payload, sourceWindow) {
       const map = event.rrule ? seriesMapper(previous, event, { move, byPlace: !('rrule' in payload) }) : null;
       if (map && event.exdates) event.exdates = event.exdates.map(map).filter(Boolean);
       if (!event.rrule) { delete event.exdates; toFirstShown(event, previous, true); }
-      const colour = seriesColour(payload, previous);
+      const colour = seriesColour(payload, previous); const alert = seriesAlert(payload, previous);
       commit(state => {
         if (colour !== undefined) for (const item of exceptionsOf(state, previous.id)) paint(item, colour);
+        if (alert !== undefined) for (const item of exceptionsOf(state, previous.id)) ring(item, alert, event.allDay);
         if (map) for (const item of exceptionsOf(state, previous.id)) { if (!item.recurrenceId) continue; const id = map(item.recurrenceId); if (id) item.recurrenceId = id; else detach(item); }
         state.events = state.events.map(item => item.id === event.id ? event : item);
         // No repeat any more: edited occurrences stay as events of their own, as from 「이후 모든 일정」 (2026-10-21 review).
@@ -1072,11 +1183,15 @@ async function command(commandName, payload, sourceWindow) {
       const events = store.get().events.filter(item => item.calendarId === from.id);
       let moved = 0;
       for (const source of events) {
-        if (!store.get().events.some(item => item.id === source.id)) continue;
+        if (!store.read(state => state.events.some(item => item.id === source.id))) continue;
         const exceptionDates = source.rrule ? events.filter(item => item.masterId === source.id).map(item => item.recurrenceId) : [];
         const { masterId, recurrenceId: _recurrence, ...plain } = source;
         const outgoing = { ...plain, id: randomUUID(), calendarId: to.id, provider: to.provider, ...(source.rrule ? { exdates: [...new Set([...(source.exdates || []), ...exceptionDates])] } : {}) };
         if (!source.rrule) delete outgoing.exdates;
+        // The alert (1.1.3): none here is none there (an event of this PC with no alert would take the account's default), and one the
+        // account cannot keep (「당일 오전 9시」 on Google or Outlook) takes the account's default instead of stopping the move (2026-10-27 review).
+        if (!Number.isInteger(source.alert)) outgoing.alert = null;
+        else if (source.alert < 0 && ['google', 'microsoft'].includes(to.provider)) delete outgoing.alert;
         try {
           const created = await sync.mutateEvent('add', outgoing, to);
           commit(state => {
@@ -1180,6 +1295,10 @@ async function command(commandName, payload, sourceWindow) {
         settings.noteListChosen = true; // the user's own choice: the default may change without overriding it
       }
       if ('noteOrder' in payload) settings.noteOrder = idList(payload.noteOrder, 2000, tr('메모 순서가 올바르지 않습니다.'));
+      // Task order per screen (this PC, 1.1.3): Reminders' sort choices, and the order dragged in a list ('manual').
+      if ('taskSort' in payload) settings.taskSort = taskSorts(payload.taskSort);
+      if ('taskOrder' in payload) settings.taskOrder = taskOrders(payload.taskOrder, settings.taskOrder);
+      if ('eventAlerts' in payload) settings.eventAlerts = boolean(payload.eventAlerts, tr('일정 알림'));
       // Calendar view (month, week, day) and the right panel (auto: open when the window is wide enough).
       if ('calendarView' in payload) {
         if (!['month', 'week', 'day'].includes(payload.calendarView)) throw new Error(tr('지원하지 않는 달력 보기입니다.'));
@@ -1502,6 +1621,15 @@ async function runSmokeTest() {
     if (!store.get().tasks.find(task => task.id === reminded.id)?.reminderFiredAt) throw new Error(tr('알림 발송 기록 실패'));
     report.checks.push(`reminder-${Notification.isSupported() ? 'notified' : 'unsupported'}`);
     await invoke('task:delete', { id: reminded.id });
+    // An event's alert that came due rings once (1.1.3): recorded in alertsFired, and the next check finds nothing new.
+    const alerted = await invoke('event:add', { calendarId: 'local-calendar', title: tr('Dayboard 알림 시험'), start: new Date(Date.now() + 5 * 60000).toISOString(), end: new Date(Date.now() + 35 * 60000).toISOString(), alert: 10 });
+    const firedFor = () => Object.keys(store.get().alertsFired || {}).filter(key => key.startsWith(`${alerted.id}|`)).length;
+    checkEventAlerts();
+    const once = firedFor();
+    checkEventAlerts();
+    if (once !== 1 || firedFor() !== 1) throw new Error(tr('알림 발송 기록 실패'));
+    report.checks.push(`event-alert-${Notification.isSupported() ? 'notified' : 'unsupported'}`);
+    await invoke('event:delete', { id: alerted.id });
     report.state = await invoke('state:get');
     report.renderer = await mainWindow.webContents.executeJavaScript('({title:document.title,text:document.body.innerText.slice(0,2000),nodeExposed:typeof window.require!=="undefined"})');
     if (report.renderer.nodeExposed) throw new Error(tr('Node가 renderer에 노출되었습니다.'));
@@ -1603,7 +1731,7 @@ else {
       purge();
       // The start-up check is guarded like the interval's: a save that fails for a moment (a locked data file) must not end the
       // start with 「Dayboard를 열 수 없습니다」 (2026-10-27 review).
-      const remind = () => { try { checkReminders(); } catch (error) { console.error('reminder check failed:', error.message); } };
+      const remind = () => { try { checkReminders(); } catch (error) { console.error('reminder check failed:', error.message); } try { checkEventAlerts(); } catch (error) { console.error('event alert check failed:', error.message); } };
       const reminderTimer = setInterval(remind, 30 * 1000);
       reminderTimer.unref();
       remind();

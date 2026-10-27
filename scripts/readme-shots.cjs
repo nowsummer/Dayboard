@@ -53,13 +53,14 @@ app.whenReady().then(async () => {
     const shot = async (win, name) => { win.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 }); await run('document.activeElement?.blur?.()'); await settle(win); const img = await win.webContents.capturePage(); fs.writeFileSync(path.join(OUT, `${name}.png`), img.toPNG()); log('saved', name, img.getSize()); };
 
     await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true });
-    const { work, focusNote } = await seedSample(invoke, new Date(), LANG);
+    const { work, focusNote, planned } = await seedSample(invoke, new Date(), LANG);
 
     main.setBounds({ x: 0, y: 0, width: 1240, height: 820 });
     await wait(600);
     await run(`goto('today');`);
     await shot(main, 'tasks-today');
-    await run(`goto(${JSON.stringify(work.id)});`);
+    // A task's subtasks opened under it (1.1.3), as one would after clicking its arrow.
+    await run(`openSteps.add(${JSON.stringify(planned.id)});goto(${JSON.stringify(work.id)});`);
     await shot(main, 'tasks-list');
     await run(`document.querySelector('.main-nav .nav-item:nth-child(2)').click();`);
     await shot(main, 'calendar');

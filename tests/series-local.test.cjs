@@ -152,5 +152,5 @@ test('idList: one validator for the id lists of settings:update (six copies befo
   assert.throws(() => V.idList('a', 3, 'bad'), /bad/);
   const main = read('main.cjs');
   assert.equal((main.match(/value\.some\(item => typeof item !== 'string' \|\| !item \|\| item\.length > 400\)/g) || []).length, 0, 'the six inline copies are gone');
-  assert.equal((main.match(/= idList\(payload\./g) || []).length, 6, 'noteOrder, listOrder, hiddenCalendars, hiddenSections, hiddenLists, collapsedSections');
+  assert.equal((main.match(/= idList\(payload\./g) || []).length, 6, 'noteOrder, listOrder, hiddenCalendars, hiddenSections, hiddenLists, collapsedSections (taskOrder is per list: validate.taskOrders)');
 });

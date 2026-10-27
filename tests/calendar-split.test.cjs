@@ -470,3 +470,16 @@ test('sync records a split before its first write, settles it at the next sync, 
   await sync.sync();
   assert.deepEqual(repaired, [['n1', 'primary']]); assert.equal(store.get().splitRepairs.length, 0, 'the next sync settled it');
 });
+
+test('Google 「이후 모든 일정」 from an occurrence with its own alert: the new series takes the alert it showed, not the series\' (2026-10-27 recheck)', async () => {
+  const g = googleCalendar({ ...countMaster(), reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 900 }] } });
+  const own = { ...third, alert: 2340 };
+  await g.provider.mutateEvent('update', { ...own, title: '바뀜' }, gCalendar, { scope: 'future', previous: own, splits: journal() });
+  const created = [...g.events.values()].find(ev => ev.id !== 'm');
+  assert.deepEqual(created.reminders, { useDefault: false, overrides: [{ method: 'popup', minutes: 2340 }] });
+  // The same alert as the series: its reminders as they are.
+  const h = googleCalendar({ ...countMaster(), reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 900 }, { method: 'email', minutes: 1440 }] } });
+  const plain = { ...third, alert: 900 };
+  await h.provider.mutateEvent('update', { ...plain, title: '바뀜' }, gCalendar, { scope: 'future', previous: plain, splits: journal() });
+  assert.deepEqual([...h.events.values()].find(ev => ev.id !== 'm').reminders.overrides, [{ method: 'popup', minutes: 900 }, { method: 'email', minutes: 1440 }]);
+});

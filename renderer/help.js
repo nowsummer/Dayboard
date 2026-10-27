@@ -22,6 +22,7 @@ function shortcutGroups(){
       [tr('고른 할 일 삭제'),[['Delete']]]]],
     [tr('달력'),[
       [tr('오늘로 이동'),[['T'],['Ctrl','T']]],
+      [tr('날짜로 이동'),[['Ctrl','Shift','T']]],
       [tr('일·주·월 보기'),[['D'],['W'],['M']]],
       [tr('다음 기간'),[['J'],['→']]],
       [tr('이전 기간'),[['K'],['←']]],
@@ -40,7 +41,7 @@ function shortcutGroups(){
 }
 // The few that matter on the screen in view (Notion Calendar's 「유용한 단축키」).
 function usefulShortcuts(){
-  if(view==='calendar')return [[tr('오늘로 이동'),[['T']]],[tr('일·주·월 보기'),[['D'],['W'],['M']]],[tr('다음·이전 기간'),[['J'],['K']]],[tr('새 일정'),[['C']]],[tr('일정 검색'),[['Ctrl','F']]]];
+  if(view==='calendar')return [[tr('오늘로 이동'),[['T']]],[tr('날짜로 이동'),[['Ctrl','Shift','T']]],[tr('일·주·월 보기'),[['D'],['W'],['M']]],[tr('다음·이전 기간'),[['J'],['K']]],[tr('새 일정'),[['C']]],[tr('일정 검색'),[['Ctrl','F']]]];
   if(view==='notes')return [[tr('새 메모'),[['Ctrl','N']]],[tr('메모 안에서 찾기'),[['Ctrl','F']]],[tr('메모 목록 검색'),[['Ctrl','K']]],[tr('실행 취소'),[['Ctrl','Z']]]];
   return [[tr('새 할 일'),[['Ctrl','N']]],[tr('할 일 검색'),[['Ctrl','F']]],[tr('고른 할 일 삭제'),[['Delete']]],[tr('방금 한 일 되돌리기'),[['Ctrl','Z']]]];
 }

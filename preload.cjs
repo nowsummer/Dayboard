@@ -45,6 +45,13 @@ contextBridge.exposeInMainWorld('dayboard', Object.freeze({
     ipcRenderer.on('dayboard:backdrop', listener);
     return () => ipcRenderer.removeListener('dayboard:backdrop', listener);
   },
+  // A Windows notification of an event was clicked (1.1.3): the calendar opens on that day with the event's card.
+  onOpenDay(callback) {
+    if (typeof callback !== 'function') throw new TypeError('달력 열기 함수가 필요합니다.');
+    const listener = (_event, day, eventId) => callback(day, eventId);
+    ipcRenderer.on('dayboard:open-day', listener);
+    return () => ipcRenderer.removeListener('dayboard:open-day', listener);
+  },
   onFlush(callback) {
     if (typeof callback !== 'function') throw new TypeError('저장 함수가 필요합니다.');
     flushHandler = callback;

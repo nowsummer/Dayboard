@@ -301,8 +301,9 @@
   // becomes a reminder on that day; with no date it is today, or tomorrow once the time has passed,
   // and a time that is already past on the given day is left in the title. A bare 「3시」 is not a time.
   const quickStrip=(raw,m)=>(raw.slice(0,m.index)+' '+raw.slice(m.index+m[0].length)).replace(/\s+/g,' ').trim();
-  // 「매주 월요일 보고」 / "every monday report" is a repeat, which tasks do not have yet: nothing is read from it, so the title
-  // stays whole instead of becoming a one-off 「매주 보고」 on Monday (2026-10-27 review). m[1] is the space before the token.
+  // 「매주 월요일 보고」 / "every monday report" is a repeat, which quick add does not set (a task's repeat is chosen in its dialog,
+  // 1.1.3): nothing is read from it, so the title stays whole instead of becoming a one-off 「매주 보고」 on Monday (2026-10-27
+  // review). m[1] is the space before the token.
   const repeatBefore=(text,m)=>/(?:^|\s)(?:매주|격주|매달|매월|매년|매일|매|every|each|other|daily|weekly)\s*$/i.test(text.slice(0,m.index+m[1].length));
   // 「이번 주 금요일」 typed on Saturday or Sunday is the coming Friday, as Reminders reads it, never a day already past (2026-10-27 review).
   function quickWeekDay(today,weeks,idx){const dow=fromDate(today).getDay();const key=dayOffset(today,-((dow+6)%7)+7*weeks+((idx+6)%7));return key<today?dayOffset(key,7):key;}
@@ -402,6 +403,71 @@
     }
     return quickClock(result,t,t[5],Number(t[5]),Number(t[6]),today,now);
   }
+  // ---- 「날짜로 이동」 (Apple Calendar ⌘⇧T): the whole box is one date. Unlike quick add, a month-day already past stays in
+  // this year (going back is the point), and a year and month alone go to its 1st. Words quick add reads (내일, 다음 주 금요일,
+  // next friday) work too when they are all that was typed. '' when it is not a date.
+  const GO_MONTHS_EN='jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+  function parseGoDate(raw,today=dateKey()){
+    const text=String(raw||'').trim().replace(/\s+/g,' ').replace(/[.,]$/,'');if(!text)return '';
+    const real=(y,m,d)=>{if(!(y>=1900&&y<=2200))return '';const key=`${y}-${pad(m)}-${pad(d)}`;return dateKey(fromDate(key))===key?key:'';};
+    const year=Number(today.slice(0,4)),month=Number(today.slice(5,7));
+    const monthEn=name=>QUICK_MONTHS_EN.indexOf(name.slice(0,3).toLowerCase())+1;
+    let m;
+    if((m=text.match(/^(\d{4})\s?[-./]\s?(\d{1,2})\s?[-./]\s?(\d{1,2})$/)))return real(+m[1],+m[2],+m[3]);
+    if((m=text.match(/^(\d{4})\s?[-./]\s?(\d{1,2})$/)))return real(+m[1],+m[2],1);
+    if((m=text.match(/^(\d{4})년(?:\s?(\d{1,2})월(?:\s?(\d{1,2})일)?)?$/)))return real(+m[1],m[2]?+m[2]:1,m[3]?+m[3]:1);
+    if((m=text.match(/^(\d{1,2})월(?:\s?(\d{1,2})일)?$/)))return real(year,+m[1],m[2]?+m[2]:1);
+    if((m=text.match(/^(\d{1,2})일$/)))return real(year,month,+m[1]);
+    if((m=text.match(/^(\d{1,2})\s?[/.]\s?(\d{1,2})$/)))return real(year,+m[1],+m[2]);
+    if((m=text.match(/^(\d{1,2})\s?[/.]\s?(\d{1,2})\s?[/.]\s?(\d{4})$/)))return real(+m[3],+m[1],+m[2]); // 3/15/2027, month first as M/D
+    if((m=text.match(new RegExp(String.raw`^(${GO_MONTHS_EN})\.?(?:\s(\d{1,2})(?:st|nd|rd|th)?)?(?:,?\s(\d{4}))?$`,'i'))))return real(m[3]?+m[3]:year,monthEn(m[1]),m[2]?+m[2]:1);
+    if((m=text.match(new RegExp(String.raw`^(\d{1,2})(?:st|nd|rd|th)?\s(${GO_MONTHS_EN})\.?(?:,?\s(\d{4}))?$`,'i'))))return real(m[3]?+m[3]:year,monthEn(m[2]),+m[1]);
+    if(/^(어제|yesterday)$/i.test(text))return dayOffset(today,-1);
+    // A word quick add reads, typed alone: its title is the whole text again (quickStrip left nothing, so the text came back).
+    for(const read of [parseQuickKo,parseQuickEn]){const r=read(text,today,new Date(`${today}T00:00:00`));if(r.dueDate&&r.title===text)return r.dueDate;}
+    return '';
+  }
+  // ---- Task order (Reminders' 「정렬 기준」, To Do's sort): the drag order chosen on this PC, due date, 중요, creation, title.
+  // 'due' is the order Dayboard always had (no date last, then 중요, then oldest first), so it stays the default. In the manual
+  // order a task not placed yet comes after the placed ones, oldest first: a new row lands next to the add box, as in Reminders.
+  const TASK_SORTS=['manual','due','important','created','title'];
+  // One collator per language (2026-10-27 review: localeCompare with options built one per comparison — 2,000 titles took 150 ms).
+  const collators=new Map();
+  function collatorFor(locale){const key=locale||'';if(!collators.has(key))collators.set(key,new Intl.Collator(locale||undefined,{numeric:true,sensitivity:'base'}));return collators.get(key);}
+  // importantOf: the 중요 flag as the screen holds it (a flag just clicked keeps its row in place until the pointer leaves).
+  function sortTasks(tasks,mode,order,locale,importantOf=t=>t.important){
+    const byDue=(a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999');
+    const byImportant=(a,b)=>Number(Boolean(importantOf(b)))-Number(Boolean(importantOf(a)));
+    const byCreated=(a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''));
+    let cmp;
+    if(mode==='manual'){const rank=new Map((order||[]).map((id,i)=>[id,i]));const at=t=>rank.has(t.id)?rank.get(t.id):Number.MAX_SAFE_INTEGER;cmp=(a,b)=>(at(a)-at(b))||byCreated(a,b);}
+    else if(mode==='important')cmp=(a,b)=>byImportant(a,b)||byDue(a,b)||byCreated(a,b);
+    else if(mode==='created')cmp=(a,b)=>byCreated(a,b);
+    else if(mode==='title'){const collator=collatorFor(locale);cmp=(a,b)=>collator.compare(String(a.title||''),String(b.title||''))||byCreated(a,b);}
+    else cmp=(a,b)=>byDue(a,b)||byImportant(a,b)||byCreated(a,b);
+    return [...tasks].sort(cmp);
+  }
+  // ---- Repeating tasks (Reminders, To Do): completing one adds the next, dated the rule's first day after its due date (not
+  // after the day it was done — To Do and Reminders count from the due date). '' when the rule has ended (UNTIL, COUNT).
+  function nextDue(rruleText,dueKey){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(dueKey||''))||!parseRRule(rruleText))return '';
+    let next='';
+    walkRRule({start:dueKey,allDay:true,rrule:rruleText},o=>{const key=dateKey(o);if(key>dueKey){next=key;return false;}return true;});
+    return next;
+  }
+  // The rule the next task carries: a COUNT counts what is left once this one is done.
+  function ruleAfter(rruleText){const rule=parseRRule(rruleText);if(!rule)return '';return buildRRule(rule.count?{...rule,count:Math.max(1,rule.count-1)}:rule);}
+  // ---- Event alerts (Apple Calendar 「알림」): minutes before the start. An all-day event counts from midnight of its first
+  // day, so 900 is 「1일 전 오전 9시」 and -540 「당일 오전 9시」 (wall clock, as Apple and Google do). The choices the card offers;
+  // a value the service has that is not among them is shown as it is.
+  const ALERTS_TIMED=[0,5,10,15,30,60,120,1440,2880,10080];
+  const ALERTS_ALLDAY=[-540,900,2340,9540];
+  const alertOk=value=>Number.isInteger(value)&&value>=-1440&&value<=40320;
+  function alertTime(event,minutes){
+    if(!alertOk(minutes))return null;
+    if(event.allDay){const day=fromDate(String(event.start).slice(0,10));if(!Number.isFinite(day.getTime()))return null;const at=new Date(day.getFullYear(),day.getMonth(),day.getDate(),0,-minutes);return at;}
+    const start=new Date(event.start);return Number.isFinite(start.getTime())?new Date(start.getTime()-minutes*60000):null;
+  }
   // New event times (Apple Calendar's +): today after 09:00 starts at the next whole hour (at most 23:00) for one hour,
   // so a new event never opens in the past; other days 09:00-10:00. Values are datetime-local strings.
   function defaultEventTimes(day,now=new Date()){
@@ -499,7 +565,7 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,scopeChoices};
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -15,6 +15,7 @@ const TEXT = {
       shop: ['우유·달걀·사과 사기', '세제 리필'], books: ['「아주 작은 습관의 힘」 3장 읽기', '독서 모임 발제 준비'],
       trip: ['렌터카 예약 확인', '숙소 체크인 시간 문의'], inbox: ['병원 예약 시간 확인', '관리비 납부', '운동화 세탁 맡기기', '부모님께 안부 전화'],
     },
+    steps: ['매출 숫자 확인', '초안 쓰기', '팀장님께 검토 요청'],
     events: {
       weekly: ['팀 주간 회의', '3층 회의실'], swim: '아침 수영', lunch: ['점심 약속 · 민지', '광화문'], review: '분기 계획 리뷰', dentist: '치과 정기 검진',
       club: ['독서 모임', '동네 서점'], trip: '제주 여행', family: '가족 저녁 식사', demo: '프로젝트 중간 발표', report: '월간 보고 마감',
@@ -33,6 +34,7 @@ const TEXT = {
       shop: ['Milk, eggs and apples', 'Laundry detergent'], books: ['Read chapter 3 of Atomic Habits', 'Prepare questions for book club'],
       trip: ['Confirm the rental car', 'Ask about hotel check-in time'], inbox: ['Confirm the dentist appointment', 'Pay the electricity bill', 'Drop off running shoes for cleaning', 'Call Mom'],
     },
+    steps: ['Check the sales numbers', 'Write the draft', 'Ask for a review'],
     events: {
       weekly: ['Team weekly sync', 'Room 3A'], swim: 'Morning swim', lunch: ['Lunch with Mia', 'Downtown'], review: 'Quarterly plan review', dentist: 'Dentist check-up',
       club: ['Book club', 'Corner bookshop'], trip: 'Trip to Lisbon', family: 'Family dinner', demo: 'Project midpoint demo', report: 'Monthly report due',
@@ -63,8 +65,9 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
   const trip = await mk(t.trip, '#30b0c7', 'plane');
 
   // ---- Tasks ----
-  const task = async (title, listId, dueDate = '', important = false, completed = false, notes = '') => {
-    const item = await invoke('task:add', { title, listId, dueDate, important, notes });
+  // `extra`: a repeat (rrule) or subtasks (steps), new in 1.1.3, so the pictures show them.
+  const task = async (title, listId, dueDate = '', important = false, completed = false, notes = '', extra = {}) => {
+    const item = await invoke('task:add', { title, listId, dueDate, important, notes, ...extra });
     if (completed) await invoke('task:update', { id: item.id, completed: true });
     return item;
   };
@@ -72,9 +75,9 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
   await task(w[0], work.id, today, true);
   await task(w[1], work.id, today);
   await task(w[2], work.id, day(1), true);
-  await task(w[3], work.id, day(3));
+  const planned = await task(w[3], work.id, day(3), false, false, '', { steps: t.steps.map((title, n) => ({ title, completed: n === 0 })) });
   await task(w[4], work.id, '', false, true);
-  await task(s[0], shop.id, today);
+  await task(s[0], shop.id, today, false, false, '', { rrule: 'FREQ=WEEKLY' });
   await task(s[1], shop.id, day(2));
   await task(b[0], books.id, today);
   await task(b[1], books.id, day(5));
@@ -96,9 +99,9 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
   await ev({ title: e.weekly[0], start: at(offsetOf(firstMon), 10), end: at(offsetOf(firstMon), 11), location: e.weekly[1], color: '#5856d6', rrule: 'FREQ=WEEKLY;BYDAY=MO' });
   let firstTue = new Date(firstOfMonth); while (firstTue.getDay() !== 2) firstTue.setDate(firstTue.getDate() + 1);
   await ev({ title: e.swim, start: at(offsetOf(firstTue), 7), end: at(offsetOf(firstTue), 8), color: '#30b0c7', rrule: 'FREQ=WEEKLY;BYDAY=TU,TH' });
-  await ev({ title: e.lunch[0], start: at(0, 12, 30), end: at(0, 13, 30), location: e.lunch[1], color: '#ff9500' });
+  await ev({ title: e.lunch[0], start: at(0, 12, 30), end: at(0, 13, 30), location: e.lunch[1], color: '#ff9500', alert: 30 });
   await ev({ title: e.review, start: at(0, 16), end: at(0, 17), color: '#ff3b30' });
-  await ev({ title: e.dentist, start: at(2, 18, 30), end: at(2, 19, 30), color: '#34c759' });
+  await ev({ title: e.dentist, start: at(2, 18, 30), end: at(2, 19, 30), color: '#34c759', alert: 60 });
   await ev({ title: e.club[0], start: at(5, 19), end: at(5, 21), location: e.club[1], color: '#af52de' });
   await ev({ title: e.trip, start: day(8), end: day(11), allDay: true, color: '#30b0c7' });
   await ev({ title: e.family, start: at(-3, 18), end: at(-3, 20), color: '#ff2d55' });
@@ -111,7 +114,7 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
   for (const [title, body] of others) await invoke('note:save', { title, body, color: 'yellow' });
   // The focus note is edited last, so it is the newest note (the side panel and the note widget show it).
   await invoke('note:save', { id: focusNote.id, title: focusNote.title, body: focusNote.body, color: 'yellow' });
-  return { work, focusNote, inbox: 'local-inbox' };
+  return { work, focusNote, planned, inbox: 'local-inbox' };
 }
 
 // The language of a screenshot run: DAYBOARD_SHOTS_LANG=en|ko (Korean when unset).

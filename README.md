@@ -27,8 +27,8 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 
 | | |
 |---|---|
-| **Tasks** | Today, Scheduled and Flagged · lists and groups · quick add that understands "tomorrow 3pm" |
-| **Calendar** | Day, week and month · drag to move or resize · edit in a card beside the event · repeating events |
+| **Tasks** | Today, Scheduled and Flagged · lists and groups · repeating tasks and subtasks · sort, or drag into your own order · quick add that understands "tomorrow 3pm" |
+| **Calendar** | Day, week and month · drag to move or resize · edit in a card beside the event · repeating events and alerts · jump to any date |
 | **Notes** | Grouped by date · pinning · find · earlier versions · synced across your PCs through your Google account |
 | **Widgets** | Tasks, calendar and notes on the desktop, in Liquid Glass style |
 | **Everyday** | Search, undo and redo, shortcuts (press <kbd>?</kbd>), light and dark mode, English and Korean |
