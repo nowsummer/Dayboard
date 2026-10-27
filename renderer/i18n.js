@@ -31,7 +31,7 @@
     // ---- Calendar ----
     '색상':'Color','기본 색':'Default color','달력 색 사용':'Use calendar color','편집':'Edit','상세 보기':'Details','복제':'Duplicate','이 일정만':'This event only','삭제':'Delete','일정을 복제했어요.':'Event duplicated.','원래 색':'Original color','취소':'Cancel',
     '「{0}」 반복 일정을 삭제할까요?':'Delete repeating event “{0}”?','이 일정만 삭제':'Delete this event only','이후 모든 일정 삭제':'Delete all future events','모든 일정 삭제':'Delete all events','「{0}」 일정을 이 날만 삭제할까요?':'Delete “{0}” on this day only?','「{0}」 일정을 삭제할까요?':'Delete “{0}”?','제목 없는 일정':'Untitled event','이 PC의 개인 달력에서 삭제합니다.':'It will be removed from the personal calendar on this PC.',
-    '반복':'Repeat','안 함':'Never','매일':'Every day','매주':'Every week','매월':'Every month','매년':'Every year','격주':'Every 2 weeks','사용자 지정…':'Custom…','간격':'Interval','없음':'Never','날짜':'On date','횟수':'After','종료 날짜':'End date','빈도':'Every','종료':'End','시작':'Starts',
+    '반복':'Repeat','안 함':'Never','매일':'Every day','매주':'Every week','매월':'Every month','매년':'Every year','격주':'Every 2 weeks','사용자 지정…':'Custom…','간격':'Interval','없음':'Never','날짜':'Date','날짜 지정':'On date','횟수':'After','종료 날짜':'End date','빈도':'Every','종료':'End','시작':'Starts',
     '달력 색':'Calendar color','색 바꾸기':'Change color','달력 숨기기':'Hide calendar','달력 표시':'Show calendar','숨긴 달력 「{0}」에 저장했어요.':'Saved to the hidden calendar “{0}”.','달력 숨기기: ':'Hide calendar: ','달력 표시: ':'Show calendar: ','색 바꾸기 · 오른쪽 클릭으로 메뉴':'Change color · right-click for the menu','달력 삭제':'Delete calendar','「{0}」 달력을 삭제할까요?':'Delete the calendar “{0}”?','이 달력의 일정 {0}개도 함께 삭제됩니다. 연결 해제로 남은 보관본이면 삭제해야 다시 연결한 달력과 겹치지 않습니다.':'Its {0|event|events} will be deleted too. If this is an archive left by a disconnect, deleting it stops the duplicates with the reconnected calendar.',' · 일정 {0}개':', {0|event|events}','두 번 누르면 일정 추가':'Double-click to add an event','+{0}개':'+{0} more','할 일 {0}개':'{0|task|tasks}','하루 종일':'All day','예정된 일정이 없어요':'No events','+{0}개 더 보기':'+{0} more',
     '오늘의 일정':'Today’s events','{0} 일정':'Events on {0}','메모 열기':'Open note','메모 화면에서 첫 메모를 적으면 여기에 표시됩니다.':'Your latest note appears here once you write one in Notes.','이날 일정 추가':'Add an event on this day','정해진 할 일이 없어요':'No tasks for this day',
     '일정 제목':'Event title','장소 (선택)':'Location (optional)','일정 편집':'Edit event','종료 시간을 시작 시간 뒤로 설정하세요.':'Set the end after the start.','종료 날짜를 시작 날짜와 같거나 뒤로 설정하세요.':'Set the end date on or after the start date.','반복 일정을 어떻게 저장할까요?':'Save changes to repeating event?','이 일정만 저장':'Save for this event only','이후 모든 일정에 저장':'Save for future events','모든 일정에 저장':'Save for all events',
@@ -220,11 +220,17 @@
     '메모 동기화':'Notes sync',
     '다시 로그인해 권한을 허용하면 메모를 동기화할 수 있어요.':'Sign in again and allow access to sync notes.',
     '여는 중…':'Opening…','목록으로 옮기기':'Move to list','「{0}」 할 일을 「{1}」 목록으로 옮겼어요.':'Moved “{0}” to “{1}”.','연결한 계정':'the connected account','Outlook·Google·iCloud 계정 연결':'Connect an Outlook, Google or iCloud account','「{0}」 할 일을 {1} 알림으로 추가했어요.':'Added “{0}” with a reminder {1}.','화면이 응답하지 않아요':'The window is not responding','다시 불러오면 저장하지 않은 입력이 사라질 수 있어요.':'Reloading may lose anything typed but not saved yet.','기다리기':'Wait','다시 불러오기':'Reload',
+    // ---- 2026-10-27 review ----
+    '{0}\n\n취소하면 창이 그대로 남아 고친 뒤 다시 종료할 수 있어요.':'{0}\n\nCancel keeps the window open so you can fix it and quit again.',
+    '내일 일정':'Tomorrow’s events','어제 일정':'Yesterday’s events','할 일을 삭제했어요.':'Task deleted.',
   };
   // Keys that stay as they are in every language: Korean parser tokens and Korean-only phrase pieces
   // (the English wording is built in code), language names, developer-only smoke messages.
   const NEUTRAL=new Set(['일월화수목금토','모레','다음주','오전','오후','시','일','주','개월','년','마다','요일','마지막','{0}번째',' {0}일',' {0}월 {1}일',' · {0}회',' · {0}월 {1}일까지','{0}{1}마다','매월 {0}일','매월 {0}번째 {1}','매월 마지막 {0}','한국어',
-    '스모크 테스트','할 일 변경 검증 실패','Dayboard 알림 시험','알림 발송 기록 실패','Node가 renderer에 노출되었습니다.','렌더러 화면이 비어 있습니다.']);
+    '스모크 테스트','할 일 변경 검증 실패','Dayboard 알림 시험','알림 발송 기록 실패','Node가 renderer에 노출되었습니다.','렌더러 화면이 비어 있습니다.',
+    // preload.cjs has no tr(): five are TypeErrors for programmer misuse that never reach the screen, two are fallbacks for a
+    // rejection without a message, which main's tr() errors never produce (2026-10-27 review).
+    '변경 사항을 저장하지 못했습니다.','올바른 명령이 필요합니다.','요청을 처리하지 못했습니다.','변경 알림 함수가 필요합니다.','창 상태 함수가 필요합니다.','배경 함수가 필요합니다.','저장 함수가 필요합니다.']);
   function translate(language,key,params){
     let text=language==='en'&&Object.hasOwn(EN,key)?EN[key]:key;
     // {0} inserts the value; {0|task|tasks} inserts the value and the noun, singular for exactly 1 (English counts; Korean keys never need it).

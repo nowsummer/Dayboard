@@ -6,8 +6,9 @@
 // 3.5 s and names the ones without an answer, next to a repeating card's unsaved change. main.cjs: a resend of a local add
 // returns the stored event unless the card asks for its new values; a connected add passes revise on; a kept add failing
 // while the window is hidden is told by a Windows notification. Real renderer/calendar.js in a VM (harness of
-// tests/sync-card-r14.test.cjs), app.js's subscribe line, and main.cjs's event:add block with the helpers it calls, cut
-// from the source and run against a real lib/store.cjs (no Electron, no network).
+// tests/sync-card-r14.test.cjs), app.js's subscribe line, and main.cjs's event:add block cut from the source, with the real
+// lib/validate.cjs and lib/series.cjs it calls (2026-10-27: the validators and eventFields moved there) and main's lookup, run
+// against a real lib/store.cjs (no Electron, no network).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -16,6 +17,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const D = require('../renderer/domain.js');
 const { createStore } = require('../lib/store.cjs');
+const V = require('../lib/validate.cjs');
+const { eventFields } = require('../lib/series.cjs');
 
 const project = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(project, 'renderer/calendar.js'), 'utf8');
@@ -190,7 +193,7 @@ test('quitting names a repeating card\'s unsaved change together with a kept add
     'both told before main\'s 5-second timeout');
 });
 
-// ---------------- main.cjs event:add (its case block and the helpers it calls, cut from the source) ----------------
+// ---------------- main.cjs event:add (its case block cut from the source; the validators and eventFields are the real modules) ----------------
 const mainSource = fs.readFileSync(path.join(project, 'main.cjs'), 'utf8');
 // One top-level function of main.cjs, to its closing brace (the braces in its strings and patterns pair up).
 function mainFunction(name) {
@@ -208,7 +211,8 @@ function mainAdd(t) {
   const sent = []; const notes = []; const win = { shown: true }; let failure = null;
   const context = {
     store, tr, path, __dirname: project, randomUUID: () => crypto.randomUUID(),
-    parseRRule: D.parseRRule, buildRRule: D.buildRRule, defaultCalendarId: D.defaultCalendarId,
+    text: V.text, identifier: V.identifier, boolean: V.boolean, dateOnly: V.dateOnly, dateTime: V.dateTime, eventColor: V.eventColor, rruleText: V.rruleText, eventFields,
+    defaultCalendarId: D.defaultCalendarId,
     commit: fn => store.mutate(fn),
     // The service: stores it under the key and returns it, or fails.
     async writeRemoteEvent(kind, event) { sent.push(event); if (failure) throw failure; return [{ ...event, id: `g-${event.key}`, remoteId: event.key }]; },
@@ -217,7 +221,7 @@ function mainAdd(t) {
     showMain() {},
   };
   vm.createContext(context);
-  vm.runInContext(['text', 'identifier', 'lookup', 'boolean', 'dateOnly', 'dateTime', 'eventColor', 'rruleText'].map(mainFunction).join('\n'), context, { filename: 'main.cjs' });
+  vm.runInContext(['lookup'].map(mainFunction).join('\n'), context, { filename: 'main.cjs' });
   const from = mainSource.indexOf("    case 'event:add': {"); const to = mainSource.indexOf("    case 'event:update': {", from);
   assert.ok(from > 0 && to > from, 'main.cjs still has the event:add case');
   const command = vm.runInContext(`(async function command(commandName, payload) { switch (commandName) { ${mainSource.slice(from, to)} } })`, context, { filename: 'main.cjs' });

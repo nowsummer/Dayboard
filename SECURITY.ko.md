@@ -146,7 +146,7 @@ Dayboard는 한 사람이 만드는 개인 프로젝트입니다. 보안 문제�
 - **설치된 코드 비교**: 설치된 앱의 코드(`%LOCALAPPDATA%\Programs\dayboard-desktop\resources\app`)는 하나로 묶지 않은 일반 파일이라 이 저장소의 같은 버전 코드와 비교할 수 있습니다(설치 파일 안에서는 7z로 압축돼 있음).
   - `package.json`: scripts·devDependencies가 빠져 있습니다.
   - 더해진 것: `node_modules`, 배포자 Google 클라이언트 `assets\google-oauth.json`.
-  - 빠진 개발용 파일: `scripts`, `build`, `docs`, 대부분의 `tests`, `renderer\preview.js`, `assets\*.svg`, `assets\google-oauth.example.json`.
+  - 빠진 개발용 파일: `scripts`, `build`, `docs`, 대부분의 `tests`, `assets\*.svg`, `assets\google-oauth.example.json`.
 - **직접 빌드**: 소스를 읽고 직접 빌드하세요([README](README.ko.md) 참고).
   - 직접 빌드해 설치한 사본도 이 저장소의 새 릴리스를 내려받으며, 설치를 고르면 배포본으로 바뀝니다.
   - 직접 빌드를 유지하려면 설정에서 「새 버전 자동 확인」을 끄세요.

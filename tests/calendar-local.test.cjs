@@ -88,7 +88,8 @@ test('a disconnect tags archived calendars with the account so a reconnect can c
   assert.equal(archived.archivedFrom, 'acc');
   assert.equal(store.get().events.find(item => item.title === 'Standup').calendarId, archived.id);
   assert.equal(JSON.stringify(store.publicState()).includes('archivedFrom'), false, 'internal field stays out of the renderer state');
-  const cleaned = store.mutate(state => { dropArchivedCalendars(state, 'acc'); });
+  store.mutate(state => { dropArchivedCalendars(state, 'acc'); });
+  const cleaned = store.get(); // mutate returns nothing since the 2026-10-27 review
   assert.equal(cleaned.calendars.some(item => item.name === 'Work · 보관본'), false);
   assert.equal(cleaned.events.some(item => item.title === 'Standup'), false);
   assert.equal(cleaned.lists.some(item => item.name === 'Google list · 보관본'), true, 'archived task list stays');

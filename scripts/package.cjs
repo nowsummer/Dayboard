@@ -28,7 +28,6 @@ const ignored = [
   /^\/(?!main\.cjs$|preload\.cjs$|package\.json$|assets(?:\/|$)|lib(?:\/|$)|renderer(?:\/|$)|node_modules(?:\/|$)|tests(?:\/|$))/,
   /^\/assets\/[^/]+\.svg$/,
   /^\/assets\/google-oauth\.example\.json$/,
-  /^\/renderer\/preview\.js$/,
   /^\/tests\/(?!desktop-smoke\.cjs$|ui-smoke\.cjs$)/,
   /(?:^|\/)\.env(?:\.[^/]*)?$/,
   /(?:^|\/)(?:\.git|\.cache|\.npm|\.test-data)(?:\/|$)/,
@@ -69,7 +68,7 @@ function verifyBundle(directory) {
     ensureInside(path.join(appDir, 'node_modules'), resolved);
   }
   assertRegularFile(path.join(appDir, 'node_modules', '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node'));
-  for (const unwanted of ['scripts', 'renderer/preview.js', 'package-lock.json',
+  for (const unwanted of ['scripts', 'package-lock.json',
     'node_modules/electron', 'node_modules/@electron/packager']) {
     if (fs.existsSync(path.join(appDir, unwanted))) throw new Error(`개발 전용 파일이 패키지에 포함됐습니다: ${unwanted}`);
   }

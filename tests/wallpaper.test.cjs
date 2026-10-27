@@ -205,3 +205,21 @@ test('a widget counts as on screen only on a connected display, with room to gra
   assert.equal(onScreen(null, [primary]), false);
   assert.equal(onScreen({ x: 1, y: 1 }, [primary]), false);
 });
+
+// 2026-10-27 review (P5): the same picture on several monitors was decoded and scaled once per monitor on the main thread.
+test('monitors showing the same picture share one decode and one scaling per placed size; each still gets its own crop', async t => {
+  const dir = tempDir(t);
+  const picture = path.join(dir, 'wall.jpg'); fs.writeFileSync(picture, 'x');
+  const small = { left: 1920, top: 0, right: 3200, bottom: 720 }; // a third monitor of another size scales separately
+  const calls = [];
+  const readCom = async () => ({ position: POSITION.fill, color: '#112233', monitors: [{ rect: left, path: picture }, { rect: primary, path: picture }, { rect: small, path: picture }] });
+  const wallpaper = createWallpaper({ nativeImage: fakeImage(calls), native: fakeNative({}), readCom, appData: dir });
+  const scene = await wallpaper.scene();
+  assert.deepEqual(calls.filter(c => c[0] === 'load'), [['load', 'wall.jpg']], 'decoded once for three monitors');
+  assert.deepEqual(calls.filter(c => c[0] === 'resize'), [['resize', 1920, 1200], ['resize', 1280, 800]], 'scaled once per placed size');
+  assert.deepEqual(calls.filter(c => c[0] === 'crop'), [['crop', 0, 40, 1920, 1080], ['crop', 0, 40, 1920, 1080], ['crop', 0, 27, 1280, 720]], 'cropped per monitor, Fill still cuts a third from the top');
+  assert.deepEqual(scene.monitors.map(item => rect(item.image)), [rect(left), rect(primary), rect(small)]);
+  assert.equal(new Set(scene.monitors.map(item => item.image.key)).size, 3, 'each monitor keeps its own cache key');
+  wallpaper.invalidate(); await wallpaper.scene();
+  assert.equal(calls.filter(c => c[0] === 'load').length, 1, 'an unchanged wallpaper is still not decoded again');
+});

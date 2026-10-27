@@ -21,7 +21,6 @@ const CAL_STEP=15;                   // minutes: every drag and time list snaps 
 const calMode=()=>['month','week','day'].includes(state?.settings?.calendarView)?state.settings.calendarView:'month';
 const calDays=()=>calMode()==='day'?[selectedDate]:D.weekDays(selectedDate);
 const calMonthKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-const calLocal=v=>{const t=String(v||'');return t.length===10?t:D.dateKey(new Date(t));};
 const calFieldFocused=()=>{const a=document.activeElement;return Boolean(a&&(['INPUT','TEXTAREA','SELECT'].includes(a.tagName)||a.isContentEditable));};
 function calSyncMonth(){const d=D.fromDate(selectedDate);month=new Date(d.getFullYear(),d.getMonth(),1);calTop=null;}
 
@@ -55,22 +54,41 @@ function calendarScreen(){const docked=calPanelDocked();if(docked)calDrawer=fals
 const calStartMs=e=>e.allDay?Date.parse(String(e.start).slice(0,10)+'T00:00:00'):Date.parse(e.start);
 const calEndMs=e=>e.allDay?Date.parse((String(e.end||'').slice(0,10)||D.dayOffset(String(e.start).slice(0,10),1))+'T00:00:00'):Date.parse(e.end||e.start);
 let calSearchCap={words:'',up:150,past:100};
+// The hits without expanding every series on each keystroke (2026-10-27 review: walking three years of 100 series took 190 ms
+// of a 400 ms keystroke). An occurrence carries its master's title and place, so the stored events are matched first and only
+// the matching series are expanded; their expansions are kept while state.events (replaced wholesale on every change) and the
+// window stay the same. Same hits in the same order as eventsBetween(from,to).filter(match).
+let calSearchPool={events:null,from:'',series:new Map()};
+function calSearchHits(words,today){
+  const from=D.dayOffset(today,-365),to=D.dayOffset(today,730);
+  if(calSearchPool.events!==state.events||calSearchPool.from!==from)calSearchPool={events:state.events,from,series:new Map()};
+  const hidden=new Set(state.settings.hiddenCalendars||[]),out=[];
+  for(const e of state.events){
+    if(hidden.has(e.calendarId)||!findMatches((e.title||'')+'\n'+(e.location||''),words).length)continue;
+    if(!e.rrule){if(D.touchesRange(e,from,to))out.push(e);continue;}
+    let list=calSearchPool.series.get(e.id);
+    if(!list)calSearchPool.series.set(e.id,list=D.expandEvent(e,from,to));
+    out.push(...list);
+  }
+  return out;
+}
 function calSearchResults(){
   const words=search.trim();const today=D.dateKey();const now=Date.now();
-  const hits=eventsBetween(D.dayOffset(today,-365),D.dayOffset(today,730)).filter(e=>findMatches((e.title||'')+'\n'+(e.location||''),words).length);
+  const hits=calSearchHits(words,today);
   // The nearest 150 upcoming and 100 past are listed and 「n개 더 보기」 shows more (a daily series matches hundreds, review).
   if(calSearchCap.words!==words)calSearchCap={words,up:150,past:100};
-  const upAll=hits.filter(e=>calEndMs(e)>=now).sort((a,b)=>calStartMs(a)-calStartMs(b)),upcoming=upAll.slice(0,calSearchCap.up);
-  const pastAll=hits.filter(e=>calEndMs(e)<now).sort((a,b)=>calStartMs(b)-calStartMs(a)),past=pastAll.slice(0,calSearchCap.past);
+  const timed=hits.map(e=>({e,s:calStartMs(e),en:calEndMs(e)}));// parsed once per hit, not once per comparison (2026-10-27 review)
+  const upAll=timed.filter(t=>t.en>=now).sort((a,b)=>a.s-b.s).map(t=>t.e),upcoming=upAll.slice(0,calSearchCap.up);
+  const pastAll=timed.filter(t=>t.en<now).sort((a,b)=>b.s-a.s).map(t=>t.e),past=pastAll.slice(0,calSearchCap.past);
   const more=(rest,key)=>rest>0?btn(tr('{0}개 더 보기',[rest.toLocaleString(I.locale())]),()=>{const shown=calSearchCap[key];calSearchCap[key]+=key==='up'?150:100;renderMain();document.querySelectorAll('.calendar-search [data-part="'+key+'"] .search-hit')[shown]?.focus();},'button subtle search-more'):null;
   const dayLabel=key=>D.fromDate(key).toLocaleDateString(I.locale(),{...(key.slice(0,4)===today.slice(0,4)?{}:{year:'numeric'}),month:'long',day:'numeric',weekday:'long'});
   const row=e=>h('button',{type:'button',class:'search-hit'+(calPast(e)?' past':''),'data-event-key':e.id,onclick:()=>calOpenSearchHit(e),oncontextmenu:ev=>{ev.preventDefault();eventMenu(e,ev.clientX,ev.clientY);}},h('i',{class:'search-hit-bar',style:{background:eventColor(e)}}),h('span',{class:'search-hit-time'},timeLabel(e)),h('strong',{},markedText(e.title||tr('제목 없는 일정'),words)),e.location?h('span',{class:'search-hit-place'},markedText(e.location,words)):null);
-  const group=list=>{const out=[];let day=null;for(const e of list){const key=calLocal(e.start);if(key!==day){day=key;out.push(h('h4',{class:'search-day'},dayLabel(key)));}out.push(row(e));}return out;};
+  const group=list=>{const out=[];let day=null;for(const e of list){const key=D.localKey(e.start);if(key!==day){day=key;out.push(h('h4',{class:'search-day'},dayLabel(key)));}out.push(row(e));}return out;};
   return h('div',{class:'calendar-search'},h('div',{class:'search-head'},h('strong',{},tr('「{0}」 일정 {1}개',[words,hits.length])),btn(tr('검색 지우기'),()=>{search='';const box=document.querySelector('.search input');if(box){box.value='';box.blur();}render();},'button subtle')),
     upcoming.length?h('section',{'data-part':'up'},h('h3',{},tr('다가오는 일정')),group(upcoming),more(upAll.length-upcoming.length,'up')):null,past.length?h('section',{'data-part':'past'},h('h3',{},tr('지난 일정')),group(past),more(pastAll.length-past.length,'past')):null,
     hits.length?null:h('p',{class:'no-events'},tr('맞는 일정이 없어요. 제목과 장소에서 찾아요.')));
 }
-function calOpenSearchHit(e){const day=calLocal(e.start);search='';const box=document.querySelector('.search input');if(box){box.value='';if(document.activeElement===box)box.blur();}selectedDate=day;calSyncMonth();render();const anchor=document.querySelector('#app .calendar-main [data-event-key="'+CSS.escape(e.id)+'"]');anchor?.scrollIntoView?.({block:'center'});openEventCard(e,anchor,anchor?null:undefined);}
+function calOpenSearchHit(e){const day=D.localKey(e.start);search='';const box=document.querySelector('.search input');if(box){box.value='';if(document.activeElement===box)box.blur();}selectedDate=day;calSyncMonth();render();const anchor=document.querySelector('#app .calendar-main [data-event-key="'+CSS.escape(e.id)+'"]');anchor?.scrollIntoView?.({block:'center'});openEventCard(e,anchor,anchor?null:undefined);}
 
 // ---- Month view ----
 // Rows of event chips that fit a cell (the 할 일 line counts as one), so tall windows show more and short ones never clip.
@@ -78,10 +96,27 @@ function calOpenSearchHit(e){const day=calLocal(e.start);search='';const box=doc
 // row was cut in half at 1180 and 900). Measured: header 39px, a chip or count row 22px plus its 2px gap.
 function calMonthLimit(){const grid=document.querySelector('.calendar-grid.large');const cellH=grid?(grid.clientHeight-30)/6:(innerHeight-52-16-24-34)/6;return Math.max(1,Math.floor((cellH-40)/24));}
 const calFirstLabel=key=>D.fromDate(key).toLocaleDateString(I.locale(),{month:'short',day:'numeric'});
+// The pool bucketed by day once per render instead of filtering the whole pool for each of the 42 cells (2026-10-27 review:
+// D.inDay ran pool × 42 times, 62,831 calls per render with 100 series). An occurrence is tested only on the cells from its
+// first day to its last; D.inDay still decides each boundary and every bucket is in eventsOn's order (pool order, then
+// byEventOrder). `cells` are consecutive days; an unreadable date falls back to testing every cell. app.js monthGrid can share it.
+function calDayBuckets(pool,cells){
+  const first=D.fromDate(cells[0].key).getTime(),last=cells.length-1,day=/^\d{4}-\d\d-\d\d$/;
+  const at=key=>day.test(key)?Math.round((D.fromDate(key).getTime()-first)/86400000):NaN;
+  const lists=cells.map(()=>[]);
+  for(const e of pool){
+    let a,b;
+    if(e.allDay){const s=String(e.start).slice(0,10);a=at(s);b=at(String(e.end||'').slice(0,10)||D.dayOffset(s,1))-1;}
+    else{const s=new Date(e.start),en=new Date(e.end||e.start);a=at(D.dateKey(s));b=en>s?at(D.dateKey(new Date(en.getTime()-1))):a;}
+    if(!Number.isFinite(a)||!Number.isFinite(b)){a=0;b=last;}
+    for(let i=Math.max(0,a),stop=Math.min(last,b);i<=stop;i++)if(D.inDay(e,cells[i].key))lists[i].push(e);
+  }
+  return new Map(cells.map((c,i)=>[c.key,lists[i].sort(byEventOrder)]));
+}
 function monthBoard(){
-  const cells=D.cellsFrom(calStart());const pool=eventsBetween(cells[0].key,D.dayOffset(cells[41].key,1));const today=D.dateKey();const limit=calMonthLimit();
+  const cells=D.cellsFrom(calStart());const pool=eventsBetween(cells[0].key,D.dayOffset(cells[41].key,1));const byDay=calDayBuckets(pool,cells);const today=D.dateKey();const limit=calMonthLimit();
   const grid=h('div',{class:'calendar-grid large rolling'},I.weekdays('short').map((d,i)=>h('div',{class:'weekday'+(i===0?' sunday':'')+(i===6?' saturday':'')+(i===0||i===6?' weekend':'')},d)),cells.map((d,i)=>{
-    const events=eventsOn(d.key,pool);const tasks=state.tasks.filter(t=>t.dueDate===d.key&&!t.completed);
+    const events=byDay.get(d.key);const tasks=state.tasks.filter(t=>t.dueDate===d.key&&!t.completed);
     const rows=Math.max(1,limit-(tasks.length?1:0));const shown=events.length>rows?events.slice(0,Math.max(1,rows-1)):events;const more=events.length-shown.length;
     return h('div',{class:'calendar-day'+(d.outside?' outside':'')+(i%7===0||i%7===6?' weekend':'')+(d.key===today?' is-today':'')+(d.key===selectedDate?' is-selected':''),role:'button',tabindex:0,'aria-label':koreanDate(d.key)+(events.length?tr(" · 일정 {0}개", [events.length]):''),'data-focus-key':'day-'+d.key,'data-day':d.key,title:tr('두 번 누르면 일정 추가'),
       onclick:e=>{if(performance.now()<calSuppressClick||e.detail>=2)return;selectedDate=d.key;render();},ondblclick:e=>{if(performance.now()<calSuppressClick)return;selectedDate=d.key;addEvent(d.key,e.currentTarget);},
@@ -135,7 +170,7 @@ function calTimeBody(days,timed,minMinutes,today){
   return h('div',{class:'time-body'},gutter,cols);
 }
 function calTimeBlock(item,day){
-  const e=item.event;const editable=canEditEvent(e);const startsHere=calLocal(e.start)===day,endsHere=D.dateKey(new Date(new Date(e.end||e.start).getTime()-1))===day||new Date(e.end||e.start).getTime()===new Date(e.start).getTime();
+  const e=item.event;const editable=canEditEvent(e);const startsHere=D.localKey(e.start)===day,endsHere=D.dateKey(new Date(new Date(e.end||e.start).getTime()-1))===day||new Date(e.end||e.start).getTime()===new Date(e.start).getTime();
   const px=(item.bottom-item.top)/60*calHour;const lines=px<36?1:px<56?2:3;const time=startsHere?timeLabel(e):tr('{0}까지',[fmtTime(e.end)]);
   const node=h('div',{class:'time-event'+(editable?'':' readonly')+(calPast(e)?' past':'')+(lines===1?' one-line':''),role:'button',tabindex:0,'data-event-key':e.id,style:{'--top':item.top/60,'--len':(item.bottom-item.top)/60,'--col':item.col,'--span':item.span||1,'--cols':item.cols,'--cal-color':eventColor(e)},title:e.title+' · '+timeLabel(e),
     onclick:ev=>{ev.stopPropagation();if(performance.now()<calSuppressClick)return;showEvent(e,ev.currentTarget);},onkeydown:ev=>calEventKey(ev,e),oncontextmenu:ev=>{ev.preventDefault();ev.stopPropagation();eventMenu(e,ev.clientX,ev.clientY);},onpointerdown:ev=>calPointerDown(ev,{kind:'move',event:e,day})},
@@ -181,7 +216,7 @@ function calStartGesture(){
 function calUpdateGesture(){
   const g=calGesture;if(!g||!g.started)return;const e=g.event;
   if(g.kind==='month'){if(g.ghost){g.ghost.style.left=g.x+'px';g.ghost.style.top=g.y+'px';}const cell=document.elementFromPoint(g.x,g.y)?.closest?.('.calendar-day[data-day]');for(const n of document.querySelectorAll('.calendar-day.drop-target'))if(n!==cell)n.classList.remove('drop-target');if(g.denied)return;if(cell)cell.classList.add('drop-target');g.result=cell?calShiftTo(e,g.day,cell.dataset.day):null;return;}
-  if(g.kind==='allday'||g.kind==='allday-create'){const day=calDayAtX(g.x);if(!day||g.denied)return;if(g.kind==='allday'){g.result=calShiftTo(e,g.grabDay,day);const r=g.result||{start:e.start,end:e.end};calAllDayGhost(e.allDay?r.start:calLocal(r.start),e.allDay?D.dayOffset(r.end,-1):D.dateKey(new Date(new Date(r.end).getTime()-1)),e.title,eventColor(e));}else{const a=g.grabDay<day?g.grabDay:day,b=g.grabDay<day?day:g.grabDay;g.result={start:a,end:D.dayOffset(b,1),allDay:true};calAllDayGhost(a,b,tr('새 일정'),null);}return;}
+  if(g.kind==='allday'||g.kind==='allday-create'){const day=calDayAtX(g.x);if(!day||g.denied)return;if(g.kind==='allday'){g.result=calShiftTo(e,g.grabDay,day);const r=g.result||{start:e.start,end:e.end};calAllDayGhost(e.allDay?r.start:D.localKey(r.start),e.allDay?D.dayOffset(r.end,-1):D.dateKey(new Date(new Date(r.end).getTime()-1)),e.title,eventColor(e));}else{const a=g.grabDay<day?g.grabDay:day,b=g.grabDay<day?day:g.grabDay;g.result={start:a,end:D.dayOffset(b,1),allDay:true};calAllDayGhost(a,b,tr('새 일정'),null);}return;}
   if(g.denied)return;
   const col=calColumnAt(g.x);if(!col)return;const days=g.days||calDays();const first=D.atWall(days[0],0).getTime(),last=D.atWall(days[days.length-1],1440-CAL_STEP).getTime();
   const pointerMinutes=calMinutesAt(g.y,col),pointerDay=col.dataset.day;
@@ -221,7 +256,7 @@ function calReadOnlyReason(e){const cal=calendarOf(e);const account=state.accoun
 // ---- Saving a moved or stretched event: repeating events ask how far it applies; Undo in the toast and Ctrl+Z ----
 function calAskScope(title,labels){return new Promise(resolve=>{let done=false;const finish=v=>{if(done)return;done=true;resolve(v);};modal(title,h('div',{class:'dialog-body'},h('div',{class:'scope-options'},[['one',labels.one],['future',labels.future],['all',labels.all]].filter(([,l])=>l).map(([s,l])=>btn(l,()=>{finish(s);closeModal();},'button subtle wide'+(s==='one'?' primary-choice':'')))),h('div',{class:'dialog-footer'},btn(tr('취소'),()=>{finish(null);closeModal();},'button subtle'))),false,{stack:true,onDismiss:()=>finish(null)});});}
 const calSeries=e=>Boolean(e&&((e.rrule&&e.masterId)||(!isLocalEvent(e)&&e.recurring)));
-function calScopeLabels(e,change){const provider=!isLocalEvent(e);const dayChanged=('start' in change)&&calLocal(change.start)!==calLocal(e.start);const flip=('allDay' in change)&&Boolean(change.allDay)!==Boolean(e.allDay);const ruleChanged='rrule' in change;const onlyOne=flip||(provider&&dayChanged);const monthly=!provider&&dayChanged&&!ruleChanged&&['MONTHLY','YEARLY'].includes(D.parseRRule(e.rrule||'')?.freq);return {one:ruleChanged?null:tr('이 일정만'),future:onlyOne?null:tr('이후 모든 일정'),all:onlyOne||monthly?null:tr('모든 일정')};}
+function calScopeLabels(e,change){const provider=!isLocalEvent(e);const dayChanged=('start' in change)&&D.localKey(change.start)!==D.localKey(e.start);const flip=('allDay' in change)&&Boolean(change.allDay)!==Boolean(e.allDay);const ruleChanged='rrule' in change;const c=D.scopeChoices(e,{provider,dayChanged,flip,ruleChanged});return {one:c.one?tr('이 일정만'):null,future:c.future?tr('이후 모든 일정'):null,all:c.all?tr('모든 일정'):null};}
 async function calCommitChange(e,change,kind){
   const before={start:e.start,end:e.end};let scope=null;
   if(calSeries(e)){scope=await calAskScope(tr('「{0}」 반복 일정을 어떻게 바꿀까요?',[shortTitle(e.title)||tr('제목 없는 일정')]),calScopeLabels(e,change));if(!scope)return;}
@@ -316,7 +351,7 @@ function calSeriesColor(c,col){
 const calDateLabel=key=>D.fromDate(key).toLocaleDateString(I.locale(),{month:'long',day:'numeric',weekday:'short'});
 function calDateButton(which){const v=calCard.v;const key=(which==='start'?v.start:v.end).slice(0,10);const picker=h('input',{type:'date',value:key,tabindex:-1,'aria-hidden':'true',onchange:ev=>{if(ev.target.value)calSetDate(which,ev.target.value);}});return h('span',{class:'card-date-wrap'},h('button',{type:'button',class:'card-date','data-card-focus':'date-'+which,'aria-label':(which==='start'?tr('시작 날짜'):tr('종료 날짜'))+' '+calDateLabel(key),onclick:()=>{try{picker.showPicker();}catch{picker.focus();}}},calDateLabel(key)),picker);}
 function calTimeInput(which){const v=calCard.v;const value=which==='start'?v.start:v.end;return h('input',{class:'card-time',type:'text',value:fmtTime(new Date(value)),'aria-label':which==='start'?tr('시작 시간'):tr('종료 시간'),'data-card-focus':'time-'+which,autocomplete:'off',spellcheck:'false',onfocus:ev=>ev.target.select(),onclick:ev=>calTimeMenu(which,ev.currentTarget),onkeydown:ev=>{if(ev.isComposing)return;if(calTimeListKey(which,ev.currentTarget,ev))return;if(ev.key==='Enter'){ev.preventDefault();closeMenu();calTypedTime(which,ev.currentTarget);}else if(ev.key==='ArrowDown'){ev.preventDefault();calTimeMenu(which,ev.currentTarget);}},onblur:ev=>calTypedTime(which,ev.currentTarget,true)});}
-function calWhenRow(view){const c=calCard,v=c.v,e=c.event;if(view)return h('div',{class:'card-row card-when'},icon('clock',16),h('span',{},calDateLabel(calLocal(e.start))+' · '+timeLabel(e)));const parts=[calDateButton('start')];if(v.allDay){parts.push(h('span',{class:'card-dash'},'–'),calDateButton('end'));}else{parts.push(calTimeInput('start'),h('span',{class:'card-dash'},'–'),calTimeInput('end'));if(v.end.slice(0,10)!==v.start.slice(0,10))parts.push(calDateButton('end'));}return h('div',{class:'card-row card-when'},icon('clock',16),parts);}
+function calWhenRow(view){const c=calCard,v=c.v,e=c.event;if(view)return h('div',{class:'card-row card-when'},icon('clock',16),h('span',{},calDateLabel(D.localKey(e.start))+' · '+timeLabel(e)));const parts=[calDateButton('start')];if(v.allDay){parts.push(h('span',{class:'card-dash'},'–'),calDateButton('end'));}else{parts.push(calTimeInput('start'),h('span',{class:'card-dash'},'–'),calTimeInput('end'));if(v.end.slice(0,10)!==v.start.slice(0,10))parts.push(calDateButton('end'));}return h('div',{class:'card-row card-when'},icon('clock',16),parts);}
 // Typed times: 3, 15, 1530, 15:30, 3시, 3시 30분, 오후 3시, 3:30pm. With the 12-hour clock a bare 1–7 means the afternoon (Notion).
 function calParseClock(text){let t=String(text||'').trim().toLowerCase().replace(/\s+/g,'');if(!t)return null;let pm=null;if(/^(오후|pm)|(오후|pm|p)$/.test(t))pm=true;else if(/^(오전|am)|(오전|am|a)$/.test(t))pm=false;t=t.replace(/오전|오후|am|pm/g,'').replace(/[ap]$/,'');let hrs,mins=0,x,bare=false;if((x=t.match(/^(\d{1,2})시(?:(\d{1,2})분?)?$/))){hrs=+x[1];mins=+(x[2]||0);bare=!x[2];}else if((x=t.match(/^(\d{1,2})[:.](\d{2})$/))){hrs=+x[1];mins=+x[2];}else if((x=t.match(/^(\d{3,4})$/))){hrs=Math.floor(+x[1]/100);mins=+x[1]%100;}else if((x=t.match(/^(\d{1,2})$/))){hrs=+x[1];bare=true;}else return null;if(mins>59||hrs>24)return null;if(pm===true&&hrs<12)hrs+=12;else if(pm===false&&hrs===12)hrs=0;else if(pm===null&&bare&&!/^0/.test(t)&&timeFormat()==='12h'&&hrs>=1&&hrs<=7)hrs+=12;if(hrs===24)hrs=0;return hrs*60+mins;}
 const calLocalAt=(key,minutes)=>key+'T'+String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0');
@@ -338,7 +373,7 @@ function calSyncWhen(c){const v=c.v;if(v.allDay||!c.node)return;for(const which 
 function calRepeatOptions(day,current){const d=D.fromDate(day);const wd=I.weekdays('long')[d.getDay()];const o=ordinalOf(d);const weekly=n=>D.buildRRule({freq:'WEEKLY',interval:n,byDay:[{ord:0,day:d.getDay()}],wkst:0});const list=[['',tr('반복 안 함')],['FREQ=DAILY',tr('매일')],[weekly(1),tr('매주 {0}',[wd])],['FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;WKST=SU',tr('평일마다 (월–금)')],[weekly(2),tr('2주마다 {0}',[wd])],['FREQ=MONTHLY',monthlyLabel('date',d)],['FREQ=MONTHLY;BYDAY='+Math.min(o.nth,4)+D.RRULE_DAYS[d.getDay()],monthlyLabel('nth',d)],o.last?['FREQ=MONTHLY;BYDAY=-1'+D.RRULE_DAYS[d.getDay()],monthlyLabel('last',d)]:null,['FREQ=YEARLY',tr('매년 {0}',[d.toLocaleDateString(I.locale(),{month:'long',day:'numeric'})])]].filter(Boolean);if(o.nth===5)list.splice(6,1);const match=list.find(([value])=>calSameRule(value,current));if(current&&!match){const rule=D.parseRRule(current);list.push([current,rule?describeRule(rule,d):current]);}list.push(['custom',tr('사용자 지정…')]);return {list,value:match?match[0]:current};}
 function calSameRule(a,b){if(!a||!b)return !a&&!b;const x=D.parseRRule(a),y=D.parseRRule(b);if(!x||!y)return a===b;const days=r=>r.byDay.map(d=>d.ord+':'+d.day).sort().join();return x.freq===y.freq&&x.interval===y.interval&&days(x)===days(y)&&x.byMonthDay===y.byMonthDay&&x.count===y.count&&x.until===y.until;}
 function calRepeatControl(){const c=calCard,v=c.v,e=c.event;if(e&&e.masterId&&!e.rrule&&isLocalEvent(e))return null;if(e&&!isLocalEvent(e)&&e.recurring)return h('span',{class:'card-chip static',title:tr('반복 규칙은 원래 달력 앱에서 바꿀 수 있어요.')},icon('repeat',13),tr('반복 일정'));const {list,value}=calRepeatOptions(v.start.slice(0,10),v.rrule);return h('select',{class:'card-repeat','aria-label':tr('반복'),'data-card-focus':'repeat',onchange:ev=>{const next=ev.target.value;if(next==='custom'){ev.target.value=value;calCustomRepeat();return;}v.rrule=next;if(c.mode==='edit')calCardChange({rrule:next});calRenderCard();}},list.map(([val,label])=>h('option',{value:val,selected:val===value?'':null},label)));}
-function calCustomRepeat(){const c=calCard;const v=c.v;const start=h('input',{type:'hidden',value:v.allDay?v.start:v.start});const picker=repeatPicker(v.rrule,start);modal(tr('반복'),h('form',{class:'dialog-body',onsubmit:ev=>{ev.preventDefault();const next=picker.value();closeModal();if(calCard!==c)return;v.rrule=next;if(c.mode==='edit')calCardChange({rrule:next});calRenderCard();}},picker.node,actionFooter(()=>closeModal(),tr('확인'))),false,{stack:true});}
+function calCustomRepeat(){const c=calCard;const v=c.v;const start=h('input',{type:'hidden',value:v.allDay?v.start:v.start});const picker=repeatPicker(v.rrule,start,{expand:true});modal(tr('반복'),h('form',{class:'dialog-body',onsubmit:ev=>{ev.preventDefault();const next=picker.value();closeModal();if(calCard!==c)return;v.rrule=next;if(c.mode==='edit')calCardChange({rrule:next});calRenderCard();}},picker.node,actionFooter(()=>closeModal(),tr('확인'))),false,{stack:true});}
 function calCardMenu(anchor){const c=calCard;const e=c.event;const r=anchor.getBoundingClientRect();contextMenu(r.left,r.bottom+4,{items:[{label:tr('복제'),icon:'copy',hint:isRecurring(e)?tr('이 일정만'):'',onClick:()=>{if(calCard!==c)return;const copy={...e,title:c.v.title.trim()||e.title,location:c.v.location,...(c.v.color?{color:c.v.color}:{}),...calTimes(c.v)};if(!c.v.color)delete copy.color;if(!closeCard(true))return;duplicateEvent(copy);}},c.mode==='edit'?'-':null,c.mode==='edit'?{label:tr('삭제'),icon:'trash',danger:true,onClick:()=>{if(calCard===c)calCardDelete();}}:null]});menuRoot?.classList.add('card-menu');}
 function calCardDelete(){const c=calCard;if(!c||c.mode!=='edit')return;deleteEventFlow(c.event);}
 // Saving: one change of a plain event goes out after 400ms; a repeating event keeps its changes until the card closes and
@@ -374,7 +409,7 @@ function calAddPayload(c,title){const payload={calendarId:c.calendarId,title,...
 function calAddFailed(payload){if(!calFailedAdds.includes(payload))calFailedAdds.push(payload);toast(tr('「{0}」 일정을 저장하지 못했어요.',[shortTitle(payload.title)]),true,{label:tr('다시 시도'),undo:false,onClick:()=>{if(calFailedAdds.includes(payload))calSendAdd(payload,true).catch(()=>calAddFailed(payload));}});}
 // Only this card's ghost block goes: a new draft opened since then keeps its own.
 const calDropDraft=c=>{if(!(calCard&&calCard!==c&&calCard.mode==='create'))calDraft=null;};
-function calSaveNew(explicit){const c=calCard;if(!c||c.mode!=='create'||c.saving)return;calCommitTyped(c);const title=c.v.title.trim()||(explicit?tr('새 일정'):'');if(!title){calCard=null;calCardRoot().replaceChildren();calDraft=null;render();return;}c.saving=true;c.addKey||=calNewKey();const payload=calAddPayload(c,title);c.savePayload=payload;const job=calSendAdd(payload,true);c.savePromise=job;job.then(created=>{if(calCard===c){calCard=null;calCardRoot().replaceChildren();}calDropDraft(c);render();const day=calLocal(payload.start);if(day!==selectedDate&&view==='calendar'&&calMode()==='month'){selectedDate=day;render();}const id=payload.calendarId;const cal=state.calendars.find(x=>x.id===id);if(cal&&(state.settings.hiddenCalendars||[]).includes(id))toast(tr('숨긴 달력 「{0}」에 저장했어요.',[cal.name]),false,{label:tr('달력 표시'),undo:false,onClick:()=>run('settings:update',{hiddenCalendars:(state.settings.hiddenCalendars||[]).filter(x=>x!==id)}).catch(()=>{})});void created;},()=>{c.saving=false;if(calCard===c)return;/* the card is still open: its values stay for another try */calDropDraft(c);render();calAddFailed(payload);});}
+function calSaveNew(explicit){const c=calCard;if(!c||c.mode!=='create'||c.saving)return;calCommitTyped(c);const title=c.v.title.trim()||(explicit?tr('새 일정'):'');if(!title){calCard=null;calCardRoot().replaceChildren();calDraft=null;render();return;}c.saving=true;c.addKey||=calNewKey();const payload=calAddPayload(c,title);c.savePayload=payload;const job=calSendAdd(payload,true);c.savePromise=job;job.then(created=>{if(calCard===c){calCard=null;calCardRoot().replaceChildren();}calDropDraft(c);render();const day=D.localKey(payload.start);if(day!==selectedDate&&view==='calendar'&&calMode()==='month'){selectedDate=day;render();}const id=payload.calendarId;const cal=state.calendars.find(x=>x.id===id);if(cal&&(state.settings.hiddenCalendars||[]).includes(id))toast(tr('숨긴 달력 「{0}」에 저장했어요.',[cal.name]),false,{label:tr('달력 표시'),undo:false,onClick:()=>run('settings:update',{hiddenCalendars:(state.settings.hiddenCalendars||[]).filter(x=>x!==id)}).catch(()=>{})});void created;},()=>{c.saving=false;if(calCard===c)return;/* the card is still open: its values stay for another try */calDropDraft(c);render();calAddFailed(payload);});}
 // Closing: Esc, an outside click, another event, a view change. Returns false when the card stays (a scope question is open).
 function closeCard(commit=true){
   const c=calCard;if(!c)return true;if(c.closing)return false;
@@ -393,7 +428,7 @@ function calPlaceCard(rect){const c=calCard;const node=c?.node;if(!node)return;i
 const calAnchorRegions='.day-panel,.context-pane,.time-sticky,.time-body,.calendar-grid';
 function calFindAnchor(c){if(!c?.key)return null;const sel='[data-event-key="'+CSS.escape(c.key)+'"]';return (c.region&&document.querySelector('#app '+c.region+' '+sel))||document.querySelector('#app '+sel);}
 function calMarkAnchor(){for(const n of document.querySelectorAll('.card-open'))n.classList.remove('card-open');const c=calCard;if(!c||!c.key)return null;const anchor=calFindAnchor(c);anchor?.classList.add('card-open');return anchor;}
-function calCardAfterRender(){const c=calCard;if(!c||!c.node)return;if(c.mode==='list'){if(view!=='calendar')closeCard(false);return;}const anchor=calMarkAnchor();if(anchor){calPlaceCard(anchor.getBoundingClientRect());calCardVisibility(anchor);return;}c.node.style.visibility='';if(c.mode!=='create'){const id=c.event.id,base=c.event.masterId||id;const day=calLocal(c.event.start);const occurrenceGone=Boolean(c.event.masterId&&c.event.rrule)&&!eventsBetween(D.dayOffset(day,-1),D.dayOffset(day,2)).some(x=>x.id===id);if(occurrenceGone||!state.events.some(x=>x.id===id||x.id===base)){if(c.hold)return;clearTimeout(c.timer);const lost=Object.keys(c.pending||{}).length>0;calCard=null;calCardRoot().replaceChildren();if(lost)toast(tr('일정이 다른 곳에서 바뀌어 카드의 변경을 저장하지 못했어요.'),true);}}}
+function calCardAfterRender(){const c=calCard;if(!c||!c.node)return;if(c.mode==='list'){if(view!=='calendar')closeCard(false);return;}const anchor=calMarkAnchor();if(anchor){calPlaceCard(anchor.getBoundingClientRect());calCardVisibility(anchor);return;}c.node.style.visibility='';if(c.mode!=='create'){const id=c.event.id,base=c.event.masterId||id;const day=D.localKey(c.event.start);const occurrenceGone=Boolean(c.event.masterId&&c.event.rrule)&&!eventsBetween(D.dayOffset(day,-1),D.dayOffset(day,2)).some(x=>x.id===id);if(occurrenceGone||!state.events.some(x=>x.id===id||x.id===base)){if(c.hold)return;clearTimeout(c.timer);const lost=Object.keys(c.pending||{}).length>0;calCard=null;calCardRoot().replaceChildren();if(lost)toast(tr('일정이 다른 곳에서 바뀌어 카드의 변경을 저장하지 못했어요.'),true);}}}
 // The card hides while its event is scrolled out of the time grid and comes back with it (Notion).
 function calCardVisibility(anchor){const c=calCard;if(!c?.node)return;const scroller=anchor.closest('.time-scroll');if(!scroller){c.node.style.visibility='';return;}const r=anchor.getBoundingClientRect(),s=scroller.getBoundingClientRect();const top=s.top+(scroller.querySelector('.time-sticky')?.offsetHeight||0);const hidden=anchor.closest('.time-sticky')?false:r.bottom<top||r.top>s.bottom;c.node.style.visibility=hidden?'hidden':'';if(!hidden)calPlaceCard(r);}
 document.addEventListener('pointerdown',ev=>{const c=calCard;if(!c||!c.node)return;const t=ev.target;if(c.node.contains(t)||t.closest?.('#modal-root,.context-menu,#toast'))return;const key=t.closest?.('[data-event-key]')?.dataset.eventKey;if(key&&key===c.key)return;if(key&&key!=='draft'){if(!closeCard(true))ev.cardClosed=true;return;}ev.cardClosed=true;calSuppressClick=performance.now()+400;closeCard(true);},true);

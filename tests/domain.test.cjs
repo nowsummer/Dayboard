@@ -297,6 +297,45 @@ test('English quick add mirrors the Korean rules', () => {
   assert.deepEqual(quickEn('today 9am run'), { title: '9am run', dueDate: '2026-10-20', reminderAt: '' });
 });
 
+// ---- 2026-10-27 review: repeat words stay as typed, this-week weekdays never fall in the past, English bare hours ----
+test('quick add leaves 「매주 월요일」 / "every monday" as typed: a repeat is not a date (tasks have no repeat yet)', () => {
+  for (const text of ['매주 월요일 보고', '격주 금요일 회의', '매주 월요일 오후 3시 보고', '매일 오후 3시 운동']) {
+    assert.deepEqual(quickKo(text), { title: text, dueDate: '', reminderAt: '' }, text);
+  }
+  for (const text of ['every monday report', 'each friday review', 'every other monday standup', 'weekly friday report']) {
+    assert.deepEqual(quickEn(text), { title: text, dueDate: '', reminderAt: '' }, text);
+  }
+  assert.equal(quickKo('월요일 보고').dueDate, '2026-10-26', 'a bare weekday is still a date');
+  assert.equal(quickEn('monday report').dueDate, '2026-10-26');
+});
+
+test('「이번 주 금요일」 / "this friday" typed on Saturday or Sunday is the coming Friday, never a past date', () => {
+  const sunday = new Date('2026-11-01T10:00:00'), saturday = new Date('2026-10-31T10:00:00');
+  assert.equal(quickKo('이번 주 금요일 보고서', '2026-11-01', sunday).dueDate, '2026-11-06');
+  assert.equal(quickKo('이번 주 월요일 보고', '2026-11-01', sunday).dueDate, '2026-11-02');
+  assert.equal(quickKo('이번 주 금요일 보고서', '2026-10-31', saturday).dueDate, '2026-11-06');
+  assert.equal(quickKo('이번 주 토요일 장보기', '2026-10-31', saturday).dueDate, '2026-10-31', 'today stays today');
+  assert.equal(quickKo('다음 주 월요일 발표', '2026-11-01', sunday).dueDate, '2026-11-02', 'next week is unchanged');
+  assert.equal(quickEn('this friday report', '2026-11-01', sunday).dueDate, '2026-11-06');
+  assert.equal(quickEn('this friday report', '2026-10-31', saturday).dueDate, '2026-11-06');
+});
+
+test('English quick add reads "at N" like Korean N시 and noon/midnight; a bare digit after a date word stays in the title', () => {
+  const dentist = quickEn('tomorrow at 3 dentist');
+  assert.equal(dentist.title, 'dentist');
+  assert.equal(dentist.dueDate, '2026-10-21');
+  assert.equal(localTime(dentist.reminderAt), '2026-10-21 15:00');
+  assert.equal(localTime(quickEn('at 9 standup').reminderAt), '2026-10-20 21:00', '9 has passed at 10:00, so tonight');
+  assert.equal(localTime(quickEn('tomorrow at 9 standup').reminderAt), '2026-10-21 09:00', 'on a later day the daytime reading');
+  assert.equal(localTime(quickEn('tomorrow at 15 review').reminderAt), '2026-10-21 15:00');
+  assert.deepEqual([quickEn('noon lunch').title, localTime(quickEn('noon lunch').reminderAt)], ['lunch', '2026-10-20 12:00']);
+  assert.equal(localTime(quickEn('tomorrow at noon lunch').reminderAt), '2026-10-21 12:00');
+  assert.equal(localTime(quickEn('midnight backup').reminderAt), '2026-10-21 00:00', 'midnight has passed, so the next one');
+  assert.equal(localTime(quickEn('at 12 lunch').reminderAt), '2026-10-20 12:00');
+  assert.deepEqual(quickEn('tomorrow 3 reports'), { title: '3 reports', dueDate: '2026-10-21', reminderAt: '' });
+  assert.deepEqual(quickEn('decide 5 things'), { title: 'decide 5 things', dueDate: '', reminderAt: '' });
+});
+
 test('a new event for today starts at the next whole hour; other days keep 09:00-10:00', () => {
   const at = (h, m) => new Date(2026, 9, 20, h, m);
   assert.deepEqual(R.defaultEventTimes('2026-10-20', at(8, 59)), ['2026-10-20T09:00', '2026-10-20T10:00']);
@@ -422,4 +461,30 @@ test('shiftRule moves a series rule with its start', () => {
   assert.equal(W.shiftRule('FREQ=WEEKLY;BYDAY=WE', at('2026-10-21', '09:00'), at('2026-10-21', '14:00')), 'FREQ=WEEKLY;BYDAY=WE', 'a time change on the same day keeps the rule');
   const moved = { id: 's', allDay: true, start: '2026-10-22', end: '2026-10-23', rrule: W.shiftRule('FREQ=WEEKLY;BYDAY=WE;WKST=SU', '2026-10-21', '2026-10-22') };
   assert.deepEqual(W.expandEvent(moved, '2026-10-18', '2026-11-08').map(item => item.start), ['2026-10-22', '2026-10-29', '2026-11-05'], 'the moved series repeats on its new day');
+});
+
+// ---- 2026-10-27 review: one scope rule, one WIDGET_MIN, localKey exported ----
+const DM = require('../renderer/domain.js');
+test('scopeChoices: the one rule for which Apple scopes a change to a repeating event may take (main, the card and the widget dialog)', () => {
+  const weekly = { rrule: 'FREQ=WEEKLY;BYDAY=MO' }, monthly = { rrule: 'FREQ=MONTHLY;BYDAY=2TU' }, yearly = { rrule: 'FREQ=YEARLY' };
+  assert.deepEqual(DM.scopeChoices(weekly, {}), { one: true, future: true, all: true }, 'a title or time change: every scope');
+  assert.deepEqual(DM.scopeChoices(weekly, { flip: true }), { one: true, future: false, all: false }, '하루 종일 on or off: this occurrence only');
+  assert.deepEqual(DM.scopeChoices(weekly, { provider: true, dayChanged: true }), { one: true, future: false, all: false }, 'a connected series moved to another day: this occurrence only');
+  assert.deepEqual(DM.scopeChoices(weekly, { provider: true }), { one: true, future: true, all: true }, 'a connected series, same day: every scope');
+  assert.deepEqual(DM.scopeChoices(monthly, { dayChanged: true }), { one: true, future: true, all: false }, 'a local monthly series moved to another day: not 「모든 일정」');
+  assert.deepEqual(DM.scopeChoices(yearly, { dayChanged: true }), { one: true, future: true, all: false }, 'yearly too');
+  assert.deepEqual(DM.scopeChoices(weekly, { dayChanged: true }), { one: true, future: true, all: true }, 'a weekly series moved: every scope (the rule moves with it)');
+  assert.deepEqual(DM.scopeChoices(monthly, { dayChanged: true, ruleChanged: true }), { one: false, future: true, all: true }, 'a changed rule cannot go to one occurrence; with a new rule the monthly day guard does not apply');
+  assert.deepEqual(DM.scopeChoices(weekly, { flip: true, ruleChanged: true }), { one: false, future: false, all: false }, 'a flip with a rule change: nothing (the dialogs say to save them apart)');
+  assert.deepEqual(DM.scopeChoices({}, { dayChanged: true }), { one: true, future: true, all: true }, 'no rule to parse: nothing is refused for its frequency');
+  assert.deepEqual(DM.scopeChoices(monthly), { one: true, future: true, all: true }, 'no facts: every scope');
+});
+
+test('WIDGET_MIN is the one table of smallest widget sizes; localKey gives the local day of a date or an instant', () => {
+  assert.deepEqual(Object.keys(DM.WIDGET_MIN).sort(), ['calendar', 'note', 'tasks']);
+  for (const size of Object.values(DM.WIDGET_MIN)) assert.ok(size.minWidth >= 280 && size.minHeight >= 220, 'every widget has a minimum that still shows its content');
+  assert.equal(DM.WIDGET_MIN.calendar.minHeight, 360, 'the calendar needs its header and six weeks');
+  assert.equal(DM.localKey('2026-10-21'), '2026-10-21');
+  assert.equal(DM.localKey(new Date(2026, 9, 21, 23, 30).toISOString()), '2026-10-21', 'an instant late in the local evening is still that day here');
+  assert.equal(DM.localKey(new Date(2026, 9, 22, 0, 30).toISOString()), '2026-10-22');
 });

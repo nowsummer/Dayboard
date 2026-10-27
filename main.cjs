@@ -8,23 +8,27 @@ const { randomUUID } = require('node:crypto');
 const { fileURLToPath } = require('node:url');
 const { spawn } = require('node:child_process');
 const { UpdateManager, releasePage, releasesPage, releaseTag, STAGING_ID } = require('./lib/updater.cjs');
-const { createStore, resolveUserDataDirectory, TRASH_DAYS, purgeAtOf } = require('./lib/store.cjs');
+const { createStore, resolveUserDataDirectory, TRASH_DAYS, publicNote } = require('./lib/store.cjs');
 const { createDesktopManager, clampBounds, onScreen } = require('./lib/desktop.cjs');
 const { createTaskbarIcon } = require('./lib/windowicon.cjs');
 const { createStartMenu } = require('./lib/startmenu.cjs');
 const { createSync, seriesKey, dropSeriesColors } = require('./lib/sync.cjs');
 const { recordNoteDeletion, copyOf, sameContent, noteKey, noteRev, laterThan, cleanPast, archiveText, NOTE_ID, pastKey } = require('./lib/notesync.cjs');
-// A note as the renderer gets it from a note command: no earlier versions (note:history), its rev (which version it is).
-const shownNote = note => { const { past, trashSeenAt, storedAt, textKey, pinnedAt, ...rest } = note; return { ...rest, rev: noteRev(note), textId: textKey || noteKey(note), ...(note.trashedAt ? { purgeAt: purgeAtOf(note) } : {}) }; };
+// A note as the renderer gets it from a note command: the shape publicState broadcasts (lib/store.cjs publicNote — the public
+// fields with rev and textId, no earlier versions; one definition since the 2026-10-27 review).
+const shownNote = publicNote;
 // The text identity a draft or the 「이전 버전」 dialog started from (store publicState textId), when it is one.
 const textIdOf = value => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z~[0-9a-f]{16}$/.test(value) ? value : null);
 // Widgets of notes moved to the trash, so 되돌리기 brings them back where they were (2026-10-21 review round 4).
 const trashedWidgets = new Map();
-const { LIST_ICONS, parseRRule, buildRRule, expandEvent, seriesPosition, untilBefore, dayOffset, shiftRule, instanceId, dateKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal } = require('./renderer/domain.js');
+const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, WIDGET_MIN, scopeChoices } = require('./renderer/domain.js');
 const { createWallpaper, backdropPayload } = require('./lib/wallpaper.cjs');
 const { providerStatus } = require('./lib/providers/oauth.cjs');
 const i18n = require('./lib/i18n.cjs');
 const { tr } = i18n;
+// Input validators and the local-series helpers live in lib/ since the 2026-10-27 review (tests run them without Electron).
+const { text, rawText, identifier, boolean, color, dateOnly, dateTime, reminderAt, idList, eventColor, rruleText, scopeOf } = require('./lib/validate.cjs');
+const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, toFirstShown, shiftedForMaster, truncatedRule } = require('./lib/series.cjs');
 
 app.setName('Dayboard');
 app.setAppUserModelId('com.dayboard.desktop');
@@ -143,6 +147,17 @@ function queued(fn) {
   queue = result.catch(() => {});
   return result;
 }
+// One open, placement or reveal at a time per widget window, outside the main queue: a widget's page takes seconds to load
+// (4-9 s on this PC) and widget:open held every other command while it did (2026-10-27 performance review). Two of these on
+// one window (an open and a mode change, a reveal after a reload) would race for its shape; other widgets and commands go on.
+const widgetQueues = new Map();
+function perWidget(id, fn) {
+  const result = (widgetQueues.get(id) || Promise.resolve()).then(fn);
+  const settled = result.catch(() => {});
+  widgetQueues.set(id, settled);
+  settled.then(() => { if (widgetQueues.get(id) === settled) widgetQueues.delete(id); });
+  return result;
+}
 // What the windows see: the stored state plus the app version and the update state (lib/updater.cjs).
 function publicState() {
   return { ...store.publicState(), app: { version: app.getVersion(), update: updater ? updater.state() : null } };
@@ -152,51 +167,11 @@ function broadcast() {
   const state = publicState();
   for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('dayboard:state', state);
 }
-function commit(fn) { const result = store.mutate(fn); broadcast(); return result; }
-function text(value, label, max = 500, allowEmpty = false) {
-  if (typeof value !== 'string') throw new Error(tr("{0}을(를) 입력해 주세요.", [label]));
-  const cleaned = value.trim();
-  if ((!allowEmpty && !cleaned) || cleaned.length > max) throw new Error(tr("{0}은(는) {1}~{2}자까지 입력할 수 있습니다.", [label, allowEmpty ? '0' : '1', max]));
-  return cleaned;
-}
-function rawText(value, label, max) {
-  if (typeof value !== 'string' || value.length > max) throw new Error(tr("{0}은(는) {1}자까지 입력할 수 있습니다.", [label, max]));
-  return value;
-}
-function identifier(value) { return text(value, tr('항목 ID'), 400); }
+function commit(fn) { store.mutate(fn); broadcast(); }
 function lookup(collection, id) {
   const item = store.peek(collection, identifier(id)); // one record, not a clone of the whole state (2026-10-26 performance review)
   if (!item) throw new Error(tr('항목이 없거나 이미 삭제되었습니다. 화면을 새로 열어 주세요.'));
   return item;
-}
-function boolean(value, label) {
-  if (typeof value !== 'boolean') throw new Error(tr("{0} 설정이 올바르지 않습니다.", [label]));
-  return value;
-}
-function color(value, fallback = '#3478f6') {
-  if (value === undefined) return fallback;
-  if (typeof value !== 'string' || !/^(#[\da-fA-F]{6}|yellow|pink|blue|green|purple|white|orange)$/.test(value)) throw new Error(tr('지원하지 않는 색상입니다.'));
-  return value;
-}
-function dateOnly(value) {
-  if (value === undefined || value === '') return '';
-  const parsed = typeof value === 'string' ? new Date(`${value}T12:00:00Z`) : new Date(NaN);
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw new Error(tr('날짜를 올바르게 입력해 주세요.'));
-  return value;
-}
-function dateTime(value, allDay) {
-  if (allDay) {
-    const result = dateOnly(value);
-    if (!result) throw new Error(tr('일정 날짜를 입력해 주세요.'));
-    return result;
-  }
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(value) || !Number.isFinite(Date.parse(value))) throw new Error(tr('일정 날짜와 시간을 입력해 주세요.'));
-  return new Date(value).toISOString();
-}
-function reminderAt(value) {
-  if (value === undefined || value === null || value === '') return '';
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(value) || !Number.isFinite(Date.parse(value))) throw new Error(tr('알림 시각을 올바르게 입력해 주세요.'));
-  return new Date(value).toISOString();
 }
 // Fire Windows notifications for reminders that came due while Dayboard runs.
 // Each reminder fires once (reminderFiredAt stays internal) and only within 12 h of its time.
@@ -319,9 +294,6 @@ function showMain() {
   return mainWindow;
 }
 
-// Smallest widget windows that still show their content (calendar: header + 6-week grid).
-// renderer/app.js WIDGET_MIN must match.
-const WIDGET_MIN = { calendar: { minWidth: 300, minHeight: 360 }, tasks: { minWidth: 280, minHeight: 240 }, note: { minWidth: 280, minHeight: 220 } };
 // First spot, scanning from the top-right corner down and then leftwards, that does not touch
 // another widget (desktop widgets look broken when they overlap, as on macOS they never do).
 function freeSlot(size, area) {
@@ -368,7 +340,8 @@ async function openWidget(widget) {
       boundsTimers.delete(widget.id);
       if (win.isDestroyed() || quitting) return;
       try {
-        commit(state => {
+        // Saved without a broadcast: no window reads a widget's bounds, and a broadcast redraws every window (2026-10-27 review).
+        store.mutate(state => {
           const current = state.widgets.find(item => item.id === widget.id);
           if (current) current.bounds = desktop.getBounds(win, screen);
         });
@@ -388,7 +361,7 @@ async function openWidget(widget) {
   win.webContents.on('did-start-loading', hideWhileReloading);
   win.webContents.on('did-finish-load', () => {
     backdropKeys.delete(win.id);
-    if (desktop.isAttached(win)) queued(() => revealOnDesktop(win, { hide: true }).then(backdrop => setWidgetBackdrop(widget.id, backdrop))).catch(() => {});
+    if (desktop.isAttached(win)) perWidget(widget.id, () => revealOnDesktop(win, { hide: true }).then(backdrop => setWidgetBackdrop(widget.id, backdrop))).catch(() => {});
   });
   win.on('close', event => {
     if (!quitting) { event.preventDefault(); closeWindow(win).catch(error => dialog.showErrorBox(tr('변경 사항을 저장하지 못했습니다'), error.message)); }
@@ -405,7 +378,7 @@ async function openWidget(widget) {
     if (wasAttached && !quitting && store) setTimeout(() => {
       if (quitting || widgetWindows.has(widget.id)) return;
       const current = store.get().widgets.find(item => item.id === widget.id);
-      if (current) queued(() => openWidget(current)).catch(() => {});
+      if (current) perWidget(widget.id, () => openWidget(current)).catch(() => {});
     }, 4000);
   });
   // A load cut short by a quit or by a close that came first is not a failure of the widget (2026-10-26 review: the startup loop
@@ -440,7 +413,8 @@ const backdropKeys = new Map(); // widget window id → wallpaper image key its 
 const pendingPaints = new Map(); // token → finish({ ok, dpr })
 const revealTokens = new Map(); // widget window id → token of the reveal allowed to set its shape
 function setWidgetBackdrop(id, backdrop) {
-  try { commit(state => { const record = state.widgets.find(item => item.id === id); if (record) record.backdrop = backdrop; }); }
+  // Saved without a broadcast: no window reads it (the renderer paints the piece it was sent), and a broadcast redraws every window (2026-10-27 review).
+  try { store.mutate(state => { const record = state.widgets.find(item => item.id === id); if (record) record.backdrop = backdrop; }); }
   catch (error) { console.warn('widget backdrop state:', error.message); }
 }
 // Resolves true once the renderer has been sent its wallpaper piece. The scene comes from a
@@ -536,7 +510,7 @@ function retryAttach(win, widgetId, attempt) {
   if (quitting || win.isDestroyed() || desktop.isAttached(win) || !store) return;
   const record = store.get().widgets.find(item => item.id === widgetId);
   if (!record || record.mode !== 'desktop') return;
-  queued(async () => {
+  perWidget(widgetId, async () => {
     if (win.isDestroyed() || desktop.isAttached(win)) return;
     const status = await placeWidget(win, 'desktop', widgetId, attempt);
     commit(state => { const current = state.widgets.find(item => item.id === widgetId); if (current) Object.assign(current, widgetStatus(status)); });
@@ -548,7 +522,7 @@ function refreshBackdrops() {
   for (const [id, win] of widgetWindows) {
     if (win.isDestroyed() || !desktop.isAttached(win)) continue;
     // A widget that fell back to the opaque card (wallpaper unreadable for a moment) tries again.
-    if (desktop.shapeOf(win) === 'card') queued(() => revealOnDesktop(win, { hide: true }).then(backdrop => setWidgetBackdrop(id, backdrop))).catch(() => {});
+    if (desktop.shapeOf(win) === 'card') perWidget(id, () => revealOnDesktop(win, { hide: true }).then(backdrop => setWidgetBackdrop(id, backdrop))).catch(() => {});
     else queueBackdrop(win);
   }
 }
@@ -627,23 +601,6 @@ function setLogin(enabled) {
 }
 
 // ---- Events: per-event colour, recurrence (RRULE on the master, EXDATE + exception events for edits) ----
-function eventColor(value) {
-  if (value === undefined || value === null || value === '') return '';
-  if (typeof value !== 'string' || !/^#[\da-fA-F]{6}$/.test(value)) throw new Error(tr('지원하지 않는 색상입니다.'));
-  return value.toLowerCase();
-}
-function rruleText(value) {
-  if (value === undefined || value === null || value === '') return '';
-  if (typeof value !== 'string' || value.length > 300) throw new Error(tr('반복 규칙이 올바르지 않습니다.'));
-  const rule = parseRRule(value);
-  if (!rule) throw new Error(tr('지원하지 않는 반복 규칙입니다.'));
-  return buildRRule(rule);
-}
-function scopeOf(value) {
-  if (value === undefined || value === null || value === '') return 'one';
-  if (!['one', 'future', 'all'].includes(value)) throw new Error(tr('반복 일정의 적용 범위가 올바르지 않습니다.'));
-  return value;
-}
 // Occurrence ids are "<masterId>@<recurrenceId>" (renderer/domain.js expandEvent); anything else is a stored event.
 function resolveEvent(rawId) {
   const id = identifier(rawId);
@@ -657,105 +614,9 @@ function resolveEvent(rawId) {
   }
   throw new Error(tr('항목이 없거나 이미 삭제되었습니다. 화면을 새로 열어 주세요.'));
 }
-function occurrenceOf(master, recurrenceId) {
-  const day = String(recurrenceId).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error(tr('반복 일정의 날짜가 올바르지 않습니다.'));
-  // A timed occurrence id is a UTC instant whose local day may differ by one; look around it. EXDATEs are ignored so an excluded instance still resolves.
-  const found = expandEvent({ ...master, exdates: [] }, dayOffset(day, -1), dayOffset(day, 2)).find(item => item.recurrenceId === recurrenceId);
-  if (!found) throw new Error(tr('해당 날짜의 반복 일정을 찾지 못했습니다. 화면을 새로 열어 주세요.'));
-  return found;
-}
-function eventFields(payload, base, allDay) {
-  const event = { ...base, allDay };
-  if ('title' in payload) event.title = text(payload.title, tr('일정 제목'), 500);
-  if ('start' in payload || 'allDay' in payload) event.start = dateTime(payload.start ?? base.start, allDay);
-  if ('end' in payload || 'allDay' in payload) event.end = dateTime(payload.end ?? base.end, allDay);
-  if ('location' in payload) event.location = text(payload.location ?? '', tr('장소'), 1000, true);
-  if ('color' in payload) { const value = eventColor(payload.color); if (value) event.color = value; else delete event.color; }
-  if ('rrule' in payload) { const rule = rruleText(payload.rrule); if (rule) event.rrule = rule; else { delete event.rrule; delete event.exdates; } }
-  if (event.end <= event.start) throw new Error(allDay ? tr('하루 종일 일정의 종료 날짜는 마지막 날의 다음 날로 입력해 주세요.') : tr('종료 시간은 시작 시간보다 늦어야 합니다.'));
-  return event;
-}
-const exceptionsOf = (state, masterId) => state.events.filter(item => item.masterId === masterId);
-// A series that moves from one start to another (same all-day kind): the same instance of the series lands on its old local
-// date plus the day difference, at the new start's clock time (as walkRRule builds occurrences). Used for EXDATEs and the
-// exceptions' recurrence ids so they keep naming the instance they named before.
-const localDay = value => String(value).length === 10 ? String(value) : dateKey(new Date(value));
-function seriesShift(fromStart, toStart, allDay) {
-  const days = Math.round((Date.parse(localDay(toStart) + 'T12:00:00') - Date.parse(localDay(fromStart) + 'T12:00:00')) / 86400000);
-  const clock = new Date(toStart);
-  if (!days && (allDay || String(fromStart) === String(toStart))) return null;
-  return id => {
-    const text = String(id);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return dayOffset(text, days);
-    const at = new Date(text); if (!Number.isFinite(at.getTime())) return text;
-    if (allDay) return dayOffset(dateKey(at), days);
-    return new Date(at.getFullYear(), at.getMonth(), at.getDate() + days, clock.getHours(), clock.getMinutes(), clock.getSeconds(), clock.getMilliseconds()).toISOString();
-  };
-}
-// Two timed ids compare as instants, else as local days (2026-10-21 review: UTC date prefixes put the evening before a DST
-// change on the wrong side of a cut).
-const onOrAfter = (recurrenceId, from) => (String(recurrenceId).length > 10 && String(from).length > 10 ? Date.parse(recurrenceId) >= Date.parse(from) : localDay(recurrenceId) >= localDay(from));
-// EXDATEs and the exceptions' recurrence ids of an old series, mapped onto a new one by their place in the series — the
-// same instance whatever the rule did with its date (2026-10-21 review: a day offset missed "the 2nd Tuesday" rules and
-// the clock part of a move made with a new rule). `from` is the place where the new series starts (the cut of "this and
-// future"). With a new rule a place means nothing: the id moves with the start instead. null: the new series has no such
-// instance (the EXDATE goes, the exception becomes an event of its own).
-function seriesMapper(oldSeries, newSeries, { from = 0, move = null, byPlace = true } = {}) {
-  const plain = { ...oldSeries, exdates: [] }; const target = { ...newSeries, exdates: [] };
-  return id => {
-    if (!byPlace) return move ? move(id) : id;
-    const position = seriesPosition(plain, id);
-    if (!position) return move ? move(id) : id;
-    return instanceId(target, position.index - from);
-  };
-}
-const detach = item => { delete item.masterId; delete item.recurrenceId; };
-// A new colour saved for 「이후 모든 일정」/「모든 일정」 colours the occurrences edited on their own too, as 「모든 반복 일정」
-// (event:color 'all') does; an unchanged colour (the old edit window always sends one) leaves their own colours alone
-// (2026-10-21 review round 7). undefined: no change.
-const seriesColour = (payload, previous) => ('color' in payload && eventColor(payload.color) !== (previous.color || '') ? eventColor(payload.color) : undefined);
-const paint = (item, colour) => { if (colour) item.color = colour; else delete item.color; };
-// A series that stops repeating keeps one event, at its first occurrence still shown: an occurrence the user skipped or edited
-// on its own (that one is now an event of its own) is not shown twice (2026-10-21 review round 6). `always` (「모든 일정」)
-// also moves it off a start the rule never showed (a Saturday start of 「평일마다」); the series held in a card right after
-// 반복 was chosen goes back to its own day (review round 7).
-function toFirstShown(event, series, always = false) {
-  const skipped = new Set(series.exdates || []);
-  if (!skipped.size && !always) return;
-  const plain = { ...series, exdates: [] };
-  let first = null;
-  for (let index = 0; index < 1000; index++) { const id = instanceId(plain, index); if (!id) break; if (!skipped.has(id)) { first = id; break; } }
-  if (!first) return;
-  const days = Math.round((Date.parse(localDay(first) + 'T12:00:00') - Date.parse(localDay(series.start) + 'T12:00:00')) / 86400000);
-  if (!days) return;
-  const shift = value => { if (String(value).length === 10) return dayOffset(value, days); const at = new Date(value); at.setDate(at.getDate() + days); return at.toISOString(); };
-  event.start = shift(event.start); event.end = shift(event.end);
-}
-// Shift an edited occurrence's new start/end back onto the master so "all events" keeps the series dates and changes the time and duration.
-function shiftedForMaster(payload, master, occurrence) {
-  if (!('start' in payload) && !('end' in payload)) return payload;
-  if (payload.allDay !== undefined && Boolean(payload.allDay) !== Boolean(master.allDay)) return payload;
-  const allDay = master.allDay;
-  const newStart = dateTime(payload.start ?? occurrence.start, allDay), newEnd = dateTime(payload.end ?? occurrence.end, allDay);
-  if (allDay) {
-    const deltaDays = Math.round((Date.parse(newStart) - Date.parse(occurrence.start)) / 86400000);
-    const lengthDays = Math.max(1, Math.round((Date.parse(newEnd) - Date.parse(newStart)) / 86400000));
-    const start = dayOffset(master.start, deltaDays);
-    return { ...payload, start, end: dayOffset(start, lengthDays) };
-  }
-  const wall = seriesShift(occurrence.start, newStart, false);
-  const start = wall ? wall(master.start) : master.start;
-  return { ...payload, start, end: new Date(Date.parse(start) + (Date.parse(newEnd) - Date.parse(newStart))).toISOString() };
-}
-// Truncate a series before one occurrence (Apple's "this and future" split). Returns the rule text for the kept part, or null when nothing stays.
-function truncatedRule(master, recurrenceId) {
-  const position = seriesPosition(master, recurrenceId);
-  if (!position || position.index === 0) return null;
-  const rule = parseRRule(master.rrule);
-  // The new part keeps the series' own end: its remaining COUNT, or its UNTIL (2026-10-21 review: it went on forever).
-  return { kept: buildRRule({ ...rule, count: null, until: untilBefore(occurrenceOf(master, recurrenceId).start, master.allDay) }), rest: buildRRule({ ...rule, count: rule.count ? position.remaining : null, until: rule.count ? null : rule.until }) };
-}
+// What an edit changes about a repeating event, for renderer/domain.js scopeChoices: 하루 종일 flipped, the start moved to another
+// local day than `from` has (the series' start, or the occurrence's), the rule itself. Values are validated first, as the edit's are.
+const scopeFacts = (payload, from, allDay) => ({ flip: ('allDay' in payload) && Boolean(allDay) !== Boolean(from.allDay), dayChanged: ('start' in payload) && localKey(dateTime(payload.start, allDay)) !== localKey(from.start), ruleChanged: 'rrule' in payload });
 
 // Send an event change to a connected calendar and mirror the answer locally. The provider returns the events that
 // now stand for what was touched (one event, or the instances of a series); `series` says they replace the whole
@@ -791,6 +652,16 @@ async function writeRemoteEvent(kind, event, calendar, { scope = 'one', previous
   return result.events;
 }
 
+// Commands answered outside the main queue (queued(): one command at a time), for two reasons (2026-10-27 review names both).
+// 1. Long-running and serialized elsewhere: a browser sign-in can take minutes and a sync run a while (account:connect,
+//    sync:run, auth:*; lib/sync.cjs runs them one at a time), and widget:open's window load takes 4-9 s on this PC (perWidget
+//    serializes it per widget). Local edits, widgets and window controls must stay responsive meanwhile.
+// 2. Replies to main's own round-trips to a renderer: note:save answers flushWindow, widget:painted answers revealOnDesktop.
+//    A queued command that awaits one of those (note:trash, widget:update, window:close → flushWindow) would wait behind
+//    itself for the 5 s / 4.5 s timeout, so the reply must come through here. Window controls, widget:close/resize/focus
+//    and update:* only touch windows or the updater and take no time.
+// Every name is a case of command() (tests/commands.test.cjs).
+const DIRECT_COMMANDS = new Set(['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit']);
 async function command(commandName, payload, sourceWindow) {
   const now = () => new Date().toISOString();
   switch (commandName) {
@@ -949,7 +820,7 @@ async function command(commandName, payload, sourceWindow) {
       const widgets = (trashedWidgets.get(note.id) || []).filter(widget => !store.get().widgets.some(item => item.id === widget.id));
       trashedWidgets.delete(note.id);
       commit(state => { state.notes = state.notes.map(item => item.id === note.id ? note : item); state.widgets.push(...widgets); });
-      for (const widget of widgets) openWidget(widget).catch(() => {});
+      for (const widget of widgets) perWidget(widget.id, () => openWidget(widget)).catch(() => {});
       sync?.scheduleNotes();
       return shownNote(note);
     }
@@ -1032,12 +903,9 @@ async function command(commandName, payload, sourceWindow) {
       // The card's key (32 hex digits) makes a resend of the same add harmless: the same local id, or the provider finds the
       // first one on the service (2026-10-26 review — 「다시 시도」 and the closing flush could add an event twice).
       const key = typeof payload.key === 'string' && /^[0-9a-f]{32}$/.test(payload.key) ? payload.key : '';
-      const event = { id: key ? `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}` : randomUUID(), calendarId: calendar.id, title: text(payload.title, tr('일정 제목'), 500),
-        start: dateTime(payload.start, allDay), end: dateTime(payload.end, allDay), allDay,
-        location: text(payload.location ?? '', tr('장소'), 1000, true), provider: calendar.provider };
-      const colorValue = eventColor(payload.color); if (colorValue) event.color = colorValue;
-      const rule = rruleText(payload.rrule); if (rule) event.rrule = rule;
-      if (event.end <= event.start) throw new Error(allDay ? tr('하루 종일 일정의 종료 날짜는 마지막 날의 다음 날로 입력해 주세요.') : tr('종료 시간은 시작 시간보다 늦어야 합니다.'));
+      // The same fields, checks and messages as an edit (lib/series.cjs eventFields; 2026-10-27 review: event:add repeated them).
+      const id = key ? `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}` : randomUUID();
+      const event = eventFields({ title: payload.title, start: payload.start, end: payload.end, location: payload.location ?? '', color: payload.color, rrule: payload.rrule }, { id, calendarId: calendar.id, provider: calendar.provider }, allDay);
       // A resend of the same key returns the first event; only a card sent again with other values (revise) updates it
       // (2026-10-26 recheck: an edit made before 「다시 시도」 was dropped; a kept add resent later overwrote edits made since).
       const revise = payload.revise === true;
@@ -1064,8 +932,9 @@ async function command(commandName, payload, sourceWindow) {
         // Notion/Apple scopes for a series instance: 'one' patches the instance, 'future' splits the series, 'all' patches the master.
         const scope = previous.recurring ? scopeOf(payload.scope) : 'one';
         if ('rrule' in payload && previous.recurring) throw new Error(tr('연결된 달력의 반복 규칙은 원래 달력 앱에서 바꿔 주세요. 제목·시간·장소는 여기서 고칠 수 있습니다.'));
-        // Another day or 하루 종일 for the whole series would keep the service's weekdays on a moved start (2026-10-21 review).
-        if (previous.recurring && scope !== 'one' && ((('allDay' in payload) && Boolean(allDay) !== Boolean(previous.allDay)) || (('start' in payload) && localDay(dateTime(payload.start, allDay)) !== localDay(previous.start)))) throw new Error(tr('연결된 달력의 반복 일정을 다른 날로 옮기거나 하루 종일을 바꿀 때는 「이 일정만」으로 저장해 주세요.'));
+        // Another day or 하루 종일 for the whole series would keep the service's weekdays on a moved start (2026-10-21 review). The
+        // scopes a change may take are one rule for main, the card and the widget's dialog (renderer/domain.js scopeChoices).
+        if (previous.recurring && scope !== 'one' && !scopeChoices(previous, { provider: true, ...scopeFacts(payload, previous, allDay) })[scope]) throw new Error(tr('연결된 달력의 반복 일정을 다른 날로 옮기거나 하루 종일을 바꿀 때는 「이 일정만」으로 저장해 주세요.'));
         const desired = eventFields(payload, previous, allDay);
         const updated = await writeRemoteEvent('update', desired, calendar, { scope, previous, color: 'color' in payload ? (desired.color || null) : undefined });
         return updated.find(item => item.id === previous.id) || updated[0] || store.publicState();
@@ -1092,9 +961,12 @@ async function command(commandName, payload, sourceWindow) {
       if ((previous.exdates || []).includes(recurrenceId)) throw new Error(tr('이미 지웠거나 따로 고친 반복 일정이에요. 화면을 새로 열어 주세요.'));
       const occurrence = occurrenceOf(previous, recurrenceId);
       // 하루 종일 on or off applies to one occurrence only, and a monthly or yearly series moves to another day only from here
-      // on (its days would be recomputed from the first one's month) — 2026-10-21 review.
-      if (scope !== 'one' && ('allDay' in payload) && Boolean(allDay) !== Boolean(previous.allDay)) throw new Error(tr('하루 종일로 바꾸거나 되돌리는 변경은 이 일정에만 적용할 수 있어요.'));
-      if (scope === 'all' && !('rrule' in payload) && ('start' in payload) && localDay(dateTime(payload.start, allDay)) !== localDay(occurrence.start) && ['MONTHLY', 'YEARLY'].includes(parseRRule(previous.rrule)?.freq)) throw new Error(tr('매월·매년 반복 일정을 다른 날로 옮길 때는 「이 일정만」이나 「이후 모든 일정」을 골라 주세요.'));
+      // on (its days would be recomputed from the first one's month) — 2026-10-21 review. One rule with the card and the widget's
+      // dialog (renderer/domain.js scopeChoices); a moved start is compared with the occurrence's own day.
+      if (scope !== 'one') {
+        const facts = scopeFacts(payload, occurrence, allDay);
+        if (!scopeChoices(previous, { provider: false, ...facts })[scope]) throw new Error(facts.flip ? tr('하루 종일로 바꾸거나 되돌리는 변경은 이 일정에만 적용할 수 있어요.') : tr('매월·매년 반복 일정을 다른 날로 옮길 때는 「이 일정만」이나 「이후 모든 일정」을 골라 주세요.'));
+      }
       const inherited = { calendarId: previous.calendarId, title: previous.title, start: occurrence.start, end: occurrence.end, allDay: previous.allDay, location: previous.location || '', provider: previous.provider, ...(previous.color ? { color: previous.color } : {}) };
       if (scope === 'one') {
         // This occurrence only: exclude it from the series and store the edited copy as an exception that still belongs to the master.
@@ -1210,6 +1082,9 @@ async function command(commandName, payload, sourceWindow) {
           commit(state => {
             const ids = new Set(created.events.map(item => item.id));
             state.events = state.events.filter(item => item.id !== source.id && !ids.has(item.id)).concat(created.events.map(item => source.color ? { ...item, color: source.color } : item));
+            // A coloured series keeps its colour as a series colour too, as event:add does (writeRemoteEvent): the instances that
+            // arrive in later syncs would come in the calendar's colour otherwise (2026-10-27 review).
+            if (source.color) for (const item of created.events) if (item.seriesId) state.seriesColors[seriesKey(item)] = source.color;
           });
           moved++;
         } catch (error) { throw new Error(tr("일정 {0}개를 옮긴 뒤 「{1}」에서 중단했습니다. {2}", [moved, source.title, error.message])); }
@@ -1304,11 +1179,7 @@ async function command(commandName, payload, sourceWindow) {
         settings.noteListStyle = payload.noteListStyle;
         settings.noteListChosen = true; // the user's own choice: the default may change without overriding it
       }
-      if ('noteOrder' in payload) {
-        const value = payload.noteOrder;
-        if (!Array.isArray(value) || value.length > 2000 || value.some(item => typeof item !== 'string' || !item || item.length > 400)) throw new Error(tr('메모 순서가 올바르지 않습니다.'));
-        settings.noteOrder = [...new Set(value)];
-      }
+      if ('noteOrder' in payload) settings.noteOrder = idList(payload.noteOrder, 2000, tr('메모 순서가 올바르지 않습니다.'));
       // Calendar view (month, week, day) and the right panel (auto: open when the window is wide enough).
       if ('calendarView' in payload) {
         if (!['month', 'week', 'day'].includes(payload.calendarView)) throw new Error(tr('지원하지 않는 달력 보기입니다.'));
@@ -1318,37 +1189,17 @@ async function command(commandName, payload, sourceWindow) {
         if (!['auto', 'open', 'closed'].includes(payload.calendarPanel)) throw new Error(tr('지원하지 않는 패널 설정입니다.'));
         settings.calendarPanel = payload.calendarPanel;
       }
-      if ('listOrder' in payload) {
-        const value = payload.listOrder;
-        if (!Array.isArray(value) || value.length > 500 || value.some(item => typeof item !== 'string' || !item || item.length > 400)) throw new Error(tr('목록 순서가 올바르지 않습니다.'));
-        settings.listOrder = [...new Set(value)];
-      }
-      if ('hiddenCalendars' in payload) {
-        const value = payload.hiddenCalendars;
-        if (!Array.isArray(value) || value.length > 500 || value.some(item => typeof item !== 'string' || !item || item.length > 400)) throw new Error(tr('달력 표시 설정이 올바르지 않습니다.'));
-        settings.hiddenCalendars = [...new Set(value)];
-      }
-      if ('hiddenSections' in payload) {
-        const value = payload.hiddenSections;
-        if (!Array.isArray(value) || value.length > 100 || value.some(item => typeof item !== 'string' || !item || item.length > 400)) throw new Error(tr('계정 표시 설정이 올바르지 않습니다.'));
-        settings.hiddenSections = [...new Set(value)];
-      }
-      if ('hiddenLists' in payload) {
-        const value = payload.hiddenLists;
-        if (!Array.isArray(value) || value.length > 500 || value.some(item => typeof item !== 'string' || !item || item.length > 400)) throw new Error(tr('목록 표시 설정이 올바르지 않습니다.'));
-        settings.hiddenLists = [...new Set(value)];
-      }
+      if ('listOrder' in payload) settings.listOrder = idList(payload.listOrder, 500, tr('목록 순서가 올바르지 않습니다.'));
+      if ('hiddenCalendars' in payload) settings.hiddenCalendars = idList(payload.hiddenCalendars, 500, tr('달력 표시 설정이 올바르지 않습니다.'));
+      if ('hiddenSections' in payload) settings.hiddenSections = idList(payload.hiddenSections, 100, tr('계정 표시 설정이 올바르지 않습니다.'));
+      if ('hiddenLists' in payload) settings.hiddenLists = idList(payload.hiddenLists, 500, tr('목록 표시 설정이 올바르지 않습니다.'));
       if ('hiddenSections' in payload || 'hiddenLists' in payload) {
         // At least one list stays visible. Only a save that hides something new is refused: a delete or a sync can
         // leave every remaining list hidden (visibleState then shows them all), and unrelated saves must still work.
         const why = hidingRefusal(store.get().settings, settings, store.get().lists);
         if (why) throw new Error(why === 'lists' ? tr('모든 목록을 숨길 수는 없어요. 하나는 보이게 두세요.') : tr('모든 계정의 목록을 숨길 수는 없어요. 하나는 보이게 두세요.'));
       }
-      if ('collapsedSections' in payload) {
-        const value = payload.collapsedSections;
-        if (!Array.isArray(value) || value.length > 100 || value.some(item => typeof item !== 'string' || !item || item.length > 400)) throw new Error(tr('사이드바 접기 상태가 올바르지 않습니다.'));
-        settings.collapsedSections = [...new Set(value)];
-      }
+      if ('collapsedSections' in payload) settings.collapsedSections = idList(payload.collapsedSections, 100, tr('사이드바 접기 상태가 올바르지 않습니다.'));
       if ('autoUpdate' in payload) settings.autoUpdate = boolean(payload.autoUpdate, tr('새 버전 자동 확인'));
       if ('launchAtLogin' in payload) {
         settings.launchAtLogin = boolean(payload.launchAtLogin, tr('자동 시작'));
@@ -1408,7 +1259,9 @@ async function command(commandName, payload, sourceWindow) {
       if (widget.type === 'tasks') widget.listId = widgetList(payload.listId);
       if (widget.type === 'note' && payload.noteId) widget.noteId = liveNote(payload.noteId).id;
       commit(state => { if (widget.type === 'note' && !widget.noteId) widget.noteId = newNote(state).id; state.widgets.push(widget); });
-      try { return await openWidget(widget); }
+      // The window's load and desktop placement run outside the main queue (a direct command, DIRECT_COMMANDS), one at a time
+      // per widget (2026-10-27 performance review: the 4-9 s load held every other command).
+      try { return await perWidget(widget.id, () => openWidget(widget)); }
       catch (error) {
         if (error.cancelled) return null; // a quit keeps the record; a close during the load already removed it
         widgetWindows.get(widget.id)?.destroy(); commit(state => { state.widgets = state.widgets.filter(w => w.id !== widget.id); }); throw error;
@@ -1422,7 +1275,7 @@ async function command(commandName, payload, sourceWindow) {
         if (!['desktop', 'top'].includes(payload.mode)) throw new Error(tr('지원하지 않는 위젯 모드입니다.'));
         widget.mode = payload.mode;
         const win = widgetWindows.get(widget.id);
-        if (win) Object.assign(widget, widgetStatus(await placeWidget(win, widget.mode, widget.id)));
+        if (win) Object.assign(widget, widgetStatus(await perWidget(widget.id, () => placeWidget(win, widget.mode, widget.id))));
       }
       commit(state => { state.widgets = state.widgets.map(w => w.id === widget.id ? widget : w); }); return widget;
     }
@@ -1602,7 +1455,7 @@ function trayMenu() {
   tray.setToolTip(tr('Dayboard · 할 일, 일정, 메모'));
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: tr('Dayboard 열기'), click: showMain },
-    ...[['tasks', tr('할 일 위젯')], ['calendar', tr('달력 위젯')], ['note', tr('메모 위젯')]].map(([type, label]) => ({ label, click: () => queued(() => command('widget:open', { type }, mainWindow)).catch(error => dialog.showErrorBox('Dayboard', error.message)) })),
+    ...[['tasks', tr('할 일 위젯')], ['calendar', tr('달력 위젯')], ['note', tr('메모 위젯')]].map(([type, label]) => ({ label, click: () => command('widget:open', { type }, mainWindow).catch(error => dialog.showErrorBox('Dayboard', error.message)) })),
     { type: 'separator' },
     { label: tr('동기화'), click: () => command('sync:run', {}, mainWindow).catch(() => {}) },
     ...(updater ? [updater.state().canInstall
@@ -1664,7 +1517,7 @@ async function runSmokeTest() {
     try {
       const opened = [];
       for (const type of ['tasks', 'calendar', 'note']) {
-        const widget = await queued(() => command('widget:open', { type }, mainWindow));
+        const widget = await command('widget:open', { type }, mainWindow);
         const win = widgetWindows.get(widget.id);
         const bounds = desktop.getBounds(win, screen);
         const handle = win.getNativeWindowHandle();
@@ -1705,11 +1558,8 @@ else {
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error(tr('명령 데이터가 올바르지 않습니다.'));
       if (JSON.stringify(payload).length > 250000) throw new Error(tr('입력 데이터가 너무 큽니다.'));
       if (name === 'state:get') return publicState();
-      // A browser-based sign-in can take minutes and a sync run can take a while.
-      // Both are already serialized inside lib/sync.cjs, so keep them off the main
-      // queue: local edits, widgets and window controls must stay responsive.
       const sourceWindow = BrowserWindow.fromWebContents(event.sender);
-      if (['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit'].includes(name)) return command(name, payload, sourceWindow);
+      if (DIRECT_COMMANDS.has(name)) return command(name, payload, sourceWindow); // off the main queue: see DIRECT_COMMANDS
       return queued(() => command(name, payload, sourceWindow));
     });
     ipcMain.on('dayboard:flushed', (event, payload) => {
@@ -1751,9 +1601,12 @@ else {
       const purge = () => { try { purgeTrash(); } catch (error) { console.error('trash purge failed:', error.message); } };
       setInterval(purge, 60 * 60 * 1000).unref();
       purge();
-      const reminderTimer = setInterval(() => { try { checkReminders(); } catch (error) { console.error('reminder check failed:', error.message); } }, 30 * 1000);
+      // The start-up check is guarded like the interval's: a save that fails for a moment (a locked data file) must not end the
+      // start with 「Dayboard를 열 수 없습니다」 (2026-10-27 review).
+      const remind = () => { try { checkReminders(); } catch (error) { console.error('reminder check failed:', error.message); } };
+      const reminderTimer = setInterval(remind, 30 * 1000);
       reminderTimer.unref();
-      checkReminders();
+      remind();
     }
   }).catch(error => {
     if (smoke) console.error(error.stack || error.message);
@@ -1776,8 +1629,10 @@ app.on('before-quit', event => {
     app.quit();
   }).catch(async error => {
     // What could not be saved may be an event card or a note: the window is shown before the question (2026-10-21 review).
+    // The first button only closes the question (the quit is off, the window stays), so it says 「취소」, not 「다시 시도」
+    // (2026-10-27 review: a retry of the same flush fails the same way until the card is fixed).
     if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); }
-    const { response } = await dialog.showMessageBox({ type: 'warning', title: 'Dayboard', message: tr('저장하지 못한 변경이 있습니다'), detail: tr("{0}\n\n다시 시도하거나, 저장되지 않은 변경을 버리고 종료할 수 있습니다.", [error.message]), buttons: [tr('다시 시도'), tr('저장하지 않고 종료')], defaultId: 0, cancelId: 0, noLink: true });
+    const { response } = await dialog.showMessageBox({ type: 'warning', title: 'Dayboard', message: tr('저장하지 못한 변경이 있습니다'), detail: tr("{0}\n\n취소하면 창이 그대로 남아 고친 뒤 다시 종료할 수 있어요.", [error.message]), buttons: [tr('취소'), tr('저장하지 않고 종료')], defaultId: 0, cancelId: 0, noLink: true });
     if (response === 1) { quitting = true; app.quit(); }
   }).finally(() => { quitInFlight = false; });
 });

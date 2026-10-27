@@ -162,3 +162,29 @@ test('peek returns one record as a copy, never the live object', t => {
   assert.equal(store.peek('notes', 'missing'), undefined);
   assert.equal(store.peek('nothing', 'n1'), undefined);
 });
+
+// ---- 2026-10-27 review: one note shape (publicNote), mutate returns nothing ----
+test('publicNote is the note shape publicState broadcasts: public fields plus rev, textId and purgeAt in the trash, no internal fields', t => {
+  const { publicNote } = require('../lib/store.cjs');
+  const { noteRev } = require('../lib/notekey.cjs');
+  const { store } = fixture(t);
+  const live = { id: 'n1', title: 'a', body: 'b', color: 'yellow', updatedAt: '2026-10-21T01:00:00.000Z', editedAt: '2026-10-21T01:00:00.000Z', pinned: true, pinnedAt: '2026-10-21T01:00:00.000Z', storedAt: '2026-10-21T01:00:00.000Z', textKey: '2026-10-20T00:00:00.000Z~0123456789abcdef', past: [{ title: 'old', body: '', color: 'yellow', updatedAt: '2026-10-20T00:00:00.000Z' }], demo: true };
+  const trashed = { id: 'n2', title: 't', body: '', color: 'pink', updatedAt: '2026-10-21T02:00:00.000Z', trashedAt: '2026-10-21T02:00:00.000Z', trashSeenAt: '2026-10-22T02:00:00.000Z' };
+  store.mutate(state => { state.notes.push(live, trashed); });
+  const shown = store.publicState().notes;
+  assert.deepEqual(publicNote(live), shown[0], 'a command\'s reply and the broadcast agree');
+  assert.deepEqual(publicNote(trashed), shown[1]);
+  assert.deepEqual(Object.keys(publicNote(live)).sort(), ['body', 'color', 'editedAt', 'id', 'pinned', 'rev', 'textId', 'title', 'updatedAt'], 'past, storedAt, pinnedAt, textKey and demo stay inside');
+  assert.equal(publicNote(live).rev, noteRev(live));
+  assert.equal(publicNote(live).textId, live.textKey, 'the text identity is the version that brought the text');
+  assert.equal(publicNote(trashed).textId, `${trashed.updatedAt}~${noteRev(trashed)}`, 'or its own version');
+  assert.equal(publicNote(trashed).purgeAt, '2026-11-21T02:00:00.000Z', '30 days from when this PC first saw it in the trash');
+  assert.equal('purgeAt' in publicNote(live), false);
+  assert.equal(publicNote(live, 'cached-rev').rev, 'cached-rev', 'a caller with the rev cached passes it in');
+});
+
+test('mutate persists and returns nothing (no caller read the clone it used to return)', t => {
+  const { store } = fixture(t);
+  assert.equal(store.mutate(state => { state.notes.push({ id: 'n1', title: 'a', body: '', color: 'yellow' }); }), undefined);
+  assert.equal(store.get().notes[0].title, 'a');
+});

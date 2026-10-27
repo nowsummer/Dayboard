@@ -146,7 +146,7 @@ What you can do:
 - **Compare the installed code** — the installed app's code (`%LOCALAPPDATA%\Programs\dayboard-desktop\resources\app`) is plain, unbundled files, so you can compare it with the same version's code in this repository. (Inside the installer it's 7z-compressed.)
   - `package.json` has its scripts and devDependencies removed.
   - Added: `node_modules` and the publisher's Google client `assets\google-oauth.json`.
-  - Left out (development files): `scripts`, `build`, `docs`, most of `tests`, `renderer\preview.js`, `assets\*.svg`, `assets\google-oauth.example.json`.
+  - Left out (development files): `scripts`, `build`, `docs`, most of `tests`, `assets\*.svg`, `assets\google-oauth.example.json`.
 - **Build it yourself** — read the source and build it (see the [README](README.md)).
   - A copy you build and install still downloads new releases from this repository. Choosing to install one switches you to the published build.
   - To stay on your own build, turn off **Check for new versions automatically** in Settings.

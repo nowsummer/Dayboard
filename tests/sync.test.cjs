@@ -505,3 +505,30 @@ test('a publisher Google client file turns Google into one-click sign-in', async
   const status = providerStatus();
   assert.equal(status.microsoft.builtIn, true); assert.equal(typeof status.google.builtIn, 'boolean');
 });
+
+// 2026-10-27 review (R30-1): sync.mutateTask copied only title/notes/dueDate/important/completed from the edited task onto
+// the stored one, so a reminder set or cleared in the edit dialog never reached Graph and quietly reverted.
+test('a reminder set or cleared on an Outlook task reaches the Graph PATCH through sync.mutateTask', async t => {
+  const requests = [];
+  let remote = { id: task.remoteId, title: task.title, status: 'notStarted', importance: 'high', body: { contentType: 'text', content: '메모' }, dueDateTime: { dateTime: '2026-10-19T00:00:00', timeZone: 'UTC' }, isReminderOn: false, reminderDateTime: null };
+  const { store, sync, vault } = setup(t, () => microsoft.createMicrosoft({ request: async (url, options = {}) => {
+    const body = options.body ? JSON.parse(options.body) : undefined;
+    requests.push([options.method || 'GET', body]);
+    remote = { ...remote, ...body }; return remote;
+  } }));
+  seed(store, vault);
+  store.mutate(state => { state.tasks = state.tasks.map(item => item.id === task.id ? { ...item, reminderAt: '2026-10-27T00:00:00.000Z', reminderFiredAt: '2026-10-27T00:00:07.000Z' } : item); }); // the old reminder already rang
+  const set = await sync.mutateTask('update', { ...task, reminderAt: '2026-10-29T00:00:00.000Z' }, list);
+  assert.equal(set.reminderFiredAt, undefined, 'a changed reminder has not rung yet (2026-10-27 re-review: the stored reminderFiredAt came back and the new time never notified)');
+  assert.deepEqual(requests, [['PATCH', { isReminderOn: true, reminderDateTime: { dateTime: '2026-10-29T00:00:00.000', timeZone: 'UTC' } }]], 'setting a reminder patches only the reminder');
+  assert.equal(set.reminderAt, '2026-10-29T00:00:00.000Z');
+  store.mutate(state => { state.tasks = state.tasks.map(item => item.id === task.id ? { ...item, ...set } : item); }); // as main stores the answer
+  const cleared = await sync.mutateTask('update', { ...set, reminderAt: '' }, list);
+  assert.deepEqual(requests[1], ['PATCH', { isReminderOn: false, reminderDateTime: null }], 'clearing a reminder patches it off');
+  assert.equal(cleared.reminderAt, '');
+  assert.equal(requests.length, 2);
+  // Only a changed reminder drops the fired flag: a rename keeps the stored one (the stored task still carries it here).
+  const same = await sync.mutateTask('update', { ...set, title: '바뀐 제목' }, list);
+  assert.equal(same.reminderFiredAt, '2026-10-27T00:00:07.000Z', 'an unchanged reminder keeps its fired flag');
+  assert.equal(requests.length, 3);
+});

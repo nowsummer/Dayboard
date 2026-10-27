@@ -22,6 +22,9 @@
   const LIST_ICONS=['list','flag','star','cart','home','briefcase','book','heart','gift','plane','bulb','coffee','mail','sun','calendar','note'];
   const LIST_PALETTE=['#ff3b30','#ff9500','#ffcc00','#34c759','#30b0c7','#007aff','#5856d6','#af52de','#ff2d55','#a2845e','#8e8e93'];
   const AUTO_PALETTE=['#007aff','#ff9500','#34c759','#af52de','#ff2d55','#30b0c7','#5856d6','#ff3b30','#a2845e'];
+  // Smallest widget windows that still show their content (calendar: header + 6-week grid). main clamps a widget to it (the
+  // window's minimum, widget:resize) and the widget's own resize handle stops there (2026-10-27 review: the two copies had to match).
+  const WIDGET_MIN={calendar:{minWidth:300,minHeight:360},tasks:{minWidth:280,minHeight:240},note:{minWidth:280,minHeight:220}};
   const EMOJI_PREFIX=/^((?:\p{Extended_Pictographic}|\p{Regional_Indicator}{2})(?:️|\p{Emoji_Modifier})?(?:‍\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?)*)\s*/u;
   // "🛒 쇼핑" → the emoji becomes the list symbol and the title loses it (Windows To Do habit).
   function splitEmoji(name){const text=String(name||'').trim();const m=text.match(EMOJI_PREFIX);if(!m)return {emoji:'',title:text};const title=text.slice(m[0].length).trim();return title?{emoji:m[1],title}:{emoji:'',title:text};}
@@ -298,7 +301,11 @@
   // becomes a reminder on that day; with no date it is today, or tomorrow once the time has passed,
   // and a time that is already past on the given day is left in the title. A bare 「3시」 is not a time.
   const quickStrip=(raw,m)=>(raw.slice(0,m.index)+' '+raw.slice(m.index+m[0].length)).replace(/\s+/g,' ').trim();
-  function quickWeekDay(today,weeks,idx){const dow=fromDate(today).getDay();return dayOffset(today,-((dow+6)%7)+7*weeks+((idx+6)%7));}
+  // 「매주 월요일 보고」 / "every monday report" is a repeat, which tasks do not have yet: nothing is read from it, so the title
+  // stays whole instead of becoming a one-off 「매주 보고」 on Monday (2026-10-27 review). m[1] is the space before the token.
+  const repeatBefore=(text,m)=>/(?:^|\s)(?:매주|격주|매달|매월|매년|매일|매|every|each|other|daily|weekly)\s*$/i.test(text.slice(0,m.index+m[1].length));
+  // 「이번 주 금요일」 typed on Saturday or Sunday is the coming Friday, as Reminders reads it, never a day already past (2026-10-27 review).
+  function quickWeekDay(today,weeks,idx){const dow=fromDate(today).getDay();const key=dayOffset(today,-((dow+6)%7)+7*weeks+((idx+6)%7));return key<today?dayOffset(key,7):key;}
   function quickNextDay(today,idx){let delta=(idx-fromDate(today).getDay()+7)%7;if(delta===0)delta=7;return dayOffset(today,delta);}
   function quickMonthDay(today,mo,da){
     const real=key=>dateKey(fromDate(key))===key?key:'';
@@ -332,6 +339,7 @@
     const text=String(raw||'').trim();let result={title:text,dueDate:'',reminderAt:''};
     // A date word may run straight into the time or a digit (「내일오후3시」, 「내일3시」) and M/D is a date too (2026-10-26 usability review).
     const m=text.match(/(^|\s)((다음|이번|담)\s?주\s?([월화수목금토일])요일|오늘|내일|모레|다음\s?주|담주|([월화수목금토일])요일|(\d{1,2})월\s?(\d{1,2})일|(\d{1,2})\/(\d{1,2}))(?:까지|에는|에|엔)?(?=\s|$|오전|오후|\d)/);
+    if(m&&repeatBefore(text,m))return result;
     if(m){
       const token=m[2].replace(/\s/g,'');let date='';
       if(m[4])date=quickWeekDay(today,m[3]==='이번'?0:1,QUICK_WEEK_KO.indexOf(m[4]));
@@ -347,7 +355,7 @@
     // 「15시」 is 24-hour; a bare 「3시」 reads like a bare 「3:00」 (quickClock) — the event card accepts both, so quick add does too
     // (2026-10-26 usability review; 「3시간」 stays a word).
     const t=result.title.match(/(^|\s)(?:(오전|오후)\s?(\d{1,2})시(?:\s?(반|\d{1,2}분))?|(\d{1,2})시(?:\s?(반|\d{1,2}분))?|([01]?\d|2[0-3]):([0-5]\d))(?:까지|에)?(?=\s|$)/);
-    if(!t)return result;
+    if(!t||repeatBefore(result.title,t))return result;
     const mins=v=>!v?0:v==='반'?30:parseInt(v,10);
     if(t[2]){
       const h12=Number(t[3]);if(h12<1||h12>12)return result;
@@ -367,6 +375,7 @@
   function parseQuickEn(raw,today=dateKey(),now=new Date()){
     const text=String(raw||'').trim();let result={title:text,dueDate:'',reminderAt:''};
     const m=text.match(QUICK_DATE_EN);
+    if(m&&repeatBefore(text,m))return result;
     if(m){
       const token=m[2].toLowerCase().replace(/\s/g,'');let date='';
       if(m[4])date=quickWeekDay(today,m[3].toLowerCase()==='this'?0:1,QUICK_WEEK_EN.indexOf(m[4].slice(0,3).toLowerCase()));
@@ -378,11 +387,18 @@
       else if(m[8])date=quickMonthDay(today,Number(m[8]),Number(m[9]));
       if(date)result={title:quickStrip(text,m)||text,dueDate:date,reminderAt:''};
     }
-    const t=result.title.match(/(^|\s)(?:at\s+)?(?:(\d{1,2})(?::([0-5]\d))?\s?(am|pm)|([01]?\d|2[0-3]):([0-5]\d))(?=\s|$)/i);
-    if(!t)return result;
+    // "at 3" reads like Korean 「3시」 (bare-clock rule), noon/midnight are 12:00/00:00; a bare "3" after a date word stays a word
+    // ("tomorrow 3 reports", 2026-10-27 review).
+    const t=result.title.match(/(^|\s)(?:at\s+)?(?:(\d{1,2})(?::([0-5]\d))?\s?(am|pm)|([01]?\d|2[0-3]):([0-5]\d)|(noon|midnight)|at\s+(\d{1,2}))(?=\s|$)/i);
+    if(!t||repeatBefore(result.title,t))return result;
     if(t[4]){
       const h12=Number(t[2]);if(h12<1||h12>12)return result;
       return quickTime(result,t,(h12%12)+(t[4].toLowerCase()==='pm'?12:0),t[3]?Number(t[3]):0,today,now);
+    }
+    if(t[7])return quickTime(result,t,t[7].toLowerCase()==='noon'?12:0,0,today,now);
+    if(t[8]){
+      const hour=Number(t[8]);if(hour>23)return result;
+      return hour>=13||hour===0||/^0/.test(t[8])?quickTime(result,t,hour,0,today,now):quickClock(result,t,t[8],hour,0,today,now);
     }
     return quickClock(result,t,t[5],Number(t[5]),Number(t[6]),today,now);
   }
@@ -471,7 +487,19 @@
   }
   // The recurrence id of a series' instance by its place in the series (EXDATEs counted, as COUNT counts them), or null.
   function instanceId(event,index){let found=null;if(index<0)return null;walkRRule(event,(o,i)=>{if(i===index){found=event.allDay?dateKey(o):o.toISOString();return false;}return i<index;});return found;}
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn};
+  // Which Apple scopes a change to a repeating event may be saved with: 이 일정만 (one), 이후 모든 일정 (future), 모든 일정 (all).
+  // 하루 종일 on or off applies to one occurrence only; a connected calendar's series moves to another day as one occurrence only
+  // (the service would keep its weekdays on a moved start); a local monthly or yearly series moves to another day only from here
+  // on (its days would be recomputed from the first one's month); a changed rule cannot go to one occurrence. main.cjs
+  // event:update refuses the rest, the event card (calendar.js calScopeLabels) and the widget's edit dialog (app.js eventDialog)
+  // offer only these — one rule for the three (2026-10-27 review). facts: provider (a connected calendar), dayChanged (the start
+  // moves to another local day), flip (하루 종일 changes), ruleChanged (the repeat rule is in the change).
+  function scopeChoices(event,{provider=false,dayChanged=false,flip=false,ruleChanged=false}={}){
+    const onlyOne=Boolean(flip)||(Boolean(provider)&&Boolean(dayChanged));
+    const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
+    return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
+  }
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,scopeChoices};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

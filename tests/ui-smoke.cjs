@@ -381,17 +381,21 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const row = document.querySelector('.task-row .task-text');
     row.focus();
     row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
-    await new Promise(resolve => setTimeout(resolve, 30));
-    const opened = Boolean(document.querySelector('#modal-root .dialog')) && document.querySelector('#modal-root .dialog').textContent.includes('삭제할까요');
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 300));
+    // A task on this PC goes at once with 되돌리기, no question (2026-10-27 review, the local event rule); the button brings it back.
+    const toastNode = document.getElementById('toast');
+    const undone = !document.querySelector('#modal-root .dialog') && /할 일을 삭제했어요/.test(toastNode.textContent) && toastNode.querySelector('.toast-action')?.textContent === '되돌리기';
+    toastNode.querySelector('.toast-action')?.click();
+    await new Promise(resolve => setTimeout(resolve, 400));
+    hideToast();
     const input = document.querySelector('.search input');
     input.focus(); input.value = '커피'; input.dispatchEvent(new Event('input', { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 30));
     const filtered = document.querySelectorAll('.task-row').length;
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 30));
-    return { opened, filtered, cleared: document.querySelector('.search input').value === '' && document.querySelectorAll('.task-row').length > filtered };`);
-  expect(taskDelete.opened && taskDelete.cleared, `할 일 Delete·검색 Escape ${JSON.stringify(taskDelete)}`);
+    return { undone, filtered, cleared: document.querySelector('.search input').value === '' && document.querySelectorAll('.task-row').length > filtered };`);
+  expect(taskDelete.undone && taskDelete.cleared, `할 일 Delete·검색 Escape ${JSON.stringify(taskDelete)}`);
   checks.push('calendar-dblclick-event-edit-shortcuts');
 
   // With a dialog open, Ctrl+N / Ctrl+K do nothing behind it: the event being written stays and the app behind is inert.
@@ -752,7 +756,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const result = { open: Boolean(card), beside: c.left >= b.right - 1 || c.right <= b.left + 1, ring: node.classList.contains('card-open') || Boolean(document.querySelector('.time-event.card-open')), fields: [...card.querySelectorAll('.card-time')].length, repeat: card.querySelector('select.card-repeat')?.value ?? null };
     const title = card.querySelector('textarea.card-title'); title.focus(); title.value = '스모크 주간 바뀜'; title.dispatchEvent(new Event('input', { bubbles: true })); title.blur();
     // The card saves 0.4 s after the edit; on a busy PC the write may take longer, so wait for it rather than a fixed 700 ms.
-    for (let tries = 0; tries < 40 && state.events.find(item => item.id === ${JSON.stringify(weekEvent.id)})?.title !== '스모크 주간 바뀜'; tries++) await wait(100);
+    for (let tries = 0; tries < 80 && state.events.find(item => item.id === ${JSON.stringify(weekEvent.id)})?.title !== '스모크 주간 바뀜'; tries++) await wait(100);
     return result;`);
   await shot(mainWindow, 'calendar-card');
   card.closed = await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 60)); return !document.querySelector('.event-card');`);
@@ -1566,7 +1570,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await invoke('task:delete', { id: timedTask.id });
   checks.push('quick-add-future-date-toast-time-escape');
 
-  // Right-click on a task: 편집 first, then 중요 and the date moves (with undo), and 삭제 asks first.
+  // Right-click on a task: 편집 first, then 중요 and the date moves (with undo), and 삭제 on a local task goes at once with 되돌리기.
   await run(mainWindow, `[...document.querySelectorAll('.task-row')].find(node => node.querySelector('.task-title')?.textContent === '스모크 치과').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 420, clientY: 260 })); await new Promise(resolve => setTimeout(resolve, 150));`);
   await shot(mainWindow, 'task-menu');
   const taskMenu = await run(mainWindow, `
@@ -1585,16 +1589,17 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const undone = (await window.dayboard.invoke('state:get')).tasks.find(task => task.title === '스모크 치과').dueDate;
     items = openMenu();
     items.find(node => node.textContent.startsWith('삭제')).click();
-    await new Promise(resolve => setTimeout(resolve, 60));
-    const dialog = document.querySelector('#modal-root .dialog');
-    const asks = Boolean(dialog) && dialog.textContent.includes('삭제할까요');
-    dialog?.querySelector('.button.danger')?.click();
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 300));
+    // A task on this PC goes at once with 되돌리기 instead of a question (2026-10-27 review, the local event rule).
+    const deleteToast = document.getElementById('toast');
+    const asks = Boolean(document.querySelector('#modal-root .dialog'));
+    const offersUndo = /할 일을 삭제했어요/.test(deleteToast.textContent) && deleteToast.querySelector('.toast-action')?.textContent === '되돌리기';
     const gone = !(await window.dayboard.invoke('state:get')).tasks.some(task => task.title === '스모크 치과');
-    return { today, labels, focused, moved, toastText, undone, asks, gone };`);
+    hideToast();
+    return { today, labels, focused, moved, toastText, undone, asks, offersUndo, gone };`);
   expect(taskMenu.labels[0] === '편집' && taskMenu.labels.includes('중요로 표시') && taskMenu.labels.includes('오늘') && !taskMenu.labels.includes('내일') && taskMenu.labels.includes('다음 주') && taskMenu.labels.includes('날짜 없음') && taskMenu.labels.at(-1) === '삭제' && taskMenu.focused, `할 일 오른쪽 클릭 메뉴 ${JSON.stringify(taskMenu.labels)}`);
   expect(taskMenu.moved === taskMenu.today && /날짜를 바꿨어요/.test(taskMenu.toastText) && taskMenu.undone === quickDated.tomorrow, `메뉴로 날짜 옮기기·되돌리기 ${JSON.stringify(taskMenu)}`);
-  expect(taskMenu.asks && taskMenu.gone, `메뉴로 삭제 ${JSON.stringify(taskMenu)}`);
+  expect(!taskMenu.asks && taskMenu.offersUndo && taskMenu.gone, `메뉴로 삭제 ${JSON.stringify(taskMenu)}`);
   checks.push('task-context-menu');
 
   // A flag click keeps the row where it is (and in 중요) until the pointer leaves the window; the editor has date shortcuts.
@@ -1758,12 +1763,14 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
         await new Promise(resolve => setTimeout(resolve, 300));
         const toastNode = document.getElementById('toast');
         const value = { text: toastNode.textContent, shown: toastNode.classList.contains('show'), action: Boolean(toastNode.querySelector('.toast-action')), listed: [...document.querySelectorAll('.task-title')].some(node => node.textContent === '위젯 확인') };
+        const tr = toastNode.getBoundingClientRect(), qr = document.querySelector('.quick-add').getBoundingClientRect();
+        value.clear = tr.bottom <= qr.top; /* the toast never covers the box just typed in (2026-10-27 review) */
         const again = document.querySelector('.quick-input'); again.focus(); again.value = '지울 글자';
         again.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
         value.cleared = again.value === '';
         return value;`);
       await shot(win, 'widget-quick-add-toast');
-      expect(widgetQuick.shown && /「위젯 확인」 할 일을 내일 날짜로 추가했어요/.test(widgetQuick.text) && !widgetQuick.action && !widgetQuick.listed && widgetQuick.cleared, `오늘 위젯 빠른 추가 안내·Esc ${JSON.stringify(widgetQuick)}`);
+      expect(widgetQuick.shown && /「위젯 확인」 할 일을 내일 날짜로 추가했어요/.test(widgetQuick.text) && !widgetQuick.action && !widgetQuick.listed && widgetQuick.cleared && widgetQuick.clear, `오늘 위젯 빠른 추가 안내·Esc ${JSON.stringify(widgetQuick)}`);
       const widgetTask = (await invoke('state:get')).tasks.find(task => task.title === '위젯 확인');
       expect(widgetTask, '오늘 위젯에서 추가한 할 일');
       await invoke('task:delete', { id: widgetTask.id });
@@ -1834,7 +1841,22 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
         await new Promise(resolve => setTimeout(resolve, 30));
         return result;`);
       await shot(win, 'widget-calendar-more');
-      expect(more.before === 3 && /^\+\d+개 더 보기$/.test(more.label) && more.after >= 4 && !more.moreLeft && more.add === '일정 추가' && more.dialog === '일정 추가' && more.start.startsWith(today), `달력 위젯 더 보기·일정 추가 ${JSON.stringify(more)}`);
+      // Whole rows only (2026-10-27 review): the card shows as many full rows as fit (at most 3) and 더 보기 opens the rest.
+      expect(more.before >= 1 && more.before <= 3 && /^\+\d+개 더 보기$/.test(more.label) && more.after >= 4 && !more.moreLeft && more.add === '일정 추가' && more.dialog === '일정 추가' && more.start.startsWith(today), `달력 위젯 더 보기·일정 추가 ${JSON.stringify(more)}`);
+      // Agenda fit at other card heights (2026-10-27 re-review): with five events the agenda shows as many whole rows as fit and
+      // 「+n개 더 보기」 — never hidden in a band of heights in between (one fitting pass left the 더 보기 button no room).
+      const wasContent = win.getContentSize();
+      const fitSweep = [];
+      for (const height of [400, 440, 480, 520, 560]) {
+        await run(win, `agendaOpenDay = null; render(); return true;`);
+        win.setContentSize(wasContent[0], height); await settle(win); await new Promise(resolve => setTimeout(resolve, 450));
+        fitSweep.push(await run(win, `return { height: ${height}, hidden: document.querySelector('.widget-agenda')?.hidden ?? null, rows: document.querySelectorAll('.widget-agenda .event-row').length, more: [...document.querySelectorAll('.widget-agenda .text-button')].some(node => /더 보기/.test(node.textContent)) };`));
+      }
+      win.setContentSize(wasContent[0], wasContent[1]); await settle(win); await new Promise(resolve => setTimeout(resolve, 450));
+      // The grid's height follows the card's width, so no fixed height is promised: once the agenda shows it stays shown at every
+      // greater height, its row count never drops, and at 560 at least one row fits. Hidden means month-only (nothing fits).
+      const first = fitSweep.findIndex(item => item.hidden === false); const shown = fitSweep.filter(item => item.hidden === false);
+      expect(first >= 0 && first <= 2 && fitSweep.slice(first).every(item => item.hidden === false && item.more) && shown.every((item, k) => k === 0 || item.rows >= shown[k - 1].rows) && shown[shown.length - 1].rows >= 1, `달력 위젯 일정 영역 높이별 ${JSON.stringify(fitSweep)}`);
       const nextMonthFirst = D.dateKey(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1));
       const reset = await run(win, `
         const head = () => document.querySelector('.widget-month')?.textContent || '';
@@ -2012,6 +2034,122 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     return { english, korean, closed: !document.querySelector('#modal-root .dialog') };`);
   expect(relabel.english.title === 'Settings' && relabel.english.focus && relabel.korean.title === '설정' && relabel.korean.focus && relabel.closed && (await invoke('state:get')).settings.language === 'ko', `설정 안에서 언어 바꾸기 ${JSON.stringify(relabel)}`);
   checks.push('settings-language-live');
+
+  // ---- 2026-10-27 review ----
+  // 오늘 shows a row's time, not 「오늘」 under every row (Reminders); an overdue row keeps its date.
+  const todayTask = await invoke('task:add', { title: '스모크 오늘 날짜 숨김', dueDate: D.dateKey() });
+  const overdueTask = await invoke('task:add', { title: '스모크 지난 날짜', dueDate: D.dayOffset(D.dateKey(), -3) });
+  const todayRows = await run(mainWindow, `
+    goto('today');
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const row = title => [...document.querySelectorAll('.task-row')].find(node => node.querySelector('.task-title')?.textContent === title);
+    const meta = node => [...node.querySelectorAll('.task-meta span')].map(span => span.textContent);
+    return { heading: document.querySelector('.topbar-main h1')?.textContent, today: meta(row('스모크 오늘 날짜 숨김')), overdue: meta(row('스모크 지난 날짜')) };`);
+  expect(todayRows.heading === '오늘' && !todayRows.today.includes('오늘') && todayRows.overdue.some(text => /\d일/.test(text)), `오늘 화면의 날짜 표시 ${JSON.stringify(todayRows)}`);
+  await shot(mainWindow, 'today-rows');
+  checks.push('today-hides-today-date');
+
+  // Typing in the search box retitles the top bar 「검색 결과」 (no count) without rebuilding the box; clearing restores 오늘.
+  const searching = await run(mainWindow, `
+    const input = document.querySelector('.search input');
+    input.focus(); input.value = '스모크 오늘'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    return { title: document.querySelector('.topbar-main h1')?.textContent, count: document.querySelector('.topbar-count')?.textContent ?? null, toolbar: document.querySelector('.task-toolbar span')?.textContent, focused: document.activeElement === input };`);
+  await shot(mainWindow, 'search-heading');
+  const cleared = await run(mainWindow, `
+    const input = document.querySelector('.search input');
+    input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    return { title: document.querySelector('.topbar-main h1')?.textContent, count: document.querySelector('.topbar-count')?.textContent ?? null };`);
+  expect(searching.title === '검색 결과' && searching.count === null && /모든 목록에서/.test(searching.toolbar) && searching.focused && cleared.title === '오늘' && cleared.count !== null, `검색 중 제목 ${JSON.stringify({ searching, cleared })}`);
+  checks.push('search-heading-follows');
+
+  // A toast never covers the quick-add box the user just typed in: it sits under the top bar (iOS's undo banner), in widgets too.
+  const toastPlace = await run(mainWindow, `
+    const input = document.querySelector('.quick-input');
+    input.focus(); input.value = '내일 스모크 토스트'; input.form.requestSubmit();
+    await new Promise(resolve => setTimeout(resolve, 350));
+    const toastNode = document.getElementById('toast'); const t = toastNode.getBoundingClientRect(), q = document.querySelector('.quick-add').getBoundingClientRect(), bar = document.querySelector('.topbar').getBoundingClientRect();
+    return { shown: toastNode.classList.contains('show'), text: toastNode.textContent, overlap: t.bottom > q.top && t.top < q.bottom, belowBar: t.top >= bar.bottom, top: Math.round(t.top) };`);
+  expect(toastPlace.shown && /「스모크 토스트」 할 일을 내일 날짜로 추가했어요/.test(toastPlace.text) && !toastPlace.overlap && toastPlace.belowBar, `토스트 위치 ${JSON.stringify(toastPlace)}`);
+  await shot(mainWindow, 'toast-under-topbar');
+  state = await invoke('state:get');
+  for (const task of state.tasks.filter(task => task.title === '스모크 토스트')) await invoke('task:delete', { id: task.id });
+  await run(mainWindow, `hideToast(); return true;`);
+  checks.push('toast-clear-of-quick-add');
+
+  // Deleting a task on this PC asks nothing and offers 되돌리기 (as a local event does); the restored task keeps its fields.
+  const localDelete = await run(mainWindow, `
+    const row = [...document.querySelectorAll('.task-row')].find(node => node.querySelector('.task-title')?.textContent === '스모크 오늘 날짜 숨김');
+    const text = row.querySelector('.task-text'); text.focus();
+    text.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const toastNode = document.getElementById('toast');
+    const result = { dialog: Boolean(document.querySelector('#modal-root .dialog')), toast: toastNode.textContent, action: toastNode.querySelector('.toast-action')?.textContent || '', gone: ![...document.querySelectorAll('.task-title')].some(node => node.textContent === '스모크 오늘 날짜 숨김') };
+    toastNode.querySelector('.toast-action')?.click();
+    await new Promise(resolve => setTimeout(resolve, 400));
+    result.back = [...document.querySelectorAll('.task-title')].some(node => node.textContent === '스모크 오늘 날짜 숨김');
+    result.undone = document.getElementById('toast').textContent;
+    return result;`);
+  expect(!localDelete.dialog && /할 일을 삭제했어요/.test(localDelete.toast) && localDelete.action === '되돌리기' && localDelete.gone && localDelete.back && /되돌렸어요/.test(localDelete.undone), `이 PC 할 일 삭제·되돌리기 ${JSON.stringify(localDelete)}`);
+  state = await invoke('state:get');
+  const restoredTask = state.tasks.find(task => task.title === '스모크 오늘 날짜 숨김');
+  expect(restoredTask && restoredTask.dueDate === D.dateKey() && restoredTask.id !== todayTask.id, `되살린 할 일 ${JSON.stringify(restoredTask)}`);
+  await run(mainWindow, `hideToast(); return true;`);
+  checks.push('local-task-delete-undo');
+
+  // English: the task editor says Title / Date (not Tasks / On date) and the side panel says Tomorrow's / Yesterday's events.
+  await invoke('settings:update', { language: 'en' });
+  const englishBits = await run(mainWindow, `
+    goto('today'); await new Promise(resolve => requestAnimationFrame(resolve));
+    editTask(state.tasks.find(task => task.title === '스모크 지난 날짜')); await new Promise(resolve => setTimeout(resolve, 40));
+    const labels = [...document.querySelectorAll('#modal-root .field > span')].map(node => node.textContent);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 40));
+    const heading = day => { selectedDate = day; render(); return document.querySelector('.context-heading h3')?.textContent; };
+    return { labels, tomorrow: heading(D.dayOffset(D.dateKey(), 1)), yesterday: heading(D.dayOffset(D.dateKey(), -1)), other: heading(D.dayOffset(D.dateKey(), 5)), today: heading(D.dateKey()) };`);
+  expect(englishBits.labels.slice(0, 3).join('|') === 'Title|Date|Reminder' && englishBits.tomorrow === 'Tomorrow’s events' && englishBits.yesterday === 'Yesterday’s events' && /^Events on [A-Z]/.test(englishBits.other) && englishBits.today === 'Today’s events', `영어 편집기 라벨·일정 제목 ${JSON.stringify(englishBits)}`);
+  await run(mainWindow, `editTask(state.tasks.find(task => task.title === '스모크 지난 날짜')); await new Promise(resolve => setTimeout(resolve, 40)); return true;`);
+  await shot(mainWindow, 'task-editor-english');
+  await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true;`);
+  await invoke('settings:update', { language: 'ko' });
+  await invoke('task:delete', { id: restoredTask.id });
+  await invoke('task:delete', { id: overdueTask.id });
+  checks.push('english-editor-labels-day-headings');
+
+  // 「사용자 지정…」 from the event card opens the repeat sheet on the rule's own fields (repeatPicker expand), not folded to 안 함.
+  const expanded = await run(mainWindow, `
+    const start = h('input', { type: 'hidden', value: '2026-11-03T10:00' });
+    const folded = repeatPicker('FREQ=WEEKLY;BYDAY=TU', start), open = repeatPicker('FREQ=WEEKLY;BYDAY=TU', start, { expand: true }), none = repeatPicker('', start, { expand: true });
+    const read = picker => ({ preset: picker.node.querySelector('select').value, panel: !picker.node.querySelector('.repeat-panel').hidden, label: picker.node.querySelector('.field > span')?.textContent || '', summary: picker.node.querySelector('.repeat-summary').textContent, value: picker.value() });
+    return { folded: read(folded), open: read(open), none: read(none) };`);
+  expect(expanded.folded.preset === 'weekly' && !expanded.folded.panel && expanded.folded.label === '반복' && expanded.open.preset === 'custom' && expanded.open.panel && expanded.open.label === '' && /매주 화요일/.test(expanded.open.summary) && expanded.open.value === 'FREQ=WEEKLY;BYDAY=TU;WKST=SU' && expanded.none.preset === 'custom' && expanded.none.panel, `반복 시트 펼침 ${JSON.stringify(expanded)}`);
+  checks.push('repeat-picker-expand');
+
+  // A second click while a widget is opening is ignored (one window), and the top-bar widget button is disabled meanwhile.
+  const dup = await run(mainWindow, `
+    goto('today'); await new Promise(resolve => requestAnimationFrame(resolve));
+    const before = state.widgets.length;
+    const first = openWidgetFlow({ type: 'tasks', listId: 'today' });
+    const second = openWidgetFlow({ type: 'tasks', listId: 'today' });
+    const disabled = document.querySelector('.topbar-main [data-widget-open]')?.disabled;
+    await Promise.all([first, second]);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return { before, after: state.widgets.length, disabled, enabled: document.querySelector('.topbar-main [data-widget-open]')?.disabled === false };`);
+  expect(dup.after === dup.before + 1 && dup.disabled === true && dup.enabled, `위젯 중복 열기 방지 ${JSON.stringify(dup)}`);
+  for (const widget of (await invoke('state:get')).widgets) await invoke('widget:close', { id: widget.id });
+  checks.push('widget-open-once');
+
+  // A main window hidden to the tray does not redraw on broadcasts; it catches up when shown (2026-10-27 performance review).
+  // The smoke runs with backgroundThrottling off, where Chromium keeps reporting 'visible' after hide(), so the hidden state is
+  // shadowed here and the visibilitychange is dispatched; the real hide → show path (window:close, window:main) is checked by hand.
+  await run(mainWindow, `goto('today'); Object.defineProperty(document, 'hidden', { get: () => true, configurable: true }); return true;`);
+  const hiddenAdd = await invoke('task:add', { title: '스모크 숨긴 창', dueDate: D.dateKey() });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const whileHidden = await mainWindow.webContents.executeJavaScript(`({ hidden: document.hidden, drawn: [...document.querySelectorAll('.task-title')].some(node => node.textContent === '스모크 숨긴 창'), pending: renderPending })`);
+  const whenShown = await mainWindow.webContents.executeJavaScript(`delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); ({ hidden: document.hidden, drawn: [...document.querySelectorAll('.task-title')].some(node => node.textContent === '스모크 숨긴 창'), pending: renderPending })`);
+  expect(whileHidden.hidden && !whileHidden.drawn && whileHidden.pending && !whenShown.hidden && whenShown.drawn && !whenShown.pending, `숨긴 창은 그리지 않음 ${JSON.stringify({ whileHidden, whenShown })}`);
+  await invoke('task:delete', { id: hiddenAdd.id });
+  checks.push('hidden-window-defers-render');
 
   return checks;
 };

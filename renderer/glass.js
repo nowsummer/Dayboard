@@ -1,7 +1,7 @@
 'use strict';
 // Liquid Glass (2026-10-21 user request: 「그냥 투명/불투명 해지는 게 아니라 애플 iOS 27처럼 리퀴드 글라스」).
 // The card is a slab of glass with a rounded bevel: the wallpaper behind it is bent at the rim (an SVG
-// displacement map through backdrop-filter: url(#…)), the edge catches the light from the top left (a
+// displacement map through backdrop-filter: url(#…)), the edge catches the light from above (a thin
 // specular rim drawn once per size), and the tint is applied inside the filter before the saturation so
 // the wallpaper's colours come through vivid instead of washed out. Loaded before app.js: app.js globals
 // are read only inside functions. Desktop widgets have their wallpaper painted behind them (#backdrop);
@@ -49,23 +49,24 @@ function lensMap(W, H, R, bevel) {
   g.putImageData(img, 0, 0);
   return c.toDataURL();
 }
-// Specular rim at device pixels: a thin bright edge and a soft inner glow, brightest where the edge faces the
-// light (top left), fainter on the far side (bottom right) and faintest along the sides.
+// Specular rim at device pixels, as on Apple's Liquid Glass: a thin highlight on the edge that faces the light (from almost
+// straight above), fading away along the sides, with a fainter reflection on the far edge and a faint glow only where the edge
+// is lit (2026-10-27 review: the old 0.25 floor and all-round glow drew a uniform white outline, plainest on dark wallpapers).
 function lensSpecular(W, H, R, dpr) {
   const key = [W, H, R, dpr].join('x');
   if (glassSpecCache.has(key)) return glassSpecCache.get(key);
   const w = Math.round(W * dpr), h = Math.round(H * dpr);
   const c = lensCanvas(w, h), g = c.getContext('2d'), img = g.createImageData(w, h), p = img.data;
-  const lx = -0.5, ly = -0.866, line = 1.2, glow = 8;
+  const lx = -0.17, ly = -0.985, line = 0.6, glow = 7;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const e = lensEdge((x + 0.5) / dpr, (y + 0.5) / dpr, W, H, R);
     if (e.d <= -1 / dpr || e.d > glow * 3) continue;
     const cover = Math.min(1, Math.max(0, e.d * dpr + 0.5));
     const k = e.nx * lx + e.ny * ly;
-    const f = 0.25 + 0.75 * Math.max(0, k) ** 1.6 + 0.55 * Math.max(0, -k) ** 1.6;
-    const edge = e.d < line ? 1 : Math.max(0, 1 - (e.d - line) * dpr / 1.2);
+    const f = 0.04 + 0.96 * Math.max(0, k) ** 3 + 0.5 * Math.max(0, -k) ** 3;
+    const edge = e.d < line ? 1 : Math.max(0, 1 - (e.d - line) * dpr);
     const soft = Math.exp(-Math.max(0, e.d) / (glow / 2.5));
-    const a = cover * Math.min(1, f * (0.85 * edge + 0.3 * soft));
+    const a = cover * Math.min(1, f * (0.9 * edge + 0.14 * soft));
     if (a <= 0) continue;
     const i = (y * w + x) * 4; p[i] = p[i + 1] = p[i + 2] = 255; p[i + 3] = Math.round(255 * a);
   }
@@ -128,7 +129,7 @@ function glassMount(el, name, level, L) {
   if (!glassOk || !el || !el.isConnected) return false;
   const r = el.getBoundingClientRect(), W = Math.round(r.width), H = Math.round(r.height);
   if (W < 40 || H < 40) return false;
-  const R = Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 22);
+  const R = Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 26);
   const id = glassFilter(name, W, H, Math.min(R, W / 2, H / 2));
   glassTune(name, glassParams(level, L));
   el.classList.add('lg');
@@ -141,7 +142,7 @@ function glassRim(el) {
   if (!el || !el.isConnected) return;
   const r = el.getBoundingClientRect(), W = Math.round(r.width), H = Math.round(r.height);
   if (W < 40 || H < 40) return;
-  const R = Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 22);
+  const R = Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 26);
   el.classList.add('lg-rim');
   el.style.setProperty('--lg-spec', `url("${lensSpecular(W, H, Math.min(R, W / 2, H / 2), devicePixelRatio || 1)}")`);
 }
@@ -191,9 +192,15 @@ function glassStretch() {
 // A widget moved to a screen with another scale, or the window was resized: draw the rim and bevel again.
 if (typeof window !== 'undefined') {
   let glassDpr = window.devicePixelRatio || 1, glassTimer = 0, glassFrame = 0;
+  // 60 ms after the last step — and, while the widget's resize handle is held (app.js resizingWidget), not before the drag has
+  // ended: a step slower than 60 ms rebuilt the lens and rim mid-drag (2026-10-27 review), so the timer waits and rebuilds once.
+  const settle = () => {
+    if (typeof resizingWidget !== 'undefined' && resizingWidget) { glassTimer = setTimeout(settle, 60); return; }
+    glassDpr = window.devicePixelRatio || 1; try { glassAfterRender(); } catch {}
+  };
   const again = () => {
     if (!glassFrame) glassFrame = requestAnimationFrame(() => { glassFrame = 0; try { glassStretch(); } catch {} });
-    clearTimeout(glassTimer); glassTimer = setTimeout(() => { glassDpr = window.devicePixelRatio || 1; try { glassAfterRender(); } catch {} }, 60);
+    clearTimeout(glassTimer); glassTimer = setTimeout(settle, 60);
   };
   window.addEventListener('resize', again);
   const watchDpr = () => { const m = matchMedia(`(resolution: ${glassDpr}dppx)`); m.addEventListener('change', () => { again(); setTimeout(watchDpr, 100); }, { once: true }); };
