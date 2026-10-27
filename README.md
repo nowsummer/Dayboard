@@ -20,7 +20,7 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 
 - **Clean** — a tidy layout, glassy desktop widgets, light and dark mode.
 - **Quick** — your data is kept on your PC, so screens open without waiting.
-- **All in one place** — Microsoft To Do and Outlook, Google Tasks and Calendar and iCloud Calendar in one window, in sync with your other PCs and your iPhone or Android phone. Or use it with no account at all.
+- **All in one place** — connect Microsoft, Google or iCloud and stay in sync with your other PCs and phones. Or use it with no account at all.
 - **Private** — no server, no sign-up, no ads.
 
 ## Features
@@ -60,7 +60,7 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 ## Install
 
 1. Download `Dayboard-<version>.exe` from the [latest release](https://github.com/nowsummer/Dayboard/releases/latest) and run it. No admin rights needed.
-2. The latest version downloads on its own and installs when you choose **Restart now to update**.
+2. Once installed, new versions download on their own. Choose **Restart now to update** in Settings to switch to the new version.
 
 > [!NOTE]
 > The installer isn't signed yet, so Windows Smart App Control may block it at first. Wait a moment and run it again. Windows x64 only.
