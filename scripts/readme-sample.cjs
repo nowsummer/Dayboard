@@ -19,6 +19,7 @@ const TEXT = {
     events: {
       weekly: ['팀 주간 회의', '3층 회의실'], swim: '아침 수영', lunch: ['점심 약속 · 민지', '광화문'], review: '분기 계획 리뷰', dentist: '치과 정기 검진',
       club: ['독서 모임', '동네 서점'], trip: '제주 여행', family: '가족 저녁 식사', demo: '프로젝트 중간 발표', report: '월간 보고 마감',
+      workshop: '디자인 워크숍', client: ['고객사 미팅', '부산 지사'], away: '부산 출장',
     },
     notes: [
       ['이번 주 집중할 것', '1. 주간 보고서 금요일 오전까지\n2. 분기 계획 초안 — 숫자 먼저 확인\n3. 운동 주 3회 지키기'],
@@ -38,6 +39,7 @@ const TEXT = {
     events: {
       weekly: ['Team weekly sync', 'Room 3A'], swim: 'Morning swim', lunch: ['Lunch with Mia', 'Downtown'], review: 'Quarterly plan review', dentist: 'Dentist check-up',
       club: ['Book club', 'Corner bookshop'], trip: 'Trip to Lisbon', family: 'Family dinner', demo: 'Project midpoint demo', report: 'Monthly report due',
+      workshop: 'Design workshop', client: ['Client meeting', 'Porto office'], away: 'Trip to Porto',
     },
     notes: [
       ['Focus this week', '1. Weekly report by Friday morning\n2. Quarterly plan — check the numbers first\n3. Work out three times'],
@@ -62,7 +64,7 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
   const mk = (name, color, icon) => invoke('list:add', { name, color, icon, groupId: personal.id });
   const shop = await mk(t.shop, '#34c759', 'cart');
   const books = await mk(t.books, '#ff9500', 'book');
-  const trip = await mk(t.trip, '#30b0c7', 'plane');
+  const trip = await mk(t.trip, '#ff2d55', 'plane'); // apart from 장보기's green above it (2026-10-27 user)
 
   // ---- Tasks ----
   // `extra`: a repeat (rrule) or subtasks (steps), new in 1.1.3, so the pictures show them.
@@ -107,6 +109,12 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
   await ev({ title: e.family, start: at(-3, 18), end: at(-3, 20), color: '#ff2d55' });
   await ev({ title: e.demo, start: day(-6), end: day(-5), allDay: true, color: '#ff3b30' });
   await ev({ title: e.report, start: day(monStart + 26), end: day(monStart + 27), allDay: true, color: '#ff9500' });
+  // This week also has long and multi-day events, so the week view is not only one-hour blocks (2026-10-27 user): a 4-hour
+  // workshop on Wednesday, a 3-hour meeting on Thursday during a two-day trip (Thursday and Friday).
+  const sunday = -now.getDay();
+  await ev({ title: e.workshop, start: at(sunday + 3, 13), end: at(sunday + 3, 17), color: '#5856d6' });
+  await ev({ title: e.client[0], start: at(sunday + 4, 9, 30), end: at(sunday + 4, 12, 30), location: e.client[1], color: '#ff9500' });
+  await ev({ title: e.away, start: day(sunday + 4), end: day(sunday + 6), allDay: true, color: '#34c759' });
 
   // ---- Notes ----
   const [focus, ...others] = t.notes;

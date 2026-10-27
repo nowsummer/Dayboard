@@ -10,7 +10,7 @@ Clean like a Mac or iPhone. Quick on Windows.<br>Tasks, calendar and notes, with
 
 [**Download for Windows**](https://github.com/nowsummer/Dayboard/releases/latest) · [Website](https://nowsummer.github.io/Dayboard/en/) · [Privacy](https://nowsummer.github.io/Dayboard/en/privacy.html)
 
-<img src="images/en/demo.gif" width="860" alt="Adding a task, completing one, the calendar and notes in Dayboard">
+<img src="images/en/demo.gif" width="860" alt="Adding and completing a task, dragging events in the month and week calendar, and notes in Dayboard">
 
 </div>
 
@@ -27,9 +27,9 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 
 | | |
 |---|---|
-| **Tasks** | Today, Scheduled and Flagged · lists and groups · repeating tasks and subtasks · sort, or drag into your own order · quick add that understands "tomorrow 3pm" |
-| **Calendar** | Day, week and month · drag to move or resize · edit in a card beside the event · repeating events and alerts · jump to any date |
-| **Notes** | Grouped by date · pinning · find · earlier versions · synced across your PCs through your Google account |
+| **Tasks** | Smart lists · lists and groups · repeats and subtasks · drag to reorder · quick add: "tomorrow 3pm" |
+| **Calendar** | Day, week, month · drag to move or resize · edit in a side card · repeats and alerts · go to any date |
+| **Notes** | Grouped by date · pinning · find · earlier versions · synced across PCs via your Google account |
 | **Widgets** | Tasks, calendar and notes on the desktop, in Liquid Glass style |
 | **Everyday** | Search, undo and redo, shortcuts (press <kbd>?</kbd>), light and dark mode, English and Korean |
 
@@ -38,7 +38,7 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 <table>
   <tr>
     <td width="50%"><img src="images/en/tasks-list.png" alt="Tasks"></td>
-    <td width="50%"><img src="images/en/calendar-week.png" alt="Week calendar"></td>
+    <td width="50%"><img src="images/en/calendar.png" alt="Month calendar"></td>
   </tr>
   <tr><td align="center">Tasks</td><td align="center">Calendar</td></tr>
   <tr>
@@ -47,10 +47,10 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
   </tr>
   <tr><td align="center">Notes</td><td align="center">Dark theme</td></tr>
   <tr>
-    <td><img src="images/en/calendar.png" alt="Month calendar"></td>
+    <td><img src="images/en/calendar-week.png" alt="Week calendar"></td>
     <td><img src="images/en/help.png" alt="Shortcut help"></td>
   </tr>
-  <tr><td align="center">Month view</td><td align="center">Shortcut help</td></tr>
+  <tr><td align="center">Week view</td><td align="center">Shortcut help</td></tr>
 </table>
 
 <p align="center"><img src="images/en/widgets.png" width="860" alt="Notes, Today and calendar widgets on the desktop"><br>Desktop widgets</p>

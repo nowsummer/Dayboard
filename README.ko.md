@@ -10,7 +10,7 @@ Mac·iPhone처럼 깔끔하게, Windows에서 빠릿하게<br>할 일·달력·�
 
 [**Windows용 내려받기**](https://github.com/nowsummer/Dayboard/releases/latest) · [소개 페이지](https://nowsummer.github.io/Dayboard/) · [개인정보처리방침](https://nowsummer.github.io/Dayboard/privacy.html)
 
-<img src="images/demo.gif" width="860" alt="Dayboard에서 할 일을 추가하고 완료한 뒤 달력과 메모를 보는 모습">
+<img src="images/demo.gif" width="860" alt="Dayboard에서 할 일을 추가하고 완료한 뒤, 월·주 달력에서 일정을 끌어 옮기고 늘리고 메모를 보는 모습">
 
 </div>
 
@@ -27,8 +27,8 @@ Mac·iPhone의 미리 알림·캘린더·메모 앱과 위젯은 보기 좋고 �
 
 | | |
 |---|---|
-| **할 일** | 오늘·예정·중요 모아보기 · 목록과 그룹 · 반복 할 일과 하위 할 일 · 정렬하거나 끌어서 순서 정하기 · 「내일 오후 3시 회의」처럼 쓰면 날짜가 들어가는 빠른 추가 |
-| **달력** | 일·주·월 보기 · 끌어서 옮기고 늘리기 · 옆에 뜨는 카드에서 바로 고치기 · 반복 일정과 알림 · 원하는 날짜로 바로 가기 |
+| **할 일** | 오늘·예정·중요 · 목록과 그룹 · 반복·하위 할 일 · 끌어서 순서 정하기 · 「내일 오후 3시 회의」 빠른 추가 |
+| **달력** | 일·주·월 보기 · 끌어서 옮기고 늘리기 · 옆에 뜨는 카드에서 바로 고치기 · 반복 일정·알림 · 날짜로 바로 가기 |
 | **메모** | 날짜별 목록 · 맨 위 고정 · 메모 안에서 찾기 · 이전 버전 · Google 계정으로 다른 PC와 동기화 |
 | **위젯** | 할 일·달력·메모를 바탕화면에, 리퀴드 글라스 모양으로 |
 | **편의** | 검색, 되돌리기·다시 실행, 단축키(<kbd>?</kbd>), 라이트·다크 모드, 한국어·영어 |
@@ -38,7 +38,7 @@ Mac·iPhone의 미리 알림·캘린더·메모 앱과 위젯은 보기 좋고 �
 <table>
   <tr>
     <td width="50%"><img src="images/tasks-list.png" alt="할 일"></td>
-    <td width="50%"><img src="images/calendar-week.png" alt="주간 달력"></td>
+    <td width="50%"><img src="images/calendar.png" alt="월간 달력"></td>
   </tr>
   <tr><td align="center">할 일</td><td align="center">달력</td></tr>
   <tr>
@@ -47,10 +47,10 @@ Mac·iPhone의 미리 알림·캘린더·메모 앱과 위젯은 보기 좋고 �
   </tr>
   <tr><td align="center">메모</td><td align="center">다크 테마</td></tr>
   <tr>
-    <td><img src="images/calendar.png" alt="월간 달력"></td>
+    <td><img src="images/calendar-week.png" alt="주간 달력"></td>
     <td><img src="images/help.png" alt="단축키 도움말"></td>
   </tr>
-  <tr><td align="center">월 보기</td><td align="center">단축키 도움말</td></tr>
+  <tr><td align="center">주간 보기</td><td align="center">단축키 도움말</td></tr>
 </table>
 
 <p align="center"><img src="images/widgets.png" width="860" alt="바탕화면의 메모·오늘·달력 위젯"><br>바탕화면 위젯</p>

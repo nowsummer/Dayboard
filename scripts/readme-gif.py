@@ -26,7 +26,25 @@ sample = frames[:: max(1, len(frames) // 16)]
 montage = Image.new('RGB', (width, height * len(sample)))
 for i, frame in enumerate(sample):
     montage.paste(frame, (0, height * i))
-palette = montage.quantize(colors=255, method=Image.Quantize.MEDIANCUT)
+# Small accent areas (the red 「예정」 tile, list icons) were merged into a neighbour by the median cut — the red tile came out orange
+# (2026-10-27 user). The clip's saturated colours that cover a few hundred pixels or more get entries of their own first.
+import colorsys
+counts = {}
+for frame in sample:
+    for count, rgb in frame.getcolors(maxcolors=width * height) or []:
+        r, g, b = rgb
+        h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+        if s >= 0.45 and v >= 0.35:
+            counts[rgb] = counts.get(rgb, 0) + count
+accents = []
+for rgb, count in sorted(counts.items(), key=lambda item: -item[1]):
+    if count < 300 or len(accents) >= 48:
+        break
+    if all(sum((a - b) ** 2 for a, b in zip(rgb, other)) > 18 ** 2 for other in accents):
+        accents.append(rgb)
+base = montage.quantize(colors=255 - len(accents), method=Image.Quantize.MEDIANCUT).getpalette()[: (255 - len(accents)) * 3]
+palette = Image.new('P', (1, 1))
+palette.putpalette(base + [channel for rgb in accents for channel in rgb] + [0, 0, 0] * (256 - (255 - len(accents)) - len(accents)))
 
 kept, times = [], []
 for frame, ms in zip(frames, durations):

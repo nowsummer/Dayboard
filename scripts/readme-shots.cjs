@@ -65,8 +65,10 @@ app.whenReady().then(async () => {
     await run(`document.querySelector('.main-nav .nav-item:nth-child(2)').click();`);
     await shot(main, 'calendar');
     // The morning in view: the week opens at the current time, which at night shows only the small hours.
-    await run(`setCalMode('week');await new Promise(r => requestAnimationFrame(r));const s = document.querySelector('.time-scroll');if (s) { s.scrollTop = 6.6 * calHour; s.dispatchEvent(new Event('scroll')); }`);
+    // The week without the side panel: wider columns, so a long event reads as one (2026-10-27 user: the week looked like one-hour blocks).
+    await run(`setCalMode('week');if (document.querySelector('.panel-toggle.active')) calTogglePanel();await new Promise(r => requestAnimationFrame(r));const s = document.querySelector('.time-scroll');if (s) { s.scrollTop = 6.6 * calHour; s.dispatchEvent(new Event('scroll')); }`);
     await shot(main, 'calendar-week');
+    await run(`if (!document.querySelector('.panel-toggle.active')) calTogglePanel();`);
     await run(`setCalMode('month');`);
     await invoke('note:pin', { id: focusNote.id, pinned: true });
     await run(`document.querySelector('.main-nav .nav-item:nth-child(3)').click();`);

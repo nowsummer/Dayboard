@@ -42,8 +42,8 @@ parentPort.on('message', ({ file, width, height, bgra }) => {
   fs.writeFileSync(file, Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw, { level: 3 })), chunk('IEND', Buffer.alloc(0))]));
 });`;
 const TEXT = {
-  ko: { quick: '오후 5시 은행에 전화하기', done: '우유·달걀·사과 사기', calendar: 1, week: '주', event: '점심 약속 · 민지', notes: 2 },
-  en: { quick: 'Call the bank at 5pm', done: 'Milk, eggs and apples', calendar: 1, week: 'Week', event: 'Lunch with Mia', notes: 2 },
+  ko: { quick: '오후 5시 은행에 전화하기', done: '우유·달걀·사과 사기', calendar: 1, week: '주', event: '점심 약속 · 민지', notes: 2, move: ['독서 모임', '가족 저녁 식사', '치과 정기 검진'], stretch: '디자인 워크숍' },
+  en: { quick: 'Call the bank at 5pm', done: 'Milk, eggs and apples', calendar: 1, week: 'Week', event: 'Lunch with Mia', notes: 2, move: ['Book club', 'Family dinner', 'Dentist check-up'], stretch: 'Design workshop' },
 }[LANG];
 
 // A drawn pointer (the real one is not in the recording) that glides to each target, and a ring where it clicks.
@@ -69,6 +69,8 @@ const PAGE = `(() => {
       return box ? center(box) : null;
     },
     move(x, y, ms) { cursor.style.transition = 'transform ' + ms + 'ms cubic-bezier(.45,.05,.25,1)'; cursor.style.transform = 'translate(' + (x - 2) + 'px,' + (y - 2) + 'px)'; },
+    // A drag as the calendar takes it (pointer events, as tests/ui-smoke.cjs fires them): pressed on what is under the point.
+    pointer(type, x, y) { const target = type === 'pointerdown' ? document.elementFromPoint(x, y) : window; target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1, pointerId: 7, pointerType: 'mouse', isPrimary: true })); },
     ring(x, y) {
       const ring = document.createElement('div');
       ring.style.cssText = 'position:fixed;left:' + (x - 16) + 'px;top:' + (y - 16) + 'px;width:32px;height:32px;border-radius:50%;background:rgba(0,122,255,.28);z-index:2147483646;pointer-events:none;transform:scale(.3);opacity:1;transition:transform .42s ease-out,opacity .42s ease-out';
@@ -122,6 +124,18 @@ app.whenReady().then(async () => {
     const key = async code => { main.webContents.sendInputEvent({ type: 'keyDown', keyCode: code }); main.webContents.sendInputEvent({ type: 'char', keyCode: code }); await wait(30); main.webContents.sendInputEvent({ type: 'keyUp', keyCode: code }); };
     // Keeps painting while nothing moves, so a pause is recorded as a pause.
     const hold = async ms => { await wait(ms); };
+    // Press, glide with the button held, let go: the drawn pointer follows every step.
+    const drag = async (from, to, ms = 900) => {
+      await glide(from, 600);
+      await js(`__demo.ring(${from.x}, ${from.y}); __demo.pointer('pointerdown', ${from.x}, ${from.y})`); await wait(160);
+      const steps = Math.max(8, Math.round(ms / 50));
+      for (let i = 1; i <= steps; i++) {
+        const x = Math.round(from.x + (to.x - from.x) * i / steps), y = Math.round(from.y + (to.y - from.y) * i / steps);
+        await js(`__demo.move(${x}, ${y}, 50); __demo.pointer('pointermove', ${x}, ${y})`); await wait(50);
+      }
+      await wait(220);
+      await js(`__demo.pointer('pointerup', ${to.x}, ${to.y})`); await wait(200);
+    };
 
     recording = true;
     main.webContents.invalidate(); // the first frame now, not at the first movement
@@ -137,10 +151,21 @@ app.whenReady().then(async () => {
     await hold(900);
     // 3. Calendar: month, then the week.
     await click(await point(`__demo.bySel('.main-nav .nav-item', ${TEXT.calendar})`, 'calendar nav'), 650);
-    await hold(1000);
+    await hold(800);
+    // Month: an event still to come dragged to the nearest free day of its week (a full day would hide it behind 「+1」); events
+    // already past look faded.
+    const moveFrom = await point(`(() => { const chip = ${JSON.stringify(TEXT.move)}.map(title => [...document.querySelectorAll('.calendar-grid.large .day-event')].find(el => el.textContent.includes(title) && el.getBoundingClientRect().height > 0)).find(Boolean); if (!chip) return null; const r = chip.getBoundingClientRect(); return { x: Math.round(r.left + Math.min(28, r.width / 2)), y: Math.round(r.top + r.height / 2) }; })()`, 'month event');
+    const moveTo = await point(`(() => { const chip = ${JSON.stringify(TEXT.move)}.map(title => [...document.querySelectorAll('.calendar-grid.large .day-event')].find(el => el.textContent.includes(title) && el.getBoundingClientRect().height > 0)).find(Boolean); const cells = [...document.querySelectorAll('.calendar-grid.large .calendar-day')]; const i = cells.findIndex(c => c.contains(chip)); if (i < 0) return null; const row = cells.slice(i - i % 7, i - i % 7 + 7); const free = row.filter(c => c !== cells[i] && !c.querySelector('.day-event')).sort((x, y) => Math.abs(cells.indexOf(x) - i) - Math.abs(cells.indexOf(y) - i))[0]; const t = (free || cells[i % 7 === 6 ? i - 1 : i + 1]).getBoundingClientRect(); return { x: Math.round(t.left + t.width / 2), y: Math.round(t.top + t.height * 0.6) }; })()`, 'next day');
+    await drag(moveFrom, moveTo, 800);
+    await hold(1300);
     await click(await point(`__demo.byText(${JSON.stringify(TEXT.week)}, 'button')`, 'week button'), 600);
     await js(`(() => { const s = document.querySelector('.time-scroll'); if (s) { s.scrollTo({ top: 8.5 * calHour, behavior: 'smooth' }); } })()`);
     await hold(900);
+    // Week: tomorrow's workshop made an hour longer by its bottom edge.
+    const edge = await point(`(() => { const block = [...document.querySelectorAll('.time-event')].find(el => el.textContent.includes(${JSON.stringify(TEXT.stretch)})); const handle = block?.querySelector('.resize-handle.bottom'); if (!handle) return null; const r = handle.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 3) }; })()`, 'resize handle');
+    const hour = await js('calHour');
+    await drag(edge, { x: edge.x, y: Math.round(edge.y + hour) }, 900);
+    await hold(1300);
     // 4. An event's card, beside it.
     await click(await point(`(() => { const el = [...document.querySelectorAll('.time-event')].find(e => e.textContent.includes(${JSON.stringify(TEXT.event)})); if (!el) return null; const r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + Math.min(r.height / 2, 18)) }; })()`, 'event block'), 650);
     await hold(1500);
