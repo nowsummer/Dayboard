@@ -8,6 +8,7 @@ const { createHash } = require('node:crypto');
 
 const { execFileSync } = require('node:child_process');
 const os = require('node:os');
+const { probeBundle, replaceBundle } = require('./bundle-swap.cjs');
 
 const sourceDir = path.resolve(__dirname, '..');
 const projectDir = path.resolve(sourceDir, '..');
@@ -194,29 +195,40 @@ async function main() {
   assertRegularFile(path.join(sourceDir, 'assets', 'icon.ico'));
   assertRegularFile(path.join(sourceDir, 'node_modules', '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node'));
   const { packager } = await import('@electron/packager');
-  const results = await packager({
-    dir: sourceDir,
-    out: outputDir,
-    name: 'Dayboard',
-    executableName: 'Dayboard',
-    platform: 'win32',
-    arch: 'x64',
-    electronVersion: manifest.devDependencies.electron,
-    appVersion: manifest.version,
-    icon: path.join(sourceDir, 'assets', 'icon.ico'),
-    overwrite: true,
-    prune: true,
-    // Native koffi must remain a real file on disk for the Windows desktop API.
-    asar: false,
-    ignore: ignored,
-    sanitizePackageJson: [(pkg) => { delete pkg.devDependencies; delete pkg.scripts; return pkg; }],
-    win32metadata: { CompanyName: 'Dayboard', FileDescription: 'Dayboard · 할 일, 일정, 메모', ProductName: 'Dayboard' },
-  });
-  if (results.length !== 1 || path.resolve(results[0]) !== bundleDir) throw new Error('패키지 출력 경로가 예상과 다릅니다.');
-  writeUpdateFeed(bundleDir);
-  const result = verifyBundle(bundleDir);
-  result.launcherSha256 = portableLayout ? buildLauncher() : null;
-  fs.writeFileSync(path.join(bundleDir, 'build-info.json'), JSON.stringify(result, null, 2) + '\n');
+  // The new bundle is built and tried in a temporary folder, and replaces the one in 앱/ only once its Dayboard.exe has run
+  // (scripts/bundle-swap.cjs — 2026-10-28: Smart App Control refused a new exe after the working bundle was overwritten).
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'dayboard-package-'));
+  try {
+    const staged = path.join(scratch, 'Dayboard-win32-x64');
+    const results = await packager({
+      dir: sourceDir,
+      out: scratch,
+      name: 'Dayboard',
+      executableName: 'Dayboard',
+      platform: 'win32',
+      arch: 'x64',
+      electronVersion: manifest.devDependencies.electron,
+      appVersion: manifest.version,
+      icon: path.join(sourceDir, 'assets', 'icon.ico'),
+      overwrite: true,
+      prune: true,
+      // Native koffi must remain a real file on disk for the Windows desktop API.
+      asar: false,
+      ignore: ignored,
+      sanitizePackageJson: [(pkg) => { delete pkg.devDependencies; delete pkg.scripts; return pkg; }],
+      win32metadata: { CompanyName: 'Dayboard', FileDescription: 'Dayboard · 할 일, 일정, 메모', ProductName: 'Dayboard' },
+    });
+    if (results.length !== 1 || path.resolve(results[0]) !== staged) throw new Error('패키지 출력 경로가 예상과 다릅니다.');
+    writeUpdateFeed(staged);
+    const result = verifyBundle(staged);
+    probeBundle(staged, scratch);
+    fs.mkdirSync(outputDir, { recursive: true });
+    replaceBundle(staged, bundleDir);
+    result.launcherSha256 = portableLayout ? buildLauncher() : null;
+    fs.writeFileSync(path.join(bundleDir, 'build-info.json'), JSON.stringify(result, null, 2) + '\n');
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
   console.log(`패키징 완료: ${path.join(bundleDir, 'Dayboard.exe')}`);
   console.log(portableLayout ? `실행기: ${launcherPath}` : '실행기: 만들지 않음(배포자의 「개발 자료」+private/ 구성이 아님). 설치 파일은 npm run dist로 만드세요.');
   console.log(fs.existsSync(path.join(bundleDir, 'resources', 'app', 'assets', 'google-oauth.json'))
