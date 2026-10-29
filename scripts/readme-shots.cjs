@@ -52,7 +52,8 @@ app.whenReady().then(async () => {
     // The real mouse pointer may rest over the window; clear hover so no cell or row is highlighted.
     const shot = async (win, name) => { win.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 }); await run('document.activeElement?.blur?.()'); await settle(win); const img = await win.webContents.capturePage(); fs.writeFileSync(path.join(OUT, `${name}.png`), img.toPNG()); log('saved', name, img.getSize()); };
 
-    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true });
+    // autoUpdate off, as in readme-demo.cjs: the throwaway profile never asks GitHub for a new version (first check 90 s after start).
+    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true, autoUpdate: false });
     const { work, focusNote, planned } = await seedSample(invoke, new Date(), LANG);
 
     await morningClock(main); // 9:41 on the page, so today's events are not drawn as past

@@ -83,16 +83,25 @@
     if(ord>0){const offset=(day-new Date(year,month,1).getDay()+7)%7;const date=1+offset+(ord-1)*7;return date<=dim?date:null;}
     const offset=(new Date(year,month,dim).getDay()-day+7)%7;const date=dim-offset+(ord+1)*7;return date>=1?date:null;
   }
+  // Whole local days from the day of `a` to the day of `b` (noon to noon, so a clock change never counts as a day).
+  const dayGapOf=(a,b)=>Math.round((fromDate(dateKey(b))-fromDate(dateKey(a)))/86400000);
   // Walks the recurrence set in order and calls visit(startDate, index) for every generated instance
-  // (EXDATEs included, as COUNT counts them). visit returns false to stop. Capped so a rule can never spin forever.
-  function walkRRule(event,visit){
-    const rule=parseRRule(event.rrule);if(!rule)return;
+  // (EXDATEs included, as COUNT counts them). visit returns false to stop. Capped so a rule can never spin forever: returns
+  // false when the cap stopped the walk before the rule or the visitor did, true otherwise (2026-10-28 Codex review R7:
+  // 6,000 steps counted from the series' start ended a daily series after 16 years, and a capped walk looked like one that
+  // had ended). `from` (a Date): the walk starts just before it instead of at the series' start when the number of instances
+  // before it is known exactly — daily and weekly rules by arithmetic, monthly and yearly ones whose date every month or year
+  // has — so the index is still the instance's place in the series and COUNT and UNTIL still end it where they did. The
+  // 29th–31st, the 5th weekday, 29 February and monthly rules by weekdays walk from the start (a dozen steps a year).
+  function walkRRule(event,visit,from){
+    const rule=parseRRule(event.rrule);if(!rule)return true;
     const allDay=Boolean(event.allDay);
     const base=allDay?startOfLocalDay(String(event.start).slice(0,10)):new Date(event.start);
-    if(!Number.isFinite(base.getTime()))return;
+    if(!Number.isFinite(base.getTime()))return true;
     const until=rule.until?untilBound(rule.until,allDay):null;
     const at=(y,m,d)=>new Date(y,m,d,base.getHours(),base.getMinutes(),base.getSeconds(),base.getMilliseconds());
-    let produced=0,steps=0;const LIMIT=6000;
+    const skipTo=from instanceof Date&&from>base?from:null;
+    let produced=0,steps=0;const LIMIT=50000;
     const consider=o=>{
       if(o<base)return true;
       produced++;
@@ -100,28 +109,57 @@
       if(until&&o>until)return false;
       return visit(o,produced-1)!==false;
     };
-    if(rule.freq==='DAILY'){for(let i=0;steps++<LIMIT;i++){if(!consider(at(base.getFullYear(),base.getMonth(),base.getDate()+i*rule.interval)))return;}}
+    // Instances the first period generates before the series' own start are not counted (consider skips them).
+    const lead=candidates=>candidates.filter(o=>o<base).length;
+    const by=base.getFullYear(),bm=base.getMonth(),bd=base.getDate();
+    if(rule.freq==='DAILY'){
+      let i=0;
+      if(skipTo){i=Math.max(0,Math.ceil(dayGapOf(base,skipTo)/rule.interval)-1);produced=i?i-lead([at(by,bm,bd)]):0;}
+      for(;steps++<LIMIT;i++){if(!consider(at(by,bm,bd+i*rule.interval)))return true;}
+    }
     else if(rule.freq==='WEEKLY'){
       const days=(rule.byDay.length?rule.byDay.map(d=>d.day):[base.getDay()]).filter((d,i,a)=>a.indexOf(d)===i).sort((a,b)=>((a-rule.wkst+7)%7)-((b-rule.wkst+7)%7));
-      const weekStart=new Date(base.getFullYear(),base.getMonth(),base.getDate()-((base.getDay()-rule.wkst+7)%7));
-      for(let w=0;steps++<LIMIT;w++)for(const d of days){if(!consider(at(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+w*7*rule.interval+((d-rule.wkst+7)%7))))return;}
+      const weekStart=new Date(by,bm,bd-((base.getDay()-rule.wkst+7)%7));
+      const inWeek=(w,d)=>at(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+w*7*rule.interval+((d-rule.wkst+7)%7));
+      let w=0;
+      if(skipTo){w=Math.max(0,Math.floor(dayGapOf(weekStart,skipTo)/(7*rule.interval))-1);produced=w?w*days.length-lead(days.map(d=>inWeek(0,d))):0;}
+      for(;steps++<LIMIT;w++)for(const d of days){if(!consider(inWeek(w,d)))return true;}
     }
     else if(rule.freq==='MONTHLY'){
       const ordinal=rule.byDay.find(d=>d.ord)||null;const weekdays=rule.byDay.filter(d=>!d.ord).map(d=>d.day);const mday=rule.byMonthDay||base.getDate();
-      for(let k=0;steps++<LIMIT;k++){
-        const first=new Date(base.getFullYear(),base.getMonth()+k*rule.interval,1);const y=first.getFullYear(),m=first.getMonth(),dim=daysInMonth(y,m);
-        let dates=[];
-        if(ordinal){const d=nthWeekday(y,m,ordinal.day,ordinal.ord);if(d)dates=[d];}
-        else if(weekdays.length){for(let d=1;d<=dim;d++)if(weekdays.includes(new Date(y,m,d).getDay()))dates.push(d);}
-        else{const d=mday>0?mday:dim+mday+1;if(d>=1&&d<=dim)dates=[d];}
-        for(const d of dates){if(!consider(at(y,m,d)))return;}
+      const datesIn=(y,m)=>{
+        const dim=daysInMonth(y,m);
+        if(ordinal){const d=nthWeekday(y,m,ordinal.day,ordinal.ord);return d?[d]:[];}
+        if(weekdays.length){const dates=[];for(let d=1;d<=dim;d++)if(weekdays.includes(new Date(y,m,d).getDay()))dates.push(d);return dates;}
+        const d=mday>0?mday:dim+mday+1;return d>=1&&d<=dim?[d]:[];
+      };
+      // Every month has its 1st–28th, its last 28 days and the 1st–4th weekday from either end: one instance a month, counted exactly.
+      const steady=ordinal?Math.abs(ordinal.ord)<=4:!weekdays.length&&Math.abs(mday)<=28;
+      let k=0;
+      if(skipTo&&steady){k=Math.max(0,Math.floor(((skipTo.getFullYear()-by)*12+skipTo.getMonth()-bm)/rule.interval)-1);produced=k?k-lead(datesIn(by,bm).map(d=>at(by,bm,d))):0;}
+      // The calendar repeats every 400 years (4,800 months, weekdays too), so the months a rule visits repeat every `cycle` of its
+      // steps: a whole cycle without its date (the 30th every 12 months from February) means it has none, and it has ended. A
+      // month past UNTIL ends it as its dates would (2026-10-28 recheck of Codex review R7: such a rule walked to the cap on
+      // every expansion).
+      const gcd=(a,b)=>b?gcd(b,a%b):a;const cycle=4800/gcd(rule.interval,4800);let empty=0;
+      for(;steps++<LIMIT;k++){
+        const first=new Date(by,bm+k*rule.interval,1);if(until&&first>until)return true;
+        const y=first.getFullYear(),m=first.getMonth(),dates=datesIn(y,m);
+        if(!dates.length){if(++empty>=cycle)return true;continue;}
+        empty=0;for(const d of dates){if(!consider(at(y,m,d)))return true;}
       }
     }
-    else{for(let k=0;steps++<LIMIT;k++){const y=base.getFullYear()+k*rule.interval,m=base.getMonth(),d=base.getDate();if(d>daysInMonth(y,m))continue;if(!consider(at(y,m,d)))return;}}
+    else{
+      let k=0;
+      if(skipTo&&!(bm===1&&bd===29)){k=Math.max(0,Math.floor((skipTo.getFullYear()-by)/rule.interval)-1);produced=k?k-lead([at(by,bm,bd)]):0;}
+      for(;steps++<LIMIT;k++){const y=by+k*rule.interval;if(bd>daysInMonth(y,bm))continue;if(!consider(at(y,bm,bd)))return true;}
+    }
+    return false;
   }
   // Occurrences of a recurring master that touch [fromKey, toKey). Each occurrence is a full event object
   // whose id is "<masterId>@<recurrenceId>" so the UI can address one instance, with masterId/recurrenceId set.
-  function expandEvent(event,fromKey,toKey){
+  // `limit` stops after that many (firstOccurrence).
+  function expandEvent(event,fromKey,toKey,limit=0){
     const allDay=Boolean(event.allDay);
     const base=allDay?startOfLocalDay(String(event.start).slice(0,10)):new Date(event.start);
     if(!Number.isFinite(base.getTime()))return [];
@@ -130,7 +168,8 @@
     const rangeStart=startOfLocalDay(fromKey).getTime(),rangeEnd=startOfLocalDay(toKey).getTime();
     const exdates=new Set(event.exdates||[]);
     const out=[];
-    walkRRule(event,o=>{
+    // The walk may start just before the range less the occurrences' length: one that begins earlier can still reach into it.
+    const complete=walkRRule(event,o=>{
       const startMs=o.getTime();if(startMs>=rangeEnd)return false;
       const endMs=allDay?startMs+span*86400000:startMs+span;
       const visible=endMs>startMs?endMs>rangeStart:startMs>=rangeStart;
@@ -140,17 +179,28 @@
       const start=allDay?recurrenceId:o.toISOString();
       const end=allDay?dayOffset(recurrenceId,span):new Date(endMs).toISOString();
       out.push({...event,id:`${event.id}@${recurrenceId}`,masterId:event.id,recurrenceId,start,end,occurrence:true});
-      return true;
-    });
+      return !limit||out.length<limit;
+    },new Date(rangeStart-(allDay?span*86400000:span)));
+    // The cap stopped the walk short of the range (no rule Dayboard writes gets there; see walkRRule): occurrences may be
+    // missing, which a caller can tell from a series that has ended (2026-10-28 Codex review R7).
+    if(!complete)out.incomplete=true;
     return out;
   }
   // Position of one occurrence inside its series: how many instances come before it, and how many COUNT leaves after it.
   function seriesPosition(event,recurrenceId){
     const rule=parseRRule(event.rrule);if(!rule)return null;
+    const key=String(recurrenceId).slice(0,10);const target=event.allDay?startOfLocalDay(key):new Date(recurrenceId);
+    if(!Number.isFinite(target.getTime()))return null;
     let found=null;
-    walkRRule(event,(o,index)=>{const rid=event.allDay?dateKey(o):o.toISOString();if(rid===recurrenceId||(event.allDay&&rid===String(recurrenceId).slice(0,10))){found={index,remaining:rule.count?rule.count-index:null};return false;}return index<20000;});
+    // The walk starts just before the instance looked for (its place is counted exactly; see walkRRule) and stops once past it,
+    // bounded only by walkRRule's cap (2026-10-28 recheck of Codex review R7: a guard of 20,000 instances stopped it at its
+    // first step for a daily series of 55 years, and main's 「이후 모든 일정」 then changed the whole series).
+    walkRRule(event,(o,index)=>{const rid=event.allDay?dateKey(o):o.toISOString();if(rid===recurrenceId||(event.allDay&&rid===key)){found={index,remaining:rule.count?rule.count-index:null};return false;}return event.allDay?rid<key:o<=target;},target);
     return found;
   }
+  // A series' first occurrence (excluded dates skipped), walked only to it; null when it has none. The calendar search lists it for
+  // a series begun outside its window, so a series of any year is found (2026-10-28, area J).
+  function firstOccurrence(event){return expandEvent(event,localKey(event.start),'9999-12-31',1)[0]||null;}
   function touchesRange(e,fromKey,toKey){
     if(e.allDay){const s=String(e.start).slice(0,10),en=String(e.end||'').slice(0,10)||dayOffset(s,1);return s<toKey&&en>fromKey;}
     const s=new Date(e.start),en=new Date(e.end||e.start),a=startOfLocalDay(fromKey),b=startOfLocalDay(toKey);
@@ -159,7 +209,7 @@
   // Everything to draw between two day keys: plain events and exceptions as stored, recurring masters expanded.
   function eventsInRange(events,fromKey,toKey){
     const out=[];
-    for(const e of events){if(e.rrule)out.push(...expandEvent(e,fromKey,toKey));else if(touchesRange(e,fromKey,toKey))out.push(e);}
+    for(const e of events){if(e.rrule){const part=expandEvent(e,fromKey,toKey);if(part.incomplete)out.incomplete=true;out.push(...part);}else if(touchesRange(e,fromKey,toKey))out.push(e);}
     return out;
   }
   // ---- Calendars: where new events go, and when the local calendar steps back ----
@@ -636,7 +686,7 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,glassLook,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime};
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,glassLook,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

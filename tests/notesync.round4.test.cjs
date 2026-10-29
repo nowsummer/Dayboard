@@ -504,7 +504,7 @@ const code = [
   pick('const liveNotes=', 'const editedTime='),
   pick('const noteTitle=', 'const noteDeleteText='),
   pick('const noteSaves=new Map();', 'function resizeHandle('),
-  pick('const noteLength=', 'function trashedNote('),
+  pick('function deleteActiveNote(', 'function trashedNote('),
   pick('let undoBusy=false;', 'async function run('), // trashNote offers 되돌리기 through undoToast (2026-10-21 redo)
   // the real handler, bound to the note as noteEditor binds it
   `function keystroke(id,name,value){const note=state.notes.find(n=>n.id===id);${oninputSrc};oninput({target:{name,value,selectionStart:value.length,selectionEnd:value.length}});}`,
@@ -577,7 +577,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'u
 const pick = (a, b) => { const i = src.indexOf(a); const j = src.indexOf(b, i + a.length); return src.slice(i, j); };
 const oninputSrc = pick('const oninput=e=>{', ";return h('div',{class:'note-editor'");
 const code = [pick('const noteDrafts=new Map();', 'const qp='), pick('const liveNotes=', 'const editedTime='), pick('const noteTitle=', 'const noteDeleteText='),
-  pick('const noteSaves=new Map();', 'function resizeHandle('), pick('const noteLength=', 'function trashedNote('), pick('let undoBusy=false;', 'async function run('),
+  pick('const noteSaves=new Map();', 'function resizeHandle('), pick('function deleteActiveNote(', 'function trashedNote('), pick('let undoBusy=false;', 'async function run('),
   `function keystroke(id,name,value){const note=state.notes.find(n=>n.id===id);${oninputSrc};oninput({target:{name,value,selectionStart:value.length,selectionEnd:value.length}});}`,
   `function key(id,k){const note=state.notes.find(n=>n.id===id);return noteUndoKey({ctrlKey:true,shiftKey:false,altKey:false,metaKey:false,isComposing:false,code:'Key'+k.toUpperCase(),key:k,preventDefault(){},stopPropagation(){}},note);}`].join('\n');
 test('after 되돌리기, Ctrl+Z / Ctrl+Y inside the restored note', async t => {

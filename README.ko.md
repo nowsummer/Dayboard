@@ -10,7 +10,7 @@ Mac·iPhone처럼 깔끔하게, Windows에서 빠릿하게<br>할 일·달력·�
 
 [**Windows용 내려받기**](https://github.com/nowsummer/Dayboard/releases/latest) · [소개 페이지](https://nowsummer.github.io/Dayboard/) · [개인정보처리방침](https://nowsummer.github.io/Dayboard/privacy.html)
 
-<img src="images/demo.gif" width="860" alt="Dayboard에서 할 일을 추가하고 완료한 뒤, 월·주 달력에서 일정을 끌어 옮기고 늘리고, 메모를 본 다음 바탕화면에 위젯을 놓고 유리 효과를 조절하는 모습">
+<img src="images/demo.webp" width="860" alt="Dayboard에서 할 일을 추가하고 완료한 뒤, 월·주 달력에서 일정을 끌어 옮기고 늘리고, 메모를 본 다음 바탕화면에 위젯을 놓고 유리 효과를 조절하는 모습">
 
 </div>
 

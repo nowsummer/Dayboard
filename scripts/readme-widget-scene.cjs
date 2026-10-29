@@ -10,7 +10,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample, shotsLanguage, morningClock } = require('./readme-sample.cjs');
+const { seedSample, shotsLanguage, morningClock, writeSampleMark } = require('./readme-sample.cjs');
 
 const LANG = shotsLanguage();
 const APP_DIR = path.resolve(__dirname, '..');
@@ -57,7 +57,8 @@ app.whenReady().then(async () => {
     if (!main) throw new Error('main window not ready');
     const js = code => main.webContents.executeJavaScript(code);
     const invoke = (name, payload = {}) => js(`window.dayboard.invoke(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
-    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true, widgetMode: 'desktop', glassLevel: 0.5 });
+    // autoUpdate off, as in readme-demo.cjs: the throwaway profile never asks GitHub for a new version (first check 90 s after start).
+    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true, widgetMode: 'desktop', glassLevel: 0.5, autoUpdate: false });
     await seedSample(invoke, new Date(), LANG);
     await morningClock(main);
 
@@ -68,12 +69,23 @@ app.whenReady().then(async () => {
     const display = screen.getPrimaryDisplay(); const area = display.workArea; const scale = display.scaleFactor;
     const first = area.x + area.width - 360 - 16;
     const slotX = first - 24 * Math.ceil((360 + 12) / 24);
-    await invoke('widget:open', { type: 'calendar' });
+    const calendar = await invoke('widget:open', { type: 'calendar' });
     for (let i = 0; i < 100; i++) {
       const widgets = (await invoke('state:get')).widgets;
       if (widgets.length && widgets.every(w => w.desktopStatus === 'attached' && w.backdrop === 'wallpaper')) break;
       await wait(200);
     }
+    // As tall as the screen allows, so the tasks widget cannot take the spot under it: on a 100 % screen it did, outside the
+    // picture, and the scene showed no widget (2026-10-29). Resized from its own window (widget:resize answers only that one).
+    for (let i = 0; i < 100; i++) {
+      const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w.webContents.getURL().includes('widget=calendar'));
+      if (win && !win.webContents.isLoading() && await win.webContents.executeJavaScript('!!window.dayboard').catch(() => false)) {
+        await win.webContents.executeJavaScript(`window.dayboard.invoke('widget:resize', ${JSON.stringify({ id: calendar.id, width: 360, height: area.height - 32 })})`);
+        break;
+      }
+      await wait(100);
+    }
+    await wait(600);
     // It also keeps clear of the screen's left edge, where the user's own desktop icons and file names are (second try).
     const scene = { x: area.x + 100, y: area.y };
     scene.width = slotX + 360 + 16 - scene.x; scene.height = Math.round(scene.width * 720 / 1120);
@@ -160,6 +172,8 @@ app.whenReady().then(async () => {
     await slide(0.05); // frosted: nearly white in light mode
     await record(false);
     await wait(400);
+    // Written only once every frame is: readme-gif.py refuses a scene without it, or with other sample colours than the app's frames.
+    writeSampleMark(OUT, LANG);
     console.log(`[scene] ${n} frames in ${OUT}`);
   } catch (error) {
     console.error('[scene] ERROR', error.stack || error.message);

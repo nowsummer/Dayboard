@@ -13,6 +13,7 @@ const { createDesktopManager, clampBounds, onScreen } = require('./lib/desktop.c
 const { createTaskbarIcon } = require('./lib/windowicon.cjs');
 const { createStartMenu } = require('./lib/startmenu.cjs');
 const { createSync, seriesKey, dropSeriesColors } = require('./lib/sync.cjs');
+const { createLanes, laneOf } = require('./lib/lanes.cjs');
 const { recordNoteDeletion, copyOf, sameContent, noteKey, noteRev, laterThan, cleanPast, archiveText, NOTE_ID, pastKey } = require('./lib/notesync.cjs');
 // A note as the renderer gets it from a note command: the shape publicState broadcasts (lib/store.cjs publicNote — the public
 // fields with rev and textId, no earlier versions; one definition since the 2026-10-27 review).
@@ -57,7 +58,7 @@ const flushingWindows = new Map();
 const closingWindows = new Map();
 const boundsTimers = new Map();
 const readyWindows = new WeakSet();
-let store, sync, mainWindow, tray, quitting = false, queue = Promise.resolve(), timer;
+let store, sync, mainWindow, tray, quitting = false, timer;
 let quitInFlight = false;
 let updater = null, trayUpdateStatus = null;
 
@@ -144,12 +145,10 @@ function persistWidgetBounds() {
   });
 }
 
-function queued(fn) {
-  const result = queue.then(fn);
-  queue = result.catch(() => {});
-  return result;
-}
-// One open, placement or reveal at a time per widget window, outside the main queue: a widget's page takes seconds to load
+// The lanes the IPC handler runs commands in (lib/lanes.cjs, 2026-10-28 Codex review R8): this PC's data at once, connected
+// items in order among themselves, what spans both alone. One queue for all held a local edit behind a 25-s service request.
+const lanes = createLanes();
+// One open, placement or reveal at a time per widget window, outside the lanes: a widget's page takes seconds to load
 // (4-9 s on this PC) and widget:open held every other command while it did (2026-10-27 performance review). Two of these on
 // one window (an open and a mode change, a reveal after a reload) would race for its shape; other widgets and commands go on.
 const widgetQueues = new Map();
@@ -702,7 +701,7 @@ async function writeRemoteEvent(kind, event, calendar, { scope = 'one', previous
   return result.events;
 }
 
-// Commands answered outside the main queue (queued(): one command at a time), for two reasons (2026-10-27 review names both).
+// Commands answered outside the lanes (lib/lanes.cjs: one command at a time per lane), for two reasons (2026-10-27 review names both).
 // 1. Long-running and serialized elsewhere: a browser sign-in can take minutes and a sync run a while (account:connect,
 //    sync:run, auth:*; lib/sync.cjs runs them one at a time), and widget:open's window load takes 4-9 s on this PC (perWidget
 //    serializes it per widget). Local edits, widgets and window controls must stay responsive meanwhile.
@@ -1379,7 +1378,7 @@ async function command(commandName, payload, sourceWindow) {
       if (widget.type === 'tasks') widget.listId = widgetList(payload.listId);
       if (widget.type === 'note' && payload.noteId) widget.noteId = liveNote(payload.noteId).id;
       commit(state => { if (widget.type === 'note' && !widget.noteId) widget.noteId = newNote(state).id; state.widgets.push(widget); });
-      // The window's load and desktop placement run outside the main queue (a direct command, DIRECT_COMMANDS), one at a time
+      // The window's load and desktop placement run outside the lanes (a direct command, DIRECT_COMMANDS), one at a time
       // per widget (2026-10-27 performance review: the 4-9 s load held every other command).
       try { return await perWidget(widget.id, () => openWidget(widget)); }
       catch (error) {
@@ -1698,7 +1697,11 @@ else {
       if (JSON.stringify(payload).length > 250000) throw new Error(tr('입력 데이터가 너무 큽니다.'));
       if (name === 'state:get') return publicState();
       const sourceWindow = BrowserWindow.fromWebContents(event.sender);
-      if (DIRECT_COMMANDS.has(name)) return command(name, payload, sourceWindow); // off the main queue: see DIRECT_COMMANDS
+      if (DIRECT_COMMANDS.has(name)) return command(name, payload, sourceWindow); // off the lanes: see DIRECT_COMMANDS
+      // Its lane (lib/lanes.cjs laneOf, 2026-10-28 Codex review R8): a command on this PC's data runs at once while a connected
+      // item's write waits for the service; connected items keep their order among themselves; what spans both, or is unknown,
+      // runs alone. Chosen now, from the stored records, before anything queued ahead of it changes them.
+      const queued = fn => lanes.run(laneOf(name, payload, store), fn);
       return queued(() => command(name, payload, sourceWindow));
     });
     ipcMain.on('dayboard:flushed', (event, payload) => {

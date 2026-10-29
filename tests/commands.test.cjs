@@ -10,6 +10,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+const { COMMAND_LANES } = require('../lib/lanes.cjs');
+
 const source = fs.readFileSync(path.join(__dirname, '..', 'main.cjs'), 'utf8').replace(/\r\n/g, '\n');
 // One top-level function of main.cjs, to its closing brace (the braces in its strings and patterns pair up).
 function mainFunction(name) {
@@ -51,6 +53,10 @@ test('every direct command is a case of command(); the set is the 18 of before p
   const handler = between("ipcMain.handle('dayboard:invoke'", "ipcMain.on('dayboard:flushed'");
   assert.ok(handler.includes('if (DIRECT_COMMANDS.has(name)) return command(name, payload, sourceWindow);'), 'the IPC handler consults the set');
   assert.ok(handler.includes('return queued(() => command(name, payload, sourceWindow));'), 'everything else is queued');
+  // The queue is the lane lib/lanes.cjs chooses for the command (2026-10-28 Codex review R8: one queue held this PC's edits behind
+  // a service request); its table names every label outside DIRECT_COMMANDS and nothing else, so a new command gets a lane here.
+  assert.ok(handler.includes('const queued = fn => lanes.run(laneOf(name, payload, store), fn);'), 'the queue is the lane chosen by lib/lanes.cjs');
+  assert.deepEqual(Object.keys(COMMAND_LANES).sort(), cases.filter(name => !direct.includes(name)).sort(), 'lib/lanes.cjs classifies every command that is not direct, and nothing else');
   assert.equal(/\[\s*'window:main'/.test(handler), false, 'no inline list of names in the handler any more');
 });
 

@@ -62,7 +62,38 @@
 @keyframes flash{from{background:color-mix(in srgb,var(--blue) 14%,transparent)}to{background:transparent}}.task-row.just-added{animation:flash 1.2s ease-out;border-radius:8px}
 .task-group-head{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:650;color:var(--secondary);padding:18px 1px 4px}.task-group-head.overdue{color:#de5c62}.task-group-head:first-child{padding-top:6px}
 .task-flag{opacity:0;color:var(--muted);width:26px;height:26px;display:grid;place-items:center;border-radius:6px;padding:0;transition:opacity .12s}.task-flag.on{opacity:1;color:#efa325}.task-row:hover .task-flag,.task-row:focus-within .task-flag{opacity:1}.task-flag:hover{background:var(--hover)}
-.calendar-view{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:28px;overflow:hidden}.calendar-main{display:flex;flex-direction:column;min-height:0}.calendar-main .month-heading{flex-shrink:0}.calendar-grid.large{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr)}.large .calendar-day{min-height:0;overflow:hidden}.day-panel{overflow:auto;border-left:1px solid var(--line);padding-left:24px;display:flex;flex-direction:column;min-height:0}.day-panel .context-heading{margin-top:0;min-height:32px}.day-panel .agenda-sub{font-size:13px;font-weight:650;color:var(--secondary);margin:18px 0 4px}.day-panel .quick-add{margin-top:12px}
+/* The docked day panel follows the window (2026-10-28 owner, r50 K: in a 1177px window the fixed 300px panel left the month
+   about 77px a day and cut most titles while the panel stood mostly empty). --cal-fluid is how far the window is past the
+   default 1180px (0-420px): 264px wide with a 20px gap and 20px inset up to 1180px, growing evenly to 300px, 28px and 24px at
+   1600px and wider (unchanged there). 264, not 248: a read-only holiday calendar row (「대한민국 빨간날 · 읽기 전용 · Google」)
+   still shows its whole name, and in English a 19-character Gmail default calendar (「… · Default」) still fits when the panel
+   scrolls (260 left it 3px short; Codex re-review of r50 K). CSS only, so a resize never re-renders; it docks from a 900px
+   calendar area (calendar.js CAL_PANEL_MIN, a 1144px window) and the drawer below that keeps its 300px. */
+.calendar-view{--cal-fluid:clamp(0px,100vw - 1180px,420px);display:grid;grid-template-columns:minmax(0,1fr) calc(264px + var(--cal-fluid)*36/420);column-gap:calc(20px + var(--cal-fluid)*8/420);overflow:hidden}.calendar-main{display:flex;flex-direction:column;min-height:0}.calendar-main .month-heading{flex-shrink:0}.calendar-grid.large{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr)}.large .calendar-day{min-height:0;overflow:hidden}.day-panel{overflow:auto;border-left:1px solid var(--line);padding-left:calc(20px + var(--cal-fluid)*4/420);display:flex;flex-direction:column;min-height:0}.day-panel .context-heading{margin-top:0;min-height:32px}.day-panel .agenda-sub{font-size:13px;font-weight:650;color:var(--secondary);margin:18px 0 4px}.day-panel .quick-add{margin-top:12px}
+/* Day-panel task rows drop the hover-only 「할 일 옵션」 button (2026-10-28 Codex review of r50 K): unseen until hover, it still
+   took 35px of every row, so at 1177-1180px work titles broke onto two lines beside blank space (126px for the title; now
+   165px, the old 300px panel had 162px). The same menu stays on right-click and the menu key, and a click opens the task,
+   as the max-width:450px rule already does for every list. */
+.day-panel .row-more{display:none}
+/* Calendar rows end in a small muted service mark instead of the word 「Google / Microsoft / 이 PC」, at every width (2026-10-28
+   owner 「작은 로고로」 after the Codex re-review of r50 K: the word took 37-60px, so beside the narrower panel the owner's
+   default calendar 「(19-character Gmail address) · 기본 · Google」 lost the end of its name). The mark takes 22px with its gap.
+   Name first (owner: 「아이콘도 들어가기 어렵게 창폭이 좁아지면 그냥 아이콘 없어도 돼」): the name and its badges are one box
+   (.cal-label) sized to the whole name, so when name, badges and mark do not fit one line the mark wraps to a second line that
+   the button clips, and that row's name gets the mark's room. Measured per row by the layout itself: a short name keeps its
+   mark in a 1177px window, the 19-character address (139px) shows whole without it. Without the mark a name has at least
+   the old 300px panel's room (the list is at most 32px short; the shortest word, 「이 PC」, freed 37px). Only on a narrower
+   panel, though (Codex re-review of fa58a9b: a name too long for any panel lost its mark even at 1920px): from a 1404px
+   window the list is at most 15px short of the old one, what even the shortest word freed beyond the mark's 22px, so
+   there every row keeps its mark and a long name is cut beside it with no less room than the old row gave it. The drawer
+   (300px, a list of 259px) opens on narrow windows only and steps aside like the narrow docked panel. The service stays in
+   the row's tooltip and in the mark's accessible name (role img), shown or not. */
+.cal-name-button{flex-wrap:wrap;row-gap:8px;max-height:26px;overflow:hidden}@media(min-width:1404px){.cal-name-button{flex-wrap:nowrap}}.cal-label{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:8px}.cal-label .cal-name{flex:1 1 auto}.cal-provider{flex:none;width:14px;height:14px;display:grid;place-items:center;color:var(--muted)}.cal-provider svg{display:block}
+/* The quick-add hint (「제주 여행 준비에 추가 · 11월 30일 날짜」) breaks at 「·」, never inside a part (same review): in the
+   narrow panel it left 「날짜」 alone on the second line. The dot sits inside the first box behind a no-break space, so a
+   line never starts with it (a no-break space between the boxes is not enough: Chromium still breaks before it, Codex
+   re-review). A part longer than the line still wraps inside its own box. */
+.quick-bottom>span>span{display:inline-block}
 .day-event{background:color-mix(in srgb,var(--cal-color,#f0a13a) 16%,transparent);color:color-mix(in srgb,var(--cal-color,#a57728) 70%,#333);cursor:pointer;font-size:12px}.day-event:hover{background:color-mix(in srgb,var(--cal-color,#f0a13a) 28%,transparent)}.day-more{font-size:12px;color:var(--secondary);padding-left:5px}
 [data-theme=dark] .day-event{color:color-mix(in srgb,var(--cal-color,#f0a13a) 75%,#fff)}
 #toast{display:flex;align-items:center;gap:12px}#toast .toast-action{color:#9dc4ff;font-weight:600;white-space:nowrap;padding:0}#toast.show:has(.toast-action){pointer-events:auto}.dialog:focus,.dialog:focus-visible{outline:none}
@@ -90,7 +121,7 @@
 .repeat-panel{background:var(--field);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;margin:-8px 0 18px}.repeat-panel[hidden]{display:none}.repeat-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--secondary);flex-wrap:wrap}.repeat-row[hidden]{display:none}.repeat-row .form-input{width:auto;min-width:0;background:var(--bg)}.repeat-row input[type=number]{width:72px}.repeat-row input[hidden]{display:none}
 .weekday-toggles{display:flex;gap:6px}.weekday-toggle{width:32px;height:32px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font-size:13px;color:var(--secondary);border:1px solid var(--line);padding:0}.weekday-toggle.on{background:var(--blue);color:#fff;border-color:var(--blue)}.repeat-summary{font-size:12px;color:var(--secondary)}
 .event-swatches .swatch{width:22px;height:22px}.swatch.reset{background:transparent;border:2px dashed var(--swatch,#c8ccd3)}.swatch.reset.selected{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--swatch,#c8ccd3)}
-.calendar-list{margin-top:auto;padding-top:18px}.calendar-list .agenda-sub{margin-bottom:6px}.calendar-row{display:flex;align-items:center;gap:9px;width:100%;padding:6px 6px;border-radius:7px;font-size:13px;color:var(--text)}.calendar-row:hover{background:var(--hover)}.cal-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}.cal-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.calendar-row small{color:var(--muted);font-size:12px}
+.calendar-list{margin-top:auto;padding-top:18px}.calendar-list .agenda-sub{margin-bottom:6px}.calendar-row{display:flex;align-items:center;gap:9px;width:100%;padding:6px 6px;border-radius:7px;font-size:13px;color:var(--text)}.calendar-row:hover{background:var(--hover)}.cal-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}.cal-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .event-detail .field{margin:4px 0 10px}
 /* Narrow month cells: the title wins over the time (Apple keeps the name readable; the time truncates first) and the repeat glyph stays out of the grid. */
 .day-event .chip-time{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;max-width:58%}.day-event .chip-title{flex:1 1 auto;min-width:2.2em}.day-event .chip-repeat{display:none}
@@ -99,9 +130,9 @@
 .large .calendar-day{container-type:inline-size}.day-event .chip-time{flex:0 0 auto;max-width:none;overflow:visible}@container (max-width:118px){.day-event .chip-time{display:none}}
 
 /* Calendar list rows: Apple-style coloured check toggles visibility; the name opens the colour/menu. */
-.calendar-row{padding:3px 6px;gap:9px}.calendar-row:hover{background:var(--hover)}.cal-check{width:17px;height:17px;border-radius:5px;border:2px solid var(--cal-color);background:var(--cal-color);color:#fff;display:grid;place-items:center;flex-shrink:0;padding:0}.calendar-row.hidden .cal-check{background:transparent}.cal-name-button{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px;color:var(--text);text-align:left}.calendar-row.hidden .cal-name,.calendar-row.hidden small{color:var(--muted)}.calendar-row.hidden .cal-name{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--muted) 50%,transparent)}
+.calendar-row{padding:3px 6px;gap:9px}.calendar-row:hover{background:var(--hover)}.cal-check{width:17px;height:17px;border-radius:5px;border:2px solid var(--cal-color);background:var(--cal-color);color:#fff;display:grid;place-items:center;flex-shrink:0;padding:0}.calendar-row.hidden .cal-check{background:transparent}.cal-name-button{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px;color:var(--text);text-align:left}.calendar-row.hidden .cal-name{color:var(--muted);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--muted) 50%,transparent)}
 /* Calendar list badges (default calendar, read-only), static calendar field in the event dialog, account notice (2026-10-20 calendar writing). */
-.cal-badge{font-size:12px;font-weight:600;color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,transparent);border-radius:5px;padding:1px 6px;flex-shrink:0;line-height:1.5}.cal-badge.muted{color:var(--muted);background:var(--field)}.calendar-row.hidden .cal-badge{opacity:.6}
+.cal-badge{font-size:12px;font-weight:600;color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,transparent);border-radius:5px;padding:1px 6px;flex-shrink:0;line-height:1.5}.cal-badge.muted{color:var(--muted);background:var(--field)}.calendar-row.hidden .cal-badge,.calendar-row.hidden .cal-provider{opacity:.6}
 .form-input.static{background:transparent;border-color:var(--line);color:var(--secondary)}
 .account-notice{margin-top:9px;display:flex;flex-direction:column;align-items:flex-start;gap:7px}.account-notice .button{padding:6px 11px;font-size:12px}
 /* Date/time fields in the two-column rows: tighter padding and tabular digits so "2026-10-20 오후 03:00" and the picker icon fit (2026-10-20 user report: clipped). */
@@ -228,7 +259,6 @@
 
 /* Gallery previews: the same glass and layout as the real widgets, on a wallpaper-like stage. */
 .widget-stage{position:relative;overflow:hidden}
-[data-theme=dark] .widget-stage{box-shadow:inset 0 0 0 9999px rgba(8,12,22,.42)}
 .widget-preview{position:relative;isolation:isolate;border:0;border-radius:22px;background:var(--w-fill);backdrop-filter:blur(var(--w-blur,22px)) saturate(var(--w-sat,175%));box-shadow:var(--w-shadow);color:var(--w-text);padding:15px 15px 13px;min-height:170px}
 .preview-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .preview-head .widget-glyph,.preview-head .widget-note-glyph{width:22px;height:22px}
@@ -347,14 +377,13 @@
 [data-theme=dark]{--weekend:rgba(255,255,255,.028)}
 .calendar-grid.large .calendar-day.weekend,.calendar-grid.large .weekday.weekend{background:var(--weekend)}
 .calendar-grid.large .calendar-day.weekend.is-selected{background:color-mix(in srgb,var(--weekend) 50%,rgba(52,120,246,.05))}
-/* Notes list: pinned mark, drag targets, character count (2026-10-21). */
+/* Notes list: pinned mark, drag targets (2026-10-21). */
 .note-card strong{display:flex;align-items:center;gap:5px;min-width:0}
 .note-card strong>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .note-card.pinned strong svg{color:#e0a020;flex-shrink:0}
 .note-card.drop-before{box-shadow:inset 0 3px 0 var(--blue)}
 .note-cards.drop-end{box-shadow:inset 0 -3px 0 var(--blue)}
 .note-footer-status{display:flex;align-items:center;gap:12px;min-width:0}
-.note-count{color:var(--muted);font-variant-numeric:tabular-nums}
 .note-footer .icon-button.active{color:#e0a020}
 /* The note beside the tasks: a menu to pick it, long titles cut (2026-10-21). */
 .context-note .context-heading h3{display:flex;align-items:center;gap:6px;min-width:0}
@@ -628,16 +657,23 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 .widget-body.has-backdrop .widget-surface.lg,.widget-preview.lg{background:var(--lg-sheen);backdrop-filter:var(--lg-filter);box-shadow:var(--w-shadow),var(--lg-outline)}
 .widget-body .widget-surface.lg::before,.widget-body .widget-surface.lg-rim::before,.widget-preview.lg::before{box-shadow:var(--lg-edge);background:var(--lg-spec) 0 0/100% 100% no-repeat;opacity:var(--lg-spec-o)}
 @media(prefers-reduced-transparency:reduce){.widget-body.has-backdrop .widget-surface.lg,.widget-preview.lg{background:var(--bg)!important;backdrop-filter:none!important}}
-/* Gallery stages (2026-10-27 stage-design review): one calm pastel gradient per card (the 2026-10-20 look the user preferred)
-   plus a muted two-tone band of the same hue (inline SVG). Its crisp top edge climbs through the card's bottom-left corner,
-   runs flat under the card's lowest row and climbs out of the right edge, so the Liquid-Glass rim visibly bends it at two
-   places; a smooth gradient alone bends invisibly, and the 10-21/10-26 crisp colour circles read playful (user: 「알록달록…
-   유아용 같아」). The band is anchored to the stage's centre/bottom (the card is centred by flex), so it meets the card the
-   same way at every gallery width, and stretches past 420px (preserveAspectRatio none, size max(100%,420px) — a maximized
-   window showed the band's hard ends, 2026-10-27 re-review); the dark theme's inset overlay darkens it with the rest of the stage. */
-.widget-stage{background:url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20preserveAspectRatio%3D%22none%22%20viewBox%3D%220%200%20420%20230%22%20width%3D%22420%22%20height%3D%22230%22%3E%3Cg%3E%3Cpath%20fill%3D%22%23cbd7ec%22%20d%3D%22M-20%20208%20C%2040%20206%2062%20190%2092%20168%20C%20122%20146%20170%20138%20230%20136%20C%20290%20134%20330%20128%20440%2090%20L%20440%20260%20L%20-20%20260%20Z%22%2F%3E%3Cpath%20fill%3D%22%23a9bbda%22%20d%3D%22M-20%20230%20C%2040%20228%2062%20212%2092%20190%20C%20122%20168%20170%20160%20230%20158%20C%20290%20156%20330%20150%20440%20112%20L%20440%20260%20L%20-20%20260%20Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") center bottom/max(100%,420px) 230px no-repeat,linear-gradient(155deg,#e0eaf5,#d1dde9 40%,#ebdee2)}
-.widget-gallery-item:nth-child(2) .widget-stage{background:url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20preserveAspectRatio%3D%22none%22%20viewBox%3D%220%200%20420%20230%22%20width%3D%22420%22%20height%3D%22230%22%3E%3Cg%3E%3Cpath%20fill%3D%22%23c2dbd5%22%20d%3D%22M-20%20208%20C%2040%20206%2062%20190%2092%20168%20C%20122%20146%20170%20138%20230%20136%20C%20290%20134%20330%20128%20440%2090%20L%20440%20260%20L%20-20%20260%20Z%22%2F%3E%3Cpath%20fill%3D%22%239dc2b9%22%20d%3D%22M-20%20230%20C%2040%20228%2062%20212%2092%20190%20C%20122%20168%20170%20160%20230%20158%20C%20290%20156%20330%20150%20440%20112%20L%20440%20260%20L%20-20%20260%20Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") center bottom/max(100%,420px) 230px no-repeat,linear-gradient(150deg,#dfe9e4,#cddedd,#e2e4e9)}
-.widget-gallery-item:nth-child(3) .widget-stage{background:url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20preserveAspectRatio%3D%22none%22%20viewBox%3D%220%200%20420%20230%22%20width%3D%22420%22%20height%3D%22230%22%3E%3Cg%3E%3Cpath%20fill%3D%22%23ecd2c0%22%20d%3D%22M-20%20208%20C%2040%20206%2062%20190%2092%20168%20C%20122%20146%20170%20138%20230%20136%20C%20290%20134%20330%20128%20440%2090%20L%20440%20260%20L%20-20%20260%20Z%22%2F%3E%3Cpath%20fill%3D%22%23ddb69b%22%20d%3D%22M-20%20230%20C%2040%20228%2062%20212%2092%20190%20C%20122%20168%20170%20160%20230%20158%20C%20290%20156%20330%20150%20440%20112%20L%20440%20260%20L%20-20%20260%20Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") center bottom/max(100%,420px) 230px no-repeat,linear-gradient(160deg,#efe7de,#e6d8cf,#e5dfe6)}
+/* Gallery stages (2026-10-28 stage review, option 「새벽 풍경」): the three stages are three windows onto ONE light
+   landscape — a pale blue sky whitening toward the horizon, a small warm-white light low at the far right, a hazy far ridge
+   and slate-blue near hills — instead of three colour-coded pastel stages (user: 「색부터가 너무 촌스러워」). The image is
+   drawn once for the whole gallery (932x230 = 3 stages + 2 gaps at a 1240px window, preserveAspectRatio none) and each stage
+   shows its own third (size calc(300% + 2 gaps), position 0/50/100%); --wp-gap also sets the grid gap, so the slices and the
+   gaps cannot drift apart. As in D7 (10-27), the near ridge's crisp edge crosses every card's bottom-left and bottom-right
+   corner so the Liquid-Glass rim visibly bends it (the calendar sits on a low swell, not in a valley); the hills' chroma is
+   kept low because the glass saturates what it shows (220% at the clear end). The fallback colour lives in --wp-base so the
+   nth-child shorthands cannot reset it. Dark: the same scene at blue hour, its own image instead of the inset overlay. */
+.widget-gallery{--wp-gap:22px;gap:var(--wp-gap);--wp-base:#e9f0f7;--wp:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none' viewBox='0 0 932 230' width='932' height='230'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23dee9f5'/%3E%3Cstop offset='0.45' stop-color='%23ebf2f8'/%3E%3Cstop offset='0.75' stop-color='%23f3f6f9'/%3E%3Cstop offset='1' stop-color='%23f2f6f8'/%3E%3C/linearGradient%3E%3CradialGradient id='g0' gradientUnits='userSpaceOnUse' cx='910' cy='120' r='250' gradientTransform='translate(910 120) scale(1 0.55) translate(-910 -120)'%3E%3Cstop offset='0' stop-color='%23fff8ea' stop-opacity='0.75'/%3E%3Cstop offset='.5' stop-color='%23fff8ea' stop-opacity='0.3'/%3E%3Cstop offset='1' stop-color='%23fff8ea' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='g1' gradientUnits='userSpaceOnUse' cx='40' cy='20' r='440' gradientTransform='translate(40 20) scale(1 0.5) translate(-40 -20)'%3E%3Cstop offset='0' stop-color='%23d6e5f4' stop-opacity='0.35'/%3E%3Cstop offset='.5' stop-color='%23d6e5f4' stop-opacity='0.14'/%3E%3Cstop offset='1' stop-color='%23d6e5f4' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cfilter id='bf' x='-10%25' y='-60%25' width='120%25' height='220%25'%3E%3CfeGaussianBlur stdDeviation='11'/%3E%3C/filter%3E%3Cfilter id='bn' x='-10%25' y='-60%25' width='120%25' height='220%25'%3E%3CfeGaussianBlur stdDeviation='12'/%3E%3C/filter%3E%3Cfilter id='fs' x='-5%25' y='-20%25' width='110%25' height='140%25'%3E%3CfeGaussianBlur stdDeviation='0.9'/%3E%3C/filter%3E%3Cpath id='f' d='M-60 152 C-46.7 150.5 -8.3 146 20 143 C48.3 140 80 136 110 134 C140 132 170 130.3 200 131 C230 131.7 260 135.2 290 138 C320 140.8 350 145.7 380 148 C410 150.3 440 152.3 470 152 C500 151.7 530 148.7 560 146 C590 143.3 620 139.2 650 136 C680 132.8 710 129.3 740 127 C770 124.7 798 122.5 830 122 C862 121.5 905 123 932 124 C959 125 982 127.3 992 128 L992 270 L-60 270 Z'/%3E%3Cpath id='n' d='M-60 214 C-53.3 213.7 -31 213.5 -20 212 C-9 210.5 -2.7 208.2 6 205 C14.7 201.8 21.3 197.7 32 193 C42.7 188.3 55.3 182.2 70 177 C84.7 171.8 103.3 165.7 120 162 C136.7 158.3 153.3 156 170 155 C186.7 154 204.7 154.5 220 156 C235.3 157.5 249.3 160.3 262 164 C274.7 167.7 286.7 172.7 296 178 C305.3 183.3 310.5 193.3 318 196 C325.5 198.7 330.7 195.7 341 194 C351.3 192.3 363.5 188.2 380 186 C396.5 183.8 420 181.7 440 181 C460 180.3 480 180.8 500 182 C520 183.2 544.7 185.8 560 188 C575.3 190.2 583 192.3 592 195 C601 197.7 606.7 202.2 614 204 C621.3 205.8 628.3 207.7 636 206 C643.7 204.3 649.3 198.7 660 194 C670.7 189.3 683.3 183 700 178 C716.7 173 740 168 760 164 C780 160 800 157 820 154 C840 151 861.3 148.3 880 146 C898.7 143.7 913.3 141.7 932 140 C950.7 138.3 982 136.7 992 136 L992 270 L-60 270 Z'/%3E%3CclipPath id='cf'%3E%3Cuse href='%23f'/%3E%3C/clipPath%3E%3CclipPath id='cn'%3E%3Cuse href='%23n'/%3E%3C/clipPath%3E%3C/defs%3E%3Crect width='932' height='230' fill='url(%23s)'/%3E%3Crect width='932' height='230' fill='url(%23g0)'/%3E%3Crect width='932' height='230' fill='url(%23g1)'/%3E%3Cg filter='url(%23fs)'%3E%3Cuse href='%23f' fill='%23d7e1eb'/%3E%3Cg clip-path='url(%23cf)'%3E%3Cuse href='%23f' fill='%23ebf0f4' transform='translate(0 16)' filter='url(%23bf)'/%3E%3C/g%3E%3C/g%3E%3Crect width='932' height='230' fill='url(%23g0)' opacity='0.4'/%3E%3Crect width='932' height='230' fill='url(%23g1)' opacity='0.4'/%3E%3Cuse href='%23n' fill='%23b1bdce'/%3E%3Cg clip-path='url(%23cn)'%3E%3Cuse href='%23n' fill='%23d5dbe3' transform='translate(0 22)' filter='url(%23bn)'/%3E%3C/g%3E%3C/svg%3E")}
+[data-theme=dark] .widget-gallery{--wp-base:#2e3746;--wp:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none' viewBox='0 0 932 230' width='932' height='230'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23293242'/%3E%3Cstop offset='0.45' stop-color='%23323b4b'/%3E%3Cstop offset='0.72' stop-color='%23414856'/%3E%3Cstop offset='1' stop-color='%233f4552'/%3E%3C/linearGradient%3E%3CradialGradient id='g0' gradientUnits='userSpaceOnUse' cx='905' cy='135' r='300' gradientTransform='translate(905 135) scale(1 0.5) translate(-905 -135)'%3E%3Cstop offset='0' stop-color='%23525a6e' stop-opacity='0.5'/%3E%3Cstop offset='.5' stop-color='%23525a6e' stop-opacity='0.2'/%3E%3Cstop offset='1' stop-color='%23525a6e' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='g1' gradientUnits='userSpaceOnUse' cx='40' cy='20' r='440' gradientTransform='translate(40 20) scale(1 0.5) translate(-40 -20)'%3E%3Cstop offset='0' stop-color='%23192232' stop-opacity='0.4'/%3E%3Cstop offset='.5' stop-color='%23192232' stop-opacity='0.16'/%3E%3Cstop offset='1' stop-color='%23192232' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cfilter id='bf' x='-10%25' y='-60%25' width='120%25' height='220%25'%3E%3CfeGaussianBlur stdDeviation='11'/%3E%3C/filter%3E%3Cfilter id='bn' x='-10%25' y='-60%25' width='120%25' height='220%25'%3E%3CfeGaussianBlur stdDeviation='12'/%3E%3C/filter%3E%3Cfilter id='fs' x='-5%25' y='-20%25' width='110%25' height='140%25'%3E%3CfeGaussianBlur stdDeviation='0.9'/%3E%3C/filter%3E%3Cpath id='f' d='M-60 152 C-46.7 150.5 -8.3 146 20 143 C48.3 140 80 136 110 134 C140 132 170 130.3 200 131 C230 131.7 260 135.2 290 138 C320 140.8 350 145.7 380 148 C410 150.3 440 152.3 470 152 C500 151.7 530 148.7 560 146 C590 143.3 620 139.2 650 136 C680 132.8 710 129.3 740 127 C770 124.7 798 122.5 830 122 C862 121.5 905 123 932 124 C959 125 982 127.3 992 128 L992 270 L-60 270 Z'/%3E%3Cpath id='n' d='M-60 214 C-53.3 213.7 -31 213.5 -20 212 C-9 210.5 -2.7 208.2 6 205 C14.7 201.8 21.3 197.7 32 193 C42.7 188.3 55.3 182.2 70 177 C84.7 171.8 103.3 165.7 120 162 C136.7 158.3 153.3 156 170 155 C186.7 154 204.7 154.5 220 156 C235.3 157.5 249.3 160.3 262 164 C274.7 167.7 286.7 172.7 296 178 C305.3 183.3 310.5 193.3 318 196 C325.5 198.7 330.7 195.7 341 194 C351.3 192.3 363.5 188.2 380 186 C396.5 183.8 420 181.7 440 181 C460 180.3 480 180.8 500 182 C520 183.2 544.7 185.8 560 188 C575.3 190.2 583 192.3 592 195 C601 197.7 606.7 202.2 614 204 C621.3 205.8 628.3 207.7 636 206 C643.7 204.3 649.3 198.7 660 194 C670.7 189.3 683.3 183 700 178 C716.7 173 740 168 760 164 C780 160 800 157 820 154 C840 151 861.3 148.3 880 146 C898.7 143.7 913.3 141.7 932 140 C950.7 138.3 982 136.7 992 136 L992 270 L-60 270 Z'/%3E%3CclipPath id='cf'%3E%3Cuse href='%23f'/%3E%3C/clipPath%3E%3CclipPath id='cn'%3E%3Cuse href='%23n'/%3E%3C/clipPath%3E%3C/defs%3E%3Crect width='932' height='230' fill='url(%23s)'/%3E%3Crect width='932' height='230' fill='url(%23g0)'/%3E%3Crect width='932' height='230' fill='url(%23g1)'/%3E%3Cg filter='url(%23fs)'%3E%3Cuse href='%23f' fill='%23343c4b'/%3E%3Cg clip-path='url(%23cf)'%3E%3Cuse href='%23f' fill='%233c4250' transform='translate(0 16)' filter='url(%23bf)'/%3E%3C/g%3E%3C/g%3E%3Crect width='932' height='230' fill='url(%23g0)' opacity='0.25'/%3E%3Crect width='932' height='230' fill='url(%23g1)' opacity='0.25'/%3E%3Cuse href='%23n' fill='%231d2534'/%3E%3Cg clip-path='url(%23cn)'%3E%3Cuse href='%23n' fill='%23272e3c' transform='translate(0 22)' filter='url(%23bn)'/%3E%3C/g%3E%3C/svg%3E")}
+.widget-stage,.widget-gallery-item:nth-child(2) .widget-stage,.widget-gallery-item:nth-child(3) .widget-stage{background:var(--wp) 0 0/calc(300% + 2 * var(--wp-gap)) 100% no-repeat var(--wp-base)}
+.widget-gallery-item:nth-child(2) .widget-stage{background-position:50% 0}
+.widget-gallery-item:nth-child(3) .widget-stage{background-position:100% 0}
+[data-theme=dark] .widget-stage{box-shadow:none}
+@media(max-width:1080px){.widget-gallery{--wp-gap:15px}}
+@media(max-width:930px){.widget-gallery{--wp-gap:12px}}
 /* Help review fixes (2026-10-21): the foot keeps the account label whole (footerFit in help.js), stacks at 450px; the tour card
    takes focus without a ring for mouse users; gray 「건너뛰기」 in both themes; a focused note row shows its ring inside the row
    (the group clips outside rings); the selected row in 최근 삭제한 메모 stays neutral like its editor. */
@@ -698,7 +734,7 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 .card-chip input{position:absolute;width:0;height:0;margin:0;opacity:0;pointer-events:none}
 .card-chip{position:relative}
 /* Colour marks are circles everywhere. */
-.card-color{width:14px;height:14px;border-radius:50%}
+.card-color{width:14px;height:14px;border-radius:50%;position:relative}
 .card-cal i{border-radius:50%}
 /* Sibling icon buttons share one size and one glyph size. */
 .sidebar-tools .icon-button,.sidebar-bottom .account-button{width:32px;height:32px;border-radius:8px}
@@ -759,3 +795,82 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
    months, 「September – October 2026」, at 900–1160px — the title is cut with an ellipsis instead of the bar sliding under the window's
    own buttons. Otherwise the title keeps its full text (the 2026-10-26 rule: the tools give first, by their padding). */
 @media(min-width:700px){.topbar-main>:not(h1):not(.topbar-spacer){flex-shrink:0}.topbar-main h1{flex-shrink:1;min-width:0}}
+/* ---- 2026-10-28 Codex review, area F ---- */
+/* D06: the 변경 버리기 / 계속 편집 choice is a footer of its own (the same sticky, opaque box); the form's footer waits under it. */
+.dialog-body:has(>.dialog-guard)>.dialog-footer:not(.dialog-guard){display:none}
+/* D07: the note footer's 다시 시도 sits beside the status at the footer's 12px, like 저장 실패 (.text-button's 13px drew it a size
+   up: 2026-10-28 review). It comes and goes by its hidden attribute, and .text-button's display:inline-flex beat the browser's own
+   [hidden] rule, so every saved note showed it (2026-10-28 review). The footer says nothing while all is well (2026-10-28 owner);
+   a note widget's footer then takes no room and the text gets it, until a problem (저장 실패, 동기화 안 됨) brings it back. */
+.note-retry{font-size:12px;padding:2px 6px;margin-left:-6px}.note-retry[hidden]{display:none}.note-editor.compact>.note-footer.quiet{display:none}
+/* With the footer gone the text would run under the widget's resize grip (8px in, 24px: 2026-10-29 Codex check — the last line's end
+   took a resize instead of the caret): the text stops at the grip's top. A shown footer keeps the old 14px; its status sits left of
+   the grip. A small widget lets the text shrink rather than push the lines out of the card. */
+.widget-body.note-widget .note-editor.compact:has(>.note-footer.quiet){padding-bottom:32px}.widget-body.note-widget .note-body{min-height:0}
+/* D08: the colour dot keeps its 14px look; an invisible 28px area around it takes the click (7px beyond it on each side — the spacer
+   follows it, nothing else is that near). One keyboard-focus mark for the card's fields, on :focus-visible so a mouse click draws no
+   ring: the title's thin blue line under the time, date and place (with the tint they show on hover), a thin inset line round the
+   pills (repeat, alert, calendar, all-day) and a thin ring round the dot. */
+.card-color::before{content:"";position:absolute;inset:-7px;border-radius:50%}
+.event-card .card-title:focus-visible,.event-card .card-time:focus-visible,.event-card .card-input:focus-visible,.event-card .card-date:focus-visible{outline:none;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--blue) 45%,transparent)}
+.event-card .card-date:focus-visible{background:var(--hover)}
+.event-card .card-repeat:focus-visible,.event-card .card-select:focus-visible,.event-card .card-chip:has(input:focus-visible){outline:none;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--blue) 45%,transparent)}.event-card .card-chip input:focus-visible{outline:none}
+.event-card .card-color:focus-visible{outline:none;box-shadow:0 0 0 2px var(--bg),0 0 0 3px color-mix(in srgb,var(--blue) 45%,transparent)}
+/* D10: the calendar title that opens 날짜로 이동 shows a small muted chevron inside the same button (Apple's title menus). The
+   chevron gives way first: the button wraps, so a chevron with no room drops to a second line that the button's one-line height
+   hides, and only then does the text shorten with its ellipsis (a fixed breakpoint did not hold: at 931px English 「October 2026」
+   was cut for it). The bar's buttons keep their size. */
+.topbar-main h1 .title-button{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px 3px;height:calc(1lh + 6px)}.topbar-main h1 .title-text{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.topbar-main h1 .title-button svg{flex:none;color:var(--muted);margin-top:2px}
+
+/* ===== 2026-10-28 owner request (area H): every drop-down opens as an Apple pop-up menu, not the Windows list =====
+   「달력에서 … 창 너무 옛날 윈도우 디자인 같아. 애플 디자인에 맞춰서 유려하게 바꿔줘」 (the event card's 반복·알림 opened the square, flat-blue
+   Windows list). Chromium's customizable select (appearance: base-select, Electron 44) keeps the real <select> — value, change,
+   arrows · type-ahead · Enter · Esc, screen readers — and draws its list in the page, so the list takes the app's own menu material
+   (.context-menu: glass, --r-pop, hairline, shadow) and stays inside the window: below or above, whichever has more room, scrolling
+   when even that is short (a 300×360 widget). The renderer's key handlers leave an open list's keys to it (app.js, calendar.js). */
+select,::picker(select){appearance:base-select}
+:root{--chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12' viewBox='0 0 8 12'%3E%3Cpath d='M1.5 4.5 4 2l2.5 2.5M1.5 7.5 4 10l2.5-2.5' fill='none' stroke='%238a8d97' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");--checkmark:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.25 6.4 4.9 9 9.75 3' fill='none' stroke='%23000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+[data-theme=dark]{--chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12' viewBox='0 0 8 12'%3E%3Cpath d='M1.5 4.5 4 2l2.5 2.5M1.5 7.5 4 10l2.5-2.5' fill='none' stroke='%23989dab' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+/* Closed, each control keeps its field (the card's 28px pills too); a form select is now exactly as tall as the text fields beside it
+   (41.5px — the Windows box was 39). The Windows arrow becomes macOS's up-down chevron, as a background so a long label stops at the
+   text box instead of running under it (base-select has no ellipsis for its label); the fields' own background shorthands (focus,
+   the repeat row) would drop it, hence !important on these four. A control without a set width hugs its label, as Apple's do. */
+select{align-items:center;white-space:nowrap;overflow:clip;overflow-clip-margin:content-box;cursor:pointer;padding-right:32px;background-image:var(--chevron)!important;background-repeat:no-repeat!important;background-size:8px 12px!important;background-position:right var(--chevron-x,13px) center!important}
+select::picker-icon{display:none}
+select.form-input{padding-right:32px}
+.widget-body select.form-input{padding-right:28px;--chevron-x:11px}
+select.card-repeat,select.card-select{padding-right:24px;--chevron-x:9px}
+select.form-input:open{border-color:color-mix(in srgb,var(--blue) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent);background-color:var(--bg)}
+/* The card's pills: the soft field ring of the other inputs (2026-10-26), not the 3px outline; pressed while the menu is open. */
+select.card-repeat:focus-visible,select.card-select:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--blue) 55%,transparent)}
+select.card-repeat:open,select.card-select:open{background-color:color-mix(in srgb,var(--text) 7%,var(--field))}
+/* The menu: .context-menu's glass, radius, hairline and shadow; 13px rows with the menu's rounded highlight; a checkmark beside the
+   chosen item; hairlines between groups. A short fade in (none with reduced motion). */
+::picker(select){margin:4px 0;padding:6px;border-radius:var(--r-pop);background:var(--glass);border:1px solid rgba(255,255,255,.7);box-shadow:0 12px 40px rgba(25,35,60,.22),0 0 0 1px rgba(30,36,50,.06);backdrop-filter:blur(30px) saturate(130%);color:var(--text);font-size:13px;font-weight:400;letter-spacing:normal;white-space:normal;min-width:max(anchor-size(width),120px);max-width:calc(100vw - 16px);max-height:min(calc(100% - 8px),420px);overflow-y:auto;overscroll-behavior:contain;-webkit-app-region:no-drag;opacity:0;scale:.98;transform-origin:top center;transition:opacity .1s ease-out,scale .1s ease-out,overlay .1s allow-discrete,display .1s allow-discrete}
+select:open::picker(select){opacity:1;scale:1;transition-duration:.14s}
+@starting-style{select:open::picker(select){opacity:0;scale:.98}}
+[data-theme=dark] ::picker(select){border-color:#ffffff14}
+/* Its scrollbar is the app's (a 5px rounded thumb, no arrows): the page-wide ::-webkit-scrollbar does not reach into the select, and
+   scrollbar-width:thin drew Windows' bar with arrow buttons (2026-10-28 review, area H). In a widget it shows only while the pointer
+   is on the menu or its control, as the widget's own scroll areas do on the card (the menu's hover does not reach the select). */
+::picker(select)::-webkit-scrollbar{width:5px}
+::picker(select)::-webkit-scrollbar-thumb{background:#9199ab33;border-radius:5px}
+::picker(select)::-webkit-scrollbar-track{background:transparent;margin:6px 0}
+.widget-body ::picker(select)::-webkit-scrollbar-thumb{background:transparent}
+.widget-body select:hover::picker(select)::-webkit-scrollbar-thumb,.widget-body ::picker(select):hover::-webkit-scrollbar-thumb{background:#9199ab40}
+select option{display:flex;align-items:center;gap:7px;min-height:30px;padding:5px 12px 5px 8px;border-radius:8px;font-size:13px;line-height:1.45;font-weight:400;color:var(--text);background:none;overflow-wrap:anywhere;cursor:default}
+select option:focus-visible{outline:none}
+select option:checked{font-weight:400}
+/* One highlight, as a Mac menu (2026-10-28 review, area H: the hovered row and the arrow keys' row were both shaded). The keys' row
+   wins over a row the pointer only rests on; app.js moves the focus to the row a moved pointer (or its wheel) brings, so the highlight follows
+   whichever moved last and is the row Enter picks. Hover alone still shades in a window without keyboard focus. With the pointer off
+   the rows nothing is shaded, as a Mac menu (app.js sets data-pointer-off and gives the focus back to the chosen item, which Enter keeps). */
+select option:is(:hover,:focus-visible){background:var(--hover)}
+select:has(option:focus-visible) option:hover:not(:focus-visible){background:none}
+select[data-pointer-off] option:focus-visible:not(:hover){background:none}
+select option::checkmark{content:"";flex:none;width:12px;height:12px;background:currentColor;-webkit-mask:var(--checkmark) no-repeat center/contain;mask:var(--checkmark) no-repeat center/contain}
+select option:not(:checked)::checkmark{visibility:hidden}
+select option:disabled{color:var(--muted)}
+select hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){::picker(select),select:open::picker(select){transition:none}}

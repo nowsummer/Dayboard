@@ -10,7 +10,7 @@ Clean like a Mac or iPhone. Quick on Windows.<br>Tasks, calendar and notes, with
 
 [**Download for Windows**](https://github.com/nowsummer/Dayboard/releases/latest) · [Website](https://nowsummer.github.io/Dayboard/en/) · [Privacy](https://nowsummer.github.io/Dayboard/en/privacy.html)
 
-<img src="images/en/demo.gif" width="860" alt="Adding and completing a task, dragging events in the month and week calendar, notes, then a widget put on the desktop and its glass adjusted in Dayboard">
+<img src="images/en/demo.webp" width="860" alt="Adding and completing a task, dragging events in the month and week calendar, notes, then a widget put on the desktop and its glass adjusted in Dayboard">
 
 </div>
 

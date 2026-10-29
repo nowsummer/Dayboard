@@ -39,22 +39,35 @@ app.whenReady().then(async () => {
     }
     if (!main) throw new Error('main window not ready');
     const invoke = (name, payload = {}) => main.webContents.executeJavaScript(`window.dayboard.invoke(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
-    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', widgetMode: 'desktop', glassLevel: 0.5 });
+    // autoUpdate off, as in readme-demo.cjs: the hold (60 s, up to 180) can outlast the first update check, 90 s after start.
+    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', widgetMode: 'desktop', glassLevel: 0.5, autoUpdate: false });
     const { focusNote } = await seedSample(invoke, new Date(), LANG);
     main.hide();
-    // The calendar is made tall enough to show today's events in full before the others take the free spots around it.
-    const calendar = await invoke('widget:open', { type: 'calendar' });
-    for (let i = 0; i < 50; i++) {
-      const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('widget=calendar'));
-      if (win && !win.webContents.isLoading() && await win.webContents.executeJavaScript('!!window.dayboard').catch(() => false)) {
-        await win.webContents.executeJavaScript(`window.dayboard.invoke('widget:resize', { id: ${JSON.stringify(calendar.id)}, width: 360, height: 540 })`);
-        break;
+    // One row, top-aligned, as on a 125 % screen (on a 100 % one the tasks widget fitted under the calendar and the picture came
+    // out tall, 2026-10-29): each widget stands as tall as the screen allows (16 px above and below, so it does not move) until
+    // the next one has taken its free spot to its left, then gets its own height — the calendar tall enough for today's events
+    // in full. A widget is resized from its own window (widget:resize); the answer is its real place, which the stored record
+    // does not follow at once.
+    const widgetWin = async type => {
+      for (let i = 0; i < 100; i++) {
+        const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w.webContents.getURL().includes(`widget=${type}`));
+        if (win && !win.webContents.isLoading() && await win.webContents.executeJavaScript('!!window.dayboard').catch(() => false)) return win;
+        await wait(100);
       }
-      await wait(100);
-    }
+      throw new Error(`${type} widget not ready`);
+    };
+    const placed = {};
+    const resize = async (type, id, height) => { placed[id] = await (await widgetWin(type)).webContents.executeJavaScript(`window.dayboard.invoke('widget:resize', ${JSON.stringify({ id, width: 360, height })})`); };
+    const tall = screen.getPrimaryDisplay().workAreaSize.height - 32;
+    const calendar = await invoke('widget:open', { type: 'calendar' });
+    await resize('calendar', calendar.id, tall);
     await wait(800);
-    await invoke('widget:open', { type: 'tasks', listId: 'today' });
+    const tasks = await invoke('widget:open', { type: 'tasks', listId: 'today' });
+    await resize('tasks', tasks.id, tall);
+    await wait(800);
     await invoke('widget:open', { type: 'note', noteId: focusNote.id });
+    await resize('tasks', tasks.id, 450);
+    await resize('calendar', calendar.id, 540);
     // Wait until all three are attached to the desktop and have painted the wallpaper behind their glass.
     let widgets = [];
     for (let i = 0; i < 100; i++) {
@@ -64,6 +77,7 @@ app.whenReady().then(async () => {
     }
     await wait(1500);
     const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
+    widgets = widgets.map(w => placed[w.id] ? { ...w, bounds: placed[w.id] } : w);
     fs.writeFileSync(path.join(OUT, 'widgets-hold.json'), JSON.stringify({ scaleFactor, holdMs: HOLD, widgets: widgets.map(w => ({ type: w.type, status: w.desktopStatus, backdrop: w.backdrop, bounds: w.bounds })) }, null, 2));
     console.log('[widgets] holding', JSON.stringify(widgets.map(w => [w.type, w.desktopStatus, w.backdrop, w.bounds])));
     await wait(HOLD);

@@ -54,7 +54,7 @@ function fakeToDo({ mode = 'roll', expand = true, dropOnComplete = false, fail =
     }
     if ((m = tail.match(/^\/me\/todo\/lists\/RL\/tasks\/([^/]+)$/))) {
       const task = tasks.get(m[1]); if (!task) throw httpError(404);
-      if (method === 'GET') return shown(task);
+      if (method === 'GET') return query.includes('expand') ? withSteps(task) : shown(task); // one task expands its steps as the list does (2026-10-28 review R1: 되돌리기 reads the twin with them)
       if (method === 'DELETE') { tasks.delete(m[1]); return null; }
       if (method === 'PATCH') {
         const wasOpen = task.status !== 'completed';
@@ -145,9 +145,13 @@ test('To Do repeat (a next task is added): 되돌리기 reopens first, takes the
   assert.equal(done.completed, true); assert.equal(done.rolledFrom, undefined); assert.equal(done.resync, true);
   const next = [...tasks.values()].find(task => task.id !== open.remoteId && task.status !== 'completed');
   const stored = { ...done, repeatRule: 'FREQ=DAILY', repeatAt: done.repeatAt };
+  const mark = log.length;
   const back = await provider.mutateTask('update', { ...stored, completed: false, undoRepeat: 'spawn' }, list, stored);
-  const order = log.filter(entry => entry.method !== 'GET').slice(-3).map(entry => `${entry.method} ${entry.tail.split('/').at(-1)}`);
-  assert.deepEqual(order, [`PATCH ${open.remoteId}`, `DELETE ${next.id}`, `PATCH ${open.remoteId}`], 'reopen, drop the next one, then the repeat');
+  const order = log.slice(mark).filter(entry => entry.method !== 'GET' || /\/tasks\/T/.test(entry.tail)).map(entry => `${entry.method} ${entry.tail.split('/').at(-1)}`);
+  // 2026-10-28 Codex review R2: the next one is read first, then one PATCH reopens the task with its repeat, then the next one goes
+  // (the old order — reopen, delete, restore — left no repeating task when its last request failed).
+  assert.deepEqual(order, [`GET ${next.id}`, `PATCH ${open.remoteId}`, `DELETE ${next.id}`], 'read the next one, reopen with the repeat, drop the next one');
+  assert.ok(log.slice(mark).find(entry => entry.method === 'PATCH').body.recurrence, 'the repeat goes back with the reopen');
   assert.deepEqual(back.dropped, [next.id]); assert.equal(back.rrule, 'FREQ=DAILY'); assert.equal(tasks.size, 1);
   // A next task written on since (a note on the phone) stays, and the repeat does not come back beside it (two series).
   const second = fakeToDo({ mode: 'spawn', dropOnComplete: true });

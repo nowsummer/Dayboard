@@ -49,6 +49,27 @@ function assertRegularFile(filename) {
   }
 }
 
+// The exe's file version in Windows' own four-number form (1.2.0 → 1.2.0.0); the product version stays the app's. The exe
+// packager makes says 1.2.0, and on the maintainer's PC Smart App Control refused it for 1.1.4 and 1.2.0 while the same exe
+// with only this field rewritten ran (2026-10-28, 10-29; packager's own buildVersion gave yet another hash, also refused). Done
+// before the bundle is checked and tried, so build-info.json, the trial run and the installer all carry this exe. resedit is
+// the library packager itself writes the version resource with.
+async function stampFileVersion(exe, version) {
+  const parts = String(version).split('.').map(Number);
+  if (parts.length !== 3 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 65535)) throw new Error(`앱 버전이 x.y.z 형식이 아닙니다: ${version}`);
+  const ResEdit = await import('resedit');
+  const image = ResEdit.NtExecutable.from(fs.readFileSync(exe));
+  const resources = ResEdit.NtExecutableResource.from(image);
+  const [info] = ResEdit.Resource.VersionInfo.fromEntries(resources.entries);
+  if (!info) throw new Error('Dayboard.exe에 버전 정보가 없습니다.');
+  const fileVersion = [...parts, 0].join('.');
+  info.setFileVersion(parts[0], parts[1], parts[2], 0, 1033);
+  for (const language of info.getAllLanguagesForStringValues()) info.setStringValues(language, { FileVersion: fileVersion });
+  info.outputToResourceEntries(resources.entries);
+  resources.outputResource(image);
+  fs.writeFileSync(exe, Buffer.from(image.generate()));
+}
+
 function verifyBundle(directory) {
   const appDir = path.join(directory, 'resources', 'app');
   const executable = path.join(directory, 'Dayboard.exe');
@@ -219,6 +240,7 @@ async function main() {
       win32metadata: { CompanyName: 'Dayboard', FileDescription: 'Dayboard · 할 일, 일정, 메모', ProductName: 'Dayboard' },
     });
     if (results.length !== 1 || path.resolve(results[0]) !== staged) throw new Error('패키지 출력 경로가 예상과 다릅니다.');
+    await stampFileVersion(path.join(staged, 'Dayboard.exe'), manifest.version);
     writeUpdateFeed(staged);
     const result = verifyBundle(staged);
     probeBundle(staged, scratch);

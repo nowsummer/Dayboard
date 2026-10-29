@@ -2,13 +2,14 @@
 // Frames of the short demo animation for the public pages (README, index.html): this source app in a brand-new temporary
 // profile with the invented sample data of scripts/readme-sample.cjs, driven by script — quick add, completing a task,
 // the month and week calendar, an event card, notes — with a drawn pointer, recorded as it paints. The user's real
-// profile and accounts are never touched. scripts/readme-gif.py turns the frames into images/demo.gif (2026-10-27).
+// profile and accounts are never touched. scripts/readme-gif.py turns the frames into images/demo.webp (2026-10-27; WebP
+// instead of GIF since 2026-10-28).
 // Run from 개발 자료/:  node_modules/.bin/electron.cmd scripts/readme-demo.cjs   (DAYBOARD_SHOTS_LANG=en for English)
 // Output: %TEMP%/dayboard-readme-demo/<ko|en>/f_<n>_<ms>.png (or DAYBOARD_DEMO_OUT). The window appears at the top-left.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample, shotsLanguage, morningClock } = require('./readme-sample.cjs');
+const { seedSample, shotsLanguage, morningClock, writeSampleMark, demoText } = require('./readme-sample.cjs');
 
 const LANG = shotsLanguage();
 const WIDTH = 1120, HEIGHT = 720;
@@ -24,7 +25,11 @@ process.chdir(APP_DIR);
 
 const { Worker } = require('node:worker_threads');
 const { app, BrowserWindow } = require('electron');
-app.commandLine.appendSwitch('force-device-scale-factor', '1');
+// Recorded at twice the window's size and scaled down by readme-gif.py: at 1x the text was drawn for 1120 px and blurred when
+// resized, and the pages show the picture larger than that on 125–200 % screens (2026-10-28 user: 「화질이 별로」).
+// DAYBOARD_DEMO_SCALE=1 records as before.
+const SCALE = Number(process.env.DAYBOARD_DEMO_SCALE) > 0 ? Number(process.env.DAYBOARD_DEMO_SCALE) : 2;
+app.commandLine.appendSwitch('force-device-scale-factor', String(SCALE));
 app.commandLine.appendSwitch('lang', LANG === 'en' ? 'en-US' : 'ko-KR');
 require(path.join(APP_DIR, 'main.cjs'));
 
@@ -41,10 +46,9 @@ parentPort.on('message', ({ file, width, height, bgra }) => {
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 6;
   fs.writeFileSync(file, Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw, { level: 3 })), chunk('IEND', Buffer.alloc(0))]));
 });`;
-const TEXT = {
-  ko: { quick: '오후 5시 은행에 전화하기', done: '우유·달걀·사과 사기', calendar: 1, week: '주', event: '점심 약속 · 민지', notes: 2, move: ['독서 모임', '가족 저녁 식사', '치과 정기 검진'], stretch: '디자인 워크숍' },
-  en: { quick: 'Call the bank at 5pm', done: 'Milk, eggs and apples', calendar: 1, week: 'Week', event: 'Lunch with Mia', notes: 2, move: ['Book club', 'Family dinner', 'Dentist check-up'], stretch: 'Design workshop' },
-}[LANG];
+// What it types, completes, drags, stretches and opens comes from the sample (readme-sample.cjs demoText), so it is always there
+// (r50 M); here only the app's own navigation: the calendar and notes buttons, the week button's label.
+const TEXT = { ...demoText(LANG), calendar: 1, week: LANG === 'en' ? 'Week' : '주', notes: 2 };
 
 // A drawn pointer (the real one is not in the recording) that glides to each target, and a ring where it clicks.
 const PAGE = `(() => {
@@ -91,7 +95,8 @@ app.whenReady().then(async () => {
     if (!main) throw new Error('main window not ready');
     const js = code => main.webContents.executeJavaScript(code);
     const invoke = (name, payload = {}) => js(`window.dayboard.invoke(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
-    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true });
+    // autoUpdate off: the throwaway profile never asks GitHub for a new version (the first check is 90 s after start).
+    await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true, autoUpdate: false });
     await seedSample(invoke, new Date(), LANG);
     await morningClock(main); // 9:41 on the page, so today's events are not drawn as past
     main.setBounds({ x: 0, y: 0, width: WIDTH, height: HEIGHT });
@@ -103,7 +108,8 @@ app.whenReady().then(async () => {
 
     // ---- Recording: every painted frame, at most one per 45 ms ----
     let recording = false; let last = 0; let n = 0;
-    const writer = new Worker(WRITER, { eval: true });
+    // Several writers: a 2x frame has four times the pixels to convert and compress, and waiting frames are held in memory.
+    const writers = Array.from({ length: SCALE > 1 ? 4 : 1 }, () => new Worker(WRITER, { eval: true }));
     main.webContents.beginFrameSubscription(false, image => {
       const now = Date.now();
       if (!recording || now - last < 45) return;
@@ -111,7 +117,7 @@ app.whenReady().then(async () => {
       const { width, height } = image.getSize(); const bgra = image.toBitmap();
       if (bgra.length !== width * height * 4) return;
       const copy = bgra.buffer.slice(bgra.byteOffset, bgra.byteOffset + bgra.length);
-      writer.postMessage({ file: path.join(OUT, `f_${String(++n).padStart(5, '0')}_${now}.png`), width, height, bgra: copy }, [copy]);
+      writers[n % writers.length].postMessage({ file: path.join(OUT, `f_${String(++n).padStart(5, '0')}_${now}.png`), width, height, bgra: copy }, [copy]);
     });
     const point = async (code, what) => { const p = await js(code); if (!p) throw new Error(`demo target not found: ${what}`); return p; };
     const glide = async (p, ms = 650) => { main.webContents.sendInputEvent({ type: 'mouseMove', x: p.x, y: p.y }); await js(`__demo.move(${p.x}, ${p.y}, ${ms})`); await wait(ms + 60); };
@@ -164,7 +170,7 @@ app.whenReady().then(async () => {
     await click(await point(`__demo.byText(${JSON.stringify(TEXT.week)}, 'button')`, 'week button'), 600);
     await js(`(() => { const s = document.querySelector('.time-scroll'); if (s) { s.scrollTo({ top: 8.5 * calHour, behavior: 'smooth' }); } })()`);
     await hold(900);
-    // Week: tomorrow's workshop made an hour longer by its bottom edge.
+    // Week: this week's workshop made an hour longer by its bottom edge.
     const edge = await point(`(() => { const block = [...document.querySelectorAll('.time-event')].find(el => el.textContent.includes(${JSON.stringify(TEXT.stretch)})); const handle = block?.querySelector('.resize-handle.bottom'); if (!handle) return null; const r = handle.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 3) }; })()`, 'resize handle');
     const hour = await js('calHour');
     await drag(edge, { x: edge.x, y: Math.round(edge.y + hour) }, 900);
@@ -181,8 +187,10 @@ app.whenReady().then(async () => {
     await wait(120);
     recording = false;
     main.webContents.endFrameSubscription();
-    await new Promise(resolve => { writer.once('message', resolve); writer.postMessage({}); });
-    await writer.terminate();
+    await Promise.all(writers.map(writer => new Promise(resolve => { writer.once('message', resolve); writer.postMessage({}); })));
+    await Promise.all(writers.map(writer => writer.terminate()));
+    // Written only once every frame is: readme-gif.py joins the desktop scene only to app frames whose sample.json is the same.
+    writeSampleMark(OUT, LANG);
     console.log(`[demo] ${n} frames in ${OUT}`);
   } catch (error) {
     console.error('[demo] ERROR', error.stack || error.message);

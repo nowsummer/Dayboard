@@ -21,7 +21,7 @@ const CAL_STEP=15;                   // minutes: every drag and time list snaps 
 const calMode=()=>['month','week','day'].includes(state?.settings?.calendarView)?state.settings.calendarView:'month';
 const calDays=()=>calMode()==='day'?[selectedDate]:D.weekDays(selectedDate);
 const calMonthKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-const calFieldFocused=()=>{const a=document.activeElement;return Boolean(a&&(['INPUT','TEXTAREA','SELECT'].includes(a.tagName)||a.isContentEditable));};
+const calFieldFocused=()=>{const a=document.activeElement;return Boolean(a&&(['INPUT','TEXTAREA','SELECT'].includes(a.tagName)||a.isContentEditable||a.closest?.('select')));};/* an option of an open drop-down menu is its select (area H: a save that lands while the menu is open does not re-draw the card under it) */
 function calSyncMonth(){const d=D.fromDate(selectedDate);month=new Date(d.getFullYear(),d.getMonth(),1);calTop=null;}
 
 // ---- Views and navigation ----
@@ -54,10 +54,16 @@ function calendarToolbar(){
   const mode=calMode(),spacer=h('span',{class:'topbar-spacer'});
   const labels={month:[tr('이전 달'),tr('다음 달')],week:[tr('이전 주'),tr('다음 주')],day:[tr('이전 날'),tr('다음 날')]}[mode];
   const names={day:tr('일간 보기'),week:tr('주간 보기'),month:tr('월간 보기')};
-  const switcher=h('div',{class:'view-switch',role:'radiogroup','aria-label':tr('달력 보기')},[['day',tr('일'),'D'],['week',tr('주'),'W'],['month',tr('월'),'M']].map(([m,label,key])=>h('button',{type:'button',class:'view-switch-item'+(m===mode?' on':''),role:'radio','aria-checked':m===mode,'aria-label':names[m],title:names[m]+' ('+key+')','data-focus-key':'view-'+m,onclick:()=>setCalMode(m)},label)));
+  // One Tab stop (the view in use); ← → ↑ ↓ change the view and keep the keyboard on it (2026-10-28 Codex review D09, C3: all three
+  // were stops and the arrows did nothing). radioKeys stops the arrows here, so they never move the calendar's day. The keyboard
+  // goes to the view in use afterwards, which is the old one when a card's open repeat question holds the change (setCalMode).
+  const modes=['day','week','month'];
+  const switcher=h('div',{class:'view-switch',role:'radiogroup','aria-label':tr('달력 보기')},[['day',tr('일'),'D'],['week',tr('주'),'W'],['month',tr('월'),'M']].map(([m,label,key],i)=>h('button',{type:'button',class:'view-switch-item'+(m===mode?' on':''),role:'radio','aria-checked':m===mode,tabindex:m===mode?0:-1,'aria-label':names[m],title:names[m]+' ('+key+')','data-focus-key':'view-'+m,onclick:()=>setCalMode(m),onkeydown:e=>radioKeys(e,modes.length,i,to=>{setCalMode(modes[to]);document.querySelector('.view-switch [aria-checked="true"]')?.focus({preventScroll:true});})},label)));
   const open=calPanelDocked()||calDrawer;
-  // The title opens 「날짜로 이동」 (Apple Calendar's Go to Date, ⌘⇧T there), as clicking the month in Notion Calendar does.
-  return [h('h1',{},h('button',{type:'button',class:'title-button','aria-label':calendarTitle()+', '+tr('날짜로 이동'),title:tr('날짜로 이동')+' (Ctrl+Shift+T)','data-focus-key':'go-date',onclick:calGoToDate},calendarTitle())),h('div',{class:'inline-actions month-nav'},keyed(ib('left',labels[0],()=>calendarStep(-1)),'month-prev','Ctrl+←'),keyed(ib('right',labels[1],()=>calendarStep(1)),'month-next','Ctrl+→')),keyed(btn(tr('오늘'),goToday,'button subtle'),'month-today','T'),spacer,switcher,keyed(ib('panel',open?tr('오른쪽 패널 숨기기'):tr('오른쪽 패널 보이기'),calTogglePanel,'panel-toggle'+(open?' active':'')),'panel-toggle','\\'),keyed((b=>{b.setAttribute('aria-label',tr('일정 추가'));return b;})(btn(h('span',{class:'button-label'},tr('일정 추가')),()=>addEvent(selectedDate),'button primary event-add-button','plus')),'event-add','C')];
+  // The title opens 「날짜로 이동」 (Apple Calendar's Go to Date, ⌘⇧T there), as clicking the month in Notion Calendar does. A small
+  // muted chevron inside the same button says so (2026-10-28 Codex review D10, C4: it read as a plain heading); when the bar is
+  // tight the chevron gives way first, then the text takes its ellipsis (styles.css).
+  return [h('h1',{},h('button',{type:'button',class:'title-button','aria-label':calendarTitle()+', '+tr('날짜로 이동'),title:tr('날짜로 이동')+' (Ctrl+Shift+T)','data-focus-key':'go-date',onclick:calGoToDate},h('span',{class:'title-text'},calendarTitle()),icon('chevdown',14))),h('div',{class:'inline-actions month-nav'},keyed(ib('left',labels[0],()=>calendarStep(-1)),'month-prev','Ctrl+←'),keyed(ib('right',labels[1],()=>calendarStep(1)),'month-next','Ctrl+→')),keyed(btn(tr('오늘'),goToday,'button subtle'),'month-today','T'),spacer,switcher,keyed(ib('panel',open?tr('오른쪽 패널 숨기기'):tr('오른쪽 패널 보이기'),calTogglePanel,'panel-toggle'+(open?' active':'')),'panel-toggle','\\'),keyed((b=>{b.setAttribute('aria-label',tr('일정 추가'));return b;})(btn(h('span',{class:'button-label'},tr('일정 추가')),()=>addEvent(selectedDate),'button primary event-add-button','plus')),'event-add','C')];
 }
 
 // ---- The right panel: docked on a wide calendar, otherwise a drawer over it (Notion 2026-01-20) ----
@@ -68,15 +74,18 @@ function calOpenPanelFor(day){selectedDate=day;calSyncMonth();if(!calPanelDocked
 function dayPanel(drawer){const dayTasks=state.tasks.filter(t=>t.dueDate===selectedDate&&!t.completed);return h('aside',{class:'day-panel'+(drawer?' drawer':''),'aria-label':tr('날짜 패널')},h('div',{class:'context-heading'},h('h3',{},koreanDate(selectedDate)),ib('plus',tr('이날 일정 추가'),e=>addEvent(selectedDate,e.currentTarget))),agenda(selectedDate),h('h4',{class:'agenda-sub'},tr('할 일')),dayTasks.length?h('div',{},dayTasks.map(t=>taskRow(t,true,selectedDate))):h('p',{class:'no-events'},tr('정해진 할 일이 없어요')),quickAdd(lastTaskView,true,selectedDate),calendarList());}
 function calendarScreen(){const docked=calPanelDocked();if(docked)calDrawer=false;const drawer=!docked&&calDrawer;return h('section',{class:'calendar-view'+(docked?'':' panel-hidden')+(drawer?' drawer-open':'')},h('div',{class:'calendar-main'},search.trim()?calSearchResults():calMode()==='month'?monthBoard():timeGrid()),docked||drawer?dayPanel(drawer):null,drawer?h('div',{class:'drawer-scrim',onpointerdown:e=>{e.preventDefault();calDrawer=false;render();}}):null);}
 
-// ---- Search (2026-10-21 user request): events whose title or place holds the words, a year back to two years ahead,
-// upcoming first then past, by day; a row opens that day with the event's card. ----
+// ---- Search (2026-10-21 user request): events whose title or place holds the words, upcoming first then past, by day; a row
+// opens that day with the event's card. Every stored event, of any year (2026-10-28 owner 「1년 전부터 가져오기」, area J — it was
+// a year back to two years ahead): this PC keeps all of its own, a connected calendar what its sync read (a year back to a year
+// ahead, lib/providers/common.cjs dateRange). A series lists its occurrences a year back to two years ahead and its first one
+// when that lies outside, so a series of any year is found while a daily one begun in 2015 adds one row, not every day since. ----
 const calStartMs=e=>e.allDay?Date.parse(String(e.start).slice(0,10)+'T00:00:00'):Date.parse(e.start);
 const calEndMs=e=>e.allDay?Date.parse((String(e.end||'').slice(0,10)||D.dayOffset(String(e.start).slice(0,10),1))+'T00:00:00'):Date.parse(e.end||e.start);
 let calSearchCap={words:'',up:150,past:100};
 // The hits without expanding every series on each keystroke (2026-10-27 review: walking three years of 100 series took 190 ms
 // of a 400 ms keystroke). An occurrence carries its master's title and place, so the stored events are matched first and only
 // the matching series are expanded; their expansions are kept while state.events (replaced wholesale on every change) and the
-// window stay the same. Same hits in the same order as eventsBetween(from,to).filter(match).
+// window stay the same. Inside the window, the same hits in the same order as eventsBetween(from,to).filter(match).
 let calSearchPool={events:null,from:'',series:new Map()};
 function calSearchHits(words,today){
   const from=D.dayOffset(today,-365),to=D.dayOffset(today,730);
@@ -84,13 +93,18 @@ function calSearchHits(words,today){
   const hidden=new Set(state.settings.hiddenCalendars||[]),out=[];
   for(const e of state.events){
     if(hidden.has(e.calendarId)||!findMatches((e.title||'')+'\n'+(e.location||''),words).length)continue;
-    if(!e.rrule){if(D.touchesRange(e,from,to))out.push(e);continue;}
+    // A stored event at any date: the old window also dropped a connected one on its sync's first day once that was 366 days back
+    // (a leap year, a day without a sync).
+    if(!e.rrule){if(Number.isFinite(calStartMs(e)))out.push(e);continue;}
     let list=calSearchPool.series.get(e.id);
-    if(!list)calSearchPool.series.set(e.id,list=D.expandEvent(e,from,to));
+    if(!list)calSearchPool.series.set(e.id,list=calSeriesHits(e,from,to));
     out.push(...list);
   }
   return out;
 }
+// A series' rows: its occurrences in the window, and its first one (D.firstOccurrence, excluded dates skipped) when the series
+// begins outside the window and that one is not already listed.
+function calSeriesHits(e,from,to){const list=D.expandEvent(e,from,to),first=D.localKey(e.start);if(first>=from&&first<to)return list;const head=D.firstOccurrence(e);return head&&!list.some(o=>o.id===head.id)?[head,...list]:list;}
 function calSearchResults(){
   const words=search.trim();const today=D.dateKey();const now=Date.now();
   const hits=calSearchHits(words,today);
@@ -134,14 +148,17 @@ function calDayBuckets(pool,cells){
 }
 function monthBoard(){
   const cells=D.cellsFrom(calStart());const pool=eventsBetween(cells[0].key,D.dayOffset(cells[41].key,1));const byDay=calDayBuckets(pool,cells);const today=D.dateKey();const limit=calMonthLimit();
+  // One Tab stop in the grid (2026-10-28 Codex review D09, C2: 42 day stops, then every chip and 「+n개」 of the month): the selected
+  // day, and after it that day's own chips; the arrow keys (app.js keydown) still walk the days, and a chip still takes a click.
+  const stop=gridTabStop(cells);
   const grid=h('div',{class:'calendar-grid large rolling'},I.weekdays('short').map((d,i)=>h('div',{class:'weekday'+(i===0?' sunday':'')+(i===6?' saturday':'')+(i===0||i===6?' weekend':'')},d)),cells.map((d,i)=>{
     const events=byDay.get(d.key);const tasks=state.tasks.filter(t=>t.dueDate===d.key&&!t.completed);
-    const rows=Math.max(1,limit-(tasks.length?1:0));const shown=events.length>rows?events.slice(0,Math.max(1,rows-1)):events;const more=events.length-shown.length;
-    return h('div',{class:'calendar-day'+(d.outside?' outside':'')+(i%7===0||i%7===6?' weekend':'')+(d.key===today?' is-today':'')+(d.key===selectedDate?' is-selected':''),role:'button',tabindex:0,'aria-label':koreanDate(d.key)+(events.length?tr(" · 일정 {0}개", [events.length]):''),'data-focus-key':'day-'+d.key,'data-day':d.key,title:tr('두 번 누르면 일정 추가'),
+    const rows=Math.max(1,limit-(tasks.length?1:0));const shown=events.length>rows?events.slice(0,Math.max(1,rows-1)):events;const more=events.length-shown.length;const off=d.key===stop?null:-1;
+    return h('div',{class:'calendar-day'+(d.outside?' outside':'')+(i%7===0||i%7===6?' weekend':'')+(d.key===today?' is-today':'')+(d.key===selectedDate?' is-selected':''),role:'button',tabindex:d.key===stop?0:-1,'aria-label':koreanDate(d.key)+(events.length?tr(" · 일정 {0}개", [events.length]):''),'data-focus-key':'day-'+d.key,'data-day':d.key,title:tr('두 번 누르면 일정 추가'),
       onclick:e=>{if(performance.now()<calSuppressClick||e.detail>=2)return;selectedDate=d.key;render();},ondblclick:e=>{if(performance.now()<calSuppressClick)return;selectedDate=d.key;addEvent(d.key,e.currentTarget);},
       onkeydown:e=>{if((e.key==='Enter'||e.key===' ')&&e.target===e.currentTarget){e.preventDefault();selectedDate=d.key;render();document.querySelector('[data-focus-key="day-'+d.key+'"]')?.focus({preventScroll:true});}}},
       h('button',{type:'button',class:'day-number'+(d.day===1?' first':''),tabindex:-1,title:tr('일간 보기'),onclick:e=>{e.stopPropagation();setCalMode('day',d.key);}},d.day===1?calFirstLabel(d.key):d.day),
-      h('div',{class:'day-items'},shown.map(e=>calChip(e,d.key)),more?h('button',{type:'button',class:'day-more',onclick:ev=>{ev.stopPropagation();calDayList(d.key,ev.currentTarget);}},tr("+{0}개", [more])):null,tasks.length?h('button',{type:'button',class:'day-tasks',onclick:ev=>{ev.stopPropagation();calOpenPanelFor(d.key);}},tr("할 일 {0}개", [tasks.length])):null));
+      h('div',{class:'day-items'},shown.map(e=>{const chip=calChip(e,d.key);if(off)chip.tabIndex=off;return chip;}),more?h('button',{type:'button',class:'day-more',tabindex:off,onclick:ev=>{ev.stopPropagation();calDayList(d.key,ev.currentTarget);}},tr("+{0}개", [more])):null,tasks.length?h('button',{type:'button',class:'day-tasks',tabindex:off,onclick:ev=>{ev.stopPropagation();calOpenPanelFor(d.key);}},tr("할 일 {0}개", [tasks.length])):null));
   }));
   grid.addEventListener('wheel',calMonthWheel,{passive:false});
   return grid;
@@ -330,7 +347,7 @@ function calOpenCard({mode,event,draft},rect){
   calMarkAnchor();
 }
 function calRenderCard(){
-  const c=calCard;if(!c)return;const active=document.activeElement;const focusKey=c.node&&c.node.contains(active)?active.getAttribute('data-card-focus'):null;
+  const c=calCard;if(!c)return;const active=document.activeElement;const focusKey=c.node&&c.node.contains(active)?active.closest('[data-card-focus]')?.getAttribute('data-card-focus')||null:null;/* a choice made in the open menu: its option has focus (area H) */
   const node=calCardNode();if(c.node&&c.node.isConnected)c.node.replaceWith(node);else calCardRoot().replaceChildren(node);
   if(c.node){node.style.left=c.node.style.left;node.style.top=c.node.style.top;}c.node=node;
   if(focusKey)node.querySelector('[data-card-focus="'+focusKey+'"]')?.focus({preventScroll:true});
@@ -392,7 +409,7 @@ function calSyncWhen(c){const v=c.v;if(v.allDay||!c.node)return;for(const which 
 // Repeat presets worked out from the event's own date (Notion, Google), the current rule when it is none of them, and 사용자 지정….
 function calRepeatOptions(day,current){const d=D.fromDate(day);const wd=I.weekdays('long')[d.getDay()];const o=ordinalOf(d);const weekly=n=>D.buildRRule({freq:'WEEKLY',interval:n,byDay:[{ord:0,day:d.getDay()}],wkst:0});const list=[['',tr('반복 안 함')],['FREQ=DAILY',tr('매일')],[weekly(1),tr('매주 {0}',[wd])],['FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;WKST=SU',tr('평일마다 (월–금)')],[weekly(2),tr('2주마다 {0}',[wd])],['FREQ=MONTHLY',monthlyLabel('date',d)],['FREQ=MONTHLY;BYDAY='+Math.min(o.nth,4)+D.RRULE_DAYS[d.getDay()],monthlyLabel('nth',d)],o.last?['FREQ=MONTHLY;BYDAY=-1'+D.RRULE_DAYS[d.getDay()],monthlyLabel('last',d)]:null,['FREQ=YEARLY',tr('매년 {0}',[d.toLocaleDateString(I.locale(),{month:'long',day:'numeric'})])]].filter(Boolean);if(o.nth===5)list.splice(6,1);const match=list.find(([value])=>calSameRule(value,current));if(current&&!match){const rule=D.parseRRule(current);list.push([current,rule?describeRule(rule,d):current]);}list.push(['custom',tr('사용자 지정…')]);return {list,value:match?match[0]:current};}
 function calSameRule(a,b){if(!a||!b)return !a&&!b;const x=D.parseRRule(a),y=D.parseRRule(b);if(!x||!y)return a===b;const days=r=>r.byDay.map(d=>d.ord+':'+d.day).sort().join();return x.freq===y.freq&&x.interval===y.interval&&days(x)===days(y)&&x.byMonthDay===y.byMonthDay&&x.count===y.count&&x.until===y.until;}
-function calRepeatControl(){const c=calCard,v=c.v,e=c.event;if(e&&e.masterId&&!e.rrule&&isLocalEvent(e))return null;if(e&&!isLocalEvent(e)&&e.recurring)return h('span',{class:'card-chip static',title:tr('반복 규칙은 원래 달력 앱에서 바꿀 수 있어요.')},icon('repeat',13),tr('반복 일정'));const {list,value}=calRepeatOptions(v.start.slice(0,10),v.rrule);return h('select',{class:'card-repeat','aria-label':tr('반복'),'data-card-focus':'repeat',onchange:ev=>{const next=ev.target.value;if(next==='custom'){ev.target.value=value;calCustomRepeat();return;}v.rrule=next;if(c.mode==='edit')calCardChange({rrule:next});calRenderCard();}},list.map(([val,label])=>h('option',{value:val,selected:val===value?'':null},label)));}
+function calRepeatControl(){const c=calCard,v=c.v,e=c.event;if(e&&e.masterId&&!e.rrule&&isLocalEvent(e))return null;if(e&&!isLocalEvent(e)&&e.recurring)return h('span',{class:'card-chip static',title:tr('반복 규칙은 원래 달력 앱에서 바꿀 수 있어요.')},icon('repeat',13),tr('반복 일정'));const {list,value}=calRepeatOptions(v.start.slice(0,10),v.rrule);return h('select',{class:'card-repeat','aria-label':tr('반복'),'data-card-focus':'repeat',onchange:ev=>{const next=ev.target.value;if(next==='custom'){ev.target.value=value;calCustomRepeat();return;}v.rrule=next;if(c.mode==='edit')calCardChange({rrule:next});calRenderCard();}},list.map(([val,label],i)=>[i===1||val==='custom'?h('hr'):null,h('option',{value:val,selected:val===value?'':null},label)]));}/* hairlines: 반복 안 함 | the rules | 사용자 지정… (Apple Calendar's groups, area H) */
 // ---- 알림 (1.1.3, Apple Calendar): one alert per event, minutes before the start (an all-day event's from its midnight). A new
 // event on a connected calendar starts on that calendar's own default (nothing is sent); Google and Outlook keep only alerts
 // before the start, so 「당일 오전 9시」 is offered on this PC's and iCloud calendars.
@@ -402,7 +419,7 @@ function calAlertRow(view){const c=calCard,v=c.v;const label=value=>alertLabel(v
   const cal=calCardCalendar();const connected=cal&&cal.provider!=='local';const values=(v.allDay?D.ALERTS_ALLDAY.filter(m=>m>=0||calOnDayAlerts()):D.ALERTS_TIMED).slice();if(typeof v.alert==='number'&&!values.includes(v.alert))values.push(v.alert);values.sort((a,b)=>a-b);
   const options=[];if(c.mode==='create'&&connected)options.push(['default',typeof cal.defaultAlert==='number'&&!v.allDay?tr('기본값 ({0})',[label(cal.defaultAlert)]):tr('달력 기본값')]);options.push(['none',tr('알림 없음')]);for(const m of values)options.push([String(m),label(m)]);
   const current=v.alert===undefined?(c.mode==='create'&&connected?'default':'none'):v.alert===null?'none':String(v.alert);
-  return h('div',{class:'card-row'},icon('bell',16),h('select',{class:'card-select card-alert','aria-label':tr('알림'),'data-card-focus':'alert',onchange:ev=>{const next=ev.target.value;v.alert=next==='default'?undefined:next==='none'?null:Number(next);if(c.mode==='edit')calCardChange({alert:v.alert===undefined?null:v.alert});}},options.map(([value,text])=>h('option',{value,selected:value===current?'':null},text))));}
+  return h('div',{class:'card-row'},icon('bell',16),h('select',{class:'card-select card-alert','aria-label':tr('알림'),'data-card-focus':'alert',onchange:ev=>{const next=ev.target.value;v.alert=next==='default'?undefined:next==='none'?null:Number(next);if(c.mode==='edit')calCardChange({alert:v.alert===undefined?null:v.alert});}},options.map(([value,text],i)=>[i&&options[i-1][0]==='none'?h('hr'):null,h('option',{value,selected:value===current?'':null},text)])));}/* a hairline under 알림 없음 (area H) */
 function calCustomRepeat(){const c=calCard;const v=c.v;const start=h('input',{type:'hidden',value:v.allDay?v.start:v.start});const picker=repeatPicker(v.rrule,start,{expand:true});modal(tr('반복'),h('form',{class:'dialog-body',onsubmit:ev=>{ev.preventDefault();const next=picker.value();closeModal();if(calCard!==c)return;v.rrule=next;if(c.mode==='edit')calCardChange({rrule:next});calRenderCard();}},picker.node,actionFooter(()=>closeModal(),tr('확인'))),false,{stack:true});}
 function calCardMenu(anchor){const c=calCard;const e=c.event;const r=anchor.getBoundingClientRect();contextMenu(r.left,r.bottom+4,{items:[{label:tr('복제'),icon:'copy',hint:isRecurring(e)?tr('이 일정만'):'',onClick:()=>{if(calCard!==c)return;const copy={...e,title:c.v.title.trim()||e.title,location:c.v.location,...(c.v.color?{color:c.v.color}:{}),...calTimes(c.v)};if(!c.v.color)delete copy.color;if(!closeCard(true))return;duplicateEvent(copy);}},c.mode==='edit'?'-':null,c.mode==='edit'?{label:tr('삭제'),icon:'trash',danger:true,onClick:()=>{if(calCard===c)calCardDelete();}}:null]});menuRoot?.classList.add('card-menu');}
 function calCardDelete(){const c=calCard;if(!c||c.mode!=='edit')return;deleteEventFlow(c.event);}

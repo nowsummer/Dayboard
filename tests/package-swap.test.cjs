@@ -110,5 +110,10 @@ test('npm run package builds in a temporary folder and tries the exe before it r
   assert.doesNotMatch(source, /out: outputDir/);
   const probe = source.indexOf('probeBundle(staged, scratch);'), swap = source.indexOf('replaceBundle(staged, bundleDir);'), launcher = source.indexOf('buildLauncher() : null');
   assert.ok(probe > 0 && swap > probe && launcher > swap, 'probe, then swap, then the launcher and build-info');
+  // The exe's file version is stamped x.y.z.0 before the bundle is checked and tried (2026-10-29: Smart App Control refused the
+  // exe packager made and let the stamped one run), so build-info.json, the trial run and the installer carry the same exe.
+  const stamp = source.indexOf("await stampFileVersion(path.join(staged, 'Dayboard.exe'), manifest.version);"), verify = source.indexOf('const result = verifyBundle(staged);');
+  assert.ok(stamp > source.indexOf('await packager(') && stamp < verify && verify < probe, 'packager, then the stamp, then verify and the trial run');
+  assert.match(source, /setFileVersion\(parts\[0\], parts\[1\], parts\[2\], 0, 1033\)/);
   assert.match(source, /finally \{\n\s+fs\.rmSync\(scratch, \{ recursive: true, force: true \}\);/, 'the temporary folder goes either way');
 });
