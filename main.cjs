@@ -812,18 +812,23 @@ async function command(commandName, payload, sourceWindow) {
       commit(state => state.lists.push(list)); return list;
     }
     case 'list:update': {
+      // Only the fields the payload names are written, onto the list as it is when the command ends (2026-10-30 review R5/R2-3: the
+      // copy taken before a rename's await was written back whole — a colour, symbol or group a view run had just brought from
+      // another PC went back to the old one, and noteViews then sent that as this user's newest choice).
       const previous = lookup('lists', payload.id);
-      let list = { ...previous };
+      const set = {}; const cleared = [];
       if ('name' in payload) {
-        list.name = text(payload.name, tr('목록 이름'), 100);
-        if (list.name !== previous.name && previous.provider === 'microsoft' && builtInList(previous)) throw new Error(tr('Microsoft To Do의 기본 목록은 이름을 바꿀 수 없어요.'));
+        set.name = text(payload.name, tr('목록 이름'), 100);
+        if (set.name !== previous.name && previous.provider === 'microsoft' && builtInList(previous)) throw new Error(tr('Microsoft To Do의 기본 목록은 이름을 바꿀 수 없어요.'));
       }
-      if ('color' in payload) list.color = color(payload.color);
-      if ('icon' in payload) { const icon = listIcon(payload.icon); if (icon) list.icon = icon; else delete list.icon; }
-      if ('groupId' in payload) { const group = groupRef(payload.groupId); if (group) list.groupId = group; else delete list.groupId; }
-      // A renamed cloud list (including an emoji prefix) is renamed at the service, so the phone sees it too.
-      if (previous.provider !== 'local' && list.name !== previous.name) list = { ...list, ...await sync.mutateList('update', list), id: previous.id };
-      commit(state => { state.lists = state.lists.map(item => item.id === list.id ? list : item); }); return list;
+      if ('color' in payload) set.color = color(payload.color);
+      if ('icon' in payload) { const icon = listIcon(payload.icon); if (icon) set.icon = icon; else cleared.push('icon'); }
+      if ('groupId' in payload) { const group = groupRef(payload.groupId); if (group) set.groupId = group; else cleared.push('groupId'); }
+      // A renamed cloud list (including an emoji prefix) is renamed at the service, so the phone sees it too; its name comes back.
+      if (previous.provider !== 'local' && 'name' in set && set.name !== previous.name) set.name = (await sync.mutateList('update', { ...previous, ...set })).name;
+      let list = null;
+      commit(state => { state.lists = state.lists.map(item => { if (item.id !== previous.id) return item; list = { ...item, ...set }; for (const field of cleared) delete list[field]; return list; }); });
+      return list || lookup('lists', previous.id);
     }
     case 'group:add': {
       const group = { id: randomUUID(), name: text(payload.name, tr('그룹 이름'), 60), collapsed: false };
@@ -1346,7 +1351,7 @@ async function command(commandName, payload, sourceWindow) {
       // accountId: sign in again for an existing account (grants newly requested scopes such as calendar writing).
       if (payload.accountId !== undefined && payload.accountId !== null) lookup('accounts', payload.accountId);
       const connected = await sync.connect(payload);
-      if (!connected?.cancelled) sync.syncNotes().catch(() => {}); // a new grant may turn notes sync on
+      if (!connected?.cancelled) { sync.syncNotes().catch(() => {}); sync.syncViews().catch(() => {}); } // a new grant may turn notes sync (and the list and calendar look) on
       return connected;
     }
     case 'account:update': {
@@ -1380,7 +1385,8 @@ async function command(commandName, payload, sourceWindow) {
     }
     case 'account:disconnect': return await sync.disconnect(identifier(payload.id));
     // 「지금 동기화」: accounts, then notes (a notes problem shows on the notes, not as a failed sync).
-    case 'sync:run': try { return await sync.sync(); } finally { await sync.syncNotes().catch(() => {}); }
+    // The list and calendar look runs beside, never holding the answer (lib/viewsync.cjs).
+    case 'sync:run': try { return await sync.sync(); } finally { sync.syncViews().catch(() => {}); await sync.syncNotes().catch(() => {}); }
     case 'widget:open': {
       if (!['tasks', 'calendar', 'note'].includes(payload.type)) throw new Error(tr('지원하지 않는 위젯입니다.'));
       if (store.get().widgets.length >= 12) throw new Error(tr('위젯은 최대 12개까지 열 수 있습니다.'));
@@ -1706,13 +1712,19 @@ else {
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error(tr('명령 데이터가 올바르지 않습니다.'));
       if (JSON.stringify(payload).length > 250000) throw new Error(tr('입력 데이터가 너무 큽니다.'));
       if (name === 'state:get') return publicState();
-      const sourceWindow = BrowserWindow.fromWebContents(event.sender);
-      if (DIRECT_COMMANDS.has(name)) return command(name, payload, sourceWindow); // off the lanes: see DIRECT_COMMANDS
-      // Its lane (lib/lanes.cjs laneOf, 2026-10-28 Codex review R8): a command on this PC's data runs at once while a connected
-      // item's write waits for the service; connected items keep their order among themselves; what spans both, or is unknown,
-      // runs alone. Chosen now, from the stored records, before anything queued ahead of it changes them.
-      const queued = fn => lanes.run(laneOf(name, payload, store), fn);
-      return queued(() => command(name, payload, sourceWindow));
+      // Whatever the command did to how connected lists and calendars look (a menu, 되돌리기, a widget, settings) is stamped once it
+      // settled, done or failed, and goes to the other PCs a moment later (lib/viewsync.cjs noteLocal, 2026-10-29) — one place for
+      // every edit path. Cheap when nothing of it changed.
+      const noted = start => start().finally(() => sync?.noteViews());
+      return noted(() => {
+        const sourceWindow = BrowserWindow.fromWebContents(event.sender);
+        if (DIRECT_COMMANDS.has(name)) return command(name, payload, sourceWindow); // off the lanes: see DIRECT_COMMANDS
+        // Its lane (lib/lanes.cjs laneOf, 2026-10-28 Codex review R8): a command on this PC's data runs at once while a connected
+        // item's write waits for the service; connected items keep their order among themselves; what spans both, or is unknown,
+        // runs alone. Chosen now, from the stored records, before anything queued ahead of it changes them.
+        const queued = fn => lanes.run(laneOf(name, payload, store), fn);
+        return queued(() => command(name, payload, sourceWindow));
+      });
     });
     ipcMain.on('dayboard:flushed', (event, payload) => {
       if (!trusted(event) || !payload || typeof payload.token !== 'string') return;
@@ -1742,7 +1754,8 @@ else {
     else {
       // Accounts, then notes, every 5 minutes and at start; notes also when Dayboard comes back to the front (at most once a
       // minute), so the other PC's notes are there when the user sits down at this one.
-      const syncAll = () => { if (store.get().accounts.length) sync.sync().catch(() => {}).then(() => sync.syncNotes()).catch(() => {}); };
+      // The list and calendar look follows each account round, beside the notes (lib/viewsync.cjs).
+      const syncAll = () => { if (store.get().accounts.length) sync.sync().catch(() => {}).then(() => { sync.syncViews().catch(() => {}); return sync.syncNotes(); }).catch(() => {}); };
       timer = setInterval(syncAll, 5 * 60 * 1000);
       timer.unref();
       syncAll();
@@ -1776,7 +1789,8 @@ app.on('before-quit', event => {
   quitInFlight = true;
   Promise.all(BrowserWindow.getAllWindows().map(flushWindow)).then(async () => {
     try { persistWidgetBounds(); } catch (error) { console.error('widget bounds not saved on quit:', error.message); }
-    await sync?.flushNotes(3000).catch(() => {}); // an edit still waiting goes to the other PCs now
+    // An edit still waiting goes to the other PCs now: notes, and the list and calendar look, side by side (3 s at most).
+    await Promise.all([sync?.flushNotes(3000).catch(() => {}), sync?.flushViews(3000).catch(() => {})]);
     quitting = true;
     app.quit();
   }).catch(async error => {

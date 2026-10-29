@@ -9,7 +9,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample, shotsLanguage, morningClock, writeSampleMark, demoText } = require('./readme-sample.cjs');
+const { seedSample, shotsLanguage, morningClock, writeSampleMark, demoText, morningMain } = require('./readme-sample.cjs');
 
 const LANG = shotsLanguage();
 const WIDTH = 1120, HEIGHT = 720;
@@ -31,6 +31,7 @@ const { app, BrowserWindow } = require('electron');
 const SCALE = Number(process.env.DAYBOARD_DEMO_SCALE) > 0 ? Number(process.env.DAYBOARD_DEMO_SCALE) : 2;
 app.commandLine.appendSwitch('force-device-scale-factor', String(SCALE));
 app.commandLine.appendSwitch('lang', LANG === 'en' ? 'en-US' : 'ko-KR');
+morningMain();
 require(path.join(APP_DIR, 'main.cjs'));
 
 const wait = ms => new Promise(r => setTimeout(r, ms));

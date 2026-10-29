@@ -53,16 +53,10 @@ const YEAR = Array.from({ length: 365 }, (_, i) => new Date(2026, 0, 1 + i, 9, 4
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const clean = s => s.toLowerCase().replace(/^[-•\d.\s]+/, '').replace(/[「」"“”.,:]/g, '').trim();
 const isWeekend = key => [0, 6].includes(D.fromDate(key).getDay());
-const overlaps = (o, [from, to]) => o.from < to && from < o.to;
-// The times a line of a plan names: 「3시」 / 「at 3」 (an afternoon hour), 「오전」 / 「morning」, 「점심」 / 「lunch」, 「저녁」 / 「dinner」.
-function namedTimes(line) {
-  const out = [];
-  for (const m of line.matchAll(/(\d{1,2})\s?시|\bat (\d{1,2})\b/g)) { let h = Number(m[1] || m[2]); if (h < 8) h += 12; out.push([h * 60, h * 60 + 60]); }
-  if (/오전|morning/i.test(line)) out.push([9 * 60, 12 * 60]);
-  if (/점심|lunch/i.test(line)) out.push([12 * 60, 13 * 60]);
-  if (/저녁|dinner/i.test(line)) out.push([18 * 60, 20 * 60]);
-  return out;
-}
+// A line that reads as a schedule — led by a day (「토:」, 「Sat:」, 「월 김치찌개」), or naming a clock time or a day to come — belongs
+// in the calendar, not in a note (2026-10-29 owner: 「주말 계획을 넣었던데 이건 사실 달력에 들어갈 내용에 가깝잖아. 메모에 들어갈 적절한 다른
+// 내용을 적어줘. 위젯 예시에 있는 메모 글도 모두 마찬가지야」 — the old 「주말 계획」, 「저녁 메뉴」 and a trip note with pick-up and check-in times).
+const SCHEDULE = /^(?:[월화수목금토일](?:요일)?[\s:]|(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\b)|\d{1,2}\s?시(?!간)|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b|\bat \d{1,2}\b(?!\s?°)|오전|오후|체크인|check-in|(?:월|화|수|목|금|토|일)요일|\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow)\b|내일|모레|다음 주|next week/i;
 
 for (const lang of ['ko', 'en']) {
   const T = sample.TEXT?.[lang];
@@ -116,17 +110,6 @@ for (const lang of ['ko', 'en']) {
       for (const t of s.tasks.filter(t => t.listId === work.id && t.dueDate)) assert.ok(!isWeekend(t.dueDate), `${when}: work 「${t.title}」 is due on a weekday (${t.dueDate})`);
       const report = allDay(s, T.events.report).start;
       assert.ok(!tripDays.includes(report) && report.slice(8) <= '27', `${when}: 「${T.events.report}」 on the 27th or the workday before, not away (${report})`);
-      // The weekend plan: what its 토/일 (Sat/Sun) lines name at a time is free that weekend, and the weekend is at home. The plan is
-      // for this weekend — on a Sunday the one ending today or the next.
-      const plan = s.notes.find(n => /^(토|일|Sat|Sun):/m.test(n.body));
-      assert.ok(plan, 'a weekend plan');
-      const saturdays = now.getDay() === 6 ? [0] : now.getDay() === 0 ? [-1, 6] : [6 - now.getDay()];
-      for (const sat of saturdays) for (const line of plan.body.split('\n')) {
-        const m = line.match(/^(토|일|Sat|Sun):\s*(.*)$/); if (!m) continue;
-        const key = D.dayOffset(s.today, sat + (['일', 'Sun'].includes(m[1]) ? 1 : 0));
-        assert.ok(!tripDays.includes(key), `${when}: 「${line}」 on ${key}, a trip day`);
-        for (const time of namedTimes(m[2])) for (const o of occ.filter(o => o.day === key && overlaps(o, time))) assert.fail(`${when}: 「${line}」 and 「${o.title}」 ${String(o.from / 60 | 0).padStart(2, '0')}:${String(o.from % 60).padStart(2, '0')} on ${key}`);
-      }
       // A task about an event is due by that event (the book club's notes by the book club).
       for (const t of s.tasks.filter(t => t.dueDate)) for (const o of occ.filter(o => !o.repeat && t.title.toLowerCase().includes(o.title.toLowerCase()))) {
         assert.ok(t.dueDate <= o.day, `${when}: 「${t.title}」 is due ${t.dueDate}, before 「${o.title}」 on ${o.day}`);
@@ -163,6 +146,7 @@ for (const lang of ['ko', 'en']) {
     for (const note of s.notes) {
       const lines = note.body.split('\n').map(clean).filter(Boolean);
       assert.notEqual(lines[0], clean(note.title), `「${note.title}」 does not repeat its title`);
+      for (const line of [note.title, ...note.body.split('\n')]) assert.ok(!SCHEDULE.test(line), `note 「${note.title}」: 「${line}」 reads as a schedule (the calendar's)`);
       for (const line of lines) for (const t of s.tasks) {
         const title = clean(t.title);
         assert.ok(!title.includes(line) && !line.includes(title), `note 「${note.title}」 line 「${line}」 repeats the task 「${t.title}」`);
@@ -195,10 +179,11 @@ for (const lang of ['ko', 'en']) {
 // 「회신은 내가 맡기로」 in meeting notes.
 const OLD = {
   ko: ['오후 회의 자료 검토', '출장 경비 정산', '세제 리필', '「아주 작은 습관의 힘」 3장 읽기', '숙소 체크인 시간 문의', '병원 예약 시간 확인', '운동화 세탁 맡기기',
-    '매출 숫자 확인', '점심 약속 · 민지', '분기 계획 리뷰', '프로젝트 중간 발표', '이번 주 집중할 것', '읽고 싶은 책', '회의 아이디어', '오후 5시 은행에 전화하기'],
+    '매출 숫자 확인', '점심 약속 · 민지', '분기 계획 리뷰', '프로젝트 중간 발표', '이번 주 집중할 것', '읽고 싶은 책', '회의 아이디어', '오후 5시 은행에 전화하기',
+    '주말 계획', '저녁 메뉴', '렌터카 픽업', '다음 회의 월요일'],
   en: ['Review slides for the 3 pm meeting', 'Submit travel expenses', 'Read chapter 3 of Atomic Habits', 'Ask about hotel check-in time', 'Confirm the dentist appointment',
     'Drop off running shoes for cleaning', 'Team weekly sync', 'Quarterly plan review', 'Project midpoint demo', 'Focus this week', 'Books to read', 'Meeting ideas', 'Call the bank at 5pm',
-    'I’m replying to the client'],
+    'I’m replying to the client', 'Weekend plan', 'Dinner plan', 'Rental car pickup', 'Next sync Monday'],
 };
 test('the phrases found odd do not come back to the sample or the demo', async () => {
   for (const lang of ['ko', 'en']) {
@@ -244,6 +229,7 @@ test('the widget gallery shows everyday examples, not slogans', () => {
       // A memo: a few things listed on short lines, not a sentence.
       const items = card.body.split(/\n|,\s*/).filter(Boolean);
       assert.ok(items.length >= 3 && card.body.split('\n').length <= 4 && !/[.!。]$/.test(card.body.trim()), `${lang}: 「${card.body}」 is a short list`);
+      for (const line of [card.title, ...card.body.split('\n')]) assert.ok(!SCHEDULE.test(line), `${lang}: the note card's 「${line}」 reads as a schedule (the calendar's)`);
     }
     // English is its own (every row translated).
     for (const [k, e] of [[ko.title, en.title], [ko.body, en.body], ...ko.rows.map((r, i) => [r, en.rows[i]])]) assert.ok(!/[가-힣]/.test(e) && e !== k, `「${k}」 → 「${e}」`);

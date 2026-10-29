@@ -307,6 +307,26 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   if (madeGroup) await invoke('group:delete', { id: madeGroup.id });
   expect(stacked.kept && stacked.asked === '변경 버리기|계속 편집' && stacked.askedFocus === '계속 편집' && stacked.resumed && stacked.sub === '새 그룹' && stacked.back && stacked.returned && stacked.selected === '스모크 새 그룹' && stacked.colourKept && stacked.askedAgain && stacked.closed && madeGroup, `목록 편집 위 새 그룹 ${JSON.stringify(stacked)}`);
   checks.push('list-edit-stacked-group');
+  // 저장 sends only what the user changed in the dialog (2026-10-30 review R5b, lib/viewsync.cjs): a symbol that changed elsewhere while
+  // the dialog was open (another PC's look laid on by a view run, here a direct update) stays, the colour picked is saved, the group too.
+  await run(mainWindow, `
+    const row = [...document.querySelectorAll('.list-nav')].find(node => node.textContent.includes('독서'));
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    [...document.querySelectorAll('.context-menu .menu-item')].find(node => node.textContent.includes('목록 편집'))?.click();
+    await new Promise(resolve => setTimeout(resolve, 30));`);
+  await invoke('list:update', { id: seeded[1].id, icon: 'gift' });
+  const partial = await run(mainWindow, `
+    const dialog = document.querySelector('#modal-root .dialog');
+    const swatches = [...dialog.querySelectorAll('.swatch')];
+    const at = swatches.findIndex(node => !node.classList.contains('selected') && D.LIST_PALETTE[swatches.indexOf(node)] !== '#af52de');
+    swatches[at].click();
+    dialog.querySelector('button[type=submit]').click();
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return { picked: D.LIST_PALETTE[at], closed: !document.querySelector('#modal-root .dialog') };`);
+  const afterSave = (await invoke('state:get')).lists.find(item => item.id === seeded[1].id);
+  expect(partial.closed && afterSave.color === partial.picked && afterSave.icon === 'gift' && afterSave.groupId === group.id && afterSave.name === '📚 독서', `목록 편집 저장은 바꾼 것만 ${JSON.stringify({ partial, afterSave })}`);
+  checks.push('list-edit-sends-changes-only');
   await invoke('group:delete', { id: group.id });
   state = await invoke('state:get');
   expect(!state.lists.some(list => list.groupId === group.id) && !state.groups.some(item => item.id === group.id), '그룹 삭제 뒤 목록 유지');

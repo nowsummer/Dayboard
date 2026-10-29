@@ -790,6 +790,11 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 /* 2026-10-27 user choice B (「글 시작 위치는 B안이 좋아」): the captions under each stage start 9px in, where the 30px corner's 45°
    point is (r(1−1/√2) ≈ 9px), at every window width. The radii stay Apple's (stage 30, inner card 22, widget 26). */
 .widget-gallery-item>:not(.widget-stage){margin-left:9px}
+/* The three 「바탕화면에 추가」 on one line whatever the length of the description above them (2026-10-30 owner: 「add to desktop
+   위치가 동일한 게 디자인적으로 올바른 거 아닐까?」 — a two-line description pushed its button below the others). The grid's cells are
+   as tall as the tallest; the button takes the bottom of its own. */
+.widget-gallery-item{display:flex;flex-direction:column}
+.widget-gallery-item>.button{margin-top:auto;align-self:flex-start}
 /* A long title (a list's name) gives way with an ellipsis before the buttons on its right slide under the window's own buttons
    (2026-10-27 review; it never shrinks below its full width otherwise, the 2026-10-26 rule). */
 @media(min-width:700px){.topbar-main h1{max-width:45%}}

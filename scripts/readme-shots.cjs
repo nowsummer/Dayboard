@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample, shotsLanguage, morningClock } = require('./readme-sample.cjs');
+const { seedSample, shotsLanguage, morningClock, morningMain } = require('./readme-sample.cjs');
 
 const LANG = shotsLanguage();
 const APP_DIR = path.resolve(__dirname, '..');
@@ -26,6 +26,7 @@ process.chdir(APP_DIR);
 const { app, BrowserWindow } = require('electron');
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
 app.commandLine.appendSwitch('lang', LANG === 'en' ? 'en-US' : 'ko-KR'); // the built-in list and calendar get names in that language
+morningMain();
 require(path.join(APP_DIR, 'main.cjs'));
 
 const log = (...a) => console.log('[shots]', ...a);

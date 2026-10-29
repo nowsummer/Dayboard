@@ -51,11 +51,13 @@ const TEXT = {
       club: ['독서 모임', '동네 서점'], trip: '제주 여행', family: '가족 저녁 식사', demo: '엄마 생신', report: '월간 보고 마감',
       workshop: '디자인 워크숍', client: ['고객사 미팅', '부산 지사'], away: '부산 출장',
     },
+    // Things one jots down to keep — a recipe, places, ideas, what a meeting decided — not a plan with days and times, which is the
+    // calendar's (2026-10-29 owner: 「주말 계획을 넣었던데 이건 사실 달력에 들어갈 내용에 가깝잖아. 메모에 들어갈 적절한 다른 내용을 적어줘」).
     notes: [
-      ['주말 계획', '토: 오전 대청소, 3시 미용실\n일: 이불 빨래, 냉장고 정리\n화분 물 주기'],
-      ['제주 여행 메모', '렌터카 픽업 10:30 (공항 1층)\n숙소: 애월 바닷가 펜션, 체크인 3시\n가고 싶은 곳: 새별오름, 협재 해변, 동문시장'],
-      ['민지 생일 선물', '후보: 향초, 핸드크림, 머그컵\n3만 원 안쪽으로'],
-      ['주간 회의 메모', '- 예산안 이번 주 안에 확정\n- 고객사 회신은 내가 맡기로\n- 다음 회의 월요일 10시'],
+      ['드립 커피 레시피', '원두 15g, 물 250ml\n물 온도는 92도\n뜸은 30초 정도'],
+      ['제주 맛집 메모', '애월 고기국수, 줄 서도 먹을 만함\n협재 근처 흑돼지집, 주차장 넓음\n동문시장 귤 찹쌀떡'],
+      ['선물 아이디어', '민지: 향초, 핸드크림\n엄마: 따뜻한 스카프\n하나에 3만 원 안쪽'],
+      ['주간 회의 메모', '- 예산안은 이번 주 안에 확정\n- 고객사 회신은 내가 맡기로\n- 디자인 시안은 B안으로'],
     ],
     // Quick add in the demo: an errand for later today with its time, as one would type it (r50 M).
     quick: '오후 6시 약국 들르기',
@@ -74,10 +76,10 @@ const TEXT = {
       workshop: 'Design workshop', client: ['Client meeting', 'Chicago office'], away: 'Trip to Chicago',
     },
     notes: [
-      ['Weekend plan', 'Sat: clean the house, haircut at 3\nSun: laundry, clean the fridge\nWater the plants'],
-      ['Lisbon trip notes', 'Rental car pickup 10:30 (airport, level 1)\nHotel in Alfama, check-in 3 pm\nTo see: Belém Tower, LX Factory, Time Out Market'],
-      ['Gift for Mia', 'Ideas: candle, hand cream, a nice mug\nAround $30'],
-      ['Team sync notes', '- Finalize the budget this week\n- I’ll handle the client reply\n- Next sync Monday at 10'],
+      ['Pour-over coffee', 'Beans 15 g, water 250 ml\nWater at 92 °C\nLet it bloom about 30 seconds'],
+      ['Lisbon food notes', 'Custard tarts in Belém, worth the queue\nGrilled sardines near Alfama\nCherry liqueur bar by Rossio'],
+      ['Gift ideas', 'Mia: candle, hand cream\nMom: a warm scarf\nAround $30 each'],
+      ['Team sync notes', '- Finalize the budget this week\n- I’ll handle the client reply\n- Going with design option B'],
     ],
     quick: 'Pick up prescription at 6pm',
   },
@@ -189,10 +191,10 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
 
   // ---- Notes ----
   const [focus, ...others] = t.notes;
-  const focusNote = await invoke('note:save', { title: focus[0], body: focus[1], color: 'yellow' });
-  for (const [title, body] of others) await invoke('note:save', { title, body, color: 'yellow' });
+  const focusNote = await writtenAt([-6, 8, 5], () => invoke('note:save', { title: focus[0], body: focus[1], color: 'yellow' }));
+  for (const [index, [title, body]] of others.entries()) await writtenAt(NOTE_TIMES[index + 1], () => invoke('note:save', { title, body, color: 'yellow' }));
   // The focus note is edited last, so it is the newest note (the side panel and the note widget show it).
-  await invoke('note:save', { id: focusNote.id, title: focusNote.title, body: focusNote.body, color: 'yellow' });
+  await writtenAt(NOTE_TIMES[0], () => invoke('note:save', { id: focusNote.id, title: focusNote.title, body: focusNote.body, color: 'yellow' }));
   return { work, focusNote, planned, inbox: 'local-inbox' };
 }
 
@@ -213,6 +215,27 @@ function shotsLanguage() { return process.env.DAYBOARD_SHOTS_LANG === 'en' ? 'en
 const MORNING = `(() => { const Real = Date; const shift = new Real(Real.now()).setHours(9, 41, 0, 0) - Real.now();
   class Morning extends Real { constructor(...args) { if (args.length) super(...args); else super(Real.now() + shift); } static now() { return Real.now() + shift; } }
   globalThis.Date = Morning; })();`;
+// The app's own clock goes to 9:41 of the same day as the page's, and seedSample sets it back further while it saves each note, so
+// the notes carry the times NOTE_TIMES gives them (2026-10-30: taken after midnight they read 「오전 12:20」 beside a page at 9:41;
+// taken in the afternoon, a time ahead of the page's clock read as now, so every note said 9:41 — 「메모에서 작성한 시간이 9:41로
+// 모두 같아서 좀 작위적여보여」). Call before main.cjs is loaded.
+function morningMain() {
+  const Real = Date; const clock = { Real, shift: new Real(Real.now()).setHours(9, 41, 0, 0) - Real.now(), extra: 0 };
+  class Morning extends Real { constructor(...args) { if (args.length) super(...args); else super(Real.now() + clock.shift + clock.extra); } static now() { return Real.now() + clock.shift + clock.extra; } }
+  globalThis.Date = Morning; globalThis.__dayboardSampleClock = clock;
+}
+// When each note was last written, as [days from today, hour, minute]: the shown note this morning, the others over the past days —
+// as a real list looks (Today / Yesterday / earlier). In the order of t.notes; without morningMain (tests, the widget pictures, which
+// show no note times) the notes are saved at the real time.
+const NOTE_TIMES = [[0, 9, 26], [-1, 16, 12], [-2, 21, 47], [-5, 11, 20]];
+async function writtenAt([days, hour, minute], save) {
+  const clock = globalThis.__dayboardSampleClock;
+  if (!clock) return save();
+  const base = clock.Real.now() + clock.shift; const when = new clock.Real(base);
+  when.setDate(when.getDate() + days); when.setHours(hour, minute, 0, 0);
+  clock.extra = when.getTime() - base;
+  try { return await save(); } finally { clock.extra = 0; }
+}
 async function morningClock(win) {
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const page = win.webContents;
@@ -231,4 +254,4 @@ async function morningClock(win) {
   throw new Error('the morning clock did not take');
 }
 
-module.exports = { seedSample, dateKey, shotsLanguage, morningClock, sampleMark, writeSampleMark, demoText, COLOURS, TEXT };
+module.exports = { seedSample, dateKey, shotsLanguage, morningClock, morningMain, sampleMark, writeSampleMark, demoText, COLOURS, TEXT };
