@@ -55,8 +55,6 @@ The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, lo
 
 <p align="center"><img src="images/en/widgets.png" width="860" alt="Notes, Today and calendar widgets on the desktop"><br>Desktop widgets</p>
 
-<sub>Screenshots use sample data.</sub>
-
 ## Install
 
 1. Download `Dayboard-<version>.exe` from the [latest release](https://github.com/nowsummer/Dayboard/releases/latest) and run it. No admin rights needed.

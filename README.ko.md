@@ -55,8 +55,6 @@ Mac·iPhone의 미리 알림·캘린더·메모 앱과 위젯은 보기 좋고 �
 
 <p align="center"><img src="images/widgets.png" width="860" alt="바탕화면의 메모·오늘·달력 위젯"><br>바탕화면 위젯</p>
 
-<sub>화면의 할 일·일정·메모는 예시 데이터예요.</sub>
-
 ## 설치
 
 1. [최신 릴리스](https://github.com/nowsummer/Dayboard/releases/latest)에서 `Dayboard-<버전>.exe`를 내려받아 실행하세요. 관리자 권한은 필요 없어요.
