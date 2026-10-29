@@ -40,9 +40,9 @@
   </nav>
 
   <h1>Dayboard Privacy Policy</h1>
-  <p class="meta">Effective October 26, 2026 · Operator (developer): Jaeha Lee</p>
+  <p class="meta">Effective October 30, 2026 · Operator (developer): Jaeha Lee</p>
 
-  <p>Dayboard is a personal tasks, calendar and notes app for Windows. It has no server, no sign-up and no ads. Data from the accounts you connect is stored <strong>on your PC</strong> (and, only when notes sync is on, also in that Google account's Drive). This policy explains what information Dayboard handles and why.</p>
+  <p>Dayboard is a personal tasks, calendar and notes app for Windows. It has no server, no sign-up and no ads. Data from the accounts you connect is stored <strong>on your PC</strong> (only your notes, when notes sync is on, and your list and calendar view settings are also kept with that account). This policy explains what information Dayboard handles and why.</p>
 
   <h2>1. Information Dayboard handles</h2>
   <table>
@@ -50,13 +50,14 @@
     <tr><td rowspan="4">Google</td><td>Account email and profile name (<code>openid</code>, <code>email</code>, <code>profile</code>)</td><td>Showing which account is connected</td></tr>
     <tr><td>Google Tasks lists and tasks (<code>tasks</code>, read and edit)</td><td>Showing, adding, editing and completing tasks</td></tr>
     <tr><td>Google Calendar calendar list and events (<code>calendar.readonly</code>, read; <code>calendar.events</code>, add, edit and delete events)</td><td>Showing, adding, editing and deleting events</td></tr>
-    <tr><td>Dayboard's own app data folder in Google Drive (<code>drive.appdata</code>, read and write to this folder only)</td><td>Syncing notes (including earlier versions and recently deleted notes) with Dayboard on your other PCs</td></tr>
-    <tr><td>Microsoft</td><td>Account information, Microsoft To Do lists and tasks (read and edit), Outlook calendar events (read and edit)</td><td>Showing, adding, editing and deleting tasks and events</td></tr>
+    <tr><td>Dayboard's own app data folder in Google Drive (<code>drive.appdata</code>, read and write to this folder only)</td><td>Syncing notes (including earlier versions and recently deleted notes) and list and calendar view settings with Dayboard on your other PCs</td></tr>
+    <tr><td>Microsoft</td><td>Account information, Microsoft To Do lists and tasks (read and edit), Outlook calendar events (read and edit)</td><td>Showing, adding, editing and deleting tasks and events; keeping list and calendar view settings as Dayboard's own data on the default To Do list, to match them with your other PCs</td></tr>
     <tr><td>Apple (iCloud)</td><td>The Apple Account email and app-specific password you enter, iCloud calendar events (read and edit)</td><td>Showing, adding, editing and deleting events</td></tr>
   </table>
   <p>If you don't connect an account, Dayboard handles no account information at all. Tasks and notes you type into the app are likewise stored only on your PC.</p>
   <ul>
     <li>Notes sync runs only when a Google account is connected. You can turn it off with the Notes switch on the Accounts screen in the app.</li>
+    <li>To match them between PCs that use the same accounts, list and calendar view settings (a list's colour, icon, order, group name, hidden state and sort; calendar and event colours) are kept in the app data folder of a Google account with this permission and on the default To Do list of a connected Microsoft account. They hold no task, event or note content, and they stop when you disconnect the account, whatever the Notes switch says.</li>
     <li>Only Dayboard can access its app data folder. The folder doesn't show up in Drive or in other apps.</li>
     <li>Dayboard never sees or changes any other file in your Drive.</li>
   </ul>
@@ -65,7 +66,7 @@
   <ul>
     <li>Sign-in tokens and app-specific passwords are stored only in Windows encrypted storage on your PC (an encrypted file in the app data folder).</li>
     <li>Tasks, events and notes Dayboard fetches are stored in the app data folder on the same PC.</li>
-    <li>With notes sync on, your notes (including earlier versions and recently deleted notes) are kept on your PC and also in the app data folder of that Google account's Drive.</li>
+    <li>With notes sync on, your notes (including earlier versions and recently deleted notes) are kept on your PC and also in the app data folder of that Google account's Drive. List and calendar view settings are kept in those two places too, besides your PC.</li>
     <li>That folder's contents belong to your Google account. Once you disconnect in the app, or revoke Dayboard's access in your Google Account, Dayboard no longer accesses the folder.</li>
     <li>Dayboard runs no server. It never sends, sells or shares this information with the developer or any third party, and never uses it for analytics or advertising.</li>
     <li>Information moves only between each service (Google, Microsoft, Apple) and your PC, using each service's official API over HTTPS.</li>
@@ -88,6 +89,7 @@
   <h2>5. Changes</h2>
   <p>If this policy changes, this page will be updated and its effective date revised.</p>
   <ul>
+    <li>October 30, 2026: Added matching list and calendar view settings between PCs that use the same accounts (Dayboard's own app data folder in Google Drive, Dayboard's own data on the default Microsoft To Do list).</li>
     <li>October 26, 2026: Added notes sync between your own PCs through Dayboard's own app data folder in Google Drive (<code>drive.appdata</code>).</li>
     <li>October 21, 2026: Added permission to add, edit and delete events in connected calendars. Added update checks.</li>
     <li>October 19, 2026: Policy first took effect.</li>

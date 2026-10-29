@@ -40,9 +40,9 @@
   </nav>
 
   <h1>Dayboard 개인정보처리방침</h1>
-  <p class="meta">시행일 2026-10-26 · 운영자(개발자): 이재하</p>
+  <p class="meta">시행일 2026-10-30 · 운영자(개발자): 이재하</p>
 
-  <p>Dayboard는 Windows용 개인 할 일·달력·메모 앱임. 서버·회원 가입·광고가 없으며, 사용자가 연결한 계정의 데이터는 <strong>사용자의 PC에</strong> 저장함(메모 동기화를 켰을 때만 그 Google 계정의 드라이브에도 보관함). 이 문서는 Dayboard가 어떤 정보를 어떤 목적으로 다루는지 설명함.</p>
+  <p>Dayboard는 Windows용 개인 할 일·달력·메모 앱임. 서버·회원 가입·광고가 없으며, 사용자가 연결한 계정의 데이터는 <strong>사용자의 PC에</strong> 저장함(메모 동기화를 켰을 때의 메모와 목록·달력 보기 설정만 그 계정 쪽에도 보관함). 이 문서는 Dayboard가 어떤 정보를 어떤 목적으로 다루는지 설명함.</p>
 
   <h2>1. 다루는 정보</h2>
   <table>
@@ -50,13 +50,14 @@
     <tr><td rowspan="4">Google</td><td>계정 이메일·프로필 이름(<code>openid</code>, <code>email</code>, <code>profile</code>)</td><td>연결된 계정 표시</td></tr>
     <tr><td>Google Tasks 목록·할 일(<code>tasks</code>, 읽기·편집)</td><td>할 일 표시·추가·수정·완료</td></tr>
     <tr><td>Google 캘린더 달력 목록·일정(<code>calendar.readonly</code>, 읽기 · <code>calendar.events</code>, 일정 추가·수정·삭제)</td><td>일정 표시·추가·수정·삭제</td></tr>
-    <tr><td>Google 드라이브의 Dayboard 전용 앱 데이터 폴더(<code>drive.appdata</code>, 이 폴더만 읽기·쓰기)</td><td>메모(이전 버전·최근 삭제한 메모 포함)를 사용자의 다른 PC에 있는 Dayboard와 맞추기</td></tr>
-    <tr><td>Microsoft</td><td>계정 정보, Microsoft To Do 목록·할 일(읽기·편집), Outlook 달력 일정(읽기·편집)</td><td>할 일·일정 표시·추가·수정·삭제</td></tr>
+    <tr><td>Google 드라이브의 Dayboard 전용 앱 데이터 폴더(<code>drive.appdata</code>, 이 폴더만 읽기·쓰기)</td><td>메모(이전 버전·최근 삭제한 메모 포함)와 목록·달력 보기 설정을 사용자의 다른 PC에 있는 Dayboard와 맞추기</td></tr>
+    <tr><td>Microsoft</td><td>계정 정보, Microsoft To Do 목록·할 일(읽기·편집), Outlook 달력 일정(읽기·편집)</td><td>할 일·일정 표시·추가·수정·삭제, To Do 기본 목록에 Dayboard 전용 데이터로 목록·달력 보기 설정을 붙여 다른 PC와 맞추기</td></tr>
     <tr><td>Apple(iCloud)</td><td>사용자가 입력한 Apple 계정 이메일과 앱 전용 암호, iCloud 달력 일정(읽기·편집)</td><td>일정 표시·추가·수정·삭제</td></tr>
   </table>
   <p>계정을 연결하지 않으면 어떤 계정 정보도 다루지 않음. 사용자가 앱에 직접 적은 할 일·메모도 PC에만 저장됨.</p>
   <ul>
     <li>메모 동기화는 Google 계정을 연결했을 때만 하며, 앱의 「계정」 화면에서 「메모」 스위치로 끌 수 있음.</li>
+    <li>목록·달력 보기 설정(목록의 색·아이콘·순서·그룹 이름·숨김·정렬, 달력·일정의 색 등)은 같은 계정을 쓰는 PC끼리 맞추려고 위 권한이 있는 Google 계정의 앱 데이터 폴더와 연결한 Microsoft 계정의 To Do 기본 목록에 함께 보관함. 할 일·일정·메모의 내용은 넣지 않으며, 「메모」 스위치와 상관없이 계정 연결을 해제하면 멈춤.</li>
     <li>앱 데이터 폴더는 Dayboard만 접근할 수 있고, 드라이브 화면이나 다른 앱에는 보이지 않음.</li>
     <li>Dayboard는 드라이브의 다른 파일을 보거나 바꾸지 않음.</li>
   </ul>
@@ -65,7 +66,7 @@
   <ul>
     <li>로그인 토큰과 앱 전용 암호는 사용자 PC의 Windows 암호화 저장소(앱 데이터 폴더의 암호화 파일)에만 저장함.</li>
     <li>가져온 할 일·일정·메모는 같은 PC의 앱 데이터 폴더에 저장함.</li>
-    <li>메모 동기화를 켜면 메모(이전 버전·최근 삭제한 메모 포함)는 사용자 PC와 함께 그 Google 계정의 드라이브 앱 데이터 폴더에도 보관됨.</li>
+    <li>메모 동기화를 켜면 메모(이전 버전·최근 삭제한 메모 포함)는 사용자 PC와 함께 그 Google 계정의 드라이브 앱 데이터 폴더에도 보관됨. 목록·달력 보기 설정도 PC와 함께 위 두 곳에 보관됨.</li>
     <li>이 폴더의 내용은 사용자의 Google 계정에 속함. 앱에서 연결을 해제하거나 Google 계정에서 Dayboard의 접근을 철회하면 Dayboard는 더 이상 그 폴더에 접근하지 않음.</li>
     <li>Dayboard는 서버를 운영하지 않으며, 이 정보를 개발자나 제3자에게 전송·판매·공유하지 않음. 분석·광고 목적으로도 쓰지 않음.</li>
     <li>정보는 각 서비스(Google·Microsoft·Apple)와 사용자 PC 사이에서만 오가며, 통신은 각 서비스의 공식 API와 HTTPS를 사용함.</li>
@@ -88,6 +89,7 @@
   <h2>5. 변경</h2>
   <p>이 방침이 바뀌면 이 페이지를 갱신하고 시행일을 고침.</p>
   <ul>
+    <li>2026-10-30: 목록·달력 보기 설정을 같은 계정을 쓰는 PC끼리 맞추는 기능(Google 드라이브의 Dayboard 전용 앱 데이터 폴더, Microsoft To Do 기본 목록의 Dayboard 전용 데이터)을 반영함.</li>
     <li>2026-10-26: 메모를 Google 드라이브의 Dayboard 전용 앱 데이터 폴더(<code>drive.appdata</code>)로 사용자의 PC끼리 맞추는 기능을 반영함.</li>
     <li>2026-10-21: 연결한 달력에 일정을 추가·수정·삭제하는 권한과 업데이트 확인을 반영함.</li>
     <li>2026-10-19: 처음 시행.</li>
