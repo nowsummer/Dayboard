@@ -22,7 +22,7 @@ const shownNote = publicNote;
 const textIdOf = value => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z~[0-9a-f]{16}$/.test(value) ? value : null);
 // Widgets of notes moved to the trash, so 되돌리기 brings them back where they were (2026-10-21 review round 4).
 const trashedWidgets = new Map();
-const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, WIDGET_MIN, scopeChoices } = require('./renderer/domain.js');
+const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, WIDGET_MIN, panelWidth, scopeChoices } = require('./renderer/domain.js');
 const { createWallpaper, backdropPayload } = require('./lib/wallpaper.cjs');
 const { providerStatus } = require('./lib/providers/oauth.cjs');
 const i18n = require('./lib/i18n.cjs');
@@ -709,9 +709,10 @@ async function writeRemoteEvent(kind, event, calendar, { scope = 'one', previous
 //    A queued command that awaits one of those (note:trash, widget:update, window:close → flushWindow) would wait behind
 //    itself for the 5 s / 4.5 s timeout, so the reply must come through here. Window controls, widget:close/resize/focus
 //    and update:* only touch windows or the updater and take no time; widget:glass-preview only passes the slider's level on (a
-//    queued one would lag behind a drag).
+//    queued one would lag behind a drag); emoji:panel only opens Windows' emoji panel over the field that has the keyboard (a
+//    queued one could open after the user had moved on).
 // Every name is a case of command() (tests/commands.test.cjs).
-const DIRECT_COMMANDS = new Set(['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'widget:glass-preview', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit']);
+const DIRECT_COMMANDS = new Set(['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'widget:glass-preview', 'emoji:panel', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit']);
 async function command(commandName, payload, sourceWindow) {
   const now = () => new Date().toISOString();
   switch (commandName) {
@@ -1209,6 +1210,9 @@ async function command(commandName, payload, sourceWindow) {
     case 'auth:status': return providerStatus();
     case 'auth:cancel': return { cancelled: sync.cancelSignIn() };
     case 'app:quit': app.quit(); return true; // before-quit flushes note drafts first
+    // Windows' own emoji panel (Win + .), searchable and complete, over the field that has the keyboard (2026-10-29 owner: more emoji,
+    // as Notion has, without making the app heavy — no emoji list of Dayboard's own). false where the system has none.
+    case 'emoji:panel': { if (!app.isEmojiPanelSupported()) return false; app.showEmojiPanel(); return true; }
     case 'event:delete': {
       const { event, recurrenceId } = resolveEvent(payload.id);
       const calendar = lookup('calendars', event.calendarId);
@@ -1307,6 +1311,12 @@ async function command(commandName, payload, sourceWindow) {
       if ('calendarPanel' in payload) {
         if (!['auto', 'open', 'closed'].includes(payload.calendarPanel)) throw new Error(tr('지원하지 않는 패널 설정입니다.'));
         settings.calendarPanel = payload.calendarPanel;
+      }
+      // The docked panel's dragged width, or null for the one that follows the window (domain.js panelWidth keeps it in range).
+      if ('calendarPanelWidth' in payload) {
+        const width = panelWidth(payload.calendarPanelWidth);
+        if (width === undefined) throw new Error(tr('패널 너비가 올바르지 않습니다.'));
+        settings.calendarPanelWidth = width;
       }
       if ('listOrder' in payload) settings.listOrder = idList(payload.listOrder, 500, tr('목록 순서가 올바르지 않습니다.'));
       if ('hiddenCalendars' in payload) settings.hiddenCalendars = idList(payload.hiddenCalendars, 500, tr('달력 표시 설정이 올바르지 않습니다.'));

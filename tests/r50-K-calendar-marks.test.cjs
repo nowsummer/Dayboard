@@ -74,6 +74,21 @@ test('every calendar row ends in a mark named after its service, never the word,
   for (const r of rows) assert.ok(r.button.attrs.title.startsWith(r.mark.getAttribute('aria-label') + ' · '), `${r.name}: tooltip ${r.button.attrs.title}`);
 });
 
+// One service only (2026-10-29 owner: 「이거 굳이 구글 마크 G가 필요해? 없어도 문제 없는 거 아니야?」 — a Gmail calendar and its
+// holidays): no marks, nothing to tell apart; the tooltip still names the service. A second service brings them back.
+test('a list of one service shows no marks, and the tooltip still names it', () => {
+  const google = CALENDARS.filter(c => c.provider === 'google');
+  const rows = rowsOf(render(google, { defaultCalendarId: 'g1' }).list);
+  assert.deepEqual(rows.map(r => r.name), ['haeun12@example.com', '생일']);
+  for (const r of rows) {
+    assert.equal(r.button.children.length, 1, `${r.name}: the label box only`);
+    assert.equal(r.row.all(byClass('cal-provider')).length, 0, `${r.name}: no mark`);
+    assert.ok(r.button.attrs.title.startsWith('Google · '), `${r.name}: tooltip ${r.button.attrs.title}`);
+  }
+  const mixed = rowsOf(render([...google, CALENDARS.find(c => c.provider === 'local')], { defaultCalendarId: 'g1' }).list);
+  assert.ok(mixed.every(r => r.button.children.length === 2 && byClass('cal-provider')(r.button.children[1])), 'a second service brings the marks back');
+});
+
 test('the marks are the account screens\' shapes in the muted text colour, within 14px', () => {
   const { list, googleParts, cloudPath } = render(CALENDARS);
   const marks = Object.fromEntries(rowsOf(list).map(r => [r.mark.getAttribute('aria-label'), r.mark.children[0]]));

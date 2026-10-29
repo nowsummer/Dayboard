@@ -110,7 +110,7 @@ for (const lang of ['ko', 'en']) {
       }
       const tripDays = [...spanDays(trip), ...spanDays(holiday)];
       // No work at the weekend: no meeting, workshop, trip or deadline, and nothing of the work list due — today's included.
-      const work = s.lists.find(l => l.name === T.work);
+      const work = s.lists.find(l => (D.splitEmoji(l.name).title || l.name) === T.work);
       for (const o of occ.filter(o => [T.events.weekly[0], T.events.review, T.events.workshop, T.events.client[0]].includes(o.title))) assert.ok(!isWeekend(o.day), `${when}: 「${o.title}」 on a weekday (${o.day})`);
       for (const title of [T.events.away, T.events.report]) for (const key of spanDays(allDay(s, title))) assert.ok(!isWeekend(key), `${when}: 「${title}」 on a weekday (${key})`);
       for (const t of s.tasks.filter(t => t.listId === work.id && t.dueDate)) assert.ok(!isWeekend(t.dueDate), `${when}: work 「${t.title}」 is due on a weekday (${t.dueDate})`);

@@ -115,5 +115,13 @@ test('npm run package builds in a temporary folder and tries the exe before it r
   const stamp = source.indexOf("await stampFileVersion(path.join(staged, 'Dayboard.exe'), manifest.version);"), verify = source.indexOf('const result = verifyBundle(staged);');
   assert.ok(stamp > source.indexOf('await packager(') && stamp < verify && verify < probe, 'packager, then the stamp, then verify and the trial run');
   assert.match(source, /setFileVersion\(parts\[0\], parts\[1\], parts\[2\], 0, 1033\)/);
+  // DAYBOARD_KEEP_EXE=1 (2026-10-29) keeps the bundle's exe instead, only with the same Electron, the exe build-info.json describes and
+  // the icon of that build; read before the old bundle is moved, copied in place of the stamp, and recorded in build-info.json.
+  assert.match(source, /if \(info\.electron !== manifest\.devDependencies\.electron\) throw/);
+  assert.match(source, /if \(sha\(exe\) !== info\.executableSha256\) throw/);
+  assert.match(source, /info\.iconSha256 \? info\.iconSha256 !== sha\(icon\)/);
+  const keep = source.indexOf('const kept = keptExecutable();'), copy = source.indexOf("if (kept) { fs.copyFileSync(kept.exe, path.join(staged, 'Dayboard.exe'));");
+  assert.ok(keep > 0 && keep < source.indexOf('await packager(') && copy > source.indexOf('await packager(') && copy < verify, 'read first, copied before verify and the trial run');
+  assert.match(source, /if \(kept\) result\.executableFrom = kept\.version;/);
   assert.match(source, /finally \{\n\s+fs\.rmSync\(scratch, \{ recursive: true, force: true \}\);/, 'the temporary folder goes either way');
 });

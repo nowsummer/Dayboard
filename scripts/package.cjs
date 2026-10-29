@@ -54,6 +54,25 @@ function assertRegularFile(filename) {
 // with only this field rewritten ran (2026-10-28, 10-29; packager's own buildVersion gave yet another hash, also refused). Done
 // before the bundle is checked and tried, so build-info.json, the trial run and the installer all carry this exe. resedit is
 // the library packager itself writes the version resource with.
+// DAYBOARD_KEEP_EXE=1: the new bundle keeps the Dayboard.exe of the bundle in 앱/ instead of the one packager just made
+// (2026-10-29: Smart App Control refused 1.2.1's new exe, file version 1.2.1.0, for an hour and more, while 1.2.0's ran). The exe is
+// Electron's launcher with Dayboard's name, icon and version labels — the app itself is resources/app — so the same Electron
+// version and icon give the same program; only Windows' file properties keep the old version label (build-info.json records
+// `executableFrom`). Refused when the Electron version differs, when the exe is not the one build-info.json describes, or when
+// the icon may have changed since (newer than that build, or another hash than the one recorded).
+function keptExecutable() {
+  if (process.env.DAYBOARD_KEEP_EXE !== '1') return null;
+  const exe = path.join(bundleDir, 'Dayboard.exe'), infoFile = path.join(bundleDir, 'build-info.json');
+  if (!fs.existsSync(exe) || !fs.existsSync(infoFile)) throw new Error('DAYBOARD_KEEP_EXE: 앱/에 지금 번들이 없습니다.');
+  const info = JSON.parse(fs.readFileSync(infoFile, 'utf8'));
+  const sha = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  if (info.electron !== manifest.devDependencies.electron) throw new Error(`DAYBOARD_KEEP_EXE: 지금 번들의 Electron ${info.electron}이 새 버전 ${manifest.devDependencies.electron}과 다릅니다.`);
+  if (sha(exe) !== info.executableSha256) throw new Error('DAYBOARD_KEEP_EXE: 지금 번들의 Dayboard.exe가 build-info.json과 다릅니다.');
+  const icon = path.join(sourceDir, 'assets', 'icon.ico');
+  if (info.iconSha256 ? info.iconSha256 !== sha(icon) : fs.statSync(icon).mtimeMs > Date.parse(info.builtAt)) throw new Error('DAYBOARD_KEEP_EXE: 아이콘이 지금 번들을 만든 뒤 바뀌었을 수 있습니다.');
+  return { exe, version: info.executableFrom || info.version };
+}
+
 async function stampFileVersion(exe, version) {
   const parts = String(version).split('.').map(Number);
   if (parts.length !== 3 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 65535)) throw new Error(`앱 버전이 x.y.z 형식이 아닙니다: ${version}`);
@@ -215,6 +234,7 @@ async function main() {
   }
   assertRegularFile(path.join(sourceDir, 'assets', 'icon.ico'));
   assertRegularFile(path.join(sourceDir, 'node_modules', '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node'));
+  const kept = keptExecutable(); // read before the old bundle is moved aside
   const { packager } = await import('@electron/packager');
   // The new bundle is built and tried in a temporary folder, and replaces the one in 앱/ only once its Dayboard.exe has run
   // (scripts/bundle-swap.cjs — 2026-10-28: Smart App Control refused a new exe after the working bundle was overwritten).
@@ -240,13 +260,16 @@ async function main() {
       win32metadata: { CompanyName: 'Dayboard', FileDescription: 'Dayboard · 할 일, 일정, 메모', ProductName: 'Dayboard' },
     });
     if (results.length !== 1 || path.resolve(results[0]) !== staged) throw new Error('패키지 출력 경로가 예상과 다릅니다.');
-    await stampFileVersion(path.join(staged, 'Dayboard.exe'), manifest.version);
+    if (kept) { fs.copyFileSync(kept.exe, path.join(staged, 'Dayboard.exe')); console.log(`Dayboard.exe: 지금 번들의 것을 그대로 씀(${kept.version}, DAYBOARD_KEEP_EXE)`); }
+    else await stampFileVersion(path.join(staged, 'Dayboard.exe'), manifest.version);
     writeUpdateFeed(staged);
     const result = verifyBundle(staged);
     probeBundle(staged, scratch);
     fs.mkdirSync(outputDir, { recursive: true });
     replaceBundle(staged, bundleDir);
     result.launcherSha256 = portableLayout ? buildLauncher() : null;
+    result.iconSha256 = createHash('sha256').update(fs.readFileSync(path.join(sourceDir, 'assets', 'icon.ico'))).digest('hex');
+    if (kept) result.executableFrom = kept.version;
     fs.writeFileSync(path.join(bundleDir, 'build-info.json'), JSON.stringify(result, null, 2) + '\n');
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });

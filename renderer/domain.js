@@ -24,6 +24,11 @@
   const AUTO_PALETTE=['#007aff','#ff9500','#34c759','#af52de','#ff2d55','#30b0c7','#5856d6','#ff3b30','#a2845e'];
   // Smallest widget windows that still show their content (calendar: header + 6-week grid). main clamps a widget to it (the
   // window's minimum, widget:resize) and the widget's own resize handle stops there (2026-10-27 review: the two copies had to match).
+  // The calendar's docked right panel at a width the user dragged its edge to (2026-10-29 owner: 「작은 창으로 달력 기능을 봤을 때 여전히
+  // 오른쪽 탭이 크지 않아? 이거 원하면 분계선 선을 잡고 원하는 크기 만큼 좁히거나」): px, or null for the width that follows the window
+  // (styles.css .calendar-view). Narrower than 220 the day's heading and its + no longer fit; wider than 480 it is no longer a side panel.
+  const CAL_PANEL_WIDTH={min:220,max:480};
+  const panelWidth=v=>v==null?null:Number.isFinite(v)?Math.round(Math.min(CAL_PANEL_WIDTH.max,Math.max(CAL_PANEL_WIDTH.min,v))):undefined;
   const WIDGET_MIN={calendar:{minWidth:300,minHeight:360},tasks:{minWidth:280,minHeight:240},note:{minWidth:280,minHeight:220}};
   const EMOJI_PREFIX=/^((?:\p{Extended_Pictographic}|\p{Regional_Indicator}{2})(?:️|\p{Emoji_Modifier})?(?:‍\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?)*)\s*/u;
   // "🛒 쇼핑" → the emoji becomes the list symbol and the title loses it (Windows To Do habit).
@@ -686,7 +691,7 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,glassLook,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,visibleState,builtInList,glassTint,glassTone,glassLook,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,CAL_PANEL_WIDTH,panelWidth,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -11,6 +11,10 @@
 // user). 업무 is brown, not indigo: indigo sat right under 내 할 일's blue (CIEDE2000 15.3, the closest pair in the sidebar) and
 // two rows under the purple (15.7), a run of three blue-violet icons; brown is 45.7 from the blue and 46.6 from the purple.
 // With indigo kept, no trip colour helps (blue/indigo stays 15.3); a gray list reads as disabled (artifacts/r50-I/sidebar-full.png).
+// The lists the user makes carry an emoji in their name, as people do in To Do and Reminders (2026-10-29 owner, of his own sidebar:
+// 「이모지 넣은 거로 된 게 더 이쁘지 않을까?」): it shows on a soft circle of the list's colour, and To Do and the iPhone show it too.
+// 내 할 일, the built-in list, keeps its icon.
+const EMOJI = { shop: '🛒', books: '📚', trip: '✈️', work: '💼' };
 const COLOURS = {
   lists: { shop: '#34c759', books: '#ff9500', trip: '#af52de', inbox: '#007aff', work: '#a2845e' },
   // 가족 저녁 식사, which the demo drags in the month view only when the book club is not shown (r50 M), is brown, which no other
@@ -130,12 +134,12 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
   // ---- Lists and groups ----
   const c = COLOURS.lists, ec = COLOURS.events;
   await invoke('list:update', { id: 'local-inbox', name: t.inbox, color: c.inbox, icon: 'list' });
-  const work = await invoke('list:add', { name: t.work, color: c.work, icon: 'briefcase' });
+  const work = await invoke('list:add', { name: `${EMOJI.work} ${t.work}`, color: c.work, icon: 'briefcase' });
   const personal = await invoke('group:add', { name: t.life });
   const mk = (name, color, icon) => invoke('list:add', { name, color, icon, groupId: personal.id });
-  const shop = await mk(t.shop, c.shop, 'cart');
-  const books = await mk(t.books, c.books, 'book');
-  const trip = await mk(t.trip, c.trip, 'plane');
+  const shop = await mk(`${EMOJI.shop} ${t.shop}`, c.shop, 'cart');
+  const books = await mk(`${EMOJI.books} ${t.books}`, c.books, 'book');
+  const trip = await mk(`${EMOJI.trip} ${t.trip}`, c.trip, 'plane');
 
   // ---- Tasks ----
   // `extra`: a repeat (rrule) or subtasks (steps), new in 1.1.3, so the pictures show them.
@@ -195,7 +199,7 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
 // The sample's mark, written by the recordings next to their frames (readme-demo.cjs, readme-widget-scene.cjs) and compared by
 // readme-gif.py before it joins a desktop scene to the app's frames. It carries the sample's words too (r50 M): a scene recorded
 // before they changed shows the old tasks in the gallery's tasks card.
-function sampleMark(lang) { return { lang, colours: COLOURS, text: TEXT[lang] || TEXT.ko }; }
+function sampleMark(lang) { return { lang, colours: COLOURS, emoji: EMOJI, text: TEXT[lang] || TEXT.ko }; }
 function writeSampleMark(folder, lang) {
   require('node:fs').writeFileSync(require('node:path').join(folder, 'sample.json'), JSON.stringify(sampleMark(lang), null, 1));
 }

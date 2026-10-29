@@ -2762,5 +2762,44 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     && /^제주 여행 준비 체크에 추가\u00a0· .+ 날짜$/.test(narrowPanel.hint) && narrowPanel.hintLines === 2 && narrowPanel.dateLines === 1 && narrowPanel.dotFirst && widePanel.dateLines === 1, `달력 오른쪽 패널 너비 ${JSON.stringify(panelSizes)}`);
   checks.push('calendar-panel-fluid');
 
+  // 2026-10-29 owner: 「분계선 선을 잡고 원하는 크기 만큼 좁히거나」 — the docked panel's edge takes a real drag (sendInputEvent, so
+  // the grip's pointer capture is a real one): narrower by the distance dragged, saved on release; never wider than 42% of the
+  // calendar however far it is dragged; ←/→ move it 16px; a double-click gives back the width that follows the window.
+  const dragBounds = mainWindow.getBounds();
+  mainWindow.setBounds({ ...dragBounds, width: 1280 });
+  await new Promise(resolve => setTimeout(resolve, 400));
+  await run(mainWindow, `hideToast(); goto('calendar'); setCalMode('month', D.dateKey()); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); return true;`);
+  const panelNow = () => run(mainWindow, `const grip = document.querySelector('.cal-panel-resizer'), panel = document.querySelector('.calendar-view>.day-panel'), view = document.querySelector('.calendar-view');
+    const g = grip?.getBoundingClientRect(), p = panel?.getBoundingClientRect(), m = document.querySelector('.calendar-main')?.getBoundingClientRect();
+    return { grip: g ? [Math.round(g.left + g.width / 2), Math.round(g.top + g.height / 2)] : null, panel: p ? Math.round(p.width) : 0, left: p ? Math.round(p.left) : 0, gripAt: g ? Math.round(g.left + 6) : 0,
+      main: m ? Math.round(m.width) : 0, grid: view ? Math.round(view.clientWidth - parseFloat(getComputedStyle(view).paddingLeft) - parseFloat(getComputedStyle(view).paddingRight)) : 0,
+      sized: view?.classList.contains('panel-sized'), saved: state.settings.calendarPanelWidth, role: grip?.getAttribute('role'), focused: document.activeElement === grip };`);
+  const dragPanel = async dx => {
+    const at = await panelNow(); const [x, y] = at.grip;
+    mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x, y });
+    mainWindow.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+    for (let i = 1; i <= 8; i++) { mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: x + Math.round(dx * i / 8), y, button: 'left', modifiers: ['leftButtonDown'] }); await new Promise(resolve => setTimeout(resolve, 16)); }
+    mainWindow.webContents.sendInputEvent({ type: 'mouseUp', x: x + dx, y, button: 'left', clickCount: 1 });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return panelNow();
+  };
+  const panelStart = await panelNow();
+  const panelNarrower = await dragPanel(40);
+  const panelWidest = await dragPanel(-600);
+  const panelKeyed = await run(mainWindow, `const grip = document.querySelector('.cal-panel-resizer'); grip.focus(); grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 400)); return state.settings.calendarPanelWidth;`);
+  const panelKeyedNow = await panelNow();
+  const panelStored = (await invoke('state:get')).settings.calendarPanelWidth;
+  await run(mainWindow, `document.querySelector('.cal-panel-resizer').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 400)); return true;`);
+  const panelReset = await panelNow();
+  const panelResetStored = (await invoke('state:get')).settings.calendarPanelWidth;
+  mainWindow.setBounds(dragBounds);
+  const panelDrag = { panelStart, panelNarrower, panelWidest, panelKeyed, panelKeyedNow, panelStored, panelReset, panelResetStored };
+  expect(panelStart.role === 'separator' && !panelStart.sized && panelStart.saved == null && Math.abs(panelStart.gripAt - panelStart.left) <= 1
+    && panelNarrower.sized && Math.abs(panelNarrower.panel - (panelStart.panel - 40)) <= 1 && panelNarrower.saved === panelNarrower.panel && panelNarrower.main > panelStart.main
+    && panelWidest.panel <= Math.ceil(panelWidest.grid * 0.42) + 1 && panelWidest.panel > panelNarrower.panel && panelWidest.saved === panelWidest.panel
+    && panelKeyed === panelWidest.panel - 16 && panelKeyedNow.panel === panelKeyed && panelStored === panelKeyed
+    && !panelReset.sized && panelReset.saved == null && panelResetStored == null && panelReset.panel === panelStart.panel, `달력 패널 끌어서 너비 조절 ${JSON.stringify(panelDrag)}`);
+  checks.push('calendar-panel-drag');
+
   return checks;
 };

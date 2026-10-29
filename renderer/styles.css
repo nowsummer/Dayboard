@@ -37,7 +37,7 @@
 @media(max-width:450px){body:not(.widget-body) .section-toggle,body:not(.widget-body) .group-row,body:not(.widget-body) .list-more{display:none}}
 
 /* Symbol picker (icon or emoji) and a quieter sidebar scrollbar. */
-.symbol-picker{display:flex;flex-direction:column;gap:8px}.picker-label{font-size:12px;color:var(--muted)}.emoji-grid .icon-choice{font-size:17px;line-height:1}.emoji-input{max-width:200px;font-size:14px}
+.symbol-picker{display:flex;flex-direction:column;gap:8px}.picker-label{font-size:12px;color:var(--muted)}.emoji-grid .icon-choice{font-size:17px;line-height:1}.emoji-input{max-width:200px;font-size:14px}.emoji-custom{display:flex;align-items:center;gap:8px}.emoji-custom .emoji-input{flex:1 1 auto;min-width:0}.emoji-more{flex:none}
 .sidebar-scroll::-webkit-scrollbar-thumb{background:transparent}.sidebar-scroll:hover::-webkit-scrollbar-thumb{background:#9199ab33}
 .widget-body .icon-grid{grid-template-columns:repeat(6,1fr)}
 
@@ -411,6 +411,11 @@
 /* The panel folds away: the calendar takes the whole width; on a narrow window it opens as a drawer over the calendar. */
 .calendar-view{position:relative}
 .calendar-view.panel-hidden{grid-template-columns:minmax(0,1fr);column-gap:0}
+/* The docked panel at the width dragged to (calendar.js calPanelResizer, 2026-10-29 owner): never more than 42% of the calendar, so a
+   width set in a wide window does not crowd the month in a narrow one. The grip sits on the panel's left edge in the panel's own grid
+   cell (so it neither scrolls with the panel nor takes a column) and shows a thin line on hover and while dragged. */
+.calendar-view.panel-sized{grid-template-columns:minmax(0,1fr) min(var(--cal-panel),42%)}.calendar-view>.calendar-main{grid-column:1;grid-row:1}.calendar-view>.day-panel:not(.drawer){grid-column:2;grid-row:1}
+.cal-panel-resizer{grid-column:2;grid-row:1;justify-self:start;align-self:stretch;position:relative;z-index:3;width:12px;margin-left:-6px;cursor:col-resize;touch-action:none;outline:none}.cal-panel-resizer::after{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;border-radius:1px;background:transparent;transition:background .15s}.cal-panel-resizer:hover::after,.cal-panel-resizer.dragging::after,.cal-panel-resizer:focus-visible::after{background:color-mix(in srgb,var(--blue) 55%,transparent)}body.col-resizing,body.col-resizing *{cursor:col-resize!important;user-select:none}
 .day-panel.drawer{position:absolute;top:0;right:0;bottom:0;width:300px;max-width:calc(100% - 24px);z-index:12;background:var(--bg);border-left:1px solid var(--line);box-shadow:0 8px 32px rgba(0,0,0,.16);padding:var(--content-top) 20px var(--content-bottom);overflow:auto;animation:drawer-in .16s ease-out}
 .drawer-scrim{position:absolute;inset:0;z-index:11}
 @keyframes drawer-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}

@@ -24,7 +24,7 @@ function mainFunction(name) {
 const between = (from, to) => { const a = source.indexOf(from); assert.ok(a >= 0, from); const b = source.indexOf(to, a + from.length); assert.ok(b > a, to); return source.slice(a, b); };
 
 const EXPECTED_DIRECT = ['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus',
-  'widget:glass-preview', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit'];
+  'widget:glass-preview', 'emoji:panel', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit'];
 
 function directCommands() {
   const match = source.match(/\nconst DIRECT_COMMANDS = new Set\(\[([^\]]*)\]\);\n/);
@@ -36,7 +36,7 @@ function caseLabels() {
   return [...body.matchAll(/\n\s+case '([^']+)':/g)].map(m => m[1]);
 }
 
-test('every direct command is a case of command(); the set is the 18 of before plus widget:open and widget:glass-preview (2026-10-28), defined next to command()', () => {
+test('every direct command is a case of command(); the set is the 18 of before plus widget:open and widget:glass-preview (2026-10-28) and emoji:panel (2026-10-29), defined next to command()', () => {
   const direct = directCommands();
   const cases = caseLabels();
   assert.ok(cases.length >= 50, `command() has its cases (${cases.length})`);

@@ -58,6 +58,8 @@ async function sample(lang) {
   };
   await seedSample(invoke, new Date(2026, 9, 28, 9, 41), lang);
   // The sidebar's order (artifacts/r50-I/sidebar-full.cjs prints it): the group's lists, then 내 할 일, then the other loose lists.
+  // Names are read as the sidebar shows them: the emoji the sample's own lists start with (2026-10-29) is their symbol, not their name.
+  for (const l of lists) l.name = D.splitEmoji(l.name).title || l.name;
   const sidebar = [...lists.filter(l => l.groupId), lists.find(l => l.id === 'local-inbox'), ...lists.filter(l => !l.groupId && l.id !== 'local-inbox')];
   return { lists, events, sidebar };
 }
