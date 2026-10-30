@@ -46,8 +46,8 @@ function services() {
     if (u.pathname === '/drive/v3/files' && method === 'GET') {
       assert.equal(u.searchParams.get('spaces'), 'appDataFolder');
       const q = u.searchParams.get('q');
-      assert.ok(q === null || q === views.VIEW_QUERY, `query ${q}`);
-      return { files: [...files.values()].filter(file => q === null || file.appProperties.dayboard === 'view').map(file => ({ id: file.id, modifiedTime: file.modifiedTime, appProperties: { ...file.appProperties } })) };
+      assert.ok(q === null || q === views.VIEW_QUERY || q === views.DEVICE_QUERY, `query ${q}`);
+      return { files: [...files.values()].filter(file => q === null || file.appProperties.dayboard === (q === views.DEVICE_QUERY ? 'viewpc' : 'view')).map(file => ({ id: file.id, modifiedTime: file.modifiedTime, appProperties: { ...file.appProperties } })) };
     }
     const id = decodeURIComponent(u.pathname.split('/').pop());
     if (u.pathname.startsWith('/drive/v3/files/') && method === 'GET') { if (!files.has(id)) throw failure(404); assert.equal(u.searchParams.get('alt'), 'media'); return JSON.parse(files.get(id).content); }
@@ -60,7 +60,7 @@ function services() {
     if (u.pathname.startsWith('/upload/drive/v3/files/') && method === 'PATCH') {
       assert.equal(u.searchParams.get('uploadType'), 'media');
       if (!files.has(id)) throw failure(404);
-      files.get(id).content = options.body; return { id };
+      files.get(id).content = options.body; files.get(id).modifiedTime = new Date(wall).toISOString(); return { id };
     }
     if (u.pathname.startsWith('/drive/v3/files/') && method === 'DELETE') { if (!files.has(id)) throw failure(404); files.delete(id); return null; }
     throw new Error(`unexpected Drive ${method} ${u.href}`);
@@ -450,11 +450,12 @@ test('a Microsoft account alone carries the look (open extension on the default 
   assert.deepEqual(a.store.publicState().viewSync, { error: null, noStore: true });
 });
 
-test('several Google view files are merged and written to the smallest id; the others go only after that write', async t => {
+test('several shared Google view files are merged and the smallest id written; another goes only once unchanged for STALE_DAYS', async t => {
   const cloud = services(); const a = pc(t, cloud, { name: 'A' });
   const docOf = items => canonical({ v: 1, items });
-  cloud.files.set('f2', { id: 'f2', appProperties: { dayboard: 'view' }, content: docOf({ [`L:${L1}`]: { c: ['#ff3b30', wall - 5000] } }), modifiedTime: '' });
-  cloud.files.set('f1', { id: 'f1', appProperties: { dayboard: 'view' }, content: docOf({ [`L:${L2}`]: { i: ['cart', wall - 5000] } }), modifiedTime: '' });
+  const recent = new Date(wall - 5000).toISOString();
+  cloud.files.set('f2', { id: 'f2', appProperties: { dayboard: 'view' }, content: docOf({ [`L:${L1}`]: { c: ['#ff3b30', wall - 5000] } }), modifiedTime: recent });
+  cloud.files.set('f1', { id: 'f1', appProperties: { dayboard: 'view' }, content: docOf({ [`L:${L2}`]: { i: ['cart', wall - 5000] } }), modifiedTime: recent });
   cloud.files.set('n1', { id: 'n1', appProperties: { dayboard: 'note', noteId: 'x' }, content: '{}', modifiedTime: '' });
   cloud.hooks.fail = (method, u) => (method === 'PATCH' ? 503 : null);
   await a.run();
@@ -463,11 +464,20 @@ test('several Google view files are merged and written to the smallest id; the o
   assert.equal(find(a.state().lists, L1).color, '#ff3b30'); assert.equal(find(a.state().lists, L2).icon, 'cart');
   cloud.hooks.fail = null;
   await a.run();
-  assert.deepEqual(cloud.viewFiles().map(file => file.id), ['f1']);
+  // f2 may still be written by a PC on 1.2.2 (2026-10-30 Codex review R02: tidying must not lose a newer change).
+  assert.deepEqual(cloud.viewFiles().map(file => file.id).sort(), ['f1', 'f2'], 'a recent extra stays');
   assert.ok(cloud.files.has('n1'), 'a note file is never touched');
   const doc = sanitizeDoc(JSON.parse(cloud.files.get('f1').content));
   assert.ok(doc.items[`L:${L1}`].c && doc.items[`L:${L2}`].i);
   assert.equal(a.state().viewSync.error, null);
+  const own = [...cloud.files.values()].filter(file => file.appProperties.dayboard === 'viewpc');
+  assert.deepEqual(own.map(file => file.appProperties.device), [a.state().viewSync.device.id], 'this PC wrote its own file');
+  assert.equal(own[0].content, cloud.files.get('f1').content);
+  const quiet = cloud.writes(); await a.run();
+  assert.equal(cloud.writes(), quiet, 'nothing to write while f2 is recent');
+  cloud.files.get('f2').modifiedTime = new Date(wall - (views.STALE_DAYS + 1) * DAY).toISOString();
+  await a.run();
+  assert.deepEqual(cloud.viewFiles().map(file => file.id), ['f1'], 'unchanged that long, it goes');
   // A file that is not a view document is left alone.
   cloud.files.set('f0', { id: 'f0', appProperties: { dayboard: 'view' }, content: '{"v":"two"}', modifiedTime: '' });
   a.edit(state => { find(state.lists, L3).color = '#34c759'; });
@@ -669,4 +679,89 @@ test('a store holding time 0 (written by an earlier build) counts as the oldest 
   assert.equal(find(a.state().lists, L1).color, '#ff3b30');
   await converge(cloud, [b, a]);
   for (const side of [a, b]) assert.equal(find(side.state().lists, L1).color, '#007aff', `${side.name}: the colour chosen last`);
+});
+
+// 2026-10-30 Codex review R02: two PCs that read the same document and write at once. Each holds its first write until the other has
+// read everything (both merged the same older document), the first to finish is switched off at once, and a third PC joins.
+async function together(cloud, sides) {
+  const names = new Set(sides.map(side => side.name)); const reached = new Set(); let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  cloud.hooks.before = async (method, u, options, who) => {
+    if (method === 'GET' || !names.has(who?.name) || reached.has(who.name)) return;
+    reached.add(who.name);
+    if (reached.size === names.size) release(); else await gate;
+  };
+  const results = await Promise.all(sides.map(side => side.run()));
+  cloud.hooks.before = null;
+  return results;
+}
+for (const microsoft of [false, true]) {
+  test(`R02: changes two PCs write at once both reach a third PC after the first is switched off${microsoft ? ' (Microsoft beside Google)' : ''}`, async t => {
+    const cloud = services(); const a = pc(t, cloud, { name: 'A', microsoft }); const b = pc(t, cloud, { name: 'B', microsoft });
+    await converge(cloud, [a, b]);
+    a.edit(state => { find(state.lists, L1).color = '#ff3b30'; });
+    b.edit(state => { find(state.lists, L1).icon = 'star'; find(state.lists, L2).color = '#007aff'; });
+    await together(cloud, [a, b]);
+    assert.equal(a.state().viewSync.dirty, false); assert.equal(b.state().viewSync.dirty, false);
+    a.views.dispose(); // switched off right after its run went through
+    const c = pc(t, cloud, { name: 'C', microsoft });
+    await c.run();
+    const list = find(c.state().lists, L1);
+    assert.equal(list.color, '#ff3b30', "A's colour is in the cloud");
+    assert.equal(list.icon, 'star', "B's symbol too");
+    assert.equal(find(c.state().lists, L2).color, '#007aff');
+    await converge(cloud, [b, c]);
+    for (const side of [b, c]) assert.equal(find(side.state().lists, L1).color, '#ff3b30', `${side.name} has A's colour`);
+  });
+}
+test('R02: the same field changed on two PCs at once ends with the later choice everywhere, also with the earlier PC off', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', microsoft: false }); const b = pc(t, cloud, { name: 'B', microsoft: false });
+  await converge(cloud, [a, b]);
+  a.edit(state => { find(state.lists, L1).color = '#ff3b30'; });
+  b.edit(state => { find(state.lists, L1).color = '#007aff'; }); // stamped a second later
+  await together(cloud, [b, a]);
+  a.views.dispose();
+  const c = pc(t, cloud, { name: 'C', microsoft: false });
+  await c.run(); await converge(cloud, [b, c]);
+  for (const side of [b, c]) assert.equal(find(side.state().lists, L1).color, '#007aff', `${side.name}: the colour chosen last`);
+});
+test("R02: each PC writes only its own file; data copied to another PC gets an id of its own there; a gone PC's file is tidied after STALE_DAYS", async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', microsoft: false }); const b = pc(t, cloud, { name: 'B', microsoft: false });
+  await converge(cloud, [a, b]);
+  const own = () => [...cloud.files.values()].filter(file => file.appProperties.dayboard === 'viewpc');
+  const idA = a.state().viewSync.device.id, idB = b.state().viewSync.device.id;
+  assert.notEqual(idA, idB);
+  assert.deepEqual(own().map(file => file.appProperties.device).sort(), [idA, idB].sort(), 'one file each');
+  assert.equal(cloud.viewFiles().length, 1, 'and the shared one, for 1.2.2');
+  // A's data on a PC of another name: a new id, not A's file.
+  const copy = createViewSync({ store: a.store, requestFor: () => (url, options) => cloud.request(url, options, { name: 'A2' }), hasAccess: id => id === GOOGLE, delay: 1e9, retryDelay: 1e9, now: () => wall, host: 'another-pc' });
+  t.after(() => copy.dispose());
+  a.views.dispose();
+  a.edit(state => { find(state.lists, L3).color = '#34c759'; });
+  await copy.sync();
+  const idA2 = a.state().viewSync.device.id;
+  assert.ok(idA2 !== idA && idA2 !== idB);
+  assert.equal(own().length, 3);
+  // A's old file, unchanged for STALE_DAYS, goes, and so does B's (off as long); this PC's own, kept fresh, stays. B writes its own again
+  // at its next run.
+  wall += (views.STALE_DAYS + 1) * DAY;
+  b.edit(state => { find(state.lists, L2).color = '#af52de'; });
+  await copy.sync();
+  assert.deepEqual(own().map(file => file.appProperties.device), [idA2], 'files unchanged that long are gone');
+  await b.run();
+  assert.deepEqual(own().map(file => file.appProperties.device).sort(), [idA2, idB].sort(), "B, still in use, wrote its own again");
+  for (const file of own()) assert.equal(sanitizeDoc(JSON.parse(file.content)).items[`L:${L3}`].c[0], '#34c759');
+  assert.equal(sanitizeDoc(JSON.parse(own().find(file => file.appProperties.device === idB).content)).items[`L:${L2}`].c[0], '#af52de');
+});
+test('R02: a lost answer of a create leaves two files of this PC; the extra goes once the first is written', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', microsoft: false });
+  await a.run();
+  const id = a.state().viewSync.device.id;
+  const first = [...cloud.files.values()].find(file => file.appProperties.device === id);
+  cloud.files.set('f0', { ...structuredClone(first), id: 'f0' });
+  a.edit(state => { find(state.lists, L1).color = '#ff3b30'; });
+  await a.run();
+  const own = [...cloud.files.values()].filter(file => file.appProperties.device === id);
+  assert.deepEqual(own.map(file => file.id), ['f0']);
+  assert.equal(sanitizeDoc(JSON.parse(own[0].content)).items[`L:${L1}`].c[0], '#ff3b30');
 });

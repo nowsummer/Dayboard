@@ -39,7 +39,7 @@ function services() {
   function drive(u, method, options) {
     if (u.pathname === '/drive/v3/files' && method === 'GET') {
       const q = u.searchParams.get('q');
-      return { files: [...files.values()].filter(file => q === null || file.appProperties.dayboard === 'view').map(file => ({ id: file.id, modifiedTime: file.modifiedTime, appProperties: { ...file.appProperties } })) };
+      return { files: [...files.values()].filter(file => q === null || file.appProperties.dayboard === (q === views.DEVICE_QUERY ? 'viewpc' : 'view')).map(file => ({ id: file.id, modifiedTime: file.modifiedTime, appProperties: { ...file.appProperties } })) };
     }
     const id = decodeURIComponent(u.pathname.split('/').pop());
     if (u.pathname.startsWith('/drive/v3/files/') && method === 'GET') { if (!files.has(id)) throw failure(404); return JSON.parse(files.get(id).content); }
@@ -48,7 +48,7 @@ function services() {
       const file = { id: `f${next++}`, appProperties: { ...metadata.appProperties }, content, modifiedTime: new Date(wall).toISOString() };
       files.set(file.id, file); return { id: file.id };
     }
-    if (u.pathname.startsWith('/upload/drive/v3/files/') && method === 'PATCH') { if (!files.has(id)) throw failure(404); files.get(id).content = options.body; return { id }; }
+    if (u.pathname.startsWith('/upload/drive/v3/files/') && method === 'PATCH') { if (!files.has(id)) throw failure(404); files.get(id).content = options.body; files.get(id).modifiedTime = new Date(wall).toISOString(); return { id }; }
     if (u.pathname.startsWith('/drive/v3/files/') && method === 'DELETE') { if (!files.has(id)) throw failure(404); files.delete(id); return null; }
     throw new Error(`unexpected Drive ${method} ${u.href}`);
   }

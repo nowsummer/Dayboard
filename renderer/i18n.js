@@ -235,6 +235,8 @@
     '모든 이모지':'All emoji',
     '이모지 창을 열 수 없어요. 칸에 이모지를 직접 입력해 주세요.':'The emoji panel did not open. Type an emoji in the box instead.',
     'Windows 이모지 창에서 검색해 고르기 (Win + .)':'Search and pick in the Windows emoji panel (Win + .)',
+    // ---- 2026-10-30: the list icons by name, for a screen reader (Codex review U01) ----
+    '깃발':'Flag','별':'Star','장바구니':'Cart','집':'Home','서류 가방':'Briefcase','책':'Book','하트':'Heart','선물':'Gift','비행기':'Plane','전구':'Light bulb','커피':'Coffee','메일':'Mail','해':'Sun',
     // ---- 2026-10-29: the calendar panel's edge takes a drag ----
     '패널 너비':'Panel width',
     '끌어서 너비 조절 · 두 번 눌러 원래대로':'Drag to resize · double-click to reset',

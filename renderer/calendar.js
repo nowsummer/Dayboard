@@ -9,6 +9,7 @@ let calTop=null;                     // month view: Sunday that starts the first
 const calScroll={week:null,day:null};// time grid scroll position per view
 let calRecenter=true;                // the next time grid render scrolls to the current time (first open, 오늘, T)
 let calGesture=null;                 // pointer gesture in progress (move, stretch, draw)
+let calPanelDragging=false;          // the day panel's edge held (calPanelResizer): a render waits for the release (2026-10-30 Codex review R03)
 let calDrawer=false;                 // narrow window: the day panel shown over the calendar
 let calAllDayOpen=false;             // all-day row shows every lane
 let calHour=48;                      // hour height in px (12 hours per screen, at least 40px)
@@ -78,7 +79,7 @@ function dayPanel(drawer){const dayTasks=state.tasks.filter(t=>t.dueDate===selec
 // follows the window, and ←/→ move it by 16px from the keyboard. Only the docked panel: the drawer of a narrow window keeps its 300px.
 function calPanelWidth(){const w=state.settings.calendarPanelWidth;return Number.isFinite(w)?w:null;}
 function calPanelSave(width){const w=width==null?null:D.panelWidth(width);if(w===(calPanelWidth()??null))return;state.settings.calendarPanelWidth=w;run('settings:update',{calendarPanelWidth:w}).catch(()=>{});render();}
-function calPanelResizer(){const set=(view,w)=>{view.classList.add('panel-sized');view.style.setProperty('--cal-panel',w+'px');};const shown=()=>Math.round(document.querySelector('.calendar-view>.day-panel')?.getBoundingClientRect().width||calPanelWidth()||264);const grip=h('div',{class:'cal-panel-resizer',role:'separator','aria-orientation':'vertical','aria-label':tr('패널 너비'),'aria-valuemin':D.CAL_PANEL_WIDTH.min,'aria-valuemax':D.CAL_PANEL_WIDTH.max,'aria-valuenow':calPanelWidth(),tabindex:0,title:tr('끌어서 너비 조절 · 두 번 눌러 원래대로'),ondblclick:()=>calPanelSave(null),onkeydown:e=>{const step={ArrowLeft:16,ArrowRight:-16}[e.key];if(!step)return;e.preventDefault();e.stopPropagation();calPanelSave(shown()+step);requestAnimationFrame(()=>document.querySelector('.cal-panel-resizer')?.focus());},onpointerdown:e=>{if(e.button!==0)return;e.preventDefault();const view=grip.closest('.calendar-view');const startX=e.clientX,startW=shown();let w=startW,done=false;grip.setPointerCapture(e.pointerId);grip.classList.add('dragging');document.body.classList.add('col-resizing');const move=ev=>{w=D.panelWidth(startW+(startX-ev.clientX));set(view,w);};const up=()=>{if(done)return;done=true;grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);grip.removeEventListener('lostpointercapture',up);grip.classList.remove('dragging');document.body.classList.remove('col-resizing');if(w!==startW)calPanelSave(Math.round(document.querySelector('.calendar-view>.day-panel')?.getBoundingClientRect().width||w));};grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);grip.addEventListener('lostpointercapture',up);}});return grip;}
+function calPanelResizer(){const set=(view,w)=>{view.classList.add('panel-sized');view.style.setProperty('--cal-panel',w+'px');};const shown=()=>Math.round(document.querySelector('.calendar-view>.day-panel')?.getBoundingClientRect().width||calPanelWidth()||264);const grip=h('div',{class:'cal-panel-resizer',role:'separator','aria-orientation':'vertical','aria-label':tr('패널 너비'),'aria-valuemin':D.CAL_PANEL_WIDTH.min,'aria-valuemax':D.CAL_PANEL_WIDTH.max,'aria-valuenow':calPanelWidth(),tabindex:0,title:tr('끌어서 너비 조절 · 두 번 눌러 원래대로'),ondblclick:()=>calPanelSave(null),onkeydown:e=>{const step={ArrowLeft:16,ArrowRight:-16}[e.key];if(!step)return;e.preventDefault();e.stopPropagation();calPanelSave(shown()+step);requestAnimationFrame(()=>document.querySelector('.cal-panel-resizer')?.focus());},onpointerdown:e=>{if(e.button!==0)return;e.preventDefault();const view=grip.closest('.calendar-view');const startX=e.clientX,startW=shown();let w=startW,done=false;grip.setPointerCapture(e.pointerId);calPanelDragging=true;grip.classList.add('dragging');document.body.classList.add('col-resizing');const move=ev=>{w=D.panelWidth(startW+(startX-ev.clientX));set(view,w);};const up=()=>{if(done)return;done=true;grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);grip.removeEventListener('lostpointercapture',up);grip.classList.remove('dragging');document.body.classList.remove('col-resizing');calPanelDragging=false;const pending=renderPending,before=calPanelWidth();renderPending=false;if(w!==startW)calPanelSave(Math.round(document.querySelector('.calendar-view>.day-panel')?.getBoundingClientRect().width||w));if(pending&&calPanelWidth()===before)render();};grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);grip.addEventListener('lostpointercapture',up);}});return grip;}
 function calendarScreen(){const docked=calPanelDocked();if(docked)calDrawer=false;const drawer=!docked&&calDrawer;const sized=docked&&calPanelWidth()!=null;return h('section',{class:'calendar-view'+(docked?'':' panel-hidden')+(drawer?' drawer-open':'')+(sized?' panel-sized':''),style:sized?{'--cal-panel':calPanelWidth()+'px'}:null},h('div',{class:'calendar-main'},search.trim()?calSearchResults():calMode()==='month'?monthBoard():timeGrid()),docked||drawer?dayPanel(drawer):null,docked?calPanelResizer():null,drawer?h('div',{class:'drawer-scrim',onpointerdown:e=>{e.preventDefault();calDrawer=false;render();}}):null);}
 
 // ---- Search (2026-10-21 user request): events whose title or place holds the words, upcoming first then past, by day; a row
@@ -109,9 +110,10 @@ function calSearchHits(words,today){
   }
   return out;
 }
-// A series' rows: its occurrences in the window, and its first one (D.firstOccurrence, excluded dates skipped) when the series
-// begins outside the window and that one is not already listed.
-function calSeriesHits(e,from,to){const list=D.expandEvent(e,from,to),first=D.localKey(e.start);if(first>=from&&first<to)return list;const head=D.firstOccurrence(e);return head&&!list.some(o=>o.id===head.id)?[head,...list]:list;}
+// A series' rows: its occurrences in the window, and its first one (D.firstOccurrence, excluded dates skipped) when that one is
+// not already listed — told by its id, not by where the series begins (2026-10-30 Codex review R05: every five years from today
+// with today's occurrence removed found nothing; its first one shown is in 2031).
+function calSeriesHits(e,from,to){const list=D.expandEvent(e,from,to),head=D.firstOccurrence(e);return head&&!list.some(o=>o.id===head.id)?[head,...list]:list;}
 function calSearchResults(){
   const words=search.trim();const today=D.dateKey();const now=Date.now();
   const hits=calSearchHits(words,today);
@@ -231,7 +233,7 @@ function calColumnAt(x){const cols=[...document.querySelectorAll('.time-col')];i
 
 // ---- Pointer gestures: a click opens the card; a real drag (4px) moves, stretches or draws (Notion, Apple) ----
 // While a time grid gesture runs, renders wait (calHolding) so the dragged block is not rebuilt under the pointer.
-const calHolding=()=>Boolean(calGesture&&calGesture.started&&!calGesture.committing&&calGesture.kind!=='month');
+const calHolding=()=>calPanelDragging||Boolean(calGesture&&calGesture.started&&!calGesture.committing&&calGesture.kind!=='month');
 let calKeyboardOpen=false;
 function calPointerDown(ev,spec){
   if(ev.button!==0||isWidget||calGesture||ev.cardClosed||calCard?.closing||$('#modal-root .dialog'))return;

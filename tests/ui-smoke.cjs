@@ -327,6 +327,42 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const afterSave = (await invoke('state:get')).lists.find(item => item.id === seeded[1].id);
   expect(partial.closed && afterSave.color === partial.picked && afterSave.icon === 'gift' && afterSave.groupId === group.id && afterSave.name === '📚 독서', `목록 편집 저장은 바꾼 것만 ${JSON.stringify({ partial, afterSave })}`);
   checks.push('list-edit-sends-changes-only');
+  // The symbol picker by keyboard and its typed emoji (2026-10-30 Codex review U01, R04): one Tab stop per grid, the arrows and End move
+  // the choice with the focus, a click keeps the focus on the same button, an emptied field chooses the icon again, and text with no
+  // emoji is cleared when left. Saved: the icon, the name without an emoji.
+  const symbolPick = await run(mainWindow, `
+    const row = [...document.querySelectorAll('.list-nav')].find(node => node.textContent.includes('여행 계획'));
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    [...document.querySelectorAll('.context-menu .menu-item')].find(node => node.textContent.includes('목록 편집'))?.click();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    const dialog = document.querySelector('#modal-root .dialog');
+    const [icons, emojis] = [...dialog.querySelectorAll('.symbol-picker [role=radiogroup]')];
+    const result = { stops: [icons, emojis].map(grid => grid.querySelectorAll('[role=radio]').length + ':' + [...grid.querySelectorAll('[role=radio]')].filter(node => node.tabIndex === 0).length) };
+    const start = icons.querySelector('[aria-checked=true]'); start.focus();
+    start.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    const next = icons.querySelector('[aria-checked=true]');
+    result.arrow = next !== start && document.activeElement === next ? next.getAttribute('aria-label') : 'lost';
+    next.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    result.end = document.activeElement === icons.querySelector('[aria-checked=true]') ? document.activeElement.getAttribute('aria-label') : 'lost';
+    const emoji = emojis.querySelectorAll('[role=radio]')[3]; emoji.focus(); emoji.click();
+    result.clickKept = document.activeElement === emoji && emoji.getAttribute('aria-checked') === 'true' && !icons.querySelector('[aria-checked=true]');
+    const field = dialog.querySelector('.emoji-input');
+    field.focus(); field.value = '🦋'; field.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    result.typed = !dialog.querySelector('.symbol-picker [aria-checked=true]');
+    field.value = ''; field.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    result.emptied = icons.querySelector('[aria-checked=true]')?.getAttribute('aria-label') || '';
+    field.value = 'abc'; field.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    result.invalid = field.getAttribute('aria-invalid');
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+    result.left = field.value;
+    dialog.querySelector('button[type=submit]').click();
+    await new Promise(resolve => setTimeout(resolve, 300));
+    result.closed = !document.querySelector('#modal-root .dialog');
+    return result;`);
+  const travel = (await invoke('state:get')).lists.find(item => item.id === seeded[3].id);
+  expect(symbolPick.stops.join() === '16:1,24:1' && symbolPick.arrow === '전구' && symbolPick.end === '메모' && symbolPick.clickKept && symbolPick.typed && symbolPick.emptied === '메모' && symbolPick.invalid === 'true' && symbolPick.left === '' && symbolPick.closed && travel.icon === 'note' && travel.name === '여행 계획', `기호 선택 키보드·직접 입력 지우기 ${JSON.stringify({ symbolPick, travel: { icon: travel.icon, name: travel.name } })}`);
+  checks.push('symbol-picker-keyboard');
   await invoke('group:delete', { id: group.id });
   state = await invoke('state:get');
   expect(!state.lists.some(list => list.groupId === group.id) && !state.groups.some(item => item.id === group.id), '그룹 삭제 뒤 목록 유지');
@@ -2812,6 +2848,31 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await run(mainWindow, `document.querySelector('.cal-panel-resizer').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 400)); return true;`);
   const panelReset = await panelNow();
   const panelResetStored = (await invoke('state:get')).settings.calendarPanelWidth;
+  // A state broadcast in the middle of the drag (a command elsewhere, a background sync) does not replace the edge being held: the
+  // panel follows the pointer to the end and that width is saved once (2026-10-30 Codex review R03: 264 → 314 → 264 after the
+  // broadcast, and 264 kept).
+  const panelHeld = await (async () => {
+    const at = await panelNow(); const [x, y] = at.grip;
+    const move = async (from, to) => { for (let i = 1; i <= 4; i++) { mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: x + Math.round(from + (to - from) * i / 4), y, button: 'left', modifiers: ['leftButtonDown'] }); await new Promise(resolve => setTimeout(resolve, 16)); } };
+    mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x, y });
+    mainWindow.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+    await move(0, -30);
+    const mid = await panelNow();
+    await invoke('settings:update', { collapsedSections: [] });
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const afterBroadcast = await panelNow();
+    await move(-30, -60);
+    mainWindow.webContents.sendInputEvent({ type: 'mouseUp', x: x - 60, y, button: 'left', clickCount: 1 });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const end = await panelNow();
+    const tidy = await run(mainWindow, `return { resizing: document.body.classList.contains('col-resizing'), dragging: Boolean(document.querySelector('.cal-panel-resizer.dragging')) };`);
+    const stored = (await invoke('state:get')).settings.calendarPanelWidth;
+    await run(mainWindow, `document.querySelector('.cal-panel-resizer').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 400)); return true;`);
+    return { start: at.panel, mid: mid.panel, afterBroadcast: afterBroadcast.panel, end: end.panel, saved: end.saved, stored, ...tidy, reset: (await panelNow()).saved };
+  })();
+  expect(Math.abs(panelHeld.mid - (panelHeld.start + 30)) <= 1 && panelHeld.afterBroadcast === panelHeld.mid && Math.abs(panelHeld.end - (panelHeld.start + 60)) <= 1
+    && panelHeld.saved === panelHeld.end && panelHeld.stored === panelHeld.end && !panelHeld.resizing && !panelHeld.dragging && panelHeld.reset == null, `달력 패널 끄는 중 상태 갱신 ${JSON.stringify(panelHeld)}`);
+  checks.push('calendar-panel-drag-broadcast');
   mainWindow.setBounds(dragBounds);
   const panelDrag = { panelStart, panelNarrower, panelWidest, panelKeyed, panelKeyedNow, panelStored, panelReset, panelResetStored };
   expect(panelStart.role === 'separator' && !panelStart.sized && panelStart.saved == null && Math.abs(panelStart.gripAt - panelStart.left) <= 1

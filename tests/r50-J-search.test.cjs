@@ -139,3 +139,25 @@ test('order and groups stay: upcoming soonest first, past latest first, the olde
   assert.ok(allPast.length < 60, 'a year of the weekly series, not ten: ' + allPast.length);
   assert.ok(hits.some(e => e.id === '회의 3년 뒤'));
 });
+
+// 2026-10-30 Codex review R05: the first occurrence shown is added by its id, wherever the series begins — a series begun inside the
+// window whose first days were removed is found by the next one, even years ahead; never twice, never past its end.
+test('R05: a series begun in the window whose first occurrences were removed is found by the first one shown', () => {
+  const fiveYears = { id: 'checkup', calendarId: 'local-calendar', provider: 'local', title: '5년마다 검진', location: '', allDay: true, start: TODAY, end: D.dayOffset(TODAY, 1), rrule: 'FREQ=YEARLY;INTERVAL=5', exdates: [TODAY] };
+  const { call, context } = harness([fiveYears]);
+  const first = D.firstOccurrence(fiveYears);
+  assert.ok(D.localKey(first.start) > D.dayOffset(TODAY, 730), 'its first one shown lies beyond the window');
+  assert.deepEqual(keys(call(`calSearchHits('검진', TODAY)`)), [D.localKey(first.start)], 'one row, five years ahead');
+  // Two early days removed from a weekly series that begins next week: the third week, once.
+  const weekly = { id: 'study', calendarId: 'local-calendar', provider: 'local', title: '스터디 모임', location: '', allDay: true, start: D.dayOffset(TODAY, 7), end: D.dayOffset(TODAY, 8), rrule: 'FREQ=WEEKLY;COUNT=5', exdates: [D.dayOffset(TODAY, 7), D.dayOffset(TODAY, 14)] };
+  context.state.events = [weekly];
+  const hits = call(`calSearchHits('스터디', TODAY)`);
+  assert.deepEqual(keys(hits), [D.dayOffset(TODAY, 21), D.dayOffset(TODAY, 28), D.dayOffset(TODAY, 35)], 'the first one inside the window is not added twice');
+  assert.equal(new Set(ids(hits)).size, hits.length);
+  // Every occurrence removed (COUNT ran out): nothing, not a made-up day.
+  context.state.events = [{ ...weekly, id: 'gone', title: '스터디 끝', rrule: 'FREQ=WEEKLY;COUNT=2' }];
+  assert.equal(call(`calSearchHits('스터디 끝', TODAY)`).length, 0);
+  // A hidden calendar stays out.
+  context.state.events = [fiveYears]; context.state.settings.hiddenCalendars = ['local-calendar'];
+  assert.equal(call(`calSearchHits('검진', TODAY)`).length, 0);
+});
