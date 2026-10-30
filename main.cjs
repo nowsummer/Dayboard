@@ -54,6 +54,7 @@ const rendererFile = path.join(__dirname, 'renderer', 'index.html');
 const preloadFile = path.join(__dirname, 'preload.cjs');
 const desktop = createDesktopManager();
 const widgetWindows = new Map();
+const resizeAnchors = new Map(); // widget id → { key, bounds }: the widget as a resizing drag found it (widget:resize)
 const smokeErrors = [];
 const pendingFlushes = new Map();
 const flushingWindows = new Map();
@@ -1446,7 +1447,13 @@ async function command(commandName, payload, sourceWindow) {
       // Which sides the drag moves (the corner grip and the arrow keys: the right and bottom ones); the others stay put (lib/desktop.cjs).
       const edge = payload.edge === undefined ? 'se' : payload.edge;
       if (!RESIZE_EDGES.includes(edge)) throw new Error(tr('위젯 크기가 올바르지 않습니다.'));
-      const current = desktop.getBounds(win, screen);
+      // Within one drag (payload.drag names it) the sides that stay are those of the widget when the drag began: read back after every
+      // step, an attached widget's rectangle drifted a pixel at a time at 125% scale and the bottom crept down while the top was dragged
+      // (2026-10-30 smoke). The grip's arrow keys send no name and start from where the widget is.
+      const key = typeof payload.drag === 'string' && payload.drag.length <= 40 ? payload.drag : '';
+      const held = key ? resizeAnchors.get(widget.id) : null;
+      const current = held && held.key === key ? held.bounds : desktop.getBounds(win, screen);
+      if (key && !(held && held.key === key)) resizeAnchors.set(widget.id, { key, bounds: current });
       const bounds = resizedBounds(current, { width: payload.width, height: payload.height, edge }, screen.getAllDisplays(), WIDGET_MIN[widget.type]);
       desktop.setBounds(win, bounds, screen);
       return bounds;

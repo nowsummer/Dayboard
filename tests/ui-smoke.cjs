@@ -637,6 +637,8 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   expect(!state.events.some(event => event.title.startsWith('스모크 반복')), '모든 일정 삭제(예외 포함)');
   checks.push('recurring-scopes');
 
+  // The month view's rows glide (calendar.js calRoll): a step that moves the month waits until they rest on a week edge.
+  const ROLLED = "await new Promise(resolve => { const t0 = performance.now(); const tick = () => (!document.querySelector('.calendar-grid.rolling.moving') || performance.now() - t0 > 3000) ? resolve() : requestAnimationFrame(tick); tick(); });";
   // Event times: a new event for today opens at the next whole hour (Apple's +; 09:00 before nine and on other days).
   // Moving the start keeps the length for timed and all-day events (Apple, Google, Notion); an all-day end before the
   // start is reported in date words.
@@ -645,7 +647,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.querySelector('.main-nav .nav-item:nth-child(2)').click();
     await new Promise(resolve => requestAnimationFrame(resolve));
     document.querySelector('[data-focus-key="month-today"]').click();
-    await new Promise(resolve => setTimeout(resolve, 30));
+    await new Promise(resolve => setTimeout(resolve, 30)); ${ROLLED}
     const open = async key => { eventDialog(null, key); await new Promise(resolve => setTimeout(resolve, 40)); return document.querySelector('#modal-root .dialog'); };
     const close = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 30)); document.querySelector('#modal-root .dialog-guard .discard')?.click(); await new Promise(resolve => setTimeout(resolve, 30)); }; // an edited dialog asks first (2026-10-28 review D06)
     let dialog = await open(today);
@@ -687,7 +689,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => setTimeout(resolve, 200));
     const result = { closed: !document.querySelector('#modal-root .dialog'), title: document.querySelector('.topbar h1')?.textContent || '', selected: document.querySelector('.calendar-grid.large .is-selected')?.dataset.focusKey || '', chip: [...document.querySelectorAll('.calendar-grid.large .day-event')].some(node => node.textContent.includes('스모크 다른 달')) };
     document.querySelector('[data-focus-key="month-today"]').click();
-    await new Promise(resolve => setTimeout(resolve, 30));
+    await new Promise(resolve => setTimeout(resolve, 30)); ${ROLLED}
     return result;`);
   const laterTitle = later.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
   expect(movedSave.closed && movedSave.title === laterTitle && movedSave.selected === `day-${laterKey}` && movedSave.chip, `다른 달에 저장한 일정으로 이동 ${JSON.stringify(movedSave)} (${laterTitle})`);
@@ -719,7 +721,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const title = () => document.querySelector('.topbar h1')?.textContent || '';
     const selected = () => document.querySelector('.calendar-grid.large .is-selected')?.dataset.focusKey || '';
     document.querySelector('[data-focus-key="month-today"]').click();
-    await new Promise(resolve => setTimeout(resolve, 30));
+    await new Promise(resolve => setTimeout(resolve, 30)); ${ROLLED}
     const current = title();
     const cell = document.querySelector('.calendar-grid.large .calendar-day.is-today');
     cell.focus(); cell.click();
@@ -729,9 +731,15 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     result.arrow = document.activeElement?.dataset.focusKey === 'day-' + tomorrow && selected() === 'day-' + tomorrow;
     const before = title();
     await press(document.activeElement || document.body, { key: 'ArrowRight', code: 'ArrowRight', ctrlKey: true });
+    result.glides = Boolean(document.querySelector('.calendar-grid.rolling.moving')); ${ROLLED}
     result.nextMonth = title() !== before;
-    await press(document.activeElement || document.body, { key: 't', code: 'KeyT', ctrlKey: true });
+    await press(document.activeElement || document.body, { key: 't', code: 'KeyT', ctrlKey: true }); ${ROLLED}
     result.back = title() === current && selected() === 'day-' + today;
+    const ahead = new Date(); ahead.setDate(1); ahead.setMonth(ahead.getMonth() + 2);
+    document.querySelector('[data-focus-key="month-next"]').click(); await new Promise(resolve => setTimeout(resolve, 40));
+    document.querySelector('[data-focus-key="month-next"]').click(); ${ROLLED}
+    result.twice = document.querySelector('.calendar-grid.large .calendar-day').dataset.day === D.monthStart(ahead);
+    document.querySelector('[data-focus-key="month-today"]').click(); await new Promise(resolve => setTimeout(resolve, 30)); ${ROLLED}
     result.tips = [...document.querySelectorAll('.topbar [data-focus-key]')].map(node => node.title);
     const chip = [...document.querySelectorAll('.calendar-grid.large .day-event')].find(node => node.textContent.includes('스모크 삭제키'));
     chip.focus();
@@ -744,7 +752,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => setTimeout(resolve, 250));
     result.undone = [...document.querySelectorAll('.calendar-grid.large .day-event')].some(node => node.textContent.includes('스모크 삭제키'));
     return result;`);
-  expect(keys.kept && keys.arrow && keys.nextMonth && keys.back && !keys.dialog && /일정을 삭제했어요/.test(keys.toast) && keys.gone && keys.undone && ['이전 달 (Ctrl+←)', '다음 달 (Ctrl+→)', '오늘 (T)', '일정 추가 (C)', '월간 보기 (M)', '오른쪽 패널 숨기기 (\\)'].every(tip => keys.tips.includes(tip)), `달력 키보드 ${JSON.stringify(keys)}`);
+  expect(keys.kept && keys.arrow && keys.nextMonth && keys.glides && keys.back && keys.twice && !keys.dialog && /일정을 삭제했어요/.test(keys.toast) && keys.gone && keys.undone && ['이전 달 (Ctrl+←)', '다음 달 (Ctrl+→)', '오늘 (T)', '일정 추가 (C)', '월간 보기 (M)', '오른쪽 패널 숨기기 (\\)'].every(tip => keys.tips.includes(tip)), `달력 키보드 ${JSON.stringify(keys)}`);
   state = await invoke('state:get');
   const restored = state.events.filter(item => item.title === '스모크 삭제키');
   expect(restored.length === 1 && restored[0].start === keyEvent.start && restored[0].end === keyEvent.end && !state.events.some(item => item.id === keyEvent.id), 'Delete 뒤 실행 취소로 일정 되돌림');
@@ -764,7 +772,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const block = key => document.querySelector('.time-event[data-event-key="' + key + '"]');`;
   const week = await run(mainWindow, `${pointerKit}
     document.querySelector('.main-nav .nav-item:nth-child(2)').click(); await wait(60);
-    document.querySelector('[data-focus-key="month-today"]').click(); await wait(40);
+    document.querySelector('[data-focus-key="month-today"]').click(); await wait(40); ${ROLLED}
     document.querySelector('.view-switch [data-focus-key="view-week"]').click(); await wait(150);
     const result = { cols: document.querySelectorAll('.time-view.week .time-col').length, today: Boolean(document.querySelector('.time-day.is-today')), now: Boolean(document.querySelector('.time-col.is-today .now-line')), labels: document.querySelectorAll('.hour-label').length, panel: Boolean(document.querySelector('.day-panel:not(.drawer)')) };
     const node = block(${JSON.stringify(weekEvent.id)});
@@ -886,13 +894,22 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.querySelector('[data-focus-key="panel-toggle"]').click(); await wait(150);
     result.shown = Boolean(document.querySelector('.day-panel'));
     const first = document.querySelector('.calendar-grid.large .calendar-day').dataset.day;
-    document.querySelector('.calendar-grid.large').dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })); await wait(120);
-    result.scrolled = document.querySelector('.calendar-grid.large .calendar-day').dataset.day === D.dayOffset(first, 7);
-    document.querySelector('[data-focus-key="month-today"]').click(); await wait(60);
-    result.back = document.querySelector('.calendar-grid.large .calendar-day').dataset.day === first;
+    const between = new Set(); let watching = true;
+    const watch = () => { const rows = document.querySelector('.calendar-grid.rolling.moving .month-rows'); if (rows) { const px = Math.round(parseFloat(rows.style.getPropertyValue('--shift')) || 0); if (px) between.add(px); } if (watching) requestAnimationFrame(watch); };
+    watch();
+    document.querySelector('.calendar-grid.large').dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }));
+    result.moving = Boolean(document.querySelector('.calendar-grid.rolling.moving .month-viewport')); await wait(30); ${ROLLED}
+    result.between = between.size;
+    result.scrolled = document.querySelector('.calendar-grid.large .calendar-day').dataset.day === D.dayOffset(first, 7) && document.querySelectorAll('.calendar-grid.large .calendar-day').length === 42;
+    between.clear();
+    document.querySelector('[data-focus-key="month-today"]').click(); await wait(30);
+    result.glidesBack = Boolean(document.querySelector('.calendar-grid.rolling.moving')); ${ROLLED}
+    watching = false;
+    result.betweenBack = between.size;
+    result.back = document.querySelector('.calendar-grid.large .calendar-day').dataset.day === first && !document.querySelector('.calendar-grid.rolling.moving');
     return result;`);
   state = await invoke('state:get');
-  expect(panelWheel.hidden && panelWheel.wide && panelWheel.shown && panelWheel.scrolled && panelWheel.back && state.settings.calendarPanel === 'auto', `오른쪽 패널 접기·월간 휠 ${JSON.stringify(panelWheel)} ${state.settings.calendarPanel}`);
+  expect(panelWheel.hidden && panelWheel.wide && panelWheel.shown && panelWheel.scrolled && panelWheel.back && panelWheel.moving && panelWheel.between >= 3 && panelWheel.glidesBack && panelWheel.betweenBack >= 3 && state.settings.calendarPanel === 'auto', `오른쪽 패널 접기·월간 휠 ${JSON.stringify(panelWheel)} ${state.settings.calendarPanel}`);
   for (const item of state.events.filter(event => ['스모크 그린 일정'].includes(event.title) || event.id === weekEvent.id)) await invoke('event:delete', { id: item.id });
   await invoke('event:delete', { id: weekly.id, scope: 'all' });
   await invoke('settings:update', { calendarView: 'month', calendarPanel: 'auto' });

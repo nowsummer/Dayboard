@@ -950,3 +950,32 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 .widget-edge.se{right:calc(var(--edge-at) - 6px);bottom:calc(var(--edge-at) - 6px);cursor:nwse-resize}
 .widget-edge.ne{right:calc(var(--edge-at) - 6px);top:calc(var(--edge-at) - 6px);cursor:nesw-resize}
 .widget-edge.sw{left:calc(var(--edge-at) - 6px);bottom:calc(var(--edge-at) - 6px);cursor:nesw-resize}
+/* 2026-10-30 The month view scrolls as one strip (calendar.js monthBoard, calRoll): the header stays; the weeks sit in a viewport six
+   rows high that clips them; while they move, one more week above and below is laid out and the strip slides by --shift. */
+.calendar-grid.large.rolling{display:flex;flex-direction:column}
+.calendar-grid.large.rolling .month-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));flex-shrink:0}
+.calendar-grid.large.rolling .month-viewport{position:relative;flex:1;min-height:0;overflow:hidden}
+.calendar-grid.large.rolling .month-rows{position:absolute;left:0;right:0;top:0;height:calc(100% * var(--rows) / 6);display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(var(--rows),minmax(0,1fr));transform:translateY(calc(-100% * var(--buffer) / var(--rows) - var(--shift,0px)))}
+.calendar-grid.large.rolling.moving .month-rows{will-change:transform}
+.calendar-grid.large.rolling.moving .calendar-day:hover{background:none}
+.calendar-grid.large.rolling.moving .calendar-day.weekend:hover{background:var(--weekend)}
+/* 2026-10-30 Motion, as Apple's apps (owner: 「애플에서 만든 프로그램들 처럼 작동성 등이 유려하고 미려하도록」). Everything here stops with
+   Windows' 「애니메이션 효과」 off (the reduced-motion rule at the top). Week and day pages: the day headings, the all-day row and the
+   columns slide in from the side they lie on (calendar.js calSlide); the hour gutter and the hour lines stay. */
+@keyframes cal-page-next{from{opacity:.2;transform:translateX(32px)}to{opacity:1;transform:none}}
+@keyframes cal-page-prev{from{opacity:.2;transform:translateX(-32px)}to{opacity:1;transform:none}}
+.time-view.slide-next .time-scroll,.time-view.slide-prev .time-scroll{overflow-x:hidden}
+.time-view.slide-next :is(.time-head .time-day,.allday-grid,.time-col){animation:cal-page-next .28s cubic-bezier(.2,.8,.2,1)}
+.time-view.slide-prev :is(.time-head .time-day,.allday-grid,.time-col){animation:cal-page-prev .28s cubic-bezier(.2,.8,.2,1)}
+/* Sheets open with a short fade and a slight scale on a decelerating curve; menus, event cards and the help card the same, smaller and
+   quicker (the backdrop still only fades). */
+@keyframes sheet-in{from{opacity:0;transform:scale(.965)}to{opacity:1;transform:none}}
+@keyframes pop-in{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.modal-overlay>.dialog{animation:sheet-in .24s cubic-bezier(.2,.9,.25,1)}
+.context-menu{transform-origin:top left;animation:pop-in .14s cubic-bezier(.2,.9,.25,1)}
+.event-card,.help-pop{animation:pop-in .16s cubic-bezier(.2,.9,.25,1)}
+/* A completed task folds away (app.js taskLeave). */
+.task-row.leaving{min-height:0;padding-top:0;padding-bottom:0;opacity:0;overflow:hidden;pointer-events:none;border-bottom-color:transparent;transition:height .26s cubic-bezier(.32,.72,0,1),padding .26s cubic-bezier(.32,.72,0,1),opacity .16s ease-out,border-color .26s ease}
+/* The weekday heading keeps its line while the weeks pass under it (a half-hidden week no longer reads as space under the heading). At
+   rest it falls on the first week's own top line. */
+.calendar-grid.large.rolling .month-weekdays{position:relative;z-index:1;box-shadow:0 1px 0 var(--line)}

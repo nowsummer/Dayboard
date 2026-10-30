@@ -9,6 +9,7 @@ let calTop=null;                     // month view: Sunday that starts the first
 const calScroll={week:null,day:null};// time grid scroll position per view
 let calRecenter=true;                // the next time grid render scrolls to the current time (first open, 오늘, T)
 let calGesture=null;                 // pointer gesture in progress (move, stretch, draw)
+let calSlide=0;                      // the next week or day grid comes in from this side (calendarStep: 1 later, -1 earlier)
 let calPanelDragging=false;          // the day panel's edge held (calPanelResizer): a render waits for the release (2026-10-30 Codex review R03)
 let calDrawer=false;                 // narrow window: the day panel shown over the calendar
 let calAllDayOpen=false;             // all-day row shows every lane
@@ -27,7 +28,7 @@ function calSyncMonth(){const d=D.fromDate(selectedDate);month=new Date(d.getFul
 
 // ---- Views and navigation ----
 function setCalMode(mode,day){if(!['month','week','day'].includes(mode))return;if(!closeCard(true))return;if(day){selectedDate=day;calSyncMonth();}if(mode!=='month'&&calMode()==='month'&&!day){const visible=D.cellsFrom(calStart());if(!visible.some(c=>c.key===selectedDate))selectedDate=visible.find(c=>!c.outside).key;}state.settings.calendarView=mode;render();run('settings:update',{calendarView:mode}).catch(()=>{});}
-function calendarStep(n){closeCard(true);const mode=calMode();if(mode==='month'){month=new Date(month.getFullYear(),month.getMonth()+n,1);calTop=null;render();return;}selectedDate=D.dayOffset(selectedDate,(mode==='week'?7:1)*n);calSyncMonth();render();}
+function calendarStep(n){const mode=calMode();if(mode==='month'){const base=calRollMonth();const next=new Date(base.getFullYear(),base.getMonth()+n,1);if(calGlideToMonth(next))return;closeCard(true);calRollReset();month=next;calTop=null;render();return;}closeCard(true);calSlide=n;selectedDate=D.dayOffset(selectedDate,(mode==='week'?7:1)*n);calSyncMonth();render();}
 // Month view rows: a rolling run of six weeks that the wheel moves a week at a time; month (the title) follows the rows.
 // 「날짜로 이동」 (Apple Calendar ⌘⇧T): one box read as it is typed — 2027-3-15, 3월 15일, 11/3, 2027년 1월, 다음 주 금요일, Nov 3.
 // The day it reads is shown under the box; Enter goes there in the current view (the day becomes the selected day).
@@ -48,7 +49,8 @@ function calGoToDate(){
 const calLongDate=key=>D.fromDate(key).toLocaleDateString(I.locale(),{year:'numeric',month:'long',day:'numeric',weekday:'long'});
 function calJumpTo(key){selectedDate=key;calSyncMonth();render();}
 function calStart(){const aligned=D.monthStart(month);if(!calTop)return aligned;const focus=D.cellsFrom(calTop).find(c=>!c.outside).key.slice(0,7);return focus===calMonthKey(month)?calTop:aligned;}
-function calWeekStep(n){const top=D.dayOffset(calStart(),7*n);const focus=D.cellsFrom(top).find(c=>!c.outside).key;calTop=top;month=new Date(Number(focus.slice(0,4)),Number(focus.slice(5,7))-1,1);closeCard(true);render();return top;}
+function calShiftWeeks(n){const top=D.dayOffset(calStart(),7*n);const focus=D.cellsFrom(top).find(c=>!c.outside).key;calTop=top;month=new Date(Number(focus.slice(0,4)),Number(focus.slice(5,7))-1,1);return top;}
+function calWeekStep(n){const top=calShiftWeeks(n);closeCard(true);render();return top;}
 function calendarTitle(){const mode=calMode();if(mode==='month')return month.toLocaleDateString(I.locale(),{year:'numeric',month:'long'});if(mode==='day'){const d=D.fromDate(selectedDate);return d.toLocaleDateString(I.locale(),{...(d.getFullYear()===new Date().getFullYear()?{}:{year:'numeric'}),month:'long',day:'numeric',weekday:'short'});}// Week: the month (Notion), or both months when the week crosses into the next one — the top bar stays short.
 const days=D.weekDays(selectedDate),a=D.fromDate(days[0]),b=D.fromDate(days[6]);const fmt={year:'numeric',month:'long'};if(a.getMonth()===b.getMonth())return a.toLocaleDateString(I.locale(),fmt);/* two months: short names (「Sep – Oct 2026」; Korean is short anyway) — the long ones were cut at 900px (2026-10-27 recheck) */const range={year:'numeric',month:'short'};try{return new Intl.DateTimeFormat(I.locale(),range).formatRange(a,b);}catch{return b.toLocaleDateString(I.locale(),range);}}
 function calendarToolbar(){
@@ -113,15 +115,23 @@ function calSearchHits(words,today){
   for(const e of calHistoryHits(words))if(!known.has(e.id)&&!hidden.has(e.calendarId))out.push(e);
   return out;
 }
+// Main's copy of the older tier as a key, for what the views (app.js historyEventsFor) and the search ask for: any account's copy
+// written or dropped changes it (state.calendarHistory.rev), not only the newest time (2026-10-30 Codex review R03: a disconnected
+// account whose copy was the older one stayed on screen and in the search).
+function calHistoryKey(){return state.calendarHistory?.at?(state.calendarHistory.rev||state.calendarHistory.at):null;}
+// The calendars whose older events may show: still here, of an account still bringing its calendars — what was asked for before a
+// disconnect, a calendar switched off or one deleted at its service never shows from a copy here, whatever an answer still held (R03).
+function calHistoryLive(){const on=new Set(state.accounts.filter(a=>a.syncCalendar!==false).map(a=>a.id));return new Set(state.calendars.filter(c=>c.accountId&&on.has(c.accountId)).map(c=>c.id));}
 let calHistoryFind={asked:'',words:'',events:[],timer:0};
 function calHistoryHits(words){
-  if(!state.calendarHistory?.at||!words)return [];
-  const at=state.calendarHistory.at;
+  const at=calHistoryKey();
+  if(!at||!words)return [];
   if(calHistoryFind.asked!==words+'|'+at){
     calHistoryFind.asked=words+'|'+at;clearTimeout(calHistoryFind.timer);
     calHistoryFind.timer=setTimeout(()=>api.invoke('calendar:history-search',{text:words}).then(r=>{if(calHistoryFind.asked!==words+'|'+at)return;calHistoryFind.words=words+'|'+at;calHistoryFind.events=Array.isArray(r?.events)?r.events:[];if(search.trim()===words&&view==='calendar')renderMain();}).catch(()=>{}),180);
   }
-  return calHistoryFind.words===words+'|'+at?calHistoryFind.events:[];
+  if(calHistoryFind.words!==words+'|'+at)return [];
+  const live=calHistoryLive();return calHistoryFind.events.filter(e=>live.has(e.calendarId));
 }
 // A series' rows: its occurrences in the window, and its first one (D.firstOccurrence, excluded dates skipped) when that one is
 // not already listed — told by its id, not by where the series begins (2026-10-30 Codex review R05: every five years from today
@@ -149,7 +159,7 @@ function calOpenSearchHit(e){const day=D.localKey(e.start);search='';const box=d
 // Rows of event chips that fit a cell (the 할 일 line counts as one), so tall windows show more and short ones never clip.
 // Rows that fit under a cell's date header; a half row never shows — the rest folds into 「+N개」 (2026-10-26 review: the last
 // row was cut in half at 1180 and 900). Measured: header 39px, a chip or count row 22px plus its 2px gap.
-function calMonthLimit(){const grid=document.querySelector('.calendar-grid.large');const cellH=grid?(grid.clientHeight-30)/6:(innerHeight-52-16-24-34)/6;return Math.max(1,Math.floor((cellH-40)/24));}
+function calMonthLimit(){const viewport=document.querySelector('#app .calendar-grid.rolling .month-viewport');const cellH=viewport?viewport.clientHeight/6:(innerHeight-52-16-24-34)/6;return Math.max(1,Math.floor((cellH-40)/24));}
 const calFirstLabel=key=>D.fromDate(key).toLocaleDateString(I.locale(),{month:'short',day:'numeric'});
 // The pool bucketed by day once per render instead of filtering the whole pool for each of the 42 cells (2026-10-27 review:
 // D.inDay ran pool × 42 times, 62,831 calls per render with 100 series). An occurrence is tested only on the cells from its
@@ -168,12 +178,18 @@ function calDayBuckets(pool,cells){
   }
   return new Map(cells.map((c,i)=>[c.key,lists[i].sort(byEventOrder)]));
 }
-function monthBoard(){
-  const cells=D.cellsFrom(calStart());const pool=eventsBetween(cells[0].key,D.dayOffset(cells[41].key,1));const byDay=calDayBuckets(pool,cells);const today=D.dateKey();const limit=calMonthLimit();
+// The month board (2026-10-30 owner: 「노션 캘린더의 경우 달력(월간)에서 스크롤을 내려서 한 줄이 내려갈 때 줄이 연속적으로 내려가서 끊김이 없어보이고
+// 유려해보이는데, 지금 Dayboard는 한 칸이 그냥 바로 내려가서 너무 확확 전환되고 연속성이 없어 보여」): the weekday header, and the weeks in a
+// viewport six rows high that clips them. At rest exactly the six weeks (one Tab stop, the counts and keys as before); while the rows
+// move (calRoll below) one more week above and below, slid by the scrolled pixels (--shift).
+function monthBoard(buffer=calRoll.moving?1:0){
+  const top=calStart(),focus=D.dayOffset(top,20).slice(0,7),from=D.dayOffset(top,-7*buffer),rows=6+2*buffer;
+  const cells=Array.from({length:7*rows},(_,i)=>{const key=D.dayOffset(from,i);return {key,day:Number(key.slice(8)),outside:key.slice(0,7)!==focus};});
+  const pool=eventsBetween(cells[0].key,D.dayOffset(cells.at(-1).key,1));const byDay=calDayBuckets(pool,cells);const today=D.dateKey();const limit=calMonthLimit();
   // One Tab stop in the grid (2026-10-28 Codex review D09, C2: 42 day stops, then every chip and 「+n개」 of the month): the selected
   // day, and after it that day's own chips; the arrow keys (app.js keydown) still walk the days, and a chip still takes a click.
   const stop=gridTabStop(cells);
-  const grid=h('div',{class:'calendar-grid large rolling'},I.weekdays('short').map((d,i)=>h('div',{class:'weekday'+(i===0?' sunday':'')+(i===6?' saturday':'')+(i===0||i===6?' weekend':'')},d)),cells.map((d,i)=>{
+  const days=h('div',{class:'month-rows',style:{'--rows':rows,'--buffer':buffer,'--shift':(buffer?calRoll.off:0).toFixed(2)+'px'}},cells.map((d,i)=>{
     const events=byDay.get(d.key);const tasks=state.tasks.filter(t=>t.dueDate===d.key&&!t.completed);
     const rows=Math.max(1,limit-(tasks.length?1:0));const shown=events.length>rows?events.slice(0,Math.max(1,rows-1)):events;const more=events.length-shown.length;const off=d.key===stop?null:-1;
     return h('div',{class:'calendar-day'+(d.outside?' outside':'')+(i%7===0||i%7===6?' weekend':'')+(d.key===today?' is-today':'')+(d.key===selectedDate?' is-selected':''),role:'button',tabindex:d.key===stop?0:-1,'aria-label':koreanDate(d.key)+(events.length?tr(" · 일정 {0}개", [events.length]):''),'data-focus-key':'day-'+d.key,'data-day':d.key,title:tr('두 번 누르면 일정 추가'),
@@ -182,6 +198,7 @@ function monthBoard(){
       h('button',{type:'button',class:'day-number'+(d.day===1?' first':''),tabindex:-1,title:tr('일간 보기'),onclick:e=>{e.stopPropagation();setCalMode('day',d.key);}},d.day===1?calFirstLabel(d.key):d.day),
       h('div',{class:'day-items'},shown.map(e=>{const chip=calChip(e,d.key);if(off)chip.tabIndex=off;return chip;}),more?h('button',{type:'button',class:'day-more',tabindex:off,onclick:ev=>{ev.stopPropagation();calDayList(d.key,ev.currentTarget);}},tr("+{0}개", [more])):null,tasks.length?h('button',{type:'button',class:'day-tasks',tabindex:off,onclick:ev=>{ev.stopPropagation();calOpenPanelFor(d.key);}},tr("할 일 {0}개", [tasks.length])):null));
   }));
+  const grid=h('div',{class:'calendar-grid large rolling'+(buffer?' moving':'')},h('div',{class:'month-weekdays'},I.weekdays('short').map((d,i)=>h('div',{class:'weekday'+(i===0?' sunday':'')+(i===6?' saturday':'')+(i===0||i===6?' weekend':'')},d))),h('div',{class:'month-viewport'},days));
   grid.addEventListener('wheel',calMonthWheel,{passive:false});
   return grid;
 }
@@ -189,15 +206,80 @@ function monthBoard(){
 function calChip(e,day){const chip=eventChip(e,day);chip.dataset.eventKey=e.id;chip.addEventListener('pointerdown',ev=>calPointerDown(ev,{kind:'month',event:e,day}));if(!canEditEvent(e))chip.classList.add('readonly');if(calPast(e))chip.classList.add('past');return chip;}
 // "+N개": the day's events in a small list beside the cell; a row opens the event card.
 function calDayList(day,anchor){const events=eventsOn(day);if(!closeCard(true))return;calCard={mode:'list',day,key:null,node:null,anchor};const node=h('div',{class:'event-card day-list',role:'dialog','aria-label':koreanDate(day),tabindex:-1},h('header',{class:'card-head'},h('strong',{},koreanDate(day)),ib('close',tr('닫기'),()=>closeCard(true))),h('div',{class:'agenda'},events.map(e=>h('button',{type:'button',class:'event-row','data-event-key':e.id,onclick:ev=>{const rect=calCard?.node?.getBoundingClientRect()||ev.currentTarget.getBoundingClientRect();closeCard(true);openEventCard(e,null,rect);}},h('span',{class:'event-line',style:{background:eventColor(e)}}),h('div',{},h('strong',{},e.title),h('span',{},timeLabel(e)))))));calCard.node=node;calCardRoot().replaceChildren(node);calPlaceCard(anchor.getBoundingClientRect());node.focus({preventScroll:true});}
-// Wheel and trackpad: one week per 50px; within one gesture the rows stop when a month's 1st reaches the top (Notion).
-let calWheelAcc=0,calWheelIdle=null,calWheelLast=0,calWheelHold=false;
-function calMonthWheel(e){if(e.ctrlKey||Math.abs(e.deltaX)>Math.abs(e.deltaY))return;e.preventDefault();const dy=e.deltaMode===1?e.deltaY*40:e.deltaMode===2?e.deltaY*innerHeight:e.deltaY;clearTimeout(calWheelIdle);calWheelIdle=setTimeout(()=>{calWheelAcc=0;calWheelHold=false;},200);if(calWheelHold)return;calWheelAcc+=dy;if(Math.abs(calWheelAcc)<50)return;const now=performance.now();if(now-calWheelLast<60)return;calWheelLast=now;const dir=Math.sign(calWheelAcc);calWheelAcc-=dir*50;const top=calWeekStep(dir);if(D.cellsFrom(top).slice(0,7).some(c=>c.day===1)){calWheelHold=true;calWheelAcc=0;}}
+// The month view's scroll, as Notion Calendar's (2026-10-30 owner: 「한 칸이 그냥 바로 내려가서 너무 확확 전환되고 연속성이 없어 보여」): the
+// rows move by the pixel instead of jumping a week at a time. off: how far the rows have moved past calStart()'s week (later weeks:
+// positive), target: where they are going. The wheel and the trackpad move the target (a wheel's notch is a week; a trackpad's pixels,
+// 100 to a week) and the rows ease after it every frame, by time, so the speed does not depend on the frame rate. The arrow keys, the
+// month buttons and 오늘 glide there from rest on a critically damped spring (calGlide — starts and stops softly, as Apple's; when the
+// rows are already moving they ease after the new target instead, so a held key does not stutter). Each time a whole row has passed,
+// calTop moves a week (the title follows) and the strip is rebuilt around it; once the wheel stops the target rounds to a week edge,
+// and settled there the view is drawn at rest. Within one gesture the rows still stop where a month's 1st reaches the top (as before).
+// With Windows' 「애니메이션 효과」 off (prefers-reduced-motion) the rows land at once.
+const CAL_ROLL={off:0,target:0,frame:0,time:0,idle:0,hold:false,wheel:false,moving:false,glide:null};
+let calRoll={...CAL_ROLL};
+const calReduceMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+function calRowHeight(){const vp=document.querySelector('#app .calendar-grid.rolling .month-viewport');return vp?vp.clientHeight/6:0;}
+function calRollReset(){cancelAnimationFrame(calRoll.frame);clearTimeout(calRoll.idle);calRoll={...CAL_ROLL};}
+// The strip with the extra weeks, built anew (a row passed, or the motion began; a focused day keeps the focus); the title follows the rows.
+function calRollStrip(){const old=document.querySelector('#app .calendar-grid.large.rolling');if(old){const had=old.contains(document.activeElement)?document.activeElement.dataset.focusKey||'':null;const board=monthBoard(1);old.replaceWith(board);if(had!==null)(board.querySelector('[data-focus-key="'+had+'"]')||board.querySelector('.calendar-day[tabindex="0"]'))?.focus({preventScroll:true});}const title=document.querySelector('.topbar h1 .title-text');if(title&&title.textContent!==calendarTitle()){title.textContent=calendarTitle();title.closest('button')?.setAttribute('aria-label',calendarTitle()+', '+tr('날짜로 이동'));}}
+function calRollGo(){const s=calRoll;if(!s.moving){s.moving=true;calRollStrip();}if(!s.frame){s.time=performance.now();s.frame=requestAnimationFrame(calRollFrame);}}
+function calRollFrame(now){
+  const s=calRoll;s.frame=0;const row=calRowHeight();
+  if(!row||isWidget||view!=='calendar'||calMode()!=='month'||!document.querySelector('#app .calendar-grid.rolling.moving')){calRollReset();return;}
+  const dt=Math.min(48,Math.max(0,now-s.time));s.time=now;const g=s.glide;
+  if(calReduceMotion()){s.off=s.target;s.glide=null;}
+  else if(g){const t=Math.min(1,(now-g.at)/g.ms),w=9.2*t;s.off=t>=1?s.target:g.from+(s.target-g.from)*(1-(1+w)*Math.exp(-w));if(t>=1)s.glide=null;}
+  else{s.off+=(s.target-s.off)*(1-Math.exp(-dt/65));if(Math.abs(s.target-s.off)<0.35)s.off=s.target;}
+  let passed=0;
+  while(s.off>=row-0.01){s.off-=row;s.target-=row;if(s.glide)s.glide.from-=row;calShiftWeeks(1);passed++;}
+  while(s.off<=-row+0.01){s.off+=row;s.target+=row;if(s.glide)s.glide.from+=row;calShiftWeeks(-1);passed++;}
+  if(passed)calRollStrip();else document.querySelector('#app .calendar-grid.rolling .month-rows')?.style.setProperty('--shift',s.off.toFixed(2)+'px');
+  if(s.off!==s.target||s.wheel||s.glide){s.frame=requestAnimationFrame(calRollFrame);return;}
+  // Settled on a week edge: drawn at rest (six weeks, the card anchors and the keys as before).
+  s.moving=false;s.off=s.target=0;render();
+}
+// The wheel stopped: the destination rounds to a week edge.
+function calRollIdle(){const s=calRoll,row=calRowHeight();s.wheel=false;s.hold=false;if(row)s.target=Math.round(s.target/row)*row;if(s.moving||s.target)calRollGo();}
+function calMonthWheel(e){
+  if(e.ctrlKey||Math.abs(e.deltaX)>Math.abs(e.deltaY))return;e.preventDefault();
+  const s=calRoll,row=calRowHeight();if(!row||calGesture)return;
+  clearTimeout(s.idle);s.idle=setTimeout(calRollIdle,160);s.wheel=true;
+  if(s.hold)return;
+  if(!s.moving&&!closeCard(true))return;
+  s.glide=null;
+  // A mouse wheel's notch (wheelDelta in steps of 120) is a whole week from the week edge the rows are going to; a trackpad and a
+  // smooth-scrolling wheel move by their pixels. The way comes from deltaY (wheelDelta's sign is not the same in every source).
+  const notch=e.deltaY&&e.wheelDeltaY&&e.wheelDeltaY%120===0?Math.sign(e.deltaY)*Math.abs(e.wheelDeltaY)/120:0;
+  const dy=e.deltaMode===1?e.deltaY*40:e.deltaMode===2?e.deltaY*innerHeight:e.deltaY;
+  s.target=notch?(Math.round(s.target/row)+notch)*row:s.target+dy*row/100;
+  // The first week ahead (in the way the rows go) that holds a month's 1st stops this gesture there.
+  const dir=Math.sign(s.target),whole=Math.floor(Math.abs(s.target)/row+1e-6);
+  for(let k=1;k<=whole;k++){if(D.cellsFrom(D.dayOffset(calStart(),7*dir*k)).slice(0,7).some(c=>c.day===1)){s.target=dir*k*row;s.hold=true;break;}}
+  calRollGo();
+}
+// Gliding n weeks (the arrow keys, the month buttons, 오늘): false when the month view is not on screen or it is too far to glide (a jump).
+function calGlide(n){
+  const s=calRoll,row=calRowHeight();if(!row||!n||Math.abs(n)>8||isWidget||view!=='calendar'||calMode()!=='month'||calGesture)return false;
+  if(!s.moving&&!closeCard(true))return true;
+  const rest=!s.moving||(s.off===s.target&&!s.wheel&&!s.glide);
+  s.target=(Math.round(s.target/row)+n)*row;s.wheel=false;s.hold=false;clearTimeout(s.idle);
+  s.glide=rest?{from:s.off,at:performance.now(),ms:Math.min(560,280+45*Math.abs(n))}:null;
+  calRollGo();return true;
+}
+// The month the rows rest on once they stop (the one on screen when they are still).
+function calRollMonth(){const row=calRowHeight();const top=row&&calRoll.moving?D.dayOffset(calStart(),7*Math.round(calRoll.target/row)):calStart();const key=D.cellsFrom(top).find(c=>!c.outside).key;return new Date(Number(key.slice(0,4)),Number(key.slice(5,7))-1,1);}
+// To the week that holds a month's 1st (the month buttons, J/K, 오늘), gliding when it is near; already on the way there, nothing more.
+function calGlideToMonth(date){const target=D.monthStart(new Date(date.getFullYear(),date.getMonth(),1));const weeks=Math.round((D.fromDate(target)-D.fromDate(calStart()))/604800000)-Math.round(calRoll.target/(calRowHeight()||1));if(!weeks)return calRoll.moving;return calGlide(weeks);}
 
 // ---- Week and day views ----
 const calPast=e=>e.allDay?String(e.end||'').slice(0,10)<=D.dateKey():new Date(e.end||e.start)<new Date();
 // The current time in the gutter pill: the clock without 오전/오후 (the hour labels around it say which), so it fits.
 const calClock=d=>timeFormat()==='24h'?fmtTime(d):(d.getHours()%12||12)+':'+String(d.getMinutes()).padStart(2,'0');
 function calHourLabel(hour){const d=new Date(2000,0,1,hour);return fmtTime(d,true);}
+// A sideways swipe on the trackpad (or Shift+wheel) over the week and day grids turns one page — the next or the previous week or day —
+// once per gesture, as Apple Calendar does (2026-10-30 owner: 「애플에서 만든 프로그램들 처럼 작동성 등이 유려하고 미려하도록」).
+let calSwipe={acc:0,idle:0,done:false};
+function calTimeWheel(e){if(e.ctrlKey||Math.abs(e.deltaX)<=Math.abs(e.deltaY))return;e.preventDefault();const s=calSwipe;clearTimeout(s.idle);s.idle=setTimeout(()=>{s.acc=0;s.done=false;},220);if(s.done||calGesture)return;s.acc+=e.deltaX;if(Math.abs(s.acc)<80)return;s.done=true;calendarStep(Math.sign(s.acc));}
 function timeGrid(){
   const mode=calMode(),days=calDays(),today=D.dateKey();
   const pool=eventsBetween(days[0],D.dayOffset(days[days.length-1],1));
@@ -205,7 +287,9 @@ function timeGrid(){
   const minMinutes=Math.ceil(22/calHour*60);
   const head=h('div',{class:'time-head'},h('div',{class:'time-gutter-cell'}),days.map((key,i)=>{const d=D.fromDate(key);const dow=d.getDay();return h('button',{type:'button',class:'time-day'+(key===today?' is-today':'')+(key===selectedDate&&mode==='week'?' is-selected':'')+(dow===0||dow===6?' weekend':'')+(dow===0?' sunday':'')+(dow===6?' saturday':''),'data-day':key,'data-focus-key':'head-'+key,title:mode==='week'?tr('일간 보기'):koreanDate(key),onclick:()=>{if(mode==='week')setCalMode('day',key);}},h('span',{class:'time-weekday'},I.weekdays('short')[dow]),h('span',{class:'time-date'},d.getDate()));}));
   const tasksByDay=days.map(key=>state.tasks.filter(t=>t.dueDate===key&&!t.completed).length);
-  return h('div',{class:'time-view '+mode,style:{'--days':days.length,'--hour':calHour+'px'}},h('div',{class:'time-scroll',onscroll:e=>{calScroll[mode]=e.currentTarget.scrollTop/calHour*60;}},h('div',{class:'time-sticky'},head,calAllDayRow(spans,days,tasksByDay)),calTimeBody(days,timed,minMinutes,today)));
+  // Stepped to the next or the previous page: the headings, the all-day row and the columns slide in from that side (styles.css).
+  const slide=calSlide;calSlide=0;
+  return h('div',{class:'time-view '+mode+(slide>0?' slide-next':slide<0?' slide-prev':''),style:{'--days':days.length,'--hour':calHour+'px'},onwheel:calTimeWheel},h('div',{class:'time-scroll',onscroll:e=>{calScroll[mode]=e.currentTarget.scrollTop/calHour*60;}},h('div',{class:'time-sticky'},head,calAllDayRow(spans,days,tasksByDay)),calTimeBody(days,timed,minMinutes,today)));
 }
 function calAllDayRow(spans,days,tasksByDay){
   const {bars,lanes}=D.spanLayout(spans,days);const max=calAllDayOpen?lanes:Math.min(lanes,3);const shownBars=bars.filter(b=>b.lane<max);
@@ -590,7 +674,7 @@ function calendarKey(e){
   if(!e.shiftKey&&code==='KeyC'){e.preventDefault();addEvent(selectedDate);return true;}
   if(code==='Backslash'){e.preventDefault();calTogglePanel();return true;}
   if(!onCell&&!e.shiftKey&&(e.key==='ArrowLeft'||e.key==='ArrowRight')&&!document.activeElement?.closest?.('.sidebar,.topbar')){e.preventDefault();calendarStep(e.key==='ArrowLeft'?-1:1);return true;}
-  if(!onCell&&!e.shiftKey&&calMode()==='month'&&(e.key==='ArrowUp'||e.key==='ArrowDown')&&!document.activeElement?.closest?.('.sidebar,.topbar,.day-panel')){e.preventDefault();calWeekStep(e.key==='ArrowUp'?-1:1);return true;}
+  if(!onCell&&!e.shiftKey&&calMode()==='month'&&(e.key==='ArrowUp'||e.key==='ArrowDown')&&!document.activeElement?.closest?.('.sidebar,.topbar,.day-panel')){e.preventDefault();if(!calGlide(e.key==='ArrowUp'?-1:1))calWeekStep(e.key==='ArrowUp'?-1:1);return true;}
   return false;
 }
 document.addEventListener('pointerdown',()=>{calKeyboardOpen=false;},true);
