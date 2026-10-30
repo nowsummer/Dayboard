@@ -82,10 +82,12 @@ const DIRECT = ['window:main', 'window:minimize', 'window:maximize', 'window:clo
   'widget:glass-preview', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit'];
 const LANED = ['state:get', 'task:add', 'task:update', 'task:delete', 'list:add', 'list:update', 'group:add', 'group:update', 'group:delete', 'list:delete', 'note:trash', 'note:restore',
   'note:pin', 'note:duplicate', 'note:history', 'note:revert', 'note:delete', 'event:add', 'event:update', 'event:color', 'calendar:update', 'calendar:delete', 'calendar:move', 'event:delete',
-  'settings:update', 'account:update', 'account:disconnect', 'widget:update', 'external:open', 'backup:export', 'demo:load'];
+  'settings:update', 'account:update', 'account:disconnect', 'widget:update', 'external:open', 'backup:export', 'demo:load',
+  'task:transfer', 'task:transfer-check', 'task:transfer-forget', // 2026-10-30: this PC's tasks to a connected list (lib/taskmove.cjs)
+  'calendar:history', 'calendar:history-search']; // 2026-10-30: the older calendar tier (lib/calhistory.cjs), read-only
 
-test('laneOf: a rule for each of the 31 commands that take a lane, none for the 20 direct ones; an unknown name is exclusive', () => {
-  assert.equal(DIRECT.length + LANED.length, 51);
+test('laneOf: a rule for each of the 36 commands that take a lane, none for the 20 direct ones; an unknown name is exclusive', () => {
+  assert.equal(DIRECT.length + LANED.length, 56);
   assert.deepEqual(Object.keys(COMMAND_LANES).sort(), [...LANED].sort());
   const store = fakeStore();
   for (const name of DIRECT) assert.equal(laneOf(name, {}, store), EXCLUSIVE, `${name} never comes to the lanes; conservative if it did`);
@@ -108,6 +110,11 @@ test('laneOf: this PC\'s items are local, connected items remote, connected list
   assert.equal(laneOf('task:update', { id: 'local-task', listId: 'local-2' }, s), LOCAL, 'a move between this PC\'s lists');
   assert.equal(laneOf('task:update', { id: 'local-task', listId: 'local-inbox' }, s), LOCAL, 'the same list is no move');
   assert.equal(laneOf('task:update', { id: 'local-task', listId: 'cloud-list' }, s), EXCLUSIVE, 'a move into a connected list spans both');
+  // A task of this PC made anew in a connected list: with the account's writes (the switch here checks nothing changed meanwhile).
+  assert.equal(laneOf('task:transfer', { id: 'local-task', to: 'cloud-list' }, s), REMOTE);
+  assert.equal(laneOf('task:transfer', { id: 'cloud-task', to: 'cloud-list' }, s), EXCLUSIVE, 'not a task of this PC');
+  assert.equal(laneOf('task:transfer', { id: 'local-task', to: 'local-2' }, s), EXCLUSIVE, 'not to a connected list');
+  assert.equal(laneOf('task:transfer', { id: 'nope', to: 'cloud-list' }, s), EXCLUSIVE);
   assert.equal(laneOf('task:update', { id: 'cloud-task', listId: 'local-2' }, s), EXCLUSIVE);
   assert.equal(laneOf('task:update', { id: 'local-task', listId: 'nope' }, s), EXCLUSIVE);
   assert.equal(laneOf('task:update', { id: 'orphan-task', title: 'x' }, s), EXCLUSIVE, 'its list is gone');

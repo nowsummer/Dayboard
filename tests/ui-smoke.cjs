@@ -1983,6 +1983,36 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const after = win.getBounds();
     // The desktop host applies sizes in device pixels, so the window may land a pixel or two off the requested DIP size.
     expect(Math.abs(after.width - resized.width) <= 2 && Math.abs(after.height - resized.height) <= 2, `${widget.type} 위젯 창 크기 반영 ${JSON.stringify(before)} → ${JSON.stringify(after)} (요청 ${JSON.stringify(resized)})`);
+    // Any edge resizes (2026-10-30 owner: 「양 사방 어디서든 잡고 크기를 늘리는 게 낫지 않을까?」): the left band dragged in with the real
+    // mouse narrows the widget with its right side in place, and dragged back widens it again; the top band the same with the bottom.
+    // The window moves under the pointer, so each step is placed where the pointer would be on the screen, with that screen position
+    // given too (globalX/Y — injected events otherwise report screenX 0, and the drag reads screen positions as a real mouse gives them).
+    if (widget.type === 'tasks') {
+      const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const dragEdge = async (edge, dx, dy) => {
+        const start = win.getBounds();
+        const [x, y] = await win.webContents.executeJavaScript(`(() => { const r = document.querySelector('.widget-edge.${edge}').getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]; })()`);
+        const at = (fx, fy) => { const now = win.getBounds(); return { x: x + fx - (now.x - start.x), y: y + fy - (now.y - start.y), globalX: start.x + x + fx, globalY: start.y + y + fy }; };
+        win.webContents.sendInputEvent({ type: 'mouseMove', ...at(0, 0) });
+        win.webContents.sendInputEvent({ type: 'mouseDown', ...at(0, 0), button: 'left', clickCount: 1 });
+        for (let i = 1; i <= 6; i++) { win.webContents.sendInputEvent({ type: 'mouseMove', ...at(Math.round(dx * i / 6), Math.round(dy * i / 6)), button: 'left', modifiers: ['leftButtonDown'] }); await pause(70); }
+        await pause(250);
+        win.webContents.sendInputEvent({ type: 'mouseUp', ...at(dx, dy), button: 'left', clickCount: 1 });
+        await pause(400);
+        return { start, end: win.getBounds() };
+      };
+      const right = b => b.x + b.width, bottom = b => b.y + b.height;
+      const zones = await win.webContents.executeJavaScript(`[...document.querySelectorAll('.widget-edges .widget-edge')].map(n => n.className.replace('widget-edge ', '') + ':' + getComputedStyle(n).cursor)`);
+      const fromLeft = await dragEdge('w', 30, 0), back = await dragEdge('w', -30, 0);
+      const fromTop = await dragEdge('n', 0, 30), down = await dragEdge('n', 0, -30);
+      const edges = { zones, fromLeft, back, fromTop, down };
+      expect(zones.length === 8 && zones.includes('w:ew-resize') && zones.includes('n:ns-resize') && zones.includes('nw:nwse-resize') && zones.includes('ne:nesw-resize')
+        && Math.abs(fromLeft.end.width - (fromLeft.start.width - 30)) <= 3 && Math.abs(right(fromLeft.end) - right(fromLeft.start)) <= 3
+        && Math.abs(back.end.width - fromLeft.start.width) <= 3 && Math.abs(back.end.x - fromLeft.start.x) <= 3
+        && Math.abs(fromTop.end.height - (fromTop.start.height - 30)) <= 3 && Math.abs(bottom(fromTop.end) - bottom(fromTop.start)) <= 3
+        && Math.abs(down.end.y - fromTop.start.y) <= 3, `위젯 사방 크기 조절 ${JSON.stringify(edges)}`);
+      checks.push('widget-resize-any-edge');
+    }
     const switched = await invoke('widget:update', { id: widget.id, mode: widget.mode === 'top' ? 'desktop' : 'top' });
     expect(['top', 'desktop'].includes(switched.mode), `${widget.type} 위젯 모드 전환`);
     const restored = await invoke('widget:update', { id: widget.id, mode: widget.mode });
@@ -2485,6 +2515,53 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     return result;`);
   expect(alertSetting.found && alertSetting.on === true && alertSetting.off === false && alertSetting.back === true, `일정 알림 설정 ${JSON.stringify(alertSetting)}`);
   checks.push('event-alert-card-setting');
+
+  // The settings sheet scrolls as an Apple sheet (2026-10-30 owner: 「설정 창에서 스크롤이 너무 완성도가 낮게 디자인 되어 있는데 수정해줘.
+  // 애플 최신 디자인 컨셉에 맞고」): no system bar (no gutter), a thin overlay thumb hidden at rest, shown while the sheet moves or the
+  // pointer is on it, kept between the header and the 닫기 bar, 3-5px from the edge, draggable with the real mouse; the header's rule
+  // only once something is under it, the footer's rule and fade only while more is below.
+  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const sheetAt = () => run(mainWindow, `const d = document.querySelector('#modal-root .dialog'), hd = d.querySelector('.dialog-header'), ft = d.querySelector('.dialog-body>.dialog-footer'), th = d.querySelector('.sheet-thumb');
+    const r = th.getBoundingClientRect(), dr = d.getBoundingClientRect();
+    return { gutter: d.offsetWidth - d.clientWidth, range: d.scrollHeight - d.clientHeight, top: Math.round(d.scrollTop), on: th.parentNode.classList.contains('on'), opacity: Number(getComputedStyle(th).opacity),
+      thumb: [Math.round(r.top - dr.top), Math.round(r.bottom - dr.top)], right: Math.round(dr.right - r.right), width: Math.round(r.width), center: [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)],
+      head: Math.round(hd.getBoundingClientRect().bottom - dr.top), foot: Math.round(ft.getBoundingClientRect().top - dr.top), focus: document.activeElement?.tagName,
+      headRule: getComputedStyle(hd).boxShadow !== 'none', footRule: getComputedStyle(ft).boxShadow !== 'none', footFade: getComputedStyle(ft, '::before').opacity };`);
+  await run(mainWindow, `openSettings(); await new Promise(resolve => setTimeout(resolve, 300)); return true;`);
+  const sheetScroll = { rest: await sheetAt() };
+  await run(mainWindow, `const d = document.querySelector('#modal-root .dialog'); d.scrollTop = Math.round((d.scrollHeight - d.clientHeight) / 2); return true;`);
+  await pause(250); sheetScroll.moving = await sheetAt();
+  await pause(1600); sheetScroll.still = await sheetAt();
+  const [thumbX, thumbY] = sheetScroll.still.center;
+  mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: thumbX, y: thumbY });
+  await pause(300); sheetScroll.hover = await sheetAt();
+  mainWindow.webContents.sendInputEvent({ type: 'mouseDown', x: thumbX, y: thumbY, button: 'left', clickCount: 1 });
+  for (let i = 1; i <= 6; i++) { mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: thumbX, y: thumbY + 10 * i, button: 'left', modifiers: ['leftButtonDown'] }); await pause(16); }
+  mainWindow.webContents.sendInputEvent({ type: 'mouseUp', x: thumbX, y: thumbY + 60, button: 'left', clickCount: 1 });
+  await pause(150); sheetScroll.dragged = await sheetAt();
+  mainWindow.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 });
+  await run(mainWindow, `const d = document.querySelector('#modal-root .dialog'); d.scrollTop = d.scrollHeight; return true;`);
+  await pause(300); sheetScroll.end = await sheetAt();
+  await run(mainWindow, `closeModal(true); return true;`);
+  const inTrack = s => s.thumb[0] >= s.head + 4 && s.thumb[1] <= s.foot - 4 && s.right >= 2 && s.right <= 6;
+  const per = sheetScroll.still.range / ((sheetScroll.still.foot - 6) - (sheetScroll.still.head + 6) - (sheetScroll.still.thumb[1] - sheetScroll.still.thumb[0]));
+  expect(sheetScroll.rest.gutter <= 2 && sheetScroll.rest.range > 40 && !sheetScroll.rest.on && sheetScroll.rest.opacity === 0 && !sheetScroll.rest.headRule && sheetScroll.rest.footRule && sheetScroll.rest.footFade === '1'
+    && sheetScroll.moving.on && sheetScroll.moving.opacity > 0.5 && sheetScroll.moving.headRule && sheetScroll.moving.footRule && inTrack(sheetScroll.moving)
+    && !sheetScroll.still.on && sheetScroll.still.opacity < 0.05 && sheetScroll.hover.opacity > 0.5 && sheetScroll.hover.width > sheetScroll.still.width
+    && Math.abs(sheetScroll.dragged.top - Math.min(sheetScroll.still.range, sheetScroll.still.top + 60 * per)) <= 3 * per /* a short sheet ends before 60px */ && sheetScroll.dragged.focus === sheetScroll.still.focus
+    && sheetScroll.end.headRule && !sheetScroll.end.footRule && sheetScroll.end.footFade === '0' && inTrack(sheetScroll.end), `설정 창 스크롤 ${JSON.stringify(sheetScroll)}`);
+  checks.push('settings-sheet-scroll');
+
+  // Where questions go (2026-10-30 owner): settings ends with 문의 and Dayboard's address; main opens mail to that address alone — any
+  // other mailto is refused (not opened here: the real address would start the PC's mail app). No account list here, so the list menu
+  // offers no move to one (2026-10-30, lib/taskmove.cjs).
+  const contact = await run(mainWindow, `openSettings(); await new Promise(resolve => setTimeout(resolve, 200));
+    const a = document.querySelector('#modal-root .settings-contact a'); const result = { text: a?.textContent || '', href: a?.getAttribute('href') || '', label: a?.previousElementSibling?.textContent || '' };
+    closeModal(true); listMenu(listBy('local-inbox'), 200, 200); await new Promise(resolve => setTimeout(resolve, 60));
+    result.move = [...document.querySelectorAll('.context-menu .menu-item')].some(n => n.textContent.includes('계정 목록으로 옮기기')); closeMenu(); return result;`);
+  const otherMail = await invoke('external:open', { url: 'mailto:someone@example.com' }).then(() => 'opened', error => error.message);
+  expect(contact.text === 'nowsummer.apps@gmail.com' && contact.href === 'mailto:nowsummer.apps@gmail.com' && contact.label === '문의' && !contact.move && /HTTPS/.test(otherMail), `설정 문의 줄 ${JSON.stringify({ contact, otherMail })}`);
+  checks.push('settings-contact');
 
   // Drop-downs open as Apple pop-up menus drawn in the page (2026-10-28 owner request, area H): every select is base-select, the
   // card's 반복 menu opens inside the window, 「매일」 chosen with the mouse is saved, and keys inside an open menu stay with it — the

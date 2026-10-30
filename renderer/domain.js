@@ -28,7 +28,52 @@
   // 오른쪽 탭이 크지 않아? 이거 원하면 분계선 선을 잡고 원하는 크기 만큼 좁히거나」): px, or null for the width that follows the window
   // (styles.css .calendar-view). Narrower than 220 the day's heading and its + no longer fit; wider than 480 it is no longer a side panel.
   const CAL_PANEL_WIDTH={min:220,max:480};
+  // Where questions go (2026-10-30 owner: 「nowsummer.apps@gmail.com 이걸로 새로운 이메일 하나 만들었어. 설정이나 적절한 곳에 문의 있으면 여기로
+  // 연락하라고 짤막하게 적어놔줘」): Dayboard's own address, public on purpose — settings shows it, main opens mail to it and nowhere else
+  // (external:open), scripts/public-text-rules.cjs lets this one address through.
+  const CONTACT_EMAIL='nowsummer.apps@gmail.com';
+  // Connected calendars in two tiers (2026-10-30 owner chose 「달력 5년 기록 2단 방식」, agreed 2026-10-28: widening the one window to five
+  // years made every edit two to three times slower, as each save writes the whole state and sends it to every window). The recent
+  // window — a year back to a year ahead — is synced every five minutes into the saved state, as before; the years before it, back
+  // to five years from today, are fetched once a day into files of their own (lib/calhistory.cjs) and read only when an old month or
+  // a search needs them. One reckoning for the providers (common.dateRange), main and the screen.
+  const SYNC_MONTHS=12,HISTORY_MONTHS=60,HISTORY_OVERLAP_DAYS=31;
+  function syncWindow(now=new Date()){
+    const start=new Date(now);start.setMonth(start.getMonth()-SYNC_MONTHS);start.setHours(0,0,0,0);
+    const end=new Date(now);end.setMonth(end.getMonth()+SYNC_MONTHS);end.setHours(23,59,59,999);
+    return {start:start.toISOString(),end:end.toISOString()};
+  }
+  // The older tier: five years back from today, up to a month into the recent window — the recent window's start moves a day
+  // each day while the history is fetched once a day, so the overlap leaves no gap (the same event in both is shown once, by id).
+  function historyWindow(now=new Date()){
+    const start=new Date(now);start.setMonth(start.getMonth()-HISTORY_MONTHS);start.setHours(0,0,0,0);
+    const end=new Date(syncWindow(now).start);end.setDate(end.getDate()+HISTORY_OVERLAP_DAYS);
+    return {start:start.toISOString(),end:end.toISOString()};
+  }
+  // That window in pieces of twelve months, one request each, oldest first; the last piece ends with the window.
+  function historyChunks(window){
+    const out=[];const end=Date.parse(window.end);let from=new Date(window.start);
+    while(from.getTime()<end){const to=new Date(from);to.setMonth(to.getMonth()+12);out.push({start:from.toISOString(),end:new Date(Math.min(to.getTime(),end)).toISOString()});from=to;}
+    return out;
+  }
   const panelWidth=v=>v==null?null:Number.isFinite(v)?Math.round(Math.min(CAL_PANEL_WIDTH.max,Math.max(CAL_PANEL_WIDTH.min,v))):undefined;
+  // A sheet's overlay scroll thumb (2026-10-30 owner: 「설정 창에서 스크롤이 너무 완성도가 낮게 디자인 되어 있는데 수정해줘. 애플 최신
+  // 디자인 컨셉에 맞고」, app.js sheetScroll): it runs between the pinned header and footer, `inset` px clear of both (the system bar
+  // ran the sheet's whole height, into the rounded corners and past the 닫기 bar), and its length is the part of the scrolling
+  // body in view. view/content: the sheet's clientHeight/scrollHeight, top: its scrollTop, head/foot: the pinned bars' heights.
+  // A sheet too short to keep that track uses its whole height. null when nothing scrolls. per: scroll px per px of dragging.
+  function scrollThumb({view,content,top=0,head=0,foot=0,inset=6,min=32}){
+    const range=content-view;
+    if(!(view>0)||!(range>=1))return null;
+    let start=head+inset,end=view-foot-inset;
+    if(end-start<min*2){start=inset;end=view-inset;}
+    const track=end-start;
+    if(track<min)return null;
+    const seen=Math.max(1,view-head-foot);
+    const length=Math.min(track,Math.max(min,Math.round(track*seen/(seen+range))));
+    const at=Math.min(1,Math.max(0,top/range));
+    return {top:Math.round(start+(track-length)*at),length,start,track,range,per:track>length?range/(track-length):0};
+  }
   const WIDGET_MIN={calendar:{minWidth:300,minHeight:360},tasks:{minWidth:280,minHeight:240},note:{minWidth:280,minHeight:220}};
   const EMOJI_PREFIX=/^((?:\p{Extended_Pictographic}|\p{Regional_Indicator}{2})(?:️|\p{Emoji_Modifier})?(?:‍\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?)*)\s*/u;
   // "🛒 쇼핑" → the emoji becomes the list symbol and the title loses it (Windows To Do habit).
@@ -694,7 +739,7 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,CAL_PANEL_WIDTH,panelWidth,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

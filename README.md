@@ -89,6 +89,10 @@ Needs Windows x64, Git and Node.js 22.12 or later.
 - Official installers include the Google sign-in client. Your own build asks for your own Google Cloud OAuth client (see `assets/google-oauth.example.json`).
 - Your own build still offers official releases. Turn off **Check for new versions automatically** to stay on it.
 
+## Contact
+
+Questions or feedback: nowsummer.apps@gmail.com
+
 ## License
 
 [MIT](LICENSE). Fonts and service logos keep their own licenses ([notices](docs/licenses/THIRD-PARTY.txt)). Dayboard isn't affiliated with Microsoft, Google or Apple.

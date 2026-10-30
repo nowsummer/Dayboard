@@ -51,10 +51,15 @@ function personalMarkers(project) {
   return words.map(m => ({ kind: 'a private marker', re: new RegExp(escape(m), 'i') }));
 }
 
+// Dayboard's own contact address (renderer/domain.js CONTACT_EMAIL, 2026-10-30): public on purpose, so the e-mail rule looks past this
+// one address — the whole address only, not inside a longer one nor followed by more of one; every other address still stops the text.
+// The same text as renderer/domain.js CONTACT_EMAIL (tests/contact.test.cjs): written here, as this file is read on its own.
+const CONTACT_EMAIL = 'nowsummer.apps@gmail.com';
+const CONTACT =new RegExp(`(?<![A-Za-z0-9._%+-])${escape(CONTACT_EMAIL)}(?![A-Za-z0-9.-]*[A-Za-z0-9])`, 'g');
 // The first rule a text breaks, or null. The match itself is never returned, so a refusal never echoes it.
 function firstHit(text, rules, { allowEmail = false } = {}) {
   const views = [text, decodedView(text)];
-  return rules.find(rule => !(allowEmail && rule.email) && views.some(view => rule.re.test(view))) || null;
+  return rules.find(rule => !(allowEmail && rule.email) && views.some(view => rule.re.test(rule.email ? view.replace(CONTACT, ' ') : view))) || null;
 }
 
-module.exports = { SECRETS, GENERAL, PLACEHOLDER, decodedView, personalMarkers, firstHit, escape };
+module.exports = { SECRETS, GENERAL, PLACEHOLDER, CONTACT_EMAIL, decodedView, personalMarkers, firstHit, escape };

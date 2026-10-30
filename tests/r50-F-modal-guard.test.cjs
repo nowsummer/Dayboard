@@ -13,7 +13,7 @@ function dialogHarness() {
     calendarKey: () => false, notesTrash: false, activeNote: null, deleteActiveNote() {}, goToday() {}, shiftMonth() {}, openShortcuts() {},
     toastAction: null, toastRedo: null, openNoteFind: () => false, newNote() {}, addEvent() {}, isTaskView: () => true, goto() {}, calTop: null, calStart: () => null,
   });
-  h.loadApp('let restoreFocus=null;', 'const formSnapshot=', 'function modal(', 'function dismissModal(', { prefix: 'function askCloseModal(', optional: true }, 'const field=', 'const input=', 'function actionFooter(',
+  h.loadApp('let restoreFocus=null;', 'const formSnapshot=', 'function sheetScroll(', 'function modal(', 'function dismissModal(', { prefix: 'function askCloseModal(', optional: true }, 'const field=', 'const input=', 'function actionFooter(',
     "document.addEventListener('keydown',e=>{if(calendarKey(e))return;");
   // A form like 목록 편집: one text field and the 취소/저장 footer.
   h.open = async (title, options, value = '원래 이름') => {

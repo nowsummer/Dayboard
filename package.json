@@ -1,7 +1,7 @@
 {
   "name": "dayboard-desktop",
   "productName": "Dayboard",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "A quiet place for your day. Windows tasks, calendar and desktop widgets.",
   "main": "main.cjs",
   "private": true,

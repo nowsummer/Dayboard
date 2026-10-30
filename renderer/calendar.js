@@ -108,7 +108,20 @@ function calSearchHits(words,today){
     if(!list)calSearchPool.series.set(e.id,list=calSeriesHits(e,from,to));
     out.push(...list);
   }
+  // The years before the recent window (lib/calhistory.cjs): main finds them, a moment after the words settle; shown once it answered.
+  const known=new Set(out.map(e=>e.id));
+  for(const e of calHistoryHits(words))if(!known.has(e.id)&&!hidden.has(e.calendarId))out.push(e);
   return out;
+}
+let calHistoryFind={asked:'',words:'',events:[],timer:0};
+function calHistoryHits(words){
+  if(!state.calendarHistory?.at||!words)return [];
+  const at=state.calendarHistory.at;
+  if(calHistoryFind.asked!==words+'|'+at){
+    calHistoryFind.asked=words+'|'+at;clearTimeout(calHistoryFind.timer);
+    calHistoryFind.timer=setTimeout(()=>api.invoke('calendar:history-search',{text:words}).then(r=>{if(calHistoryFind.asked!==words+'|'+at)return;calHistoryFind.words=words+'|'+at;calHistoryFind.events=Array.isArray(r?.events)?r.events:[];if(search.trim()===words&&view==='calendar')renderMain();}).catch(()=>{}),180);
+  }
+  return calHistoryFind.words===words+'|'+at?calHistoryFind.events:[];
 }
 // A series' rows: its occurrences in the window, and its first one (D.firstOccurrence, excluded dates skipped) when that one is
 // not already listed — told by its id, not by where the series begins (2026-10-30 Codex review R05: every five years from today
@@ -296,7 +309,7 @@ function calShiftTo(e,fromDay,toDay){if(!fromDay||!toDay||fromDay===toDay)return
 function calAutoScroll(){const g=calGesture;if(!g||!g.started)return;const scroller=document.querySelector('.time-scroll');if(scroller){const r=scroller.getBoundingClientRect();const top=r.top+(document.querySelector('.time-sticky')?.offsetHeight||0);let dy=0;if(g.y<top+40)dy=-Math.ceil((40-(g.y-top))/40*14);else if(g.y>r.bottom-40)dy=Math.ceil((40-(r.bottom-g.y))/40*14);if(dy){const before=scroller.scrollTop;scroller.scrollTop+=dy;if(scroller.scrollTop!==before)calUpdateGesture();}}g.frame=requestAnimationFrame(calAutoScroll);}
 // Month view: resting near the top or bottom edge moves the rows a week (renders are allowed during a month drag).
 function calMonthEdge(){const g=calGesture;const cells=document.querySelectorAll('.calendar-grid.large .calendar-day');if(!g||!cells.length)return;const top=cells[0].getBoundingClientRect().top,bottom=cells[cells.length-1].getBoundingClientRect().bottom;const dir=g.y<top+12?-1:g.y>bottom-12?1:0;if(!dir){g.edgeSince=0;return;}const now=performance.now();if(!g.edgeSince){g.edgeSince=now;return;}if(now-g.edgeSince<500)return;g.edgeSince=now;calWeekStep(dir);calUpdateGesture();}
-function calReadOnlyReason(e){const cal=calendarOf(e);const account=state.accounts.find(a=>a.id===cal?.accountId);return account&&account.calendarWrite===false?tr('계정 연결 화면에서 「다시 로그인해 달력 쓰기 허용」을 누르면 여기서도 고칠 수 있어요.'):tr('읽기 전용으로 공유된 달력이라 원래 달력 앱에서만 바꿀 수 있어요.');}
+function calReadOnlyReason(e){if(e?.history)return tr('1년보다 오래된 일정은 여기서 볼 수만 있어요. 고치려면 원래 달력 앱에서 바꿔 주세요.');const cal=calendarOf(e);const account=state.accounts.find(a=>a.id===cal?.accountId);return account&&account.calendarWrite===false?tr('계정 연결 화면에서 「다시 로그인해 달력 쓰기 허용」을 누르면 여기서도 고칠 수 있어요.'):tr('읽기 전용으로 공유된 달력이라 원래 달력 앱에서만 바꿀 수 있어요.');}
 
 // ---- Saving a moved or stretched event: repeating events ask how far it applies; Undo in the toast and Ctrl+Z ----
 function calAskScope(title,labels){return new Promise(resolve=>{let done=false;const finish=v=>{if(done)return;done=true;resolve(v);};modal(title,h('div',{class:'dialog-body'},h('div',{class:'scope-options'},[['one',labels.one],['future',labels.future],['all',labels.all]].filter(([,l])=>l).map(([s,l])=>btn(l,()=>{finish(s);closeModal();},'button subtle wide'+(s==='one'?' primary-choice':'')))),h('div',{class:'dialog-footer'},btn(tr('취소'),()=>{finish(null);closeModal();},'button subtle'))),false,{stack:true,onDismiss:()=>finish(null)});});}
@@ -369,7 +382,8 @@ const calGrow=t=>{t.style.height='auto';t.style.height=Math.min(t.scrollHeight,3
 function calCardNode(){
   const c=calCard,v=c.v,e=c.event,view=c.mode==='view';
   const cal=c.mode==='create'?state.calendars.find(x=>x.id===c.calendarId):calendarOf(e);const base=calendarColor(cal);const color=v.color||base;
-  const head=h('header',{class:'card-head'},h('button',{type:'button',class:'card-color',style:{'--dot':color},'aria-label':tr('이 일정의 색'),title:tr('이 일정의 색'),'aria-expanded':c.swatches,'data-card-focus':'color',onclick:()=>{c.swatches=!c.swatches;calRenderCard();}}),h('span',{class:'card-spacer'}),c.mode==='create'?null:ib('more',tr('더 보기'),ev=>calCardMenu(ev.currentTarget)),ib('close',c.mode==='create'?tr('취소'):tr('닫기'),()=>closeCard(c.mode!=='create')));
+  // An event older than the recent window keeps its colour as it is (lib/calhistory.cjs): a dot, not a button.
+  const head=h('header',{class:'card-head'},e?.history?h('span',{class:'card-color static',style:{'--dot':color},'aria-hidden':'true'}):h('button',{type:'button',class:'card-color',style:{'--dot':color},'aria-label':tr('이 일정의 색'),title:tr('이 일정의 색'),'aria-expanded':c.swatches,'data-card-focus':'color',onclick:()=>{c.swatches=!c.swatches;calRenderCard();}}),h('span',{class:'card-spacer'}),c.mode==='create'?null:ib('more',tr('더 보기'),ev=>calCardMenu(ev.currentTarget)),ib('close',c.mode==='create'?tr('취소'):tr('닫기'),()=>closeCard(c.mode!=='create')));
   const title=view?h('h2',{class:'card-title static'},e.title||tr('제목 없는 일정')):h('textarea',{class:'card-title',rows:1,maxlength:500,placeholder:c.mode==='create'?tr('새 일정'):tr('일정 제목'),'aria-label':tr('일정 제목'),'data-card-focus':'title',value:v.title,
     oninput:ev=>{const t=ev.target;if(t.value.includes('\n'))t.value=t.value.replace(/\n+/g,' ');v.title=t.value;c.title=t.value.trim();calGrow(t);for(const n of document.querySelectorAll('#app [data-event-key="draft"] .time-event-title,#app [data-event-key="draft"] .chip-title'))n.textContent=c.title||tr('새 일정');},
     ...calEnter(target=>{if(c.mode==='create')calSaveNew(true);else target.blur();}),
@@ -484,7 +498,7 @@ function calPlaceCard(rect){const c=calCard;const node=c?.node;if(!node)return;i
 const calAnchorRegions='.day-panel,.context-pane,.time-sticky,.time-body,.calendar-grid';
 function calFindAnchor(c){if(!c?.key)return null;const sel='[data-event-key="'+CSS.escape(c.key)+'"]';return (c.region&&document.querySelector('#app '+c.region+' '+sel))||document.querySelector('#app '+sel);}
 function calMarkAnchor(){for(const n of document.querySelectorAll('.card-open'))n.classList.remove('card-open');const c=calCard;if(!c||!c.key)return null;const anchor=calFindAnchor(c);anchor?.classList.add('card-open');return anchor;}
-function calCardAfterRender(){const c=calCard;if(!c||!c.node)return;if(c.mode==='list'){if(view!=='calendar')closeCard(false);return;}const anchor=calMarkAnchor();if(anchor){calPlaceCard(anchor.getBoundingClientRect());calCardVisibility(anchor);return;}c.node.style.visibility='';if(c.mode!=='create'){const id=c.event.id,base=c.event.masterId||id;const day=D.localKey(c.event.start);const occurrenceGone=Boolean(c.event.masterId&&c.event.rrule)&&!eventsBetween(D.dayOffset(day,-1),D.dayOffset(day,2)).some(x=>x.id===id);if(occurrenceGone||!state.events.some(x=>x.id===id||x.id===base)){if(c.hold)return;clearTimeout(c.timer);const lost=Object.keys(c.pending||{}).length>0;calCard=null;calCardRoot().replaceChildren();if(lost)toast(tr('일정이 다른 곳에서 바뀌어 카드의 변경을 저장하지 못했어요.'),true);}}}
+function calCardAfterRender(){const c=calCard;if(!c||!c.node)return;if(c.mode==='list'){if(view!=='calendar')closeCard(false);return;}const anchor=calMarkAnchor();if(anchor){calPlaceCard(anchor.getBoundingClientRect());calCardVisibility(anchor);return;}c.node.style.visibility='';/* an older-tier event is not in the saved state: its card stays */if(c.mode!=='create'&&!c.event.history){const id=c.event.id,base=c.event.masterId||id;const day=D.localKey(c.event.start);const occurrenceGone=Boolean(c.event.masterId&&c.event.rrule)&&!eventsBetween(D.dayOffset(day,-1),D.dayOffset(day,2)).some(x=>x.id===id);if(occurrenceGone||!state.events.some(x=>x.id===id||x.id===base)){if(c.hold)return;clearTimeout(c.timer);const lost=Object.keys(c.pending||{}).length>0;calCard=null;calCardRoot().replaceChildren();if(lost)toast(tr('일정이 다른 곳에서 바뀌어 카드의 변경을 저장하지 못했어요.'),true);}}}
 // The card hides while its event is scrolled out of the time grid and comes back with it (Notion).
 function calCardVisibility(anchor){const c=calCard;if(!c?.node)return;const scroller=anchor.closest('.time-scroll');if(!scroller){c.node.style.visibility='';return;}const r=anchor.getBoundingClientRect(),s=scroller.getBoundingClientRect();const top=s.top+(scroller.querySelector('.time-sticky')?.offsetHeight||0);const hidden=anchor.closest('.time-sticky')?false:r.bottom<top||r.top>s.bottom;c.node.style.visibility=hidden?'hidden':'';if(!hidden)calPlaceCard(r);}
 document.addEventListener('pointerdown',ev=>{const c=calCard;if(!c||!c.node)return;const t=ev.target;if(c.node.contains(t)||t.closest?.('#modal-root,.context-menu,#toast'))return;const key=t.closest?.('[data-event-key]')?.dataset.eventKey;if(key&&key===c.key)return;if(key&&key!=='draft'){if(!closeCard(true))ev.cardClosed=true;return;}ev.cardClosed=true;calSuppressClick=performance.now()+400;closeCard(true);},true);

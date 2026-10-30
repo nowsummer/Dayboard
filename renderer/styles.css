@@ -884,3 +884,69 @@ select option:disabled{color:var(--muted)}
 select hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
 select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 @media(prefers-reduced-motion:reduce){::picker(select),select:open::picker(select){transition:none}}
+/* ---- 2026-10-30 sheet scrolling (owner: 「설정 창에서 스크롤이 너무 완성도가 낮게 디자인 되어 있는데 수정해줘. 애플 최신 디자인 컨셉에 맞고
+   애플의 디자인에 맞게 만들어줘.」) ----
+   One steady surface for the whole sheet (2026-10-28 review D01: a long form keeps a stable background). The 94% glass let the app's
+   blurred text through the body, and the pinned header — the same glass again on top — was whiter than the body, with the body's
+   words ghosting behind the title as it scrolled under. The header and the 닫기 bar are the sheet itself while nothing is under
+   them; with content passing under, a soft fade and a faint rule come in (Apple's scroll edge effect), so the body dissolves
+   instead of ending in a cut. Being the sheet's own colour, the bars need no fade of their own: nothing shows through them. The fades start a pixel out, past the rule
+   (from the bar's edge, their solid end hid it). The system scroll bar gives way to app.js sheetScroll's thin overlay thumb. */
+.dialog{--sheet:rgb(from var(--glass) r g b / 1);--sheet-clear:rgb(from var(--sheet) r g b / 0);--sheet-thumb:rgba(28,32,46,.28);--sheet-thumb-on:rgba(28,32,46,.44);background:var(--sheet);backdrop-filter:none;scrollbar-width:none;scroll-padding-top:76px;scroll-padding-bottom:100px}
+[data-theme=dark] .dialog{--sheet-thumb:rgba(236,239,250,.28);--sheet-thumb-on:rgba(236,239,250,.44)}
+@media(prefers-reduced-transparency:reduce){.dialog{--sheet:var(--bg)}}
+.dialog-header,.dialog-body>.dialog-footer{background:var(--sheet);box-shadow:none;transition:box-shadow .2s ease}
+.dialog-header::after,.dialog-body>.dialog-footer::before{content:"";position:absolute;left:0;right:0;pointer-events:none;opacity:0;transition:opacity .2s ease}
+.dialog-header::after{top:calc(100% + 1px);height:14px;background:linear-gradient(var(--sheet),var(--sheet-clear))}
+.dialog-body>.dialog-footer::before{bottom:calc(100% + 1px);height:28px;background:linear-gradient(var(--sheet-clear),var(--sheet))}
+@container dialog scroll-state(scrollable: top){.dialog-header{box-shadow:0 1px 0 var(--line)}.dialog-header::after{opacity:1}}
+@container dialog scroll-state(scrollable: bottom){.dialog-body>.dialog-footer{box-shadow:0 -1px 0 var(--line)}.dialog-body>.dialog-footer::before{opacity:1}}
+.sheet-rail{position:sticky;top:0;height:0;z-index:3;pointer-events:none}
+.sheet-rail[hidden]{display:none}
+.sheet-thumb{position:absolute;top:0;right:3px;width:6px;border-radius:99px;background:var(--sheet-thumb);opacity:0;pointer-events:auto;transition:opacity .4s ease .05s,width .12s ease,background-color .12s ease}
+.sheet-rail.on .sheet-thumb,.sheet-thumb:hover{opacity:1;transition:opacity .12s ease,width .12s ease,background-color .12s ease}
+.sheet-thumb:hover,.sheet-rail.drag .sheet-thumb{width:9px;background:var(--sheet-thumb-on)}
+/* The settings sheet's rhythm, as a Mac settings pane: one 20px step between sections, a section's note right under its rows (a help
+   line used to add its own 16px to the section's 18, so the step after 「끈 계정은…」 and 「체크하면…」 was twice the others), the
+   switch rows one height and one 13px size (the two at the end were 12px beside 13px account rows), and the update box set by
+   spacing rather than a negative margin. */
+.settings-brand{margin-bottom:18px}
+.settings-body .update-block{margin:0 0 22px}
+.settings-body .field{gap:8px;margin-bottom:20px}
+.settings-body .field-help{margin:0;line-height:1.6}
+.settings-body .section-visibility .checkbox-field{margin:0;min-height:32px}
+.settings-body>.checkbox-field{font-size:13px;margin:0;min-height:34px}
+.settings-body>.checkbox-field+.settings-links{margin-top:14px}
+.settings-body .settings-links{padding-top:18px}
+/* Every switch in the sheet at the right edge: 「새 버전 자동 확인」's sat beside its words, under the 업데이트 확인 button's edge. */
+.settings-body .update-row>.checkbox-field{flex:1}
+/* An ON switch is blue in dark mode too: the dark track rule (same specificity, later) painted ON and OFF the same grey. */
+[data-theme=dark] .checkbox-field input[type=checkbox]:checked{background:var(--blue)}
+.settings-body .update-block .checkbox-field{font-size:13px}
+/* 2026-10-30 This PC's tasks to an account list (app.js transferListDialog): the count, then why the rest stay, in the sheet's rhythm. */
+.transfer-body .move-summary{display:flex;flex-direction:column;gap:4px;margin:0 0 14px}
+.transfer-body .move-count{font-size:13px;color:var(--text);line-height:1.6}
+.transfer-body .move-line{font-size:12px;color:var(--secondary);line-height:1.6}
+.transfer-body>.checkbox-field{font-size:13px;margin:0;min-height:32px}
+.transfer-body>.checkbox-field[hidden]{display:none}
+/* 2026-10-30 Where questions go: one quiet line under the settings' links; the address is a link that can also be selected. */
+.settings-contact{display:flex;gap:8px;align-items:baseline;margin-top:14px;font-size:12px;color:var(--muted)}
+.settings-contact a{color:var(--secondary);text-decoration:none;user-select:text;-webkit-user-select:text}
+.settings-contact a:hover{color:var(--blue);text-decoration:underline}
+/* 2026-10-30 An event older than the recent window (lib/calhistory.cjs): its card's colour is a plain dot. */
+.card-color.static{cursor:default}.card-color.static:hover{transform:none}
+/* 2026-10-30 A widget resizes from any edge or corner (app.js widgetEdges): invisible bands 10px wide on the card's border — 6px in the
+   window's clear margin, 4px on the card, clear of rows and scroll bars — corners 22px. The window's region (lib/desktop.cjs 'frame')
+   takes the margin, so the outer part is grabbable; the fallback card that fills its window keeps the inner part. */
+.widget-edges{position:fixed;inset:0;pointer-events:none;z-index:4;--edge-at:var(--w-margin)}
+.widget-body.attached:not(.has-backdrop) .widget-edges{--edge-at:0px}
+.widget-edge{position:absolute;pointer-events:auto;touch-action:none;-webkit-app-region:no-drag}
+.widget-edge.n,.widget-edge.s{left:calc(var(--edge-at) + 16px);right:calc(var(--edge-at) + 16px);height:10px;cursor:ns-resize}
+.widget-edge.n{top:calc(var(--edge-at) - 6px)}.widget-edge.s{bottom:calc(var(--edge-at) - 6px)}
+.widget-edge.e,.widget-edge.w{top:calc(var(--edge-at) + 16px);bottom:calc(var(--edge-at) + 16px);width:10px;cursor:ew-resize}
+.widget-edge.w{left:calc(var(--edge-at) - 6px)}.widget-edge.e{right:calc(var(--edge-at) - 6px)}
+.widget-edge.nw,.widget-edge.ne,.widget-edge.sw,.widget-edge.se{width:22px;height:22px}
+.widget-edge.nw{left:calc(var(--edge-at) - 6px);top:calc(var(--edge-at) - 6px);cursor:nwse-resize}
+.widget-edge.se{right:calc(var(--edge-at) - 6px);bottom:calc(var(--edge-at) - 6px);cursor:nwse-resize}
+.widget-edge.ne{right:calc(var(--edge-at) - 6px);top:calc(var(--edge-at) - 6px);cursor:nesw-resize}
+.widget-edge.sw{left:calc(var(--edge-at) - 6px);bottom:calc(var(--edge-at) - 6px);cursor:nesw-resize}

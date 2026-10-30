@@ -98,7 +98,7 @@ function harness(events, settings = {}) {
   vm.runInContext(findSource, context, { filename: 'renderer/notefind.js' });
   vm.runInContext(calendarSource, context, { filename: 'renderer/calendar.js' });
   // The real pool, filter and order from app.js.
-  vm.runInContext(['let rangeCache=new Map();', appLine('function eventsBetween(from,to)'), appLine('function byEventOrder(a,b)'), appLine('function eventsOn(day,pool)')].join('\n'), context, { filename: 'renderer/app.js (excerpt)' });
+  vm.runInContext(['let rangeCache=new Map();', appLine('const historyMonths='), appLine('const historyNextMonth='), appLine('function historyEventsFor('), appLine('function historyAsk('), appLine('let historyRecent='), appLine('const historyRecentIds='), appLine('function eventsBetween(from,to)'), appLine('function byEventOrder(a,b)'), appLine('function eventsOn(day,pool)')].join('\n'), context, { filename: 'renderer/app.js (excerpt)' });
   const call = expression => vm.runInContext(expression, context);
   return { context, call, counts };
 }

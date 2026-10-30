@@ -488,3 +488,26 @@ test('WIDGET_MIN is the one table of smallest widget sizes; localKey gives the l
   assert.equal(DM.localKey(new Date(2026, 9, 21, 23, 30).toISOString()), '2026-10-21', 'an instant late in the local evening is still that day here');
   assert.equal(DM.localKey(new Date(2026, 9, 22, 0, 30).toISOString()), '2026-10-22');
 });
+
+test('a sheet\'s overlay scroll thumb stays between its pinned header and footer and tracks the scroll (2026-10-30 owner)', () => {
+  const { scrollThumb } = require('../renderer/domain.js');
+  // The settings sheet at the 900×650 window: 600px in view, 1245px of content, header 59px, the 닫기 bar 67px.
+  const sheet = { view: 600, content: 1245, head: 59, foot: 67 };
+  const top = scrollThumb({ ...sheet, top: 0 }), end = scrollThumb({ ...sheet, top: 645 }), mid = scrollThumb({ ...sheet, top: 322.5 });
+  assert.equal(top.top, 65, 'starts 6px below the header (the system bar ran into the header and the rounded corner)');
+  assert.equal(end.top + end.length, 600 - 67 - 6, 'ends 6px above the 닫기 bar');
+  assert.equal(top.length, end.length, 'one length all the way');
+  assert.equal(top.length, Math.round(top.track * (600 - 59 - 67) / (600 - 59 - 67 + 645)), 'the length is the part of the scrolling body in view');
+  assert.ok(Math.abs(mid.top - (top.top + end.top) / 2) <= 1, 'halfway down the sheet, halfway down the track');
+  assert.equal(scrollThumb({ ...sheet, top: -40 }).top, top.top, 'an elastic overscroll above the top does not lift it past its start');
+  assert.equal(scrollThumb({ ...sheet, top: 900 }).top, end.top, 'nor below the end');
+  assert.ok(Math.abs(end.per - 645 / (end.track - end.length)) < 1e-9, 'dragging the thumb over its free track scrolls the whole range');
+  assert.equal(scrollThumb({ view: 600, content: 600, head: 59, foot: 67 }), null, 'nothing to scroll: no thumb');
+  assert.equal(scrollThumb({ view: 600, content: 600.5 }), null, 'a sub-pixel overflow is not scrolling');
+  assert.equal(scrollThumb({ view: 0, content: 400 }), null, 'a sheet not laid out yet: no thumb');
+  const long = scrollThumb({ view: 600, content: 60000, head: 59, foot: 67 });
+  assert.equal(long.length, 32, 'a very long sheet keeps a thumb one can grab');
+  const short = scrollThumb({ view: 150, content: 400, head: 59, foot: 67 });
+  assert.equal(short.start, 6, 'a sheet too short for a track between its bars uses its whole height');
+  assert.ok(short.top + short.length <= 144, 'still inset from the bottom edge');
+});

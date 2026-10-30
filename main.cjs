@@ -9,7 +9,7 @@ const { fileURLToPath } = require('node:url');
 const { spawn } = require('node:child_process');
 const { UpdateManager, releasePage, releasesPage, releaseTag, STAGING_ID } = require('./lib/updater.cjs');
 const { createStore, resolveUserDataDirectory, TRASH_DAYS, publicNote, publicRecord } = require('./lib/store.cjs');
-const { createDesktopManager, clampBounds, onScreen } = require('./lib/desktop.cjs');
+const { createDesktopManager, clampBounds, resizedBounds, RESIZE_EDGES, onScreen } = require('./lib/desktop.cjs');
 const { createTaskbarIcon } = require('./lib/windowicon.cjs');
 const { createStartMenu } = require('./lib/startmenu.cjs');
 const { createSync, seriesKey, dropSeriesColors } = require('./lib/sync.cjs');
@@ -22,7 +22,7 @@ const shownNote = publicNote;
 const textIdOf = value => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z~[0-9a-f]{16}$/.test(value) ? value : null);
 // Widgets of notes moved to the trash, so 되돌리기 brings them back where they were (2026-10-21 review round 4).
 const trashedWidgets = new Map();
-const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, WIDGET_MIN, panelWidth, scopeChoices } = require('./renderer/domain.js');
+const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, WIDGET_MIN, panelWidth, scopeChoices, CONTACT_EMAIL } = require('./renderer/domain.js');
 const { createWallpaper, backdropPayload } = require('./lib/wallpaper.cjs');
 const { providerStatus } = require('./lib/providers/oauth.cjs');
 const i18n = require('./lib/i18n.cjs');
@@ -31,6 +31,8 @@ const { tr } = i18n;
 const { text, rawText, identifier, boolean, color, dateOnly, dateTime, reminderAt, idList, eventColor, rruleText, scopeOf, taskSorts, taskSteps, eventAlert, taskOrders } = require('./lib/validate.cjs');
 const { dueAlerts, alertLine, pruneFired } = require('./lib/alerts.cjs');
 const { setRepeat, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries } = require('./lib/tasks.cjs');
+const { isAccountList, moveSummary, settleMovesAtStart } = require('./lib/taskmove.cjs');
+const { createCalendarHistory } = require('./lib/calhistory.cjs');
 const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, seriesAlert, ring, alertOtherKind, seriesAllDay, toFirstShown, shiftedForMaster, truncatedRule } = require('./lib/series.cjs');
 
 app.setName('Dayboard');
@@ -58,7 +60,7 @@ const flushingWindows = new Map();
 const closingWindows = new Map();
 const boundsTimers = new Map();
 const readyWindows = new WeakSet();
-let store, sync, mainWindow, tray, quitting = false, timer;
+let store, sync, history, mainWindow, tray, quitting = false, timer;
 let quitInFlight = false;
 let updater = null, trayUpdateStatus = null;
 
@@ -800,6 +802,27 @@ async function command(commandName, payload, sourceWindow) {
       });
       return publicRecord('tasks', task);
     }
+    // This PC's tasks to a connected Google or Microsoft list (2026-10-30, lib/taskmove.cjs). transfer-check counts before a move —
+    // the tasks of one list of this PC (listId) or the ones named (ids); transfer moves one task (the screen goes one by one, so it can
+    // show how far it is and stop between two); transfer-forget settles a move whose answer never came by leaving the task here.
+    // The older calendar tier (lib/calhistory.cjs): the events of a range the screen shows (YYYY-MM-DD, the end not included), and
+    // the matches of a search. Read-only; nothing here waits for a service.
+    case 'calendar:history': return history.query(payload.from, payload.to);
+    case 'calendar:history-search': return history.search(typeof payload.text === 'string' ? payload.text : '');
+    case 'task:transfer-check': {
+      const list = lookup('lists', payload.to);
+      if (!isAccountList(list)) throw new Error(tr('옮길 계정 목록을 찾지 못했어요. 동기화한 뒤 다시 시도해 주세요.'));
+      const from = payload.listId === undefined ? null : lookup('lists', payload.listId);
+      if (from && from.provider !== 'local') throw new Error(tr('이 PC 목록의 할 일만 계정 목록으로 옮길 수 있어요.'));
+      const ids = from ? null : new Set(Array.isArray(payload.ids) ? payload.ids.slice(0, 5000).map(identifier) : []);
+      return store.read(state => {
+        const local = new Set(state.lists.filter(item => item.provider === 'local').map(item => item.id));
+        const tasks = state.tasks.filter(item => local.has(item.listId) && (from ? item.listId === from.id : ids.has(item.id)));
+        return moveSummary(tasks, list, state.taskMoves || []);
+      });
+    }
+    case 'task:transfer': return sync.moveTask(identifier(payload.id), identifier(payload.to), { resend: payload.resend === true });
+    case 'task:transfer-forget': sync.forgetMove(identifier(payload.id)); return true;
     case 'task:delete': {
       const task = lookup('tasks', payload.id), list = lookup('lists', task.listId);
       if (list.provider !== 'local') await sync.mutateTask('delete', task, list);
@@ -1351,7 +1374,7 @@ async function command(commandName, payload, sourceWindow) {
       // accountId: sign in again for an existing account (grants newly requested scopes such as calendar writing).
       if (payload.accountId !== undefined && payload.accountId !== null) lookup('accounts', payload.accountId);
       const connected = await sync.connect(payload);
-      if (!connected?.cancelled) { sync.syncNotes().catch(() => {}); sync.syncViews().catch(() => {}); } // a new grant may turn notes sync (and the list and calendar look) on
+      if (!connected?.cancelled) { sync.syncNotes().catch(() => {}); sync.syncViews().catch(() => {}); history.refreshDue().catch(() => {}); } // a new grant may turn notes sync (and the list and calendar look) on; a new account's older events follow
       return connected;
     }
     case 'account:update': {
@@ -1379,11 +1402,12 @@ async function command(commandName, payload, sourceWindow) {
         }
       });
       // Re-sync in the background so the lists, calendars or notes appear or disappear right away.
-      if ('syncTasks' in payload || 'syncCalendar' in payload) sync.sync().catch(() => {});
+      if ('syncTasks' in payload || 'syncCalendar' in payload) sync.sync().catch(() => {}).then(() => history.refreshDue()).catch(() => {});
+      if (flags.syncCalendar === false) history.drop(account.id); // its older events go with its calendars
       if ('syncNotes' in payload) sync.syncNotes().catch(() => {});
       return store.publicState();
     }
-    case 'account:disconnect': return await sync.disconnect(identifier(payload.id));
+    case 'account:disconnect': { const id = identifier(payload.id); const result = await sync.disconnect(id); history.drop(id); return result; }
     // 「지금 동기화」: accounts, then notes (a notes problem shows on the notes, not as a failed sync).
     // The list and calendar look runs beside, never holding the answer (lib/viewsync.cjs).
     case 'sync:run': try { return await sync.sync(); } finally { sync.syncViews().catch(() => {}); await sync.syncNotes().catch(() => {}); }
@@ -1419,8 +1443,11 @@ async function command(commandName, payload, sourceWindow) {
       const win = widgetWindows.get(widget.id);
       if (!win || win !== sourceWindow) throw new Error(tr('이 위젯의 크기만 변경할 수 있습니다.'));
       if (!Number.isFinite(payload.width) || !Number.isFinite(payload.height)) throw new Error(tr('위젯 크기가 올바르지 않습니다.'));
+      // Which sides the drag moves (the corner grip and the arrow keys: the right and bottom ones); the others stay put (lib/desktop.cjs).
+      const edge = payload.edge === undefined ? 'se' : payload.edge;
+      if (!RESIZE_EDGES.includes(edge)) throw new Error(tr('위젯 크기가 올바르지 않습니다.'));
       const current = desktop.getBounds(win, screen);
-      const bounds = clampBounds({ ...current, width: payload.width, height: payload.height }, screen.getAllDisplays(), current, WIDGET_MIN[widget.type]);
+      const bounds = resizedBounds(current, { width: payload.width, height: payload.height, edge }, screen.getAllDisplays(), WIDGET_MIN[widget.type]);
       desktop.setBounds(win, bounds, screen);
       return bounds;
     }
@@ -1469,6 +1496,8 @@ async function command(commandName, payload, sourceWindow) {
     case 'update:open': { const current = updater ? updater.state() : null; await shell.openExternal(payload.all ? (current?.releasesUrl || releasesPage()) : (current?.releaseUrl || releasePage())); return true; }
     case 'external:open': {
       const url = new URL(text(payload.url, tr('주소'), 2048));
+      // Mail to Dayboard's own address (settings 「문의」), nothing else: no other address, no subject or body from the page.
+      if (url.protocol === 'mailto:' && decodeURIComponent(url.pathname) === CONTACT_EMAIL && !url.search && !url.hash) { await shell.openExternal(`mailto:${CONTACT_EMAIL}`); return true; }
       if (url.protocol !== 'https:' || url.username || url.password || /^(localhost|127\.|\[?::1)/i.test(url.hostname)) throw new Error(tr('안전한 HTTPS 웹 주소만 열 수 있습니다.'));
       await shell.openExternal(url.href); return true;
     }
@@ -1699,6 +1728,8 @@ else {
     if (startupError) throw startupError;
     applyLanguage();
     store = createStore(userData);
+    // A move to a connected list that was under way when Dayboard stopped may have gone through: it waits for the user (lib/taskmove.cjs).
+    if ((store.get().taskMoves || []).length) store.mutate(settleMovesAtStart);
     if (smoke) store.mutate(state => { state.settings.tourDone = true; }); // the tour for new users would cover the checks
     applyLanguage();
     // A note deleted on another PC also closes the widgets showing it (their records are already gone).
@@ -1706,6 +1737,8 @@ else {
     sync = createSync({ store, safeStorage, shell, userData, onChange: broadcast,
       beforeNotesApply: () => Promise.all(BrowserWindow.getAllWindows().map(win => flushWindow(win, 'notes'))),
       onNotesRemoved: ({ widgetIds }) => { for (const id of widgetIds) widgetWindows.get(id)?.destroy(); } });
+    // The years of connected calendars before the recent window, in files of their own (lib/calhistory.cjs, 2026-10-30).
+    history = createCalendarHistory({ userData, store, fetchEvents: (accountId, calendarId, range) => sync.historyEvents(accountId, calendarId, range), onChange: broadcast });
     ensureStartMenu();
     ipcMain.handle('dayboard:invoke', (event, name, payload) => {
       if (!trusted(event)) throw new Error(tr('이 화면에서는 앱 데이터에 접근할 수 없습니다.'));
@@ -1755,7 +1788,8 @@ else {
       // Accounts, then notes, every 5 minutes and at start; notes also when Dayboard comes back to the front (at most once a
       // minute), so the other PC's notes are there when the user sits down at this one.
       // The list and calendar look follows each account round, beside the notes (lib/viewsync.cjs).
-      const syncAll = () => { if (store.get().accounts.length) sync.sync().catch(() => {}).then(() => { sync.syncViews().catch(() => {}); return sync.syncNotes(); }).catch(() => {}); };
+      // The older calendar tier follows, once a day per account, in the background (lib/calhistory.cjs).
+      const syncAll = () => { if (store.get().accounts.length) sync.sync().catch(() => {}).then(() => { sync.syncViews().catch(() => {}); history.refreshDue().catch(() => {}); return sync.syncNotes(); }).catch(() => {}); };
       timer = setInterval(syncAll, 5 * 60 * 1000);
       timer.unref();
       syncAll();
@@ -1783,7 +1817,7 @@ else {
 app.on('activate', showMain);
 app.on('window-all-closed', () => { if (!tray) app.quit(); });
 app.on('before-quit', event => {
-  if (quitting) { clearInterval(timer); sync?.dispose(); updater?.dispose(); return; }
+  if (quitting) { clearInterval(timer); sync?.dispose(); history?.dispose(); updater?.dispose(); return; }
   event.preventDefault();
   if (quitInFlight) return;
   quitInFlight = true;

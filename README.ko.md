@@ -89,6 +89,10 @@ Windows x64, Git, Node.js 22.12 이상이 필요해요.
 - 배포 설치 파일에는 Google 로그인 클라이언트가 들어 있어요. 직접 빌드한 앱은 자기 Google Cloud OAuth 클라이언트를 입력하라고 안내해요(`assets/google-oauth.example.json` 참고).
 - 직접 빌드한 앱도 공식 릴리스를 내려받아요. 그대로 쓰려면 설정의 「새 버전 자동 확인」을 끄세요.
 
+## 문의
+
+궁금한 점이나 의견은 nowsummer.apps@gmail.com으로 보내 주세요.
+
 ## 라이선스
 
 [MIT](LICENSE). 글꼴과 서비스 로고는 각자의 라이선스를 따라요([안내](docs/licenses/THIRD-PARTY.txt)). Microsoft·Google·Apple과 관계없는 개인 프로젝트예요.
