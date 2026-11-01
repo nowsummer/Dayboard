@@ -1279,6 +1279,10 @@ async function command(commandName, payload, sourceWindow) {
         if (!['light', 'dark', 'system'].includes(payload.theme)) throw new Error(tr('지원하지 않는 테마입니다.'));
         settings.theme = payload.theme;
       }
+      if ('widgetTheme' in payload) {
+        if (!['app', 'auto', 'light', 'dark'].includes(payload.widgetTheme)) throw new Error(tr('지원하지 않는 테마입니다.'));
+        settings.widgetTheme = payload.widgetTheme;
+      }
       if ('glassLevel' in payload) {
         if (typeof payload.glassLevel !== 'number' || !Number.isFinite(payload.glassLevel) || payload.glassLevel < 0 || payload.glassLevel > 1) throw new Error(tr('유리 효과는 0~1 사이로 설정해 주세요.'));
         settings.glassLevel = Math.round(payload.glassLevel * 100) / 100;

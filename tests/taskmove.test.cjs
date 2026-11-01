@@ -36,6 +36,7 @@ function service() {
     if (u.hostname === 'tasks.googleapis.com') {
       const m = u.pathname.match(/\/lists\/([^/]+)\/tasks(?:\/([^/]+))?$/);
       if (method === 'POST') { const item = { id: id('gt'), list: m[1], title: body.title, notes: body.notes, due: body.due, status: body.status, updated: new Date().toISOString(), ...(u.searchParams.get('parent') ? { parent: u.searchParams.get('parent') } : {}) }; tasks.set(item.id, item); answer = item; }
+      else if (method === 'GET') { answer = tasks.get(m[2]); if (!answer) { const error = new Error('Not found (HTTP 404)'); error.status = 404; throw error; } }
       else if (method === 'PATCH') { const item = tasks.get(m[2]); Object.assign(item, body); answer = item; }
       else if (method === 'DELETE') { tasks.delete(m[2]); answer = {}; }
     } else {
@@ -45,6 +46,7 @@ function service() {
         else if (method === 'DELETE') { checklist.delete(m[3]); answer = {}; }
         else if (method === 'PATCH') { Object.assign(checklist.get(m[3]), body); answer = checklist.get(m[3]); }
       } else if (method === 'POST') { const item = { id: id('mt'), list: m[1], ...body, createdDateTime: new Date().toISOString(), lastModifiedDateTime: new Date().toISOString() }; tasks.set(item.id, item); answer = item; }
+      else if (method === 'GET') { answer = tasks.get(m[2]); if (!answer) { const error = new Error('Not found (HTTP 404)'); error.status = 404; throw error; } }
       else if (method === 'PATCH') { Object.assign(tasks.get(m[2]), body); answer = tasks.get(m[2]); }
     }
     if (how === 'lost') throw new Error('The connection was lost.');
@@ -361,4 +363,129 @@ test('records keep what was sent: their shape is checked (a move recorded before
   const base = { title: 't', notes: '', dueDate: '', important: false, reminderAt: '', rrule: '' };
   const ok = { id: 'a', listId: 'l', accountId: 'c', at: 'd', phase: 'unknown', remoteId: 'r', base, steps: [{ id: 's', remoteId: 'x', title: '하나', completed: true }], unsure: ['u'] };
   assert.deepEqual(M.validMoves([ok, { ...ok, id: 'b', unsure: [1] }, { ...ok, id: 'c', base: 'x' }, { ...ok, id: 'd', steps: [{ id: 's', remoteId: 'x', title: 3 }] }, { id: 'e', listId: 'l', accountId: 'c', at: 'd', phase: 'made', remoteId: 'r', steps: [{ id: 's', remoteId: 'x' }] }]).map(item => item.id), ['a', 'e']);
+});
+
+// 1.2.5 review T01/T02: old on-disk records and a remote-deleted parent. The real store/provider/sync code is exercised.
+for (const list of [GL, ML]) {
+  for (const phase of ['made', 'unknown', 'sending']) test(`T01 ${list.provider}: legacy ${phase} record survives restart and cannot overwrite either side, even on explicit resend`, async t => {
+    const { svc, sync, add, get, store, directory } = setup(t);
+    add({ id: 'legacy', title: '원래 제목', notes: '원래 메모', steps: [{ id: 'a', title: '원래 단계', completed: false }, { id: 'b', title: '남은 단계', completed: false }] });
+    stopAt(svc, list, 1, 'busy');
+    assert.equal((await sync.moveTask('legacy', list.id)).outcome, 'partial');
+    // The actual 1.2.4 schema: ids only, without base/title/completed. Persist, reopen, and settle as at app startup.
+    store.mutate(state => { const r = state.taskMoves[0]; delete r.base; r.phase = phase; r.steps = r.steps.map(({ id, remoteId }) => ({ id, remoteId })); });
+    const reopened = M.settleMovesAtStart(createStore(directory).get());
+    store.mutate(state => { state.taskMoves = reopened.taskMoves; });
+    const record = store.get().taskMoves[0];
+    const parent = parentsAt(svc)[0];
+    if (list.provider === 'google') { parent.notes = '휴대폰 메모'; [...svc.tasks.values()].find(item => item.parent).title = '휴대폰 단계'; }
+    else { parent.body = { contentType: 'text', content: '휴대폰 메모' }; [...svc.checklist.values()][0].displayName = '휴대폰 단계'; }
+    // The original can also change; neither version is silently declared authoritative.
+    store.mutate(state => { state.tasks.find(item => item.id === 'legacy').title = 'PC에서 고친 제목'; });
+    const local = get('legacy'), remote = remoteOf(svc, list), before = svc.calls.length;
+    assert.equal((await sync.moveTask('legacy', list.id)).outcome, 'unknown');
+    assert.equal((await sync.moveTask('legacy', list.id, { resend: true })).outcome, 'unknown');
+    assert.equal(svc.calls.length, before, 'no reads or writes can supply the missing old baseline');
+    assert.deepEqual(get('legacy'), local); assert.deepEqual(remoteOf(svc, list), remote);
+    assert.equal(store.get().taskMoves[0].remoteId, record.remoteId); assert.deepEqual(store.get().taskMoves[0].steps, record.steps);
+    assert.equal(store.publicState().taskMoves[0].review, 'legacy');
+    assert.equal(M.moveSummary([local], list, store.get().taskMoves).waiting.length, 1);
+    // Keeping the local original is explicit; it does not remove the remote task.
+    sync.forgetMove('legacy'); assert.deepEqual(get('legacy'), local); assert.deepEqual(remoteOf(svc, list), remote);
+    assert.deepEqual(store.get().taskMoves, []);
+  });
+
+  test(`T02 ${list.provider}: a no-op resume of a remote-deleted parent keeps the original through the next snapshot and restart`, async t => {
+    const { svc, sync, add, get, store, directory } = setup(t);
+    add({ id: 'gone', title: '남겨야 하는 원본', notes: '내 메모', steps: [{ id: 'a', title: '보낸 단계', completed: false }, { id: 'b', title: '거절된 단계', completed: false }] });
+    stopAt(svc, list, 1, 'busy');
+    assert.equal((await sync.moveTask('gone', list.id)).outcome, 'partial');
+    const record = store.get().taskMoves[0]; svc.tasks.clear(); svc.checklist.clear();
+    store.mutate(state => { state.tasks.find(item => item.id === 'gone').steps.pop(); });
+    const original = get('gone'), before = svc.calls.length;
+    assert.equal((await sync.moveTask('gone', list.id)).outcome, 'unknown');
+    assert.deepEqual(svc.calls.slice(before).map(c => c.line.split(' ')[0]), ['GET'], 'check the known parent, never POST it again');
+    assert.equal(store.get().taskMoves[0].remoteId, record.remoteId);
+    assert.equal(store.publicState().taskMoves[0].review, 'missing');
+    assert.equal((await sync.moveTask('gone', list.id, { resend: true })).outcome, 'unknown');
+    assert.equal(svc.calls.length, before + 1, 'a deleted target is not silently recreated');
+    store.mutate(state => replaceAccountSnapshot(state, list.accountId, { lists: [list], tasks: [], calendars: [], events: [] }, list.provider));
+    assert.deepEqual(get('gone'), original);
+    assert.deepEqual(createStore(directory).get().tasks.find(item => item.id === 'gone'), original);
+  });
+
+  test(`T02 ${list.provider}: a transient target-read failure preserves the exact record, and a later no-op resume succeeds`, async t => {
+    const { svc, sync, add, get, store } = setup(t);
+    add({ id: 'retry-read', title: '잠시 실패', steps: [{ id: 'a', title: '보낸 단계', completed: false }, { id: 'b', title: '안 보낸 단계', completed: false }] });
+    stopAt(svc, list, 1, 'busy');
+    assert.equal((await sync.moveTask('retry-read', list.id)).outcome, 'partial');
+    store.mutate(state => { state.tasks.find(item => item.id === 'retry-read').steps.pop(); });
+    const record = store.get().taskMoves[0], original = get('retry-read'), before = svc.calls.length;
+    svc.fail(/^GET /, 'down');
+    assert.equal((await sync.moveTask('retry-read', list.id)).outcome, 'partial');
+    assert.deepEqual(store.get().taskMoves[0], record); assert.deepEqual(get('retry-read'), original);
+    assert.equal(store.publicState().taskMoves[0].review, undefined);
+    assert.equal((await sync.moveTask('retry-read', list.id)).outcome, 'moved');
+    assert.deepEqual(svc.calls.slice(before).map(c => c.line.split(' ')[0]), ['GET', 'GET']);
+    assert.equal(get('retry-read').listId, list.id);
+  });
+}
+
+for (const list of [GL, ML]) test(`T02 ${list.provider}: an explicit retry with an unreadable parent retains its unknown child and never inserts it`, async t => {
+  const { svc, sync, add, store, get } = setup(t);
+  add({ id: 'unknown-read', title: '확인 안 된 단계', steps: [{ id: 'a', title: '응답이 끊긴 단계', completed: false }] });
+  stopAt(svc, list, 0, 'lost');
+  assert.equal((await sync.moveTask('unknown-read', list.id)).outcome, 'unknown');
+  const record = store.get().taskMoves[0], original = get('unknown-read');
+  for (const failure of ['down', 'refuse']) {
+    const before = svc.calls.length; svc.fail(/^GET /, failure);
+    assert.equal((await sync.moveTask('unknown-read', list.id, { resend: true })).outcome, 'unknown');
+    assert.deepEqual(store.get().taskMoves[0], record, 'do not turn an unknown child into an ordinary retry');
+    assert.deepEqual(get('unknown-read'), original);
+    assert.deepEqual(svc.calls.slice(before).map(c => c.line.split(' ')[0]), ['GET']);
+    assert.equal(store.publicState().taskMoves[0].review, undefined, 'unreadable is not proven deleted');
+  }
+  assert.deepEqual(stepsAt(svc, list), ['응답이 끊긴 단계']);
+});
+
+test('T02 Google: a returned deletion tombstone is not an existing destination', async t => {
+  const { svc, sync, add, get, store } = setup(t);
+  add({ id: 'tombstone', title: '남길 것', steps: [{ id: 'a', title: '단계', completed: false }] });
+  stopAt(svc, GL, 0, 'busy');
+  assert.equal((await sync.moveTask('tombstone', GL.id)).outcome, 'partial');
+  parentsAt(svc)[0].deleted = true;
+  const original = get('tombstone'), before = svc.calls.length;
+  assert.equal((await sync.moveTask('tombstone', GL.id)).outcome, 'unknown');
+  assert.deepEqual(svc.calls.slice(before).map(c => c.line.split(' ')[0]), ['GET']);
+  assert.deepEqual(get('tombstone'), original);
+  assert.equal(store.publicState().taskMoves[0].review, 'missing');
+});
+
+test('T01 a journal with parent baseline but id-only child still requires review', () => {
+  const record = { remoteId: 'r', base: M.sentOf(M.moveCopy({ id: 't', title: '제목' }, GL)), steps: [{ id: 'a', remoteId: 'x' }] };
+  assert.equal(M.moveReview(record), 'legacy');
+  assert.throws(() => M.resumeParts(M.moveCopy({ id: 't', title: '고친 제목' }, GL), record), /이전 버전/);
+});
+
+test('transfer recovery renders no resend for unsafe journals and keeps the existing resend for unknown writes', async () => {
+  const vm = require('node:vm');
+  const source = fs.readFileSync(path.join(__dirname, '../renderer/app.js'), 'utf8');
+  const begin = source.indexOf('function transferWaiting(t){'), end = source.indexOf('\n// The count before a list', begin);
+  assert.ok(begin >= 0 && end > begin);
+  for (const review of ['legacy', 'missing', undefined]) {
+    let content; const calls = []; const record = { id: 't', listId: GL.id, phase: 'unknown', ...(review ? { review } : {}) };
+    const context = {
+      state: { allLists: [GL] }, transferWaitingOf: () => record, transferName: () => 'Google', shortTitle: x => x, tr: x => x,
+      modal: (_title, body) => { content = body; }, closeModal() {},
+      h: (tag, props, ...children) => ({ tag, props, children: children.flat().filter(Boolean) }),
+      btn: (label, onClick, style) => ({ label, onClick, style }),
+      run: async (command, value) => { calls.push({ command, value }); },
+    };
+    vm.runInNewContext(source.slice(begin, end), context);
+    context.transferWaiting({ id: 't', title: '제목' });
+    const buttons = []; const walk = item => { if (item?.label) buttons.push(item); for (const child of item?.children || []) walk(child); }; walk(content);
+    assert.deepEqual(buttons.map(b => b.label), review ? ['이 PC에 두기'] : ['이 PC에 두기', '다시 보내기']);
+    buttons[0].onClick(); await Promise.resolve();
+    assert.equal(calls.length, 1); assert.equal(calls[0].command, 'task:transfer-forget'); assert.equal(calls[0].value.id, 't');
+  }
 });

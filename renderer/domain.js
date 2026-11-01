@@ -396,54 +396,27 @@
     if(previous==='light')return L<0.46?'dark':'light';
     return L<0.5?'dark':'light';
   }
-  // The look of a widget's glass on the wallpaper at a glass level: the tint (its colour and strength in the filter), the text tone
-  // and the blur and saturation. Up to the slider's middle it follows the wallpaper as before (glassTint, the wallpaper's tone —
-  // the text must read on what shows through). From the middle to the opaque end it moves step by step toward the app theme's own
-  // card, white in light mode and dark in dark mode (2026-10-28 user: 「화이트 모드로 … 불투명한걸로 선택했다면 하얗게 나와야」 and
-  // 「투명도 %에 따라서 조금씩 … 특정 구간을 지나면 갑자기 확 투명해지거나 하얗게 되는 게 아니라」): the tint's colour and strength
-  // are blended linearly, so each step lightens or darkens the glass a little. Only the text colour changes at once, where the glass
-  // crosses from dark to light, and the step or two where neither text colour would read (between GLASS_DARK_MAX and
-  // GLASS_LIGHT_MIN, the limits tests/lists.test.cjs holds the glass to) are passed over. `spread` is the wallpaper's luminance
-  // {mean, low, high} (app.js backdropLuminance); null when nothing is painted (the caller then uses the theme). `previous` is the
-  // text tone shown so far: inside the passed-over gap the glass keeps to that tone's edge while it is at most GLASS_HOLD (a share
-  // of the way: about .05 of wallpaper brightness, like glassTone's band) farther than the nearer edge, so a widget moved along the boundary does not flip its text back
-  // and forth (2026-10-28 review; app.js passes it only for the same wallpaper, theme and level — the slider and a new wallpaper get
-  // the nearer edge). Both edges read, so this costs no contrast; a narrow hold keeps a spot looking the same after a restart.
-  const GLASS_SLATE=[0.145,0.153,0.18],GLASS_WHITE=[1,1,1],GLASS_DARK_MAX=0.42,GLASS_LIGHT_MIN=0.48,GLASS_HOLD=0.02,GLASS_INK_LIGHT=1,GLASS_INK_DARK=0.2;
-  function glassLook(level,spread,wall,theme,previous){
-    if(!spread||typeof spread.mean!=='number'||!Number.isFinite(spread.mean)||(wall!=='dark'&&wall!=='light'))return null;
+  // Theme and glass strength are independent (1.2.6). A selected theme never changes halfway along the slider.
+  // Auto follows the wallpaper, including the opaque endpoint; without a wallpaper it follows the app.
+  function widgetTheme(choice,app,wall){
+    if(choice==='light'||choice==='dark')return choice;
+    if(choice==='auto'&&(wall==='light'||wall==='dark'))return wall;
+    return app==='dark'?'dark':'light';
+  }
+  const GLASS_SLATE=[0.145,0.153,0.18],GLASS_WHITE=[1,1,1];
+  function glassLook(level,spread,wall,theme){
+    if(!spread||typeof spread.mean!=='number'||!Number.isFinite(spread.mean))return null;
     const g=typeof level==='number'&&Number.isFinite(level)?Math.min(1,Math.max(0,level)):0.5;
+    const tone=theme==='dark'?'dark':'light',dark=tone==='dark';
     const low=Number.isFinite(spread.low)?spread.low:spread.mean,high=Number.isFinite(spread.high)?spread.high:spread.mean;
-    const luma=c=>0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
-    const over=(L,x)=>L*(1-x.t)+x.t*luma(x.c);
-    const wallAt=x=>{const k=glassTint(x,wall==='dark'?high:low);return wall==='dark'?{t:k.da,c:GLASS_SLATE}:{t:k.a,c:GLASS_WHITE};};
-    const now=glassTint(g,wall==='dark'?high:low);
-    // How strongly the text and accents are drawn (glassInks): 0 on white glass (light) or glass darker than .2 (dark), rising as the
-    // glass nears the change of text colour to 1 at the gap's edge — continuous, so they too change a little per step (2026-10-28
-    // review: an on/off class turned the check circles black and the red month dark in one step). From the first dimming of white
-    // glass, so a yellow check circle or the orange flag is never fainter on the glass than on the app's own card (tests); the dark
-    // ramp starts at .2, not .3, so it spans more than one slider step (re-review: .3 to .42 moved the accents ~2/3 in one step). Every level.
-    const ink=(x,tone)=>{const v=tone==='light'?(GLASS_INK_LIGHT-over(low,x))/(GLASS_INK_LIGHT-GLASS_LIGHT_MIN):(over(high,x)-GLASS_INK_DARK)/(GLASS_DARK_MAX-GLASS_INK_DARK);return +Math.min(1,Math.max(0,v)).toFixed(3);};
-    // The saturation boost (which keeps the wallpaper's colour through the tint) fades over the first third of the way: kept up to
-    // where the text colour changes, a vivid colour under a lightening tint sank the text (tests/lists.test.cjs).
-    const look=(x,tone,w=0)=>{const sat=tone==='dark'?now.dsat:now.sat,k=ink(x,tone);return {tone,t:+x.t.toFixed(4),tint:x.c.map(v=>+v.toFixed(4)),sat:Math.round(sat+(100-sat)*Math.min(1,w*3)),blur:now.blur,solid:now.solid,ink:k,mid:k>0};};
-    if(g<=0.5)return look(wallAt(g),wall);
-    const own=theme==='dark'?'dark':'light';
-    const from=wallAt(0.5),to={t:0.97,c:own==='dark'?GLASS_SLATE:GLASS_WHITE}; // next to the solid card (2026-10-28 review: dark stayed charcoal)
-    // The tint at a share w of the way: strength and premultiplied colour blended, so the glass over any pixel moves in a line.
-    const at=w=>{const t=from.t+(to.t-from.t)*w;const p=[0,1,2].map(i=>from.t*from.c[i]+(to.t*to.c[i]-from.t*from.c[i])*w);return {t,c:t>0?p.map(v=>Math.min(1,Math.max(0,v/t))):GLASS_WHITE};};
-    const reads=x=>({dark:over(high,x)<=GLASS_DARK_MAX+1e-9,light:over(low,x)>=GLASS_LIGHT_MIN-1e-9});
-    let w=(g-0.5)/0.5,x=at(w),r=reads(x);
-    if(!r.dark&&!r.light){
-      // The nearer share where one text colour reads again (the glass over a pixel is a line in w, so each edge is one division).
-      const edge=(L,limit)=>{const a=over(L,at(0)),b=over(L,at(1))-a;if(Math.abs(b)<1e-9)return null;const e=(limit-a)/b;return e>=0&&e<=1?e:null;};
-      const edges=[{tone:'dark',w:edge(high,GLASS_DARK_MAX)},{tone:'light',w:edge(low,GLASS_LIGHT_MIN)}].filter(e=>e.w!==null);
-      const near=edges.sort((p,q)=>Math.abs(p.w-w)-Math.abs(q.w-w))[0],held=edges.find(e=>e.tone===previous);
-      const pick=held&&Math.abs(held.w-w)<=Math.abs(near.w-w)+GLASS_HOLD?held:near;
-      if(pick){w=pick.w;x=at(w);r=reads(x);}
-    }
-    const tone=r.light&&!r.dark?'light':r.dark&&!r.light?'dark':(over(spread.mean,x)>=0.5?'light':'dark');
-    return look(x,tone,w);
+    // Solve the readable clear end once, then interpolate the entire range. Clamping a moving target, or projecting
+    // intermediate light/dark blends onto a contrast boundary, leaves several slider positions visually identical.
+    const clear=glassTint(0,dark?high:low),start=dark?clear.da:clear.a,t=start+(1-start)*g;
+    const tint=dark?GLASS_SLATE:GLASS_WHITE,L=dark?high:low;
+    const brightness=L*(1-t)+t*(0.2126*tint[0]+0.7152*tint[1]+0.0722*tint[2]);
+    const ink=+Math.min(1,Math.max(0,dark?(brightness-0.2)/0.22:(1-brightness)/0.52)).toFixed(4);
+    const sat=(dark?clear.dsat:clear.sat)+(100-(dark?clear.dsat:clear.sat))*g;
+    return {tone,t:+t.toFixed(5),tint,sat:+sat.toFixed(3),blur:+(7+17*g).toFixed(3),solid:g>=0.995,ink,mid:ink>0};
   }
   // The widget text and accents on glass of a tone at an ink strength (glassLook ink): each between its plain colour (glass well
   // inside the tone, styles.css's own values) and its strong one (at the gap's edge: pure black or white text, secondary nearly as
@@ -739,7 +712,7 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,widgetTheme,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

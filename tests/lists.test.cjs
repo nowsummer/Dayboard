@@ -88,10 +88,10 @@ test('glass on the wallpaper follows its brightness, with a little hysteresis (2
   // From the middle to the opaque end the glass moves step by step to the app theme's card (2026-10-28 user: white mode and opaque
   // give a white widget on any wallpaper, and not all at once).
   const navy = { mean: 0.1, low: 0.06, high: 0.16 };
-  assert.equal(D.glassLook(0.5, navy, 'dark', 'light').tone, 'dark', 'the default middle keeps the tone of the wallpaper');
+  assert.equal(D.glassLook(0.5, navy, 'dark', 'light').tone, 'light', 'a light widget stays light, even over dark wallpaper');
   assert.deepEqual([D.glassLook(1, navy, 'dark', 'light').tone, D.glassLook(1, navy, 'dark', 'light').tint], ['light', [1, 1, 1]], 'opaque in light mode: white');
   assert.equal(D.glassLook(1, { mean: 0.9, low: 0.85, high: 0.95 }, 'light', 'dark').tone, 'dark', 'opaque in dark mode: dark, on a light wallpaper too');
-  assert.equal(D.glassLook(0.2, navy, 'dark', 'light').tone, 'dark', 'toward clear: the wallpaper');
+  assert.equal(D.glassLook(0.2, navy, 'dark', 'light').tone, 'light', 'toward clear: the selected theme remains');
   assert.equal(D.glassLook(0.7, null, 'dark', 'light'), null, 'nothing painted: the caller uses the theme');
   // Near the middle the current tone stays until the wallpaper is clearly brighter or darker.
   assert.equal(D.glassTone(0.53, 'dark'), 'dark'); assert.equal(D.glassTone(0.55, 'dark'), 'light');
@@ -144,7 +144,7 @@ function cssColour(value) {
 test('glass text stays readable on the filtered glass over flat and two-tone wallpapers (2026-10-21 review)', () => {
   // The text, secondary text and accents at a tone and ink strength, as app.js applyGlass sets them (domain glassInks).
   // The opaque card of each tone (styles.css --w-solid at the solid end).
-  const solidCard = Object.fromEntries([['light', '.widget-body,.widget-stage'], ['dark', '[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage']]
+  const solidCard = Object.fromEntries([['light', '.widget-body,.widget-stage'], ['dark', '[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]']]
     .map(([tone, selector]) => [tone, cssProp(selector, '--w-solid').match(/^rgba\((\d+),(\d+),(\d+),/).slice(1, 4).map(v => Number(v) / 255)]));
   const inkAt = (tone, k) => {
     const v = D.glassInks(tone, k), mix = name => ({ mix: parseFloat(v[`--w-${name}-mix`]) / 100, with: cssColour(v[`--w-${name}-with`]).rgb });
@@ -161,8 +161,8 @@ test('glass text stays readable on the filtered glass over flat and two-tone wal
     // meet every wallpaper on the opaque side, at every step of the slider.
     for (const theme of ['light', 'dark']) {
       const shade = [], inks = [];
-      for (let step = 0; step <= 20; step++) {
-      const level = step / 20;
+      for (let step = 0; step <= 100; step++) {
+      const level = step / 100;
       const look = D.glassLook(level, { mean, low: Math.min(...Ls), high: Math.max(...Ls) }, D.glassTone(mean, null), theme);
       const dark = look.tone === 'dark';
       shade.push(mean * (1 - look.t) + look.t * (0.2126 * look.tint[0] + 0.7152 * look.tint[1] + 0.0722 * look.tint[2]));
@@ -208,7 +208,7 @@ test('the widget CSS draws the text and accents from the ink variables, its own 
   for (const tone of ['light', 'dark']) {
     const plain = D.glassInks(tone, 0), body = '.widget-body.tone-' + tone;
     const uses = (selector, name, value) => assert.equal(cssProp(selector, name), value, `${selector} ${name}`);
-    uses(tone === 'dark' ? '[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage' : '.widget-body,.widget-stage', '--w-text', plain['--w-text']);
+    uses(tone === 'dark' ? '[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]' : '.widget-body,.widget-stage', '--w-text', plain['--w-text']);
     for (const name of ['--w-red', '--w-secondary', '--w-tertiary']) assert.deepEqual(cssColour(cssProp(body, name)), cssColour(plain[name]), `${body} ${name}`);
     uses(body + '.note-widget .widget-title', 'color', `var(--w-note,${plain['--w-note']})`);
     uses(body + ' .widget-calendar-content .task-dot', 'background', `var(--w-dot,${plain['--w-dot']})`);
@@ -232,46 +232,33 @@ test('the widget CSS draws the text and accents from the ink variables, its own 
   const apply = app.slice(app.indexOf('function applyGlass('), app.indexOf('\n', app.indexOf('function applyGlass(')));
   assert.match(apply, /D\.glassInks\(k\.tone,k\.ink\)/, 'applyGlass sets the ink variables');
   assert.match(apply, /querySelectorAll\('\[data-ink\]'\)/, 'and the list colours drawn as text');
-  // The ink rises with the glass toward the change of text colour and is whole at the gap's edges.
+  // Ink eases back to the theme's normal colours as the glass becomes opaque.
   const navy = { mean: 0.1, low: 0.06, high: 0.16 };
-  assert.equal(D.glassLook(0.5, navy, 'dark', 'light').ink, 0, 'dark glass on navy at the middle: plain');
-  assert.ok(D.glassLook(1, navy, 'dark', 'light').ink < 0.1, 'white at the opaque end: all but plain');
-  const inks = [];
-  for (let step = 10; step <= 19; step++) inks.push(D.glassLook(step / 20, navy, 'dark', 'light').ink);
-  assert.ok(Math.max(...inks) === 1 && inks.some(k => k > 0 && k < 1), `in between it rises and falls: ${inks.join(' ')}`);
+  let ink = 1;
+  for (let step=0;step<=100;step++) {
+    const next=D.glassLook(step/100,navy,'dark','light').ink;
+    assert.ok(next<=ink); ink=next;
+  }
+  assert.equal(ink,0);
 });
 
-test('a widget moved along the boundary keeps its text colour through the passed-over gap (2026-10-28 review)', () => {
-  // Light theme, a wallpaper part that moves from dark navy to mid grey and back in small steps at 65 %: with the tone shown so far
-  // passed in, the text colour changes at most once each way, and wherever the two answers differ both are readable edges.
-  const level = 0.65, path = [];
-  for (let i = 0; i <= 70; i++) path.push(0.03 + i * 0.01);
-  for (let i = 70; i >= 0; i--) path.push(0.03 + i * 0.01);
-  let shown = null, flips = 0, differed = 0;
-  const at = [];
-  for (const L of path) {
-    const spread = { mean: L, low: Math.max(0, L - 0.03), high: L + 0.03 };
-    const look = D.glassLook(level, spread, D.glassTone(L, null), 'light', shown), fresh = D.glassLook(level, spread, D.glassTone(L, null), 'light');
-    if (look.tone !== fresh.tone) {
-      differed++;
-      const over = (v, k) => v * (1 - k.t) + k.t * (0.2126 * k.tint[0] + 0.7152 * k.tint[1] + 0.0722 * k.tint[2]);
-      // (glassLook rounds t and the tint to 4 places)
-      assert.ok(look.tone === 'dark' ? over(spread.high, look) <= 0.42 + 1e-3 : over(spread.low, look) >= 0.48 - 1e-3, `the held ${look.tone} tone reads at ${L}`);
-    }
-    if (shown && look.tone !== shown) { flips++; at.push(L); }
-    shown = look.tone;
+test('fixed widget themes do not flip with wallpaper brightness; auto keeps wallpaper hysteresis', () => {
+  for(const theme of ['light','dark']) for(let n=0;n<=100;n++) {
+    const L=n/100,spread={mean:L,low:Math.max(0,L-.03),high:Math.min(1,L+.03)};
+    assert.equal(D.glassLook(.65,spread,D.glassTone(L),theme).tone,theme);
+    assert.equal(D.widgetTheme('app',theme,D.glassTone(L)),theme);
   }
-  assert.ok(differed > 0, 'the path crosses the gap');
-  assert.equal(flips, 2, 'once over and once back');
-  assert.ok(at[0] > at[1], `it turns light later going up (${at[0]}) than it turns dark going down (${at[1]}): a hold, not a flicker point`);
-  assert.ok(at[0] - at[1] <= 0.1, 'a narrow hold: the same spot looks the same after a restart but for a sliver');
-  assert.equal(D.glassLook(level, { mean: 0.2, low: 0.17, high: 0.23 }, 'dark', 'light', 'nonsense').tone, D.glassLook(level, { mean: 0.2, low: 0.17, high: 0.23 }, 'dark', 'light').tone, 'an unknown previous tone is ignored');
+  assert.equal(D.widgetTheme('auto','light',D.glassTone(.52,'dark')),'dark');
+  assert.equal(D.widgetTheme('auto','dark',D.glassTone(.48,'light')),'light');
+  assert.equal(D.widgetTheme('auto','light',null),'light','no backdrop falls back to app');
+  assert.equal(D.widgetTheme('dark','light','light'),'dark');
+  assert.equal(D.widgetTheme('light','dark','dark'),'light');
 });
 
 test('the gallery previews follow the widgets\' glass curve and widgets redraw when the text tone changes (2026-10-28 review)', () => {
   const glass = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'glass.js'), 'utf8');
   const previews = glass.slice(glass.indexOf('function glassPreviews('), glass.indexOf('function glassStretch('));
-  assert.match(previews, /DayboardDates\.glassLook\(level, \{ mean: L, low: L, high: L \}, theme, theme\)/, 'previews use glassLook on the theme stage');
+  assert.match(previews, /DayboardDates\.glassLook\(level, \{ mean: L, low: L, high: L \}, stage, theme\)/, 'previews use glassLook on the theme stage');
   assert.match(previews, /glassMount\(el, 'preview-' \+ type, level, L, params\)/);
   // On the theme's own stage the preview only grows toward the theme card: no change of tone, no step bigger than the others.
   for (const [theme, L] of [['light', 0.82], ['dark', 0.23]]) {

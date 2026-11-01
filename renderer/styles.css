@@ -70,6 +70,14 @@
    scrolls (260 left it 3px short; Codex re-review of r50 K). CSS only, so a resize never re-renders; it docks from a 900px
    calendar area (calendar.js CAL_PANEL_MIN, a 1144px window) and the drawer below that keeps its 300px. */
 .calendar-view{--cal-fluid:clamp(0px,100vw - 1180px,420px);display:grid;grid-template-columns:minmax(0,1fr) calc(264px + var(--cal-fluid)*36/420);column-gap:calc(20px + var(--cal-fluid)*8/420);overflow:hidden}.calendar-main{display:flex;flex-direction:column;min-height:0}.calendar-main .month-heading{flex-shrink:0}.calendar-grid.large{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr)}.large .calendar-day{min-height:0;overflow:hidden}.day-panel{overflow:auto;border-left:1px solid var(--line);padding-left:calc(20px + var(--cal-fluid)*4/420);display:flex;flex-direction:column;min-height:0}.day-panel .context-heading{margin-top:0;min-height:32px}.day-panel .agenda-sub{font-size:13px;font-weight:650;color:var(--secondary);margin:18px 0 4px}.day-panel .quick-add{margin-top:12px}
+/* A day panel's field is a secondary action: keep its type in scale with the 12–13px agenda,
+   while preserving a comfortable input height and fixed submit target at the narrowest panel. */
+.day-panel .quick-input{font-size:13px;font-weight:400;line-height:1.5}
+.day-panel .quick-main{padding:10px;gap:8px}
+.day-panel .quick-plus{display:flex;flex-shrink:0}
+.day-panel .quick-plus svg{width:18px;height:18px}
+.day-panel .quick-submit{width:26px;height:26px;flex-shrink:0}
+.day-panel .quick-bottom{padding-left:36px}
 /* Day-panel task rows drop the hover-only 「할 일 옵션」 button (2026-10-28 Codex review of r50 K): unseen until hover, it still
    took 35px of every row, so at 1177-1180px work titles broke onto two lines beside blank space (126px for the title; now
    165px, the old 300px panel had 162px). The same menu stays on right-click and the menu key, and a click opens the task,
@@ -144,8 +152,8 @@
    so the card's backdrop-filter blurs the real wallpaper and its corners/shadow are anti-aliased.
    --w-margin 14px and --w-radius 26px must match SURFACE_MARGIN_DIP / SURFACE_RADIUS_DIP in lib/desktop.cjs (tests/widget-shape.test.cjs reads both). */
 .widget-body{--w-margin:14px;--w-radius:26px}
-.widget-body,.widget-stage{--w-text:#1c1d22;--w-secondary:rgba(44,48,60,.74);--w-tertiary:rgba(44,48,60,.62);--w-line:rgba(28,34,48,.09);--w-red:#e8574a;--w-fill:linear-gradient(180deg,rgba(255,255,255,calc(var(--w-a,.6) + .02)),rgba(255,255,255,calc(var(--w-a,.6) - .01)));--w-solid:rgba(250,251,253,var(--glass-alpha,.94));--w-sheen:radial-gradient(130% 70% at 12% -12%,rgba(255,255,255,.42),rgba(255,255,255,0) 58%);--w-shadow:0 4px 10px rgba(16,24,40,.16),0 1px 2px rgba(16,24,40,.1);--w-button:rgba(255,255,255,.62);--w-hover:rgba(255,255,255,.42)}
-[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage{--w-text:#f3f4f7;--w-secondary:rgba(236,238,245,.72);--w-tertiary:rgba(236,238,245,.6);--w-line:rgba(255,255,255,.1);--w-red:#ff6a5c;--w-fill:linear-gradient(180deg,rgba(44,46,54,calc(var(--w-da,.56) + .04)),rgba(30,32,38,calc(var(--w-da,.56) - .04)));--w-solid:rgba(36,39,47,var(--glass-alpha,.94));--w-sheen:radial-gradient(130% 70% at 12% -12%,rgba(255,255,255,.1),rgba(255,255,255,0) 58%);--w-shadow:0 4px 12px rgba(0,0,0,.32),0 1px 2px rgba(0,0,0,.22);--w-button:rgba(255,255,255,.14);--w-hover:rgba(255,255,255,.08)}
+.widget-body,.widget-stage{--w-text:#1c1d22;--w-secondary:rgba(44,48,60,.74);--w-tertiary:rgba(44,48,60,.62);--w-line:rgba(28,34,48,.09);--w-red:#e8574a;--w-fill:linear-gradient(180deg,rgba(255,255,255,calc(var(--w-a,.6) + .02)),rgba(255,255,255,calc(var(--w-a,.6) - .01)));--w-solid:rgba(250,251,253,var(--glass-alpha,.94));--w-opaque:#fafbfd;--w-sheen:radial-gradient(130% 70% at 12% -12%,rgba(255,255,255,.42),rgba(255,255,255,0) 58%);--w-shadow:0 4px 10px rgba(16,24,40,.16),0 1px 2px rgba(16,24,40,.1);--w-button:rgba(255,255,255,.62);--w-hover:rgba(255,255,255,.42)}
+[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]{--w-text:#f3f4f7;--w-secondary:rgba(236,238,245,.72);--w-tertiary:rgba(236,238,245,.6);--w-line:rgba(255,255,255,.1);--w-red:#ff6a5c;--w-fill:linear-gradient(180deg,rgba(44,46,54,calc(var(--w-da,.56) + .04)),rgba(30,32,38,calc(var(--w-da,.56) - .04)));--w-solid:rgba(36,39,47,var(--glass-alpha,.94));--w-opaque:#24272f;--w-sheen:radial-gradient(130% 70% at 12% -12%,rgba(255,255,255,.1),rgba(255,255,255,0) 58%);--w-shadow:0 4px 12px rgba(0,0,0,.32),0 1px 2px rgba(0,0,0,.22);--w-button:rgba(255,255,255,.14);--w-hover:rgba(255,255,255,.08)}
 .widget-body #app{padding:var(--w-margin);height:100%;box-sizing:border-box}
 #backdrop{position:fixed;inset:0;z-index:-1;pointer-events:none}
 .widget-body:not(.has-backdrop) #backdrop{display:none}
@@ -277,7 +285,7 @@
 .preview-note-label{font-size:13px;font-weight:700;color:#a57a06;margin-right:auto;margin-left:8px}
 .preview-note-title{font-size:14px;font-weight:700;margin-top:8px}
 .widget-preview.preview-note p{font-size:12px;line-height:1.7;color:var(--w-secondary);white-space:pre-wrap;max-height:84px;overflow:hidden;margin-top:6px}
-@media(prefers-reduced-transparency:reduce){.widget-body .widget-surface,.widget-body.has-backdrop .widget-surface,.widget-preview{background:var(--bg)!important;backdrop-filter:none}}
+@media(prefers-reduced-transparency:reduce){.widget-body .widget-surface,.widget-body.has-backdrop .widget-surface,.widget-preview{background:var(--w-opaque,var(--bg))!important;backdrop-filter:none}}
 
 /* Sidebar: account section options and the "hidden accounts" row. */
 .section-head{position:relative;display:flex;align-items:center}
@@ -291,7 +299,7 @@
 
 /* ===== Glass strength, list menu (2026-10-20 17:00) ===== */
 .widget-body,.widget-stage{--w-rim-line:inset 0 0 0 1px rgba(255,255,255,.22),inset 0 1px 0 rgba(255,255,255,.45)}
-[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage{--w-rim-line:inset 0 0 0 1px rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.12)}
+[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]{--w-rim-line:inset 0 0 0 1px rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.12)}
 .glass-control{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:14px 18px;margin:0 0 18px;border-radius:14px;background:var(--field)}
 .glass-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
 .glass-copy strong{font-size:14px;font-weight:650;letter-spacing:-.2px}
@@ -341,7 +349,7 @@
 .update-block .text-button{font-size:12px;flex-shrink:0;padding:5px 14px} /* same right edge as the 업데이트 확인 button's text (2026-10-21 user; 14px like the 32px buttons since the 2026-10-26 design review) */
 .update-block .button{flex-shrink:0}
 /* Calendar widget: event dots in the event's (or calendar's) colour, up to 3 per day (renderer/app.js dayDots). */
-.widget-calendar-content .event-dot.colored{background:var(--dot)}
+.event-dot.colored{background:var(--dot)}
 .widget-calendar-content .day-dots{gap:2px}
 /* Widgets: scrollbars only while the pointer is over the card (as the sidebar, and Apple overlay scrollbars). */
 .widget-body ::-webkit-scrollbar-thumb{background:transparent}
@@ -658,10 +666,10 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
    saturation) and draws the specular rim at device pixels (--lg-spec). Without the filter the old CSS tint is the fallback;
    always-on-top widgets (nothing behind them to bend) get the rim only (.lg-rim). */
 .widget-body,.widget-stage{--lg-sheen:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0) 38%);--lg-spec-o:.85;--lg-edge:inset 0 0 0 .5px rgba(255,255,255,.08);--lg-outline:0 0 0 .5px rgba(16,24,40,.08)}
-[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage{--lg-spec-o:.5;--lg-edge:inset 0 0 0 .5px rgba(255,255,255,.08);--lg-sheen:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0) 38%);--lg-outline:0 0 0 .5px rgba(0,0,0,.32)}
+[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]{--lg-spec-o:.5;--lg-edge:inset 0 0 0 .5px rgba(255,255,255,.08);--lg-sheen:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0) 38%);--lg-outline:0 0 0 .5px rgba(0,0,0,.32)}
 .widget-body.has-backdrop .widget-surface.lg,.widget-preview.lg{background:var(--lg-sheen);backdrop-filter:var(--lg-filter);box-shadow:var(--w-shadow),var(--lg-outline)}
 .widget-body .widget-surface.lg::before,.widget-body .widget-surface.lg-rim::before,.widget-preview.lg::before{box-shadow:var(--lg-edge);background:var(--lg-spec) 0 0/100% 100% no-repeat;opacity:var(--lg-spec-o)}
-@media(prefers-reduced-transparency:reduce){.widget-body.has-backdrop .widget-surface.lg,.widget-preview.lg{background:var(--bg)!important;backdrop-filter:none!important}}
+@media(prefers-reduced-transparency:reduce){.widget-body.has-backdrop .widget-surface.lg,.widget-preview.lg{background:var(--w-opaque,var(--bg))!important;backdrop-filter:none!important}}
 /* Gallery stages (2026-10-28 stage review, option 「새벽 풍경」): the three stages are three windows onto ONE light
    landscape — a pale blue sky whitening toward the horizon, a small warm-white light low at the far right, a hazy far ridge
    and slate-blue near hills — instead of three colour-coded pastel stages (user: 「색부터가 너무 촌스러워」). The image is
@@ -979,3 +987,10 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 /* The weekday heading keeps its line while the weeks pass under it (a half-hidden week no longer reads as space under the heading). At
    rest it falls on the first week's own top line. */
 .calendar-grid.large.rolling .month-weekdays{position:relative;z-index:1;box-shadow:0 1px 0 var(--line)}
+
+/* Widget appearance is independent of the app: the selected theme also colours its preview. */
+.widget-appearance{margin-top:18px;display:grid;grid-template-columns:minmax(160px,190px) minmax(0,1fr);gap:16px;align-items:center}
+.widget-appearance>.field{margin:0}.widget-appearance .glass-control{margin:0;min-width:0}
+.widget-stage .preview-note-label{color:var(--w-note,#8a6604)}
+.widget-stage .preview-task i{border-color:color-mix(in srgb,var(--task-color) var(--w-check-mix,65%),var(--w-check-with,#3a3f4a))}
+@media(max-width:1000px){.widget-appearance{grid-template-columns:1fr}.widget-appearance>.field{max-width:240px}}

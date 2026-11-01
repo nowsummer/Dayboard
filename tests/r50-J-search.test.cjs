@@ -131,7 +131,7 @@ test('order and groups stay: upcoming soonest first, past latest first, the olde
   const past = [...hits].filter(e => end(e) < now).sort((a, b) => start(b) - start(a)).slice(0, 100).map(e => e.id);
   assert.deepEqual(rows.filter(r => r[1] === 'up').map(r => r[0]), up, 'upcoming: soonest first');
   assert.deepEqual(rows.filter(r => r[1] === 'past').map(r => r[0]), past, 'past: latest first');
-  assert.equal(up[0], '회의 내일');
+  assert.ok(up.includes('회의 내일'), 'tomorrow remains upcoming; a Monday series at 09:00 can precede tomorrow at 10:00');
   assert.ok(up.some(id => id.startsWith('weekly@')) && up.at(-1) === '회의 3년 뒤', 'the series\' coming weeks, and the one-off three years ahead last');
   // 「n개 더 보기」 reaches the oldest: the five-year-old meeting, then the weekly series' first day (2016).
   const allPast = [...hits].filter(e => end(e) < now).sort((a, b) => start(b) - start(a)).map(e => e.id);

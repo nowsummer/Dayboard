@@ -170,12 +170,18 @@ function glassDropPreviews() {
 // jumped to the solid card at the last step): the stage is the theme's own colour, so the tone never changes there.
 function glassPreviews(gallery, level) {
   const solid = glassSolid(level);
-  const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light', L = theme === 'dark' ? 0.23 : 0.82;
-  const k = DayboardDates.glassLook(level, { mean: L, low: L, high: L }, theme, theme);
+  const stage = appTheme(), theme = widgetThemeNow(stage), L = stage === 'dark' ? 0.23 : 0.82;
+  const k = DayboardDates.glassLook(level, { mean: L, low: L, high: L }, stage, theme);
   const params = k ? { tint: k.tint, t: k.t, sat: k.sat, blur: k.blur } : null;
   gallery.classList.toggle('solid', solid);
   for (const el of gallery.querySelectorAll('.widget-preview')) {
     const type = ['tasks', 'calendar', 'note'].find(t => el.classList.contains('preview-' + t)) || 'tasks';
+    el.parentElement.dataset.widgetTheme = theme;
+    if (k) {
+      for (const [name,value] of Object.entries(DayboardDates.glassInks(k.tone,k.ink))) el.style.setProperty(name,value);
+      el.style.setProperty('--w-a',String(k.t)); el.style.setProperty('--w-da',String(k.t));
+      for (const label of el.querySelectorAll('[data-preview-ink]')) label.style.color=DayboardDates.inkOn(label.dataset.previewInk,k.tone,k.ink);
+    }
     if (solid) { el.classList.remove('lg'); el.style.removeProperty('--lg-filter'); continue; }
     glassMount(el, 'preview-' + type, level, L, params);
   }

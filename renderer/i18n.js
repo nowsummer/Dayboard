@@ -5,6 +5,9 @@
 (function(root){
   'use strict';
   const EN={
+    '위젯 화면 모드':'Widget appearance','앱과 같게':'Match app','바탕화면에 맞춤':'Match wallpaper','화면 모드 · 모든 위젯':'Appearance · All widgets',
+    '계정에서 이전 대상 할 일을 찾지 못했어요. 이 PC의 원본은 남겨 뒀어요. 계정 목록을 확인한 뒤 이 PC에 둘 수 있어요.':'The destination task was not found in the account. Your original is still on this PC. Check the account list, then choose to keep it on this PC.',
+    '이전 버전에서 멈춘 옮기기는 변경 내용을 비교할 수 없어 다시 보내지 않아요. 이 PC의 원본과 계정 목록을 확인한 뒤 이 PC에 둘 수 있어요.':'This move stopped in an earlier version, so its changes cannot be compared safely or resent. Compare your original with the account list, then choose to keep it on this PC.', 
     // ---- Views, sidebar, top bar ----
     '오늘':'Today','예정':'Scheduled','전체':'All','중요':'Flagged','이 PC':'This PC','할 일':'Tasks','달력':'Calendar','메모':'Notes','바탕화면 위젯':'Desktop widgets',
     '화면':'Views','나의 목록':'My Lists','새 그룹':'New group','새 목록':'New list','할 일 목록':'Task lists','검색':'Search','할 일·메모 검색':'Search tasks and notes','할 일·메모 검색 (Ctrl+K)':'Search tasks and notes (Ctrl+K)',

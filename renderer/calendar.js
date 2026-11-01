@@ -24,10 +24,13 @@ const calMode=()=>['month','week','day'].includes(state?.settings?.calendarView)
 const calDays=()=>calMode()==='day'?[selectedDate]:D.weekDays(selectedDate);
 const calMonthKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 const calFieldFocused=()=>{const a=document.activeElement;return Boolean(a&&(['INPUT','TEXTAREA','SELECT'].includes(a.tagName)||a.isContentEditable||a.closest?.('select')));};/* an option of an open drop-down menu is its select (area H: a save that lands while the menu is open does not re-draw the card under it) */
-function calSyncMonth(){const d=D.fromDate(selectedDate);month=new Date(d.getFullYear(),d.getMonth(),1);calTop=null;}
+// A chosen destination owns the rows from this point on. Cancel the old wheel/glide before changing their origin; otherwise its
+// remaining offset would be added to the newly chosen month (date form, search result, widget, or day panel). calShiftWeeks is the
+// animation's internal step and deliberately does not go through this destination reset.
+function calSyncMonth(){calRollReset();const d=D.fromDate(selectedDate);month=new Date(d.getFullYear(),d.getMonth(),1);calTop=null;}
 
 // ---- Views and navigation ----
-function setCalMode(mode,day){if(!['month','week','day'].includes(mode))return;if(!closeCard(true))return;if(day){selectedDate=day;calSyncMonth();}if(mode!=='month'&&calMode()==='month'&&!day){const visible=D.cellsFrom(calStart());if(!visible.some(c=>c.key===selectedDate))selectedDate=visible.find(c=>!c.outside).key;}state.settings.calendarView=mode;render();run('settings:update',{calendarView:mode}).catch(()=>{});}
+function setCalMode(mode,day){if(!['month','week','day'].includes(mode))return;if(!closeCard(true))return;calRollReset();if(day){selectedDate=day;calSyncMonth();}if(mode!=='month'&&calMode()==='month'&&!day){const visible=D.cellsFrom(calStart());if(!visible.some(c=>c.key===selectedDate))selectedDate=visible.find(c=>!c.outside).key;}state.settings.calendarView=mode;render();run('settings:update',{calendarView:mode}).catch(()=>{});}
 function calendarStep(n){const mode=calMode();if(mode==='month'){const base=calRollMonth();const next=new Date(base.getFullYear(),base.getMonth()+n,1);if(calGlideToMonth(next))return;closeCard(true);calRollReset();month=next;calTop=null;render();return;}closeCard(true);calSlide=n;selectedDate=D.dayOffset(selectedDate,(mode==='week'?7:1)*n);calSyncMonth();render();}
 // Month view rows: a rolling run of six weeks that the wheel moves a week at a time; month (the title) follows the rows.
 // 「날짜로 이동」 (Apple Calendar ⌘⇧T): one box read as it is typed — 2027-3-15, 3월 15일, 11/3, 2027년 1월, 다음 주 금요일, Nov 3.
@@ -50,7 +53,7 @@ const calLongDate=key=>D.fromDate(key).toLocaleDateString(I.locale(),{year:'nume
 function calJumpTo(key){selectedDate=key;calSyncMonth();render();}
 function calStart(){const aligned=D.monthStart(month);if(!calTop)return aligned;const focus=D.cellsFrom(calTop).find(c=>!c.outside).key.slice(0,7);return focus===calMonthKey(month)?calTop:aligned;}
 function calShiftWeeks(n){const top=D.dayOffset(calStart(),7*n);const focus=D.cellsFrom(top).find(c=>!c.outside).key;calTop=top;month=new Date(Number(focus.slice(0,4)),Number(focus.slice(5,7))-1,1);return top;}
-function calWeekStep(n){const top=calShiftWeeks(n);closeCard(true);render();return top;}
+function calWeekStep(n){calRollReset();const top=calShiftWeeks(n);closeCard(true);render();return top;}
 function calendarTitle(){const mode=calMode();if(mode==='month')return month.toLocaleDateString(I.locale(),{year:'numeric',month:'long'});if(mode==='day'){const d=D.fromDate(selectedDate);return d.toLocaleDateString(I.locale(),{...(d.getFullYear()===new Date().getFullYear()?{}:{year:'numeric'}),month:'long',day:'numeric',weekday:'short'});}// Week: the month (Notion), or both months when the week crosses into the next one — the top bar stays short.
 const days=D.weekDays(selectedDate),a=D.fromDate(days[0]),b=D.fromDate(days[6]);const fmt={year:'numeric',month:'long'};if(a.getMonth()===b.getMonth())return a.toLocaleDateString(I.locale(),fmt);/* two months: short names (「Sep – Oct 2026」; Korean is short anyway) — the long ones were cut at 900px (2026-10-27 recheck) */const range={year:'numeric',month:'short'};try{return new Intl.DateTimeFormat(I.locale(),range).formatRange(a,b);}catch{return b.toLocaleDateString(I.locale(),range);}}
 function calendarToolbar(){
@@ -126,12 +129,16 @@ let calHistoryFind={asked:'',words:'',events:[],timer:0};
 function calHistoryHits(words){
   const at=calHistoryKey();
   if(!at||!words)return [];
-  if(calHistoryFind.asked!==words+'|'+at){
-    calHistoryFind.asked=words+'|'+at;clearTimeout(calHistoryFind.timer);
-    calHistoryFind.timer=setTimeout(()=>api.invoke('calendar:history-search',{text:words}).then(r=>{if(calHistoryFind.asked!==words+'|'+at)return;calHistoryFind.words=words+'|'+at;calHistoryFind.events=Array.isArray(r?.events)?r.events:[];if(search.trim()===words&&view==='calendar')renderMain();}).catch(()=>{}),180);
+  // The backend caps only the visible scope. Hiding/showing or deleting a calendar must ask that scope again even when its file
+  // did not change. While it answers, an unchanged data revision may keep its still-visible hits (never a newly hidden one).
+  const live=calHistoryLive(),hidden=new Set(state.settings.hiddenCalendars||[]);
+  const base=words+'|'+at,key=base+'|'+JSON.stringify([...live].filter(id=>!hidden.has(id)).sort());
+  if(calHistoryFind.asked!==key){
+    calHistoryFind.asked=key;clearTimeout(calHistoryFind.timer);
+    calHistoryFind.timer=setTimeout(()=>api.invoke('calendar:history-search',{text:words}).then(r=>{if(calHistoryFind.asked!==key||calHistoryKey()!==at)return;calHistoryFind.words=base;calHistoryFind.events=Array.isArray(r?.events)?r.events:[];if(search.trim()===words&&view==='calendar')renderMain();}).catch(()=>{}),180);
   }
-  if(calHistoryFind.words!==words+'|'+at)return [];
-  const live=calHistoryLive();return calHistoryFind.events.filter(e=>live.has(e.calendarId));
+  if(calHistoryFind.words!==base)return [];
+  return calHistoryFind.events.filter(e=>live.has(e.calendarId)&&!hidden.has(e.calendarId));
 }
 // A series' rows: its occurrences in the window, and its first one (D.firstOccurrence, excluded dates skipped) when that one is
 // not already listed — told by its id, not by where the series begins (2026-10-30 Codex review R05: every five years from today

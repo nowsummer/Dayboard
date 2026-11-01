@@ -1764,7 +1764,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await invoke('settings:update', { glassLevel: 1 }); const tinted = await glassOf();
     await invoke('settings:update', { glassLevel: 0.5 });
     const levels = { middle, clear, tinted };
-    expect(middle.blur === '13px' && clear.blur === '7px' && tinted.blur === '24px' && Number(clear.alpha) < Number(middle.alpha) && Number(middle.alpha) < Number(tinted.alpha), `유리 효과 단계 ${JSON.stringify(levels)}`);
+    expect(middle.blur === (middle.backdrop ? '15.5px' : '13px') && clear.blur === '7px' && tinted.blur === '24px' && Number(clear.alpha) < Number(middle.alpha) && Number(middle.alpha) < Number(tinted.alpha), `유리 효과 단계 ${JSON.stringify(levels)}`);
     if (middle.a) expect(Number(clear.a) <= Number(middle.a) && Number(middle.a) <= Number(tinted.a), `유리 색 농도 ${JSON.stringify(levels)}`);
     // Liquid Glass (2026-10-21): with the wallpaper painted behind it the card bends it at the rim (an SVG lens through
     // backdrop-filter) and the slider moves the tint inside that filter; without one only the specular rim is drawn.
@@ -1773,7 +1773,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     // The opaque end (2026-10-26 user): no glass at all — a solid card in the app theme, like the first widgets.
     expect(!tinted.lg && !tinted.filter.includes('#lg-surface') && tinted.solid && tinted.tone === 'light', `불투명 끝 = 유리 없는 카드 ${JSON.stringify(levels)}`);
     // The glass follows the wallpaper (2026-10-21 user choice): dark glass with white text on a dark one, light on a light one.
-    if (middle.backdrop && middle.L !== null) expect(middle.tone === (middle.L < 0.5 ? 'dark' : 'light') && middle.toneClass && clear.tone === middle.tone, `바탕화면 밝기 따라 유리 ${JSON.stringify(levels)}`);
+    if (middle.backdrop) expect(middle.tone === 'light' && middle.toneClass && clear.tone === middle.tone, `기본 유리는 앱 테마 유지 ${JSON.stringify(levels)}`);
     await invoke('settings:update', { glassLevel: 7 }).then(() => { throw new Error('범위 밖 유리 효과가 통과했습니다.'); }, error => expect(/유리 효과는 0~1/.test(error.message), `유리 효과 검증: ${error.message}`));
     const slider = await run(mainWindow, `document.querySelector('.main-nav .nav-item:nth-child(4)').click(); await new Promise(resolve => setTimeout(resolve, 40)); const range = document.querySelector('.glass-control input[type=range]'); return range ? range.value : '';`);
     expect(slider === '0.5', `위젯 화면 유리 효과 슬라이더 ${slider}`);
@@ -1788,6 +1788,34 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     expect(flipped.join() === '불투명,투명' && clearLevel === 0, `유리 효과 슬라이더: 오른쪽이 투명 ${JSON.stringify(flipped)} ${clearLevel}`);
     await shot(mainWindow, 'view-widgets-glass');
     checks.push('widget-glass-level');
+    // Widget theme is a separate preference. OS dark does not override app/light widgets.
+    win.webContents.debugger.attach('1.3');
+    await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
+    for(const appTheme of ['light','dark'])for(const widgetTheme of ['app','light','dark','auto']){
+      await invoke('settings:update',{theme:appTheme,widgetTheme,glassLevel:.5});
+      const got=await glassOf();
+      const want=widgetTheme==='app'?appTheme:widgetTheme==='auto'?(got.backdrop&&got.L!==null?(got.L<.5?'dark':'light'):appTheme):widgetTheme;
+      expect(got.tone===want,`위젯 독립 테마 ${appTheme}/${widgetTheme}: ${got.tone}`);
+    }
+    await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[]});win.webContents.debugger.detach();
+    await invoke('settings:update',{theme:'light',widgetTheme:'app',glassLevel:.5});
+    // All 101 live previews reach the real renderer without committing 101 settings writes.
+    const ramp=[];
+    for(let i=0;i<=100;i++){
+      await invoke('widget:glass-preview',{level:i/100});
+      ramp.push(await run(win,`await new Promise(r=>requestAnimationFrame(r));return {level:glassLevel(),tone:document.documentElement.dataset.theme,t:glassLookNow()?.t,blur:glassLookNow()?.blur};`));
+      if([0,25,50,75,100].includes(i))await shot(win,'polish-glass-'+i);
+    }
+    for(let i=1;i<ramp.length;i++){
+      expect(ramp[i].level===i/100&&ramp[i].tone==='light','유리 미리보기 입력·테마 유지 '+i);
+      if(ramp[i].t!=null)expect(ramp[i].t>ramp[i-1].t&&ramp[i].blur>ramp[i-1].blur,'유리 미리보기 연속 변화 '+i);
+    }
+    expect((await invoke('state:get')).settings.glassLevel===.5,'미리보기는 저장값을 바꾸지 않음');
+    fs.writeFileSync(path.join(output,'glass-live-ramp.json'),JSON.stringify(ramp,null,2));
+    await invoke('settings:update',{glassLevel:.5,widgetTheme:'app'});
+    checks.push('widget-independent-theme','widget-glass-live-101-steps');
+
+
   }
 
   // Calendar widget dots take the colours of the day's events (event colour, else the calendar's), at most 3 per day.
@@ -2975,6 +3003,44 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     && panelKeyed === panelWidest.panel - 16 && panelKeyedNow.panel === panelKeyed && panelStored === panelKeyed
     && !panelReset.sized && panelReset.saved == null && panelResetStored == null && panelReset.panel === panelStart.panel, `달력 패널 끌어서 너비 조절 ${JSON.stringify(panelDrag)}`);
   checks.push('calendar-panel-drag');
+
+  // 1.2.6: the task sidebar's mini calendar uses the same real event colours as the widget.
+  // Exercise persisted events, then reserve one of the three dots for an unfinished task.
+  const polishEvents=[];
+  const polishDay='2030-05-15';
+  for(const [i,color] of ['#ff9500','#34c759','#af52de'].entries()) polishEvents.push(await invoke('event:add',{calendarId:'local-calendar',title:'Calendar colour '+i,start:polishDay+'T09:00:00',end:polishDay+'T10:00:00',color}));
+  await invoke('settings:update',{theme:'light',calendarPanel:'auto',calendarPanelWidth:220});
+  mainWindow.setSize(1180,820);
+  await run(mainWindow,`goto('today');month=new Date(2030,4,1);selectedDate='2030-05-15';render();`);
+  await settle(mainWindow);
+  const miniDots=await run(mainWindow,`return [...document.querySelectorAll('[data-focus-key="day-2030-05-15"] .event-dot')].map(n=>getComputedStyle(n).backgroundColor);`);
+  expect(new Set(miniDots).size===3 && miniDots.includes('rgb(52, 199, 89)'), '작은 달력의 실제 일정 색 '+JSON.stringify(miniDots));
+  await shot(mainWindow,'polish-mini-calendar-colours');
+  const polishTask=await invoke('task:add',{title:'Calendar colour task',dueDate:polishDay});
+  await settle(mainWindow);
+  const withTask=await run(mainWindow,`const day=document.querySelector('[data-focus-key="day-2030-05-15"]');return {events:day.querySelectorAll('.event-dot').length,tasks:day.querySelectorAll('.task-dot').length};`);
+  expect(withTask.events===2&&withTask.tasks===1,'작은 달력 일정·할 일 점 한도');
+  checks.push('mini-calendar-event-colours');
+  await run(mainWindow,`goto('calendar');calRollReset();month=new Date(2030,4,1);calTop='2030-04-28';selectedDate='2030-05-15';render();`);
+  await settle(mainWindow);
+  const polishLayout=await run(mainWindow,`const p=document.querySelector('.day-panel'),i=p.querySelector('.quick-input'),b=p.querySelector('.quick-submit');return {font:getComputedStyle(i).fontSize,input:i.getBoundingClientRect().width,button:b.getBoundingClientRect().width,overflow:p.scrollWidth-p.clientWidth};`);
+  expect(polishLayout.font==='13px'&&polishLayout.input>=90&&polishLayout.button>=25&&polishLayout.overflow<=1,'좁은 날짜 패널 입력 비례 '+JSON.stringify(polishLayout));
+  await shot(mainWindow,'polish-calendar-narrow-panel');
+  await invoke('settings:update',{theme:'dark'});
+  await shot(mainWindow,'polish-calendar-dark');
+  mainWindow.setSize(900,820);
+  await run(mainWindow,`calDrawer=true;render();`);
+  await shot(mainWindow,'polish-calendar-drawer');
+  checks.push('calendar-panel-input-scale');
+  await invoke('task:delete',{id:polishTask.id});
+  for(const e of polishEvents)await invoke('event:delete',{id:e.id});
+  await invoke('settings:update',{theme:'light',calendarPanelWidth:null});
+  mainWindow.setBounds(dragBounds);
+  await run(mainWindow,`calDrawer=false;render();openSettings();`);
+  const settingsCopy=await run(mainWindow,`return document.querySelector('#modal-root').innerText;`);
+  expect(!settingsCopy.includes('끈 계정은 어디에도')&&!settingsCopy.includes('체크하면 다시 보여요'),'설정 중복 도움말 정리');
+  await shot(mainWindow,'polish-settings');
+  await run(mainWindow,`closeModal(true);`);
 
   return checks;
 };

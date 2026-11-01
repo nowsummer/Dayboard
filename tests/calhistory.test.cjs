@@ -157,3 +157,34 @@ test('the providers read a calendar\'s range as their sync does, Google and Outl
   assert.deepEqual(apple.map(e => e.title), ['생일']);
   assert.deepEqual(davAsked.timeRange, range); assert.equal(davAsked.expand, true);
 });
+
+test('hidden calendars do not consume the historical search cap; restoring visibility recalculates the cap',async t=>{
+  const events=Array.from({length:500},(_,i)=>event('hidden-'+i,at(2024,6,1),{calendarId:HOLI.id,title:'회의'}));
+  events.push(event('visible-old',at(2023,6,1),{title:'회의'}));
+  const {store,history}=setup(t,{events});await history.refreshDue();
+  store.mutate(s=>{s.settings.hiddenCalendars=[HOLI.id];});
+  assert.deepEqual(history.search('회의').events.map(e=>e.id),['visible-old']);
+  assert.equal(history.search('회의').total,1);
+  store.mutate(s=>{s.settings.hiddenCalendars=[];});
+  assert.equal(history.search('회의').total,501);assert.equal(history.search('회의').events.length,500);
+  store.mutate(s=>{s.calendars=s.calendars.filter(c=>c.id!==HOLI.id);});
+  assert.deepEqual(history.search('회의').events.map(e=>e.id),['visible-old']);
+});
+
+test('historical colour changes invalidate the renderer revision without fetching five years again',async t=>{
+  const events=[event('series-one',at(2023,6,1),{title:'회의',seriesId:'series-a'})];
+  const {store,history,calls}=setup(t,{events});await history.refreshDue();
+  const count=calls.length,key=CAL.id+':series-a';
+  store.mutate(s=>{s.seriesColors={[key]:'#ff0000'};});
+  const red=store.publicState().calendarHistory;
+  assert.equal(history.query('2023-06-01','2023-06-02')[0].color,'#ff0000');
+  store.mutate(s=>{s.seriesColors[key]='#00ff00';});
+  const green=store.publicState().calendarHistory;
+  assert.equal(green.at,red.at);assert.notEqual(green.rev,red.rev);
+  assert.equal(history.query('2023-06-01','2023-06-02')[0].color,'#00ff00');
+  assert.equal(history.search('회의').events[0].color,'#00ff00');
+  store.mutate(s=>{delete s.seriesColors[key];});
+  assert.notEqual(store.publicState().calendarHistory.rev,green.rev);
+  assert.equal(history.search('회의').events[0].color,undefined);
+  assert.equal(calls.length,count,'presentation changes make no provider request');
+});
