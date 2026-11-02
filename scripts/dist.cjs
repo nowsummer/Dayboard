@@ -24,14 +24,27 @@ const fail = message => { console.error(`설치 파일 만들기 실패: ${messa
 const info = (() => { try { return JSON.parse(fs.readFileSync(path.join(bundle, 'build-info.json'), 'utf8')); } catch { return null; } })();
 if (!info) fail('먼저 npm run package로 앱 번들을 만드세요.');
 if (info.version !== version) fail(`앱 번들(${info.version})과 package.json(${version})의 버전이 다릅니다. npm run package를 다시 실행하세요.`);
+// The build's record of its runtime libraries (2026-11-02 review security-8); a bundle from before 1.2.7 has none and is packaged again.
+for (const key of ['lockfileSha256', 'koffiNodeSha256', 'bundledModulesSha256']) if (!/^[0-9a-f]{64}$/.test(info[key] || '')) fail(`앱 번들의 build-info.json에 ${key}이(가) 없습니다. npm run package를 다시 실행하세요.`);
 for (const file of ['Dayboard.exe', 'resources/app-update.yml', 'resources/app/package.json', 'resources/app/node_modules/electron-updater/package.json']) {
   if (!fs.existsSync(path.join(bundle, file))) fail(`앱 번들에 ${file}이(가) 없습니다.`);
 }
+// The exe that ships is the one npm run package flipped the fuses on and recorded: one swapped into 앱/ afterwards (a stand-in exe was put
+// back by hand once, 1.1.4) would ship with whatever fuses it has (2026-11-02 r60 carry-over S2-3).
+if (sha256(path.join(bundle, 'Dayboard.exe')) !== info.executableSha256) fail('앱 번들의 Dayboard.exe가 npm run package 뒤에 바뀌었습니다. npm run package를 다시 실행하세요.');
 const feed = fs.readFileSync(path.join(bundle, 'resources', 'app-update.yml'), 'utf8');
 const { owner, repo } = manifest.build.publish[0];
 if (!feed.includes(`owner: ${owner}`) || !feed.includes(`repo: ${repo}`) || /token/i.test(feed)) fail('resources/app-update.yml이 업데이트 저장소와 다르거나 토큰을 담고 있습니다.');
 // The download folder must be the one the installer keeps its own copy in, or partial updates never work.
 if (!feed.includes(`updaterCacheDirName: ${manifest.name.toLowerCase()}-updater`)) fail(`resources/app-update.yml의 업데이트 폴더가 설치 프로그램의 ${manifest.name.toLowerCase()}-updater와 다릅니다. npm run package를 다시 실행하세요.`);
+// The bundle's node_modules must still be what npm run package verified against the lockfile (same listing hash as scripts/package.cjs),
+// checked before electron-builder runs, so a changed bundle fails at once and leaves no installer in dist/ (2026-11-02 r60 integration X-9).
+const appDir = path.join(bundle, 'resources', 'app');
+const walk = folder => fs.readdirSync(folder, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(path.join(folder, entry.name)) : [path.join(folder, entry.name)]);
+const modulesDir = path.join(appDir, 'node_modules');
+const modulesHash = () => crypto.createHash('sha256').update(walk(modulesDir).map(file => path.relative(modulesDir, file).split(path.sep).join('/')).sort().map(file => `${file} ${sha256(path.join(modulesDir, file))}\n`).join('')).digest('hex');
+let bundledModulesSha256 = modulesHash();
+if (bundledModulesSha256 !== info.bundledModulesSha256) fail('앱 번들의 node_modules가 npm run package 뒤에 바뀌었습니다. npm run package를 다시 실행하세요.');
 
 // Older installers of other versions are not kept (each is ~100 MB).
 fs.mkdirSync(out, { recursive: true });
@@ -51,11 +64,12 @@ if (!new RegExp(`^version: ${version.replace(/\./g, '\\.')}$`, 'm').test(latest)
 if (!latest.includes(`path: ${installerName}`) || !latest.includes(`sha512: ${sha512(installer)}`)) fail('latest.yml이 설치 파일과 맞지 않습니다.');
 
 // The release script re-checks these hashes, so what is published is what was built and verified here.
-const appDir = path.join(bundle, 'resources', 'app');
-const walk = folder => fs.readdirSync(folder, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(path.join(folder, entry.name)) : [path.join(folder, entry.name)]);
 const appSha256 = Object.fromEntries(['main.cjs', 'preload.cjs', 'package.json', 'lib', 'renderer', 'assets']
   .flatMap(entry => { const full = path.join(appDir, entry); return fs.statSync(full).isDirectory() ? walk(full) : [full]; })
   .map(file => [path.relative(appDir, file).split(path.sep).join('/'), sha256(file)]).sort(([a], [b]) => a.localeCompare(b)));
+// and once more after it: electron-builder reads the prepackaged bundle and must not have changed it either.
+bundledModulesSha256 = modulesHash();
+if (bundledModulesSha256 !== info.bundledModulesSha256) fail('앱 번들의 node_modules가 npm run package 뒤에 바뀌었습니다. npm run package를 다시 실행하세요.');
 const record = {
   version, builtAt: new Date().toISOString(), feed: { owner, repo },
   outputs: {
@@ -63,7 +77,7 @@ const record = {
     blockmap: { file: `${installerName}.blockmap`, sha256: sha256(`${installer}.blockmap`) },
     latest: { file: 'latest.yml', sha256: sha256(path.join(out, 'latest.yml')) },
   },
-  bundle: { executableSha256: info.executableSha256, app: appSha256 },
+  bundle: { executableSha256: info.executableSha256, lockfileSha256: info.lockfileSha256, koffiNodeSha256: info.koffiNodeSha256, bundledModulesSha256, app: appSha256 },
 };
 fs.mkdirSync(path.join(project, 'artifacts'), { recursive: true });
 fs.writeFileSync(path.join(project, 'artifacts', 'package-verification.json'), JSON.stringify(record, null, 2) + '\n');

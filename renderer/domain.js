@@ -75,6 +75,21 @@
     return {top:Math.round(start+(track-length)*at),length,start,track,range,per:track>length?range/(track-length):0};
   }
   const WIDGET_MIN={calendar:{minWidth:300,minHeight:360},tasks:{minWidth:280,minHeight:240},note:{minWidth:280,minHeight:220}};
+  // 글자 크기 (2026-11-02 owner: text size — the main monitor went from Windows 125% to 100%, so everything looks a fifth smaller): three
+  // steps, as macOS Text Size and iOS Dynamic Type, whose +2pt steps from the 17pt body are about +12% and +24%. One per PC for the main
+  // window (settings.textSize, Chromium zoom) and one for every widget (settings.widgetTextSize, CSS zoom on the card's content). Never
+  // below the default: nothing under 12px (owner's rule). One table for main, the store and the renderer.
+  const TEXT_SIZES=Object.freeze({default:1,large:1.125,larger:1.25});
+  const TEXT_SIZE_STEPS=Object.freeze(Object.keys(TEXT_SIZES));
+  // The factor of a stored value (anything else is the default's 1); a step (+1 larger, −1 smaller) from a value, held at the ends.
+  const textScale=size=>typeof size==='string'&&Object.hasOwn(TEXT_SIZES,size)?TEXT_SIZES[size]:1;
+  const textSizeStep=(size,step)=>{const i=Math.max(0,TEXT_SIZE_STEPS.indexOf(size));return TEXT_SIZE_STEPS[Math.min(TEXT_SIZE_STEPS.length-1,Math.max(0,i+Math.sign(step||0)))];};
+  // The size a new widget opens at (main.cjs openWidget).
+  const WIDGET_OPEN={calendar:{width:360,height:440},tasks:{width:360,height:450},note:{width:360,height:330}};
+  // A widget's smallest card at a widget text size (r60-X): WIDGET_MIN grows with the factor, so the smallest card shows at 크게 and 더 크게
+  // what it shows at 기본 (at 더 크게 a 280×240 to-do card had no whole row: its first title took three lines) — never past the size a new
+  // card opens at, so a widget of that size never grows. One rule for main (window minimum, resize, display changes) and the resize grip.
+  function widgetMinimum(type,size){const m=WIDGET_MIN[type]||WIDGET_MIN.note,o=WIDGET_OPEN[type]||WIDGET_OPEN.note,f=textScale(size);return {minWidth:Math.min(o.width,Math.round(m.minWidth*f)),minHeight:Math.min(o.height,Math.round(m.minHeight*f))};}
   const EMOJI_PREFIX=/^((?:\p{Extended_Pictographic}|\p{Regional_Indicator}{2})(?:️|\p{Emoji_Modifier})?(?:‍\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?)*)\s*/u;
   // "🛒 쇼핑" → the emoji becomes the list symbol and the title loses it (Windows To Do habit).
   function splitEmoji(name){const text=String(name||'').trim();const m=text.match(EMOJI_PREFIX);if(!m)return {emoji:'',title:text};const title=text.slice(m[0].length).trim();return title?{emoji:m[1],title}:{emoji:'',title:text};}
@@ -423,9 +438,9 @@
   // strong, accents mixed by inkOn strong, check circles and + nearly monochrome as on Apple's clear widgets), as the CSS variables
   // app.js applyGlass sets on the widget body. tests/lists.test.cjs checks every step of the glass with these.
   const GLASS_INKS={
-    light:{plain:{text:'#1c1d22',second:[44,48,60,0.82],third:[44,48,60,0.7],red:'#c4372b',note:'#8a6604',dot:'#2a5fc4',flag:'#ff9500',check:[65,'#3a3f4a'],plus:[70,'#000000']},
-      strong:{text:'#000000',second:[0,0,0,0.9],third:[0,0,0,0.78],red:'#4e1611',note:'#372902',dot:'#11264e',flag:'#402500',check:[20,'#000000'],plus:[20,'#000000']}},
-    dark:{plain:{text:'#f3f4f7',second:[236,238,245,0.84],third:[236,238,245,0.72],red:'#ff8f84',note:'#f6cf5c',dot:'#9dbdff',flag:'#ff9500',check:[45,'#ffffff'],plus:[45,'#ffffff']},
+    light:{plain:{text:'#1c1d22',second:[44,48,60,0.82],third:[44,48,60,0.7],red:'#ff3b30',note:'#8a6604',dot:'#2a5fc4',flag:'#ff9500',check:[65,'#3a3f4a'],plus:[70,'#000000']},
+      strong:{text:'#000000',second:[0,0,0,0.9],third:[0,0,0,0.78],red:'#a8221a',note:'#372902',dot:'#11264e',flag:'#402500',check:[20,'#000000'],plus:[20,'#000000']}},
+    dark:{plain:{text:'#f3f4f7',second:[236,238,245,0.84],third:[236,238,245,0.72],red:'#ff453a',note:'#f6cf5c',dot:'#9dbdff',flag:'#ff9500',check:[45,'#ffffff'],plus:[45,'#ffffff']},
       strong:{text:'#ffffff',second:[255,255,255,0.92],third:[255,255,255,0.8],red:'#ffe3e0',note:'#fbe7ae',dot:'#dde8ff',flag:'#ffe5bf',check:[35,'#ffffff'],plus:[35,'#ffffff']}}};
   function glassInks(tone,ink){
     const set=GLASS_INKS[tone==='dark'?'dark':'light'],k=Math.min(1,Math.max(0,Number(ink)||0)),p=set.plain,q=set.strong;
@@ -483,10 +498,23 @@
     return quickTime(result,m,hour,minute,today,now);
   }
   const QUICK_WEEK_KO='일월화수목금토';
+  // A period word before the hour decides AM/PM (2026-11-02 review usability-3: 「밤 11시 약 먹기」 fell through to the bare-clock guess
+  // and became 11:00 AM with 「밤」 left in the title). quickClock stays for a bare 「3시」 only (2026-10-26 rule). 「낮 12시」「정오」 are 12:00,
+  // 「새벽/오전 12시」 00:00 of the same day. Beyond the review's table: 「밤 1시」–「밤 5시」 are the small hours (nobody says 밤 for 1–5 PM) and
+  // 「낮 11시」 is 11 AM (낮 reads like quickClock's daytime: 7–11 morning, 1–6 afternoon).
+  const PERIOD_KO={새벽:0,아침:0,오전:0,낮:12,오후:12,저녁:12,밤:12};
+  // A night hour (「밤/저녁 12시」, 「밤 1–5시」, 「자정」, "tonight at 12", midnight) belongs to the given day's night: with a date it is the next
+  // morning (「내일 밤 12시」 = 모레 00:00); with no date quickTime already takes the next one still ahead (typed at 00:30, 「밤 1시」 is in half an
+  // hour). A night hour that does not make a time (「내일 밤 12시 75분」) gives back the untouched result, so the moved date never sticks alone.
+  const quickNight=(result,m,hour,minute,today,now)=>{if(!result.dueDate)return quickTime(result,m,hour,minute,today,now);const r=quickTime({...result,dueDate:dayOffset(result.dueDate,1)},m,hour,minute,today,now);return r.reminderAt?r:result;};
+  // 「다음 달 N일」 / "next month N" is that day of next month (12 → January: the month-day roll of quickMonthDay takes a past January to next
+  // year); 「이번 달 N일」 / "this month N" is this month's day only while it is still ahead — quickMonthDay would roll a past one to next year.
+  const quickNextMonth=(today,da)=>quickMonthDay(today,Number(today.slice(5,7))%12+1,da);
+  const quickThisMonth=(today,da)=>{const key=today.slice(0,8)+pad(da);return key>=today&&dateKey(fromDate(key))===key?key:'';};
   function parseQuickKo(raw,today=dateKey(),now=new Date()){
     const text=String(raw||'').trim();let result={title:text,dueDate:'',reminderAt:''};
-    // A date word may run straight into the time or a digit (「내일오후3시」, 「내일3시」) and M/D is a date too (2026-10-26 usability review).
-    const m=text.match(/(^|\s)((다음|이번|담)\s?주\s?([월화수목금토일])요일|오늘|내일|모레|다음\s?주|담주|([월화수목금토일])요일|(\d{1,2})월\s?(\d{1,2})일|(\d{1,2})\/(\d{1,2}))(?:까지|에는|에|엔)?(?=\s|$|오전|오후|\d)/);
+    // A date word may run straight into the time or a digit (「내일오후3시」, 「내일3시」, 「내일밤11시」) and M/D is a date too (2026-10-26 usability review).
+    const m=text.match(/(^|\s)((다음|이번|담)\s?주\s?([월화수목금토일])요일|오늘|내일|모레|다음\s?주|담주|([월화수목금토일])요일|(\d{1,2})월\s?(\d{1,2})일|(\d{1,2})\/(\d{1,2})|(다음|이번)\s?달\s?(\d{1,2})일)(?:까지|에는|에|엔)?(?=\s|$|새벽|아침|오전|낮|오후|저녁|밤|정오|자정|\d)/);
     if(m&&repeatBefore(text,m))return result;
     if(m){
       const token=m[2].replace(/\s/g,'');let date='';
@@ -498,28 +526,51 @@
       else if(m[5])date=quickNextDay(today,QUICK_WEEK_KO.indexOf(m[5]));
       else if(m[6])date=quickMonthDay(today,Number(m[6]),Number(m[7]));
       else if(m[8])date=quickMonthDay(today,Number(m[8]),Number(m[9]));
+      else if(m[10])date=(m[10]==='다음'?quickNextMonth:quickThisMonth)(today,Number(m[11]));
       if(date)result={title:quickStrip(text,m)||text,dueDate:date,reminderAt:''};
     }
     // 「15시」 is 24-hour; a bare 「3시」 reads like a bare 「3:00」 (quickClock) — the event card accepts both, so quick add does too
-    // (2026-10-26 usability review; 「3시간」 stays a word).
-    const t=result.title.match(/(^|\s)(?:(오전|오후)\s?(\d{1,2})시(?:\s?(반|\d{1,2}분))?|(\d{1,2})시(?:\s?(반|\d{1,2}분))?|([01]?\d|2[0-3]):([0-5]\d))(?:까지|에)?(?=\s|$)/);
+    // (2026-10-26 usability review; 「3시간」 stays a word). A period word (PERIOD_KO, also before H:MM: 「밤 11:30」) or 정오/자정 is part of the
+    // match, so it leaves the title and never reaches quickClock.
+    const t=result.title.match(/(^|\s)(?:(새벽|아침|오전|낮|오후|저녁|밤)\s?(\d{1,2})(?:시(?:\s?(반|\d{1,2}분))?|:([0-5]\d))|(\d{1,2})시(?:\s?(반|\d{1,2}분))?|([01]?\d|2[0-3]):([0-5]\d)|(정오|자정))(?:까지|에)?(?=\s|$)/);
     if(!t||repeatBefore(result.title,t))return result;
     const mins=v=>!v?0:v==='반'?30:parseInt(v,10);
+    if(t[10])return t[10]==='정오'?quickTime(result,t,12,0,today,now):quickNight(result,t,0,0,today,now);
     if(t[2]){
-      const h12=Number(t[3]);if(h12<1||h12>12)return result;
-      return quickTime(result,t,(h12%12)+(t[2]==='오후'?12:0),mins(t[4]),today,now);
+      const h12=Number(t[3]);const minute=t[5]?Number(t[5]):mins(t[4]);
+      // A 24-hour H:MM that agrees with the period word is read as written (「오후 14:00」, 「밤 22:30」, 「밤 0:30」 = that night's 00:30); 1.2.6
+      // read these with the word left in the title, and only a clash (「오전 13:00」, 「저녁 0:30」) stays a word (2026-11-02 r60 carry-over G-1).
+      if(t[5]&&(h12===0||h12>12)){const pm=PERIOD_KO[t[2]]===12;/* the hour must fit the word: 밤 18–23, 저녁 17–23, 낮 13–17 — 「밤 15:30」 was 3:30 PM (2026-11-03 Codex review F2) */const fits=(t[2]!=='밤'||h12>=18)&&(t[2]!=='저녁'||h12>=17)&&(t[2]!=='낮'||h12<=17);if(h12>=13&&h12<=23&&pm&&fits)return quickTime(result,t,h12,minute,today,now);if(h12===0&&t[2]==='밤')return quickNight(result,t,0,minute,today,now);if(h12===0&&!pm)return quickTime(result,t,0,minute,today,now);return result;}
+      if(h12<1||h12>12)return result;
+      if(t[2]==='밤'&&(h12===12||h12<=5)||t[2]==='저녁'&&h12===12)return quickNight(result,t,h12%12,minute,today,now);
+      return quickTime(result,t,t[2]==='낮'&&h12>=7&&h12<=11?h12:(h12%12)+PERIOD_KO[t[2]],minute,today,now);
     }
-    if(t[5]){
-      const hour=Number(t[5]);if(hour>23)return result;
-      return hour>=13||hour===0||/^0/.test(t[5])?quickTime(result,t,hour,mins(t[6]),today,now):quickClock(result,t,t[5],hour,mins(t[6]),today,now);
+    if(t[6]){
+      const hour=Number(t[6]);if(hour>23)return result;
+      return hour>=13||hour===0||/^0/.test(t[6])?quickTime(result,t,hour,mins(t[7]),today,now):quickClock(result,t,t[6],hour,mins(t[7]),today,now);
     }
-    return quickClock(result,t,t[7],Number(t[7]),Number(t[8]),today,now);
+    return quickClock(result,t,t[8],Number(t[8]),Number(t[9]),today,now);
   }
   const QUICK_WEEK_EN=['sun','mon','tue','wed','thu','fri','sat'];
   const QUICK_MONTHS_EN=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
   const QUICK_WD_EN='sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?|sat(?:urday)?';
-  const QUICK_DATE_EN=new RegExp(String.raw`(^|\s)(?:(?:by|on|due)\s+)?((next|this)\s+(${QUICK_WD_EN})|today|tomorrow|next\s?week|(${QUICK_WD_EN})|(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s?(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})\/(\d{1,2}))(?=\s|$)`,'i');
-  // "tomorrow dentist", "next friday report", "due oct 25 wedding", "10/25 trip", "call mom 3pm".
+  const QUICK_DATE_EN=new RegExp(String.raw`(^|\s)(?:(?:by|on|due)\s+)?((next|this)\s+(${QUICK_WD_EN})|today|tomorrow|next\s?week|(${QUICK_WD_EN})|(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s?(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})\/(\d{1,2})|(next|this)\s+month\s+(\d{1,2})(?:st|nd|rd|th)?)(?=\s|$)`,'i');
+  // Period words with a bare hour, before or after it ("tonight at 11", "7 tonight"), mirror PERIOD_KO (2026-11-02 review usability-3):
+  // tonight / this evening / this afternoon / this night are PM, this morning AM; "tonight at 1"–"at 4" and "tonight / this evening at 12" are
+  // night hours (quickNight), "dinner tonight at 5" stays 5 PM. A bare evening / afternoon / morning / night is a time only right before
+  // "at N" ("tomorrow night at 11" like 「내일 밤 11시」): a count next to the noun stays a word ("book 2 night stay", "write 3 morning pages",
+  // "tomorrow morning 3 reports" — the 2026-10-27 rule; fix review G). An am/pm after the hour leaves the period word too ("tonight at 8pm");
+  // one that contradicts it ("tonight at 8am") is a word, like 「밤 15시」. They come first in the alternation so "at 11 tonight" is not read
+  // as the bare "at 11" with "tonight" left in the title.
+  // Groups: 2–5 period+hour(+am/pm), 6–9 hour(+am/pm)+period, 10–12 am/pm, 13–14 HH:MM, 15 noon|midnight, 16 "at N".
+  const QUICK_PERIOD_EN=String.raw`tonight|this\s+(?:evening|afternoon|morning|night)`;
+  // After the hour English most often says "at 7 in the morning", "at 11 at night" — and a date word between them leaves a bare noun
+  // ("at 7 tomorrow morning" → "at 7 morning"): these follow "at N", "N:MM" or "Nam/pm" only, so a count stays a word ("take 2 in the
+  // evening", "book 2 night stay"); before, the bare "at N" guess won and put the reminder in the wrong half of the day with the words left
+  // in the title (2026-11-02 r60 integration cal-1).
+  const QUICK_AFTER_EN=String.raw`(?<=(?:(?:^|\s)at\s+\d{1,2}(?::[0-5]\d)?(?:\s?(?:am|pm))?|\d{1,2}:[0-5]\d(?:\s?(?:am|pm))?|\d{1,2}\s?(?:am|pm))\s+)(?:in\s+the\s+(?:morning|afternoon|evening)|at\s+night|morning|afternoon|evening|night)`;
+  const QUICK_TIME_EN=new RegExp(String.raw`(^|\s)(?:at\s+)?(?:(?:in\s+the\s+)?(${QUICK_PERIOD_EN}|(?:evening|afternoon|morning|night)(?=\s+at\s))\s+(?:at\s+)?(\d{1,2})(?::([0-5]\d))?(?:\s?(am|pm))?|(\d{1,2})(?::([0-5]\d))?(?:\s?(am|pm))?\s+(${QUICK_PERIOD_EN}|${QUICK_AFTER_EN})|(\d{1,2})(?::([0-5]\d))?\s?(am|pm)|([01]?\d|2[0-3]):([0-5]\d)|(noon|midnight)|at\s+(\d{1,2}))(?=\s|$)`,'i');
+  // "tomorrow dentist", "next friday report", "due oct 25 wedding", "10/25 trip", "call mom 3pm", "next month 1 rent".
   function parseQuickEn(raw,today=dateKey(),now=new Date()){
     const text=String(raw||'').trim();let result={title:text,dueDate:'',reminderAt:''};
     const m=text.match(QUICK_DATE_EN);
@@ -533,22 +584,40 @@
       else if(m[5])date=quickNextDay(today,QUICK_WEEK_EN.indexOf(m[5].slice(0,3).toLowerCase()));
       else if(m[6])date=quickMonthDay(today,QUICK_MONTHS_EN.indexOf(m[6].slice(0,3).toLowerCase())+1,Number(m[7]));
       else if(m[8])date=quickMonthDay(today,Number(m[8]),Number(m[9]));
+      else if(m[10])date=(m[10].toLowerCase()==='next'?quickNextMonth:quickThisMonth)(today,Number(m[11]));
       if(date)result={title:quickStrip(text,m)||text,dueDate:date,reminderAt:''};
     }
-    // "at 3" reads like Korean 「3시」 (bare-clock rule), noon/midnight are 12:00/00:00; a bare "3" after a date word stays a word
-    // ("tomorrow 3 reports", 2026-10-27 review).
-    const t=result.title.match(/(^|\s)(?:at\s+)?(?:(\d{1,2})(?::([0-5]\d))?\s?(am|pm)|([01]?\d|2[0-3]):([0-5]\d)|(noon|midnight)|at\s+(\d{1,2}))(?=\s|$)/i);
+    // "at 3" reads like Korean 「3시」 (bare-clock rule), noon is 12:00 and midnight 00:00 of the next day (like 자정); a bare "3" after a
+    // date word stays a word ("tomorrow 3 reports", 2026-10-27 review).
+    const t=result.title.match(QUICK_TIME_EN);
     if(!t||repeatBefore(result.title,t))return result;
-    if(t[4]){
-      const h12=Number(t[2]);if(h12<1||h12>12)return result;
-      return quickTime(result,t,(h12%12)+(t[4].toLowerCase()==='pm'?12:0),t[3]?Number(t[3]):0,today,now);
+    const period=(t[2]||t[9]||'').toLowerCase().replace(/^(?:this|in\s+the|at)\s+/,'');
+    if(period){
+      const h12=Number(t[3]||t[6]);const minute=Number(t[4]||t[7]||0),ampm=(t[5]||t[8]||'').toLowerCase(),clock=Boolean(t[4]||t[7]);
+      // A 24-hour H:MM that agrees with the period word, as in Korean: "tonight at 21:00", "this morning 0:30", "tonight 0:30" = that night's
+      // 00:30 (2026-11-02 r60 carry-over G-1); "this morning 21:00" stays a word.
+      if(clock&&(h12===0||h12>12)){const pm=period!=='morning';if(h12>23||ampm&&(ampm==='pm')!==(h12>=12))return result;/* as in Korean: night 18–23, tonight/evening 17–23, afternoon 13–17 (2026-11-03 Codex review F2) */const fits=(period!=='night'||h12>=18)&&(period!=='tonight'&&period!=='evening'||h12>=17)&&(period!=='afternoon'||h12<=17);if(h12>=13&&pm&&fits)return quickTime(result,t,h12,minute,today,now);if(h12===0&&(period==='tonight'||period==='night'))return quickNight(result,t,0,minute,today,now);if(h12===0&&!pm)return quickTime(result,t,0,minute,today,now);return result;}
+      if(h12<1||h12>12)return result;
+      const night=(period==='tonight'||period==='night')&&(h12===12||h12<=4)||period==='evening'&&h12===12;
+      const hour=night?h12%12:(h12%12)+(period==='morning'?0:12);
+      if(ampm&&(ampm==='pm')!==(hour>=12))return result;
+      // A bare number in the small hours with no at / :MM / am-pm is a count ("buy 2 tonight", "this morning 3 reports" were 02:00 and 03:00
+      // tomorrow); "dinner 7 tonight" and "at 2 tonight" still read (2026-11-02 r60 carry-over G-3). So is a bare 1–5 before an afternoon or
+      // evening ("take 3 this evening", "read 2 this afternoon" were 15:00 and 14:00), and the "at" must stand right before the number — "take 2
+      // at night" holds an "at" too (2026-11-02 r60 integration cal-1).
+      if((hour<=5||h12<=5)&&!clock&&!ampm&&!/(^|\s)at\s+\d/i.test(t[0]))return result;
+      return (night?quickNight:quickTime)(result,t,hour,minute,today,now);
     }
-    if(t[7])return quickTime(result,t,t[7].toLowerCase()==='noon'?12:0,0,today,now);
-    if(t[8]){
-      const hour=Number(t[8]);if(hour>23)return result;
-      return hour>=13||hour===0||/^0/.test(t[8])?quickTime(result,t,hour,0,today,now):quickClock(result,t,t[8],hour,0,today,now);
+    if(t[12]){
+      const h12=Number(t[10]);if(h12<1||h12>12)return result;
+      return quickTime(result,t,(h12%12)+(t[12].toLowerCase()==='pm'?12:0),t[11]?Number(t[11]):0,today,now);
     }
-    return quickClock(result,t,t[5],Number(t[5]),Number(t[6]),today,now);
+    if(t[15])return t[15].toLowerCase()==='noon'?quickTime(result,t,12,0,today,now):quickNight(result,t,0,0,today,now);
+    if(t[16]){
+      const hour=Number(t[16]);if(hour>23)return result;
+      return hour>=13||hour===0||/^0/.test(t[16])?quickTime(result,t,hour,0,today,now):quickClock(result,t,t[16],hour,0,today,now);
+    }
+    return quickClock(result,t,t[13],Number(t[13]),Number(t[14]),today,now);
   }
   // ---- 「날짜로 이동」 (Apple Calendar ⌘⇧T): the whole box is one date. Unlike quick add, a month-day already past stays in
   // this year (going back is the point), and a year and month alone go to its 1st. Words quick add reads (내일, 다음 주 금요일,
@@ -712,7 +781,7 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,widgetTheme,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,widgetTheme,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

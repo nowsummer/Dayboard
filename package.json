@@ -1,7 +1,7 @@
 {
   "name": "dayboard-desktop",
   "productName": "Dayboard",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "A quiet place for your day. Windows tasks, calendar and desktop widgets.",
   "main": "main.cjs",
   "private": true,
@@ -27,8 +27,9 @@
     "tsdav": "2.5.0"
   },
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "@electron/packager": "20.3.0",
-    "electron": "44.9.0",
+    "electron": "44.10.1",
     "electron-builder": "26.15.3"
   },
   "build": {

@@ -18,10 +18,12 @@ const EMOJI = { shop: '🛒', books: '📚', trip: '✈️', work: '💼' };
 const COLOURS = {
   lists: { shop: '#34c759', books: '#ff9500', trip: '#af52de', inbox: '#007aff', work: '#a2845e' },
   // 가족 저녁 식사, which the demo drags in the month view only when the book club is not shown (r50 M), is brown, which no other
-  // event has, not the pink of the trip list. The book club the demo drags is purple, its own among the events.
+  // event has, not the pink of the trip list. The book club the demo drags is purple, its own among the events. The weekly meeting
+  // and the workshop are blue, not indigo #5856d6 (2026-11-02 owner: 「보라색도 아니고 파란색도 아닌 이 색깔은 별로 … 그냥 파랑색이나
+  // 다른 색」); no sample event or list uses indigo.
   events: {
-    weekly: '#5856d6', swim: '#30b0c7', lunch: '#ff9500', review: '#ff3b30', dentist: '#34c759', club: '#af52de', trip: '#30b0c7',
-    family: '#a2845e', demo: '#ff3b30', report: '#ff9500', workshop: '#5856d6', client: '#ff9500', away: '#34c759',
+    weekly: '#007aff', swim: '#30b0c7', lunch: '#ff9500', review: '#ff3b30', dentist: '#34c759', club: '#af52de', trip: '#30b0c7',
+    family: '#a2845e', demo: '#ff3b30', report: '#ff9500', workshop: '#007aff', client: '#ff9500', away: '#34c759',
   },
 };
 

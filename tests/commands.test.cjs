@@ -105,3 +105,27 @@ test('perWidget runs one task at a time per id, lets other ids run alongside, su
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(context.widgetQueues.size, 0, 'idle ids are forgotten');
 });
+
+// external:open opens only the https hosts the page really links to (2026-11-02 review security-7): every https URL the renderer hands
+// to external:open is on main.cjs's ALLOWED_HOSTS, and the list names no host the renderer does not use — a new external link is
+// added in both places (CONTRACT.md).
+test('external:open allows exactly the https hosts renderer/app.js links to, and refuses every other https host', () => {
+  const rendererDir = path.join(__dirname, '..', 'renderer');
+  const urls = new Set(), literals = new Set();
+  for (const file of fs.readdirSync(rendererDir).filter(name => name.endsWith('.js'))) {
+    const text = fs.readFileSync(path.join(rendererDir, file), 'utf8');
+    for (const [, argument] of text.matchAll(/'external:open',\s*\{\s*url:([^}]*)\}/g)) for (const [, url] of argument.matchAll(/'(https:\/\/[^']+)'/g)) urls.add(url);
+    for (const [, url] of text.matchAll(/'(https:\/\/[^']+)'/g)) literals.add(url);
+  }
+  assert.ok(urls.size >= 5, `the renderer links to the account pages (${urls.size})`);
+  assert.deepEqual([...literals].sort(), [...urls].sort(), 'every https literal in the renderer is one handed to external:open (nothing reaches it another way)');
+  const handler = between("    case 'external:open': {", "    case 'backup:export': {");
+  const list = handler.match(/const ALLOWED_HOSTS = new Set\(\[([^\]]*)\]\);/);
+  assert.ok(list, 'main.cjs external:open names its hosts as ALLOWED_HOSTS');
+  const allowed = [...list[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
+  const used = [...new Set([...urls].map(url => new URL(url).hostname))].sort();
+  assert.deepEqual([...allowed].sort(), used, 'the list is exactly the hosts the renderer uses');
+  assert.ok(handler.includes("url.protocol !== 'https:'") && handler.includes('!ALLOWED_HOSTS.has(url.hostname)') && handler.includes("tr('안전한 HTTPS 웹 주소만 열 수 있습니다.')"), 'any other https host is refused with the existing message');
+  assert.ok(handler.indexOf('!ALLOWED_HOSTS.has(url.hostname)') < handler.indexOf('await shell.openExternal(url.href)'), 'checked before anything opens');
+  assert.ok(handler.includes("decodeURIComponent(url.pathname) === CONTACT_EMAIL"), 'the contact mailto branch stays');
+});

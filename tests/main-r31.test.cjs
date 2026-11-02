@@ -128,10 +128,11 @@ test('S5: a failed add stops the move with the count so far, and the events befo
 test('S9: the smallest widget sizes are one table in renderer/domain.js, read by main and by the widget\'s resize handle', () => {
   assert.deepEqual(D.WIDGET_MIN, { calendar: { minWidth: 300, minHeight: 360 }, tasks: { minWidth: 280, minHeight: 240 }, note: { minWidth: 280, minHeight: 220 } });
   assert.equal(/\nconst WIDGET_MIN\b/.test(source), false, 'main.cjs defines no table of its own');
-  assert.match(source, /const \{[^}]*\bWIDGET_MIN\b[^}]*\} = require\('\.\/renderer\/domain\.js'\);/, 'main.cjs takes it from domain.js');
-  assert.ok((source.match(/WIDGET_MIN\[widget\.type\]/g) || []).length >= 3, 'main still clamps with it (openWidget, rehomeWidgets, widget:resize)');
+  // r60-X (2026-11-02 owner: text size): main reads it through domain's widgetMinimum, WIDGET_MIN at the widgets' text size
+  assert.match(source, /const \{[^}]*\bwidgetMinimum\b[^}]*\} = require\('\.\/renderer\/domain\.js'\);/, 'main.cjs takes it from domain.js');
+  assert.ok((source.match(/widgetMinimum\(widget\.type, store\.get\(\)\.settings\.widgetTextSize\)/g) || []).length >= 4, 'main still clamps with it (openWidget, rehomeWidgets, widget:resize, a text size change)');
   assert.equal(/\nconst WIDGET_MIN=/.test(appSource), false, 'app.js defines no table of its own');
-  assert.ok(appSource.includes('D.WIDGET_MIN[widgetType]||D.WIDGET_MIN.note'), 'app.js reads domain\'s table (note sizes as the fallback, as main)');
+  assert.ok(appSource.includes('D.widgetMinimum(widgetType,state?.settings?.widgetTextSize)'), 'app.js reads domain\'s table through the same rule as main (note sizes as the fallback)');
   assert.equal(appSource.includes('must match'), false, 'no "must match" contract comment is left');
 });
 

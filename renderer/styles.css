@@ -1,11 +1,11 @@
 @font-face{font-family:'Pretendard';font-style:normal;font-weight:100 900;font-display:swap;src:url('./fonts/PretendardVariable.woff2') format('woff2')}
 :root{font-family:'Pretendard','Segoe UI Variable Text','Segoe UI','Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#242731;font-size:14px;line-height:1.5;font-synthesis:none;font-optical-sizing:auto;--bg:#fff;--side:rgba(239,241,246,.88);--text:#242731;--muted:#8a8d97;--secondary:#686d78;--line:rgba(30,36,50,.07);--blue:#3478f6;--hover:rgba(45,65,110,.055);--field:#f2f3f7;--glass:rgba(255,255,255,.94);--note:#fff9e7;color-scheme:light}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}body{background:var(--bg);color:var(--text);word-break:keep-all}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}button:disabled{cursor:wait;opacity:.55}button{border:0;background:none;padding:0;text-align:left;-webkit-app-region:no-drag}input,textarea,select{-webkit-app-region:no-drag}button:active{transform:scale(.98)}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #77a7ff;outline-offset:3px}button,textarea,input{-webkit-tap-highlight-color:transparent}button svg{flex-shrink:0}h1,h2,h3,h4,p{margin:0}h1{font-size:30px;letter-spacing:-1px;line-height:1.25;font-weight:730}h2{font-size:20px;letter-spacing:-.5px}h3{font-size:14px;font-weight:650}small{font-size:12px}svg{vertical-align:middle;flex-shrink:0}#app{height:100%}.loading{display:grid;place-items:center;height:100%;font-size:30px;color:var(--blue)}
-:root{--topbar:52px;--gutter:32px;--content-top:16px;--content-bottom:24px}.topbar{height:var(--topbar);display:flex;align-items:stretch;-webkit-app-region:drag;background:linear-gradient(90deg,var(--side) 0 244px,var(--bg) 244px);user-select:none;flex-shrink:0}.topbar-brand{width:244px;flex-shrink:0;display:flex;align-items:center;gap:9px;padding:0 22px;box-shadow:inset -1px 0 var(--line);font-size:17px;font-weight:650;letter-spacing:-.5px;color:var(--text)}.topbar-brand img{border-radius:7px}.topbar-main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 12px 0 var(--gutter)}.topbar-main h1{font-size:19px;letter-spacing:-.5px;line-height:1.2;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:2px}.topbar-spacer{flex:1}.topbar .button{min-height:32px;padding:6px 13px;font-size:13px}.topbar-main .icon-button{width:32px;height:32px}.month-nav{gap:0}.window-actions{height:100%;display:flex;align-items:center;flex-shrink:0}.window-actions .icon-button{height:var(--topbar);width:46px;border-radius:0}.window-actions svg{width:16px;height:16px;stroke-width:1.5}.window-actions .window-close:hover{background:#e5484d;color:white}
+:root{--topbar:52px;--gutter:32px;--content-top:16px;--content-bottom:24px}.topbar{height:var(--topbar);display:flex;align-items:stretch;-webkit-app-region:drag;background:linear-gradient(90deg,var(--side) 0 244px,var(--bg) 244px);user-select:none;flex-shrink:0}.topbar-brand{width:244px;flex-shrink:0;display:flex;align-items:center;gap:9px;padding:0 22px 0 26px;box-shadow:inset -1px 0 var(--line);font-size:17px;font-weight:650;letter-spacing:-.5px;color:var(--text)}.topbar-brand img{border-radius:7px}.topbar-main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 12px 0 var(--gutter)}.topbar-main h1{font-size:19px;letter-spacing:-.5px;line-height:1.2;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:2px}.topbar-spacer{flex:1}.topbar .button{min-height:32px;padding:6px 13px;font-size:13px}.topbar-main .icon-button{width:32px;height:32px}.month-nav{gap:0}.window-actions{height:100%;display:flex;align-items:center;flex-shrink:0}.window-actions .icon-button{height:var(--topbar);width:46px;border-radius:0}.window-actions svg{width:16px;height:16px;stroke-width:1.5}.window-actions .window-close:hover{background:#e5484d;color:white}
 .app-layout{display:flex;height:calc(100% - var(--topbar));overflow:hidden}.sidebar{width:244px;flex-shrink:0;background:var(--side);backdrop-filter:blur(40px) saturate(140%);padding:var(--content-top) 16px 12px;display:flex;flex-direction:column;user-select:none;border-right:1px solid var(--line)}.brand{display:flex;gap:10px;align-items:center;margin:0 8px 25px;font-size:23px;letter-spacing:-1px;font-weight:650}.brand img{border-radius:10px}.search{display:flex;align-items:center;gap:7px;background:rgba(130,140,160,.09);border:1px solid rgba(100,110,130,.05);border-radius:9px;padding:7px 9px;color:var(--muted)}.search input{background:none;border:0;width:100%;min-width:0;font-size:13px}.search input:focus-visible{outline:none}.search:focus-within{background:var(--bg);border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 18%,transparent)}.smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:22px 0}.smart-tile{background:rgba(255,255,255,.84);padding:12px 13px 11px;border-radius:13px;box-shadow:0 1px 2px rgba(20,30,60,.025);color:var(--secondary);font-size:12px;font-weight:600;transition:background .12s}.smart-tile:hover{background:#fff}.smart-tile.selected{background:var(--accent);color:#fff;box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 20%,transparent)}.tile-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.tile-top strong{font-size:26px;font-weight:700;line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums;color:var(--text)}.selected .tile-top strong{color:#fff}.tile-icon{display:grid;place-items:center;width:28px;height:28px;background:var(--accent);color:#fff;border-radius:50%}.smart-tile.selected .tile-icon{background:rgba(255,255,255,.22)}.main-nav{display:flex;flex-direction:column;gap:3px}.nav-item{display:flex;gap:11px;align-items:center;padding:10px 12px;border-radius:8px;color:var(--secondary);font-size:13px}.nav-item:hover,.list-nav:hover{background:var(--hover)}.nav-item.selected,.list-nav.selected{background:rgba(115,130,155,.12);color:var(--text)}.sidebar-section-head{display:flex;align-items:center;justify-content:space-between;margin:23px 10px 5px;font-size:12px;font-weight:600;color:var(--muted)}.lists-nav{flex:1;overflow:auto;min-height:30px;display:flex;flex-direction:column;gap:3px}.list-nav{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;min-height:44px}.list-dot{width:27px;height:27px;color:#fff;display:grid;place-items:center;border-radius:50%;flex-shrink:0}.list-name{font-size:12px;flex:1;min-width:0;overflow-wrap:anywhere}.list-name small{display:block;font-size:12px;color:var(--muted);margin-top:1px}.list-count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}.sidebar-footer{padding-top:10px}.account-button{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;padding:7px 9px;border-radius:9px;border:0;color:var(--secondary);font-size:12px;font-weight:500;background:transparent;text-align:left}.account-button .status-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.account-button small{color:var(--muted);font-size:12px;white-space:nowrap}.status-dot{width:8px;height:8px;border-radius:50%;background:#b8bfca;flex-shrink:0;box-shadow:0 0 0 2px rgba(184,191,202,.28)}.account-button.ok .status-dot{background:#34c759;box-shadow:0 0 0 2px rgba(52,199,89,.22)}.account-button.busy .status-dot{background:#007aff;box-shadow:0 0 0 2px rgba(0,122,255,.22);animation:pulse 1.1s ease-in-out infinite}.account-button.error .status-dot{background:#ff3b30;box-shadow:0 0 0 2px rgba(255,59,48,.22)}.account-button.error{color:#de5960}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}.account-button:hover{background:var(--hover);color:var(--text)}.sidebar-bottom{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0}.sidebar-bottom .icon-button{color:var(--muted)}
 .main-content{flex:1;min-width:0;overflow:hidden;position:relative}.tasks-view{height:100%;display:flex;flex-direction:column}.content-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}.eyebrow{font-size:12px;color:var(--muted);margin-bottom:4px}.heading-count{font-size:38px;line-height:1;font-weight:300;letter-spacing:-2px;font-variant-numeric:tabular-nums}.task-toolbar{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}.inline-actions{display:flex;align-items:center;gap:5px}.icon-button{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;color:var(--secondary);flex-shrink:0}.icon-button:hover{background:var(--hover)}.button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:600;line-height:1.5;min-height:36px;background:var(--field);white-space:nowrap}.button.primary{background:var(--blue);color:white;box-shadow:0 2px 4px rgba(52,120,246,.1)}.button.primary:hover{background:#2469e7}.button.subtle{background:var(--field);color:var(--secondary)}.button.danger{background:#e64d52;color:#fff}.button.danger-quiet{color:#df4d53;background:transparent}.text-button{color:var(--blue);font-size:12px;display:inline-flex;gap:5px;align-items:center;padding:5px 6px;border-radius:5px}.text-button:hover{background:var(--hover)}.task-scroll{overflow:auto;flex:1;min-height:0;margin:0 -9px;padding:0 9px}.task-list{padding-top:4px}.task-row{position:relative;display:flex;align-items:flex-start;gap:12px;min-height:74px;padding:19px 1px 14px;border-bottom:1px solid var(--line)}.task-check{margin-top:3px;width:21px;height:21px;border:1.5px solid #c8ccd3;border-radius:50%;flex-shrink:0;display:grid;place-items:center;transition:background .12s,border-color .12s}.task-check:hover{border-color:var(--task-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--task-color) 10%,transparent)}.completed .task-check{border-color:var(--task-color);background:var(--task-color);color:#fff}.task-text{min-width:0;flex:1;line-height:1.5;padding:0 0 3px}.task-title{font-size:14px;display:block;overflow-wrap:anywhere}.task-meta{display:flex;align-items:center;gap:9px;margin-top:4px;font-size:12px;color:var(--muted);min-height:14px}.task-meta .overdue{color:#de5c62}.list-label{display:flex;align-items:center;gap:4px}.list-label i{width:4px;height:4px;border-radius:50%}.task-flag{color:#efa325;padding-top:3px}.row-more{opacity:0;width:23px;height:24px}.task-row:hover .row-more,.task-row:focus-within .row-more{opacity:1}.completed .task-title{text-decoration:line-through;color:var(--muted)}.completed-section{padding:24px 0 15px}.completed-section h3{font-size:12px;color:var(--muted)}.quick-add{margin-top:22px;border:1px solid var(--line);border-radius:13px;background:linear-gradient(125deg,var(--bg),var(--field));flex-shrink:0;box-shadow:0 3px 8px rgba(30,40,70,.015);overflow:hidden}.quick-main{display:flex;align-items:center;gap:9px;padding:12px 13px}.quick-plus{color:var(--blue)}.quick-input{flex:1;min-width:0;border:0;background:none;font-size:14px;padding:3px 0}.quick-submit{width:27px;height:27px;background:var(--blue);color:#fff;border-radius:50%;display:grid;place-items:center;opacity:.9}.quick-bottom{display:flex;justify-content:space-between;align-items:center;padding:0 14px 11px 41px;font-size:12px;color:var(--muted)}.quick-bottom[hidden]{display:none}.quick-list{max-width:60%;font-size:12px;border:0;background:transparent;color:var(--secondary)}.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;min-height:280px;padding:38px 20px;height:100%}.empty-symbol{color:#a9bad4;background:linear-gradient(140deg,#f0f5fd,#fafcff);border:1px solid #eaf0fa;width:76px;height:76px;border-radius:24px;display:grid;place-items:center;margin-bottom:8px}.empty-state h2{font-size:19px;letter-spacing:-.6px;font-weight:600}.empty-state p{font-size:12px;color:var(--muted);max-width:280px;line-height:1.8}.empty-state .button{margin-top:8px}
-.context-pane{width:272px;flex-shrink:0;padding:var(--content-top) 22px 18px;border-left:1px solid var(--line);background:linear-gradient(170deg,#fafbfe,#fff);display:flex;flex-direction:column;overflow:auto}.month-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;gap:10px}.month-heading h3{font-size:13px;letter-spacing:-.3px}.month-heading .icon-button{width:22px;height:22px}.month-heading svg{width:14px;height:14px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.weekday{text-align:center;font-size:12px;color:var(--muted);padding-bottom:8px;font-weight:500}.sunday{color:#ce767f}.calendar-day{display:flex;flex-direction:column;align-items:center;border-radius:8px;min-height:29px;font-variant-numeric:tabular-nums;position:relative}.day-number{width:25px;height:25px;display:grid;place-items:center;font-size:12px;border-radius:50%}.outside .day-number{opacity:.28}.calendar-day:hover{background:var(--hover)}.is-today .day-number{background:var(--blue);color:white;font-weight:600}.is-selected:not(.is-today) .day-number{background:var(--hover);outline:1px solid var(--line)}.day-dots{display:flex;gap:2px;height:4px;align-items:center}.day-dots i{width:3px;height:3px;border-radius:50%}.event-dot{background:#efa62f}.task-dot{background:var(--blue)}.context-heading{display:flex;align-items:center;justify-content:space-between;margin-top:25px;margin-bottom:7px}.context-heading h3{font-size:12px;display:flex;gap:6px;align-items:center}.agenda{display:flex;flex-direction:column;gap:13px;padding:7px 0}.event-row{display:flex;gap:10px;width:100%;padding:1px 0}.event-line{width:3px;border-radius:4px;flex-shrink:0}.event-row div{min-width:0}.event-row strong{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}.event-row span:not(.event-line){display:block;color:var(--secondary);font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums}.event-row small{display:block;font-size:12px;margin-top:3px;color:var(--muted)}.no-events{font-size:12px;color:var(--muted);padding:7px 0}.context-note{margin-top:26px;padding:16px 17px 14px;border-radius:14px;background:#fffaf0;border:1px solid rgba(217,183,100,.13)}.context-note .context-heading{margin:0 0 10px;color:#9b803f}.context-note p{white-space:pre-wrap;font-size:12px;line-height:1.9;color:#797462;max-height:130px;overflow:hidden}.context-note>span{display:block;font-size:12px;color:#b6aa8b;margin-top:17px}.context-foot{margin-top:auto;padding-top:30px;display:flex;gap:6px;justify-content:center;align-items:center;font-size:12px;color:#b3b5bb}
-.calendar-view,.notes-view,.widgets-view{height:100%;overflow:auto}.calendar-view>.month-heading{padding:4px 0 12px;margin-bottom:0}.calendar-view>.month-heading h3{font-size:20px}.calendar-view>.month-heading .icon-button{width:30px;height:30px}.calendar-grid.large{gap:0;border-bottom:1px solid var(--line)}.large .weekday{padding:10px 0}.large .calendar-day{align-items:stretch;min-height:80px;border-top:1px solid var(--line);border-radius:0;padding:7px 5px}.large .day-number{align-self:center;width:27px;height:27px;font-size:12px}.large .is-selected{background:rgba(52,120,246,.035)}.large .day-items{display:flex;flex-direction:column;gap:2px;margin-top:5px}.day-event{background:#fff3d8;color:#a57728;font-size:12px;border-radius:3px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.day-tasks{font-size:12px;color:var(--blue);text-align:center}.calendar-bottom{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding-top:25px}.calendar-bottom h3{font-size:12px;margin-bottom:8px}.calendar-bottom .task-row{padding:10px 0;min-height:50px}.calendar-bottom .task-title{font-size:13px}.calendar-bottom .task-check{width:17px;height:17px}.calendar-bottom .task-meta{font-size:12px}.notes-view{display:flex;flex-direction:column;overflow:hidden}.notes-layout{display:flex;gap:24px;min-height:0;flex:1}.note-cards{width:210px;flex-shrink:0;overflow:auto;display:flex;flex-direction:column;gap:10px}.note-card{padding:16px 17px;background:var(--field);border:1px solid transparent;border-radius:12px;min-height:126px;flex-shrink:0}.note-card.selected{background:#fff8e1;border-color:#f1dda3}.note-card strong{font-size:13px;display:block}.note-card p{font-size:12px;color:var(--secondary);line-height:1.8;margin-top:7px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.note-card>span{font-size:12px;color:var(--muted);display:block;margin-top:10px}.note-editor{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;padding:23px;background:var(--note);border-radius:15px;border:1px solid rgba(200,164,60,.12)}.note-title-input{font-size:22px;font-weight:650;letter-spacing:-.6px;background:none;border:0;padding:4px 0 18px;min-width:0;width:100%}.note-body{background:none;border:0;resize:none;flex:1;width:100%;min-height:100px;font-size:14px;line-height:1.9;padding:0;white-space:pre-wrap;color:var(--secondary);word-break:normal}.note-footer{display:flex;justify-content:space-between;align-items:center;padding-top:12px;font-size:12px;color:var(--muted)}.view-description{font-size:13px;color:var(--secondary);line-height:1.8}.widget-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:30px}.widget-stage{height:230px;border-radius:20px;background:linear-gradient(155deg,#e0eaf5,#d1dde9 40%,#ebdee2);padding:22px 17px;display:flex;align-items:center;justify-content:center}.widget-gallery-item:nth-child(2) .widget-stage{background:linear-gradient(150deg,#dfe9e4,#cddedd,#e2e4e9)}.widget-gallery-item:nth-child(3) .widget-stage{background:linear-gradient(160deg,#efe7de,#e6d8cf,#e5dfe6)}.widget-preview{width:100%;background:rgba(255,255,255,.77);box-shadow:0 8px 20px rgba(60,75,110,.1),inset 0 1px 0 white;border:1px solid rgba(255,255,255,.8);border-radius:18px;padding:18px 15px;min-height:166px;backdrop-filter:blur(15px);color:#343944}.preview-widget-title{font-size:14px;font-weight:650;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;color:#3478f6}.preview-widget-title strong{font-size:24px;font-weight:400}.preview-task{display:flex;gap:7px;align-items:center;margin-top:12px;font-size:12px}.preview-task i{width:13px;height:13px;border:1px solid #b3bdca;border-radius:50%;flex-shrink:0}.preview-task span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.preview-calendar .preview-widget-title{color:#df6657;margin-bottom:13px}.mini-preview-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px 3px;text-align:center;font-size:12px}.mini-preview-calendar span{border-radius:50%;line-height:18px}.mini-preview-calendar .active{background:#e96b5a;color:#fff}.preview-note{background:rgba(255,250,227,.85)}.preview-note .preview-widget-title{color:#967b37}.preview-note p{font-size:12px;white-space:pre-wrap;line-height:1.9;max-height:88px;overflow:hidden}.preview-note-rule{height:1px;background:#dacfaa;display:block;margin-top:16px;opacity:.35}.widget-gallery h2{font-size:16px;margin-top:20px}.widget-gallery p{font-size:12px;color:var(--secondary);margin:7px 0 15px;line-height:1.8}.widget-gallery .button{font-size:12px;padding:8px 11px;min-height:32px}.widget-gallery .button svg{width:15px}.widget-tip{display:flex;gap:10px;padding:18px;background:var(--field);border-radius:12px;color:var(--secondary);font-size:12px;line-height:1.8;margin-top:30px}.widget-tip svg{margin-top:2px}.active-widgets{margin-top:24px}.active-widgets h3{margin-bottom:8px}.active-widget-row{display:flex;align-items:center;gap:12px;padding:9px 3px;border-bottom:1px solid var(--line);font-size:12px}.active-widget-row>small{margin-left:auto;color:var(--muted)}
+.context-pane{width:272px;flex-shrink:0;padding:var(--content-top) 22px 18px;border-left:1px solid var(--line);background:linear-gradient(170deg,#fafbfe,#fff);display:flex;flex-direction:column;overflow:auto}.month-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;gap:10px}.month-heading h3{font-size:13px;letter-spacing:-.3px}.month-heading .icon-button{width:22px;height:22px}.month-heading svg{width:14px;height:14px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.weekday{text-align:center;font-size:12px;color:var(--muted);padding-bottom:8px;font-weight:500}.sunday{color:#ce767f}.calendar-day{display:flex;flex-direction:column;align-items:center;border-radius:8px;min-height:29px;font-variant-numeric:tabular-nums;position:relative}.day-number{width:25px;height:25px;display:grid;place-items:center;font-size:12px;border-radius:50%}.outside .day-number{opacity:.28}.calendar-day:hover{background:var(--hover)}.is-today .day-number{background:var(--blue);color:white;font-weight:600}.is-selected:not(.is-today) .day-number{background:var(--hover);outline:1px solid var(--line)}.day-dots{display:flex;gap:2px;height:4px;align-items:center}.day-dots i{width:3px;height:3px;border-radius:50%}.event-dot{background:#efa62f}.task-dot{background:var(--blue)}.context-heading{display:flex;align-items:center;justify-content:space-between;margin-top:25px;margin-bottom:7px}.context-heading h3{font-size:12px;display:flex;gap:6px;align-items:center}.agenda{display:flex;flex-direction:column;gap:13px;padding:7px 0}.event-row{display:flex;gap:10px;width:100%;padding:1px 0}.event-line{width:3px;border-radius:4px;flex-shrink:0}.event-row div{min-width:0}.event-row strong{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}.event-row span:not(.event-line,.event-title){display:block;color:var(--secondary);font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums}.event-row small{display:block;font-size:12px;margin-top:3px;color:var(--muted)}.no-events{font-size:12px;color:var(--muted);padding:7px 0}.context-note{margin-top:26px;padding:16px 17px 14px;border-radius:14px;background:#fffaf0;border:1px solid rgba(217,183,100,.13)}.context-note .context-heading{margin:0 0 10px;color:#9b803f}.context-note p{white-space:pre-wrap;font-size:12px;line-height:1.9;color:#797462;max-height:130px;overflow:hidden}.context-note>span{display:block;font-size:12px;color:#b6aa8b;margin-top:17px}.context-foot{margin-top:auto;padding-top:30px;display:flex;gap:6px;justify-content:center;align-items:center;font-size:12px;color:#b3b5bb}
+.calendar-view,.notes-view,.widgets-view{height:100%;overflow:auto}.calendar-view>.month-heading{padding:4px 0 12px;margin-bottom:0}.calendar-view>.month-heading h3{font-size:20px}.calendar-view>.month-heading .icon-button{width:30px;height:30px}.calendar-grid.large{gap:0;border-bottom:1px solid var(--line)}.large .weekday{padding:10px 0}.large .calendar-day{align-items:stretch;min-height:80px;border-top:1px solid var(--line);border-radius:0;padding:7px 5px}.large .day-number{align-self:center;width:27px;height:27px;font-size:12px}.large .is-selected{background:rgba(52,120,246,.035)}.large .day-items{display:flex;flex-direction:column;gap:2px;margin-top:5px}.day-event{background:#fff3d8;color:#a57728;font-size:12px;border-radius:3px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.day-tasks{font-size:12px;color:var(--blue);text-align:center}.calendar-bottom{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding-top:25px}.calendar-bottom h3{font-size:12px;margin-bottom:8px}.calendar-bottom .task-row{padding:10px 0;min-height:50px}.calendar-bottom .task-title{font-size:13px}.calendar-bottom .task-check{width:17px;height:17px}.calendar-bottom .task-meta{font-size:12px}.notes-view{display:flex;flex-direction:column;overflow:hidden}.notes-layout{display:flex;gap:24px;min-height:0;flex:1}.note-cards{width:210px;flex-shrink:0;overflow:auto;display:flex;flex-direction:column;gap:10px}.note-card{padding:16px 17px;background:var(--field);border:1px solid transparent;border-radius:12px;min-height:126px;flex-shrink:0}.note-card.selected{background:#fff8e1;border-color:#f1dda3}.note-card strong{font-size:13px;display:block}.note-card p{font-size:12px;color:var(--secondary);line-height:1.8;margin-top:7px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.note-card>span{font-size:12px;color:var(--muted);display:block;margin-top:10px}.note-editor{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;padding:23px;background:var(--note);border-radius:15px;border:1px solid rgba(200,164,60,.12)}.note-title-input{font-size:22px;font-weight:650;letter-spacing:-.6px;background:none;border:0;padding:4px 0 18px;min-width:0;width:100%}.note-body{background:none;border:0;resize:none;flex:1;width:100%;min-height:100px;font-size:14px;line-height:1.9;padding:0;white-space:pre-wrap;color:var(--secondary);word-break:normal}.note-footer{display:flex;justify-content:space-between;align-items:center;padding-top:12px;font-size:12px;color:var(--muted)}.view-description{font-size:13px;color:var(--secondary);line-height:1.8}.widget-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:30px}.widget-stage{height:230px;border-radius:20px;background:linear-gradient(155deg,#e0eaf5,#d1dde9 40%,#ebdee2);padding:22px 17px;display:flex;align-items:center;justify-content:center}.widget-gallery-item:nth-child(2) .widget-stage{background:linear-gradient(150deg,#dfe9e4,#cddedd,#e2e4e9)}.widget-gallery-item:nth-child(3) .widget-stage{background:linear-gradient(160deg,#efe7de,#e6d8cf,#e5dfe6)}.widget-preview{width:100%;background:rgba(255,255,255,.77);box-shadow:0 8px 20px rgba(60,75,110,.1),inset 0 1px 0 white;border:1px solid rgba(255,255,255,.8);border-radius:18px;padding:18px 15px;min-height:166px;backdrop-filter:blur(15px);color:#343944}.preview-widget-title{font-size:14px;font-weight:650;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;color:#3478f6}.preview-widget-title strong{font-size:24px;font-weight:400}.preview-task{display:flex;gap:7px;align-items:center;margin-top:12px;font-size:12px}.preview-task i{width:13px;height:13px;border:1px solid #b3bdca;border-radius:50%;flex-shrink:0}.preview-task span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.preview-calendar .preview-widget-title{color:#df6657;margin-bottom:13px}.mini-preview-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px 3px;text-align:center;font-size:12px}.mini-preview-calendar span{border-radius:50%;line-height:18px}.mini-preview-calendar .active{background:#e96b5a;color:#fff}.preview-note{background:rgba(255,250,227,.85)}.preview-note .preview-widget-title{color:#967b37}.preview-note p{font-size:12px;white-space:pre-wrap;line-height:1.9;max-height:88px;overflow:hidden}.preview-note-rule{height:1px;background:#dacfaa;display:block;margin-top:16px;opacity:.35}.widget-gallery h2{font-size:16px;margin-top:20px}.widget-gallery p{font-size:12px;color:var(--secondary);margin:7px 0 15px;line-height:1.8}.widget-gallery .button{font-size:12px;padding:8px 11px;min-height:32px}.widget-gallery .button svg{width:15px}.active-widgets{margin-top:24px}.active-widgets h3{margin-bottom:8px}.active-widget-row{display:flex;align-items:center;gap:12px;padding:9px 3px;border-bottom:1px solid var(--line);font-size:12px}.active-widget-row>small{margin-left:auto;color:var(--muted)}
 .modal-overlay{position:fixed;inset:0;z-index:20;background:rgba(35,40,55,.17);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:24px;animation:reveal .16s ease-out}.dialog{width:440px;max-width:100%;max-height:calc(100vh - 48px);overflow:auto;background:var(--glass);border:1px solid rgba(255,255,255,.7);border-radius:19px;box-shadow:0 25px 80px rgba(25,35,60,.18);backdrop-filter:blur(35px) saturate(130%)}.dialog.wide{width:530px}.dialog-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--glass);z-index:1}.dialog-header h2{font-size:17px;letter-spacing:-.5px}.dialog-body{padding:23px 24px}.dialog-body>.view-description{margin-bottom:18px}.field{display:flex;flex-direction:column;gap:7px;margin-bottom:18px;min-width:0}.field>span{font-size:12px;color:var(--secondary);font-weight:600}.form-input{background:var(--field);border:1px solid transparent;border-radius:8px;padding:10px 12px;width:100%;min-width:0;font-size:13px}.form-input:focus{background:var(--bg)}textarea.form-input{resize:vertical;line-height:1.8;min-height:90px}.form-columns{display:flex;gap:16px;align-items:center}.form-columns>*{flex:1}.checkbox-field{display:flex;align-items:center;gap:9px;font-size:12px;margin:4px 0 18px}.checkbox-field input{accent-color:var(--blue);width:16px;height:16px}.field-help{font-size:12px;line-height:1.85;color:var(--muted);margin:10px 0 16px}.dialog-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}.dialog-footer.split{justify-content:space-between}.dialog{container:dialog / scroll-state;scroll-padding-top:72px;scroll-padding-bottom:88px}.dialog-body>.dialog-footer{position:sticky;bottom:0;z-index:1;background:var(--glass);background:rgb(from var(--glass) r g b / 1);margin:8px -24px -23px;padding:12px 24px 23px}@container dialog scroll-state(scrollable: bottom){.dialog-body>.dialog-footer{box-shadow:0 -1px 0 var(--line)}}.task-detail-source{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--secondary)}.task-detail-source span{color:var(--muted);margin-left:auto}.event-detail>p{margin-bottom:14px;display:flex;align-items:center;gap:9px;font-size:13px}.settings-brand{display:flex;align-items:center;gap:13px;margin-bottom:25px}.settings-brand strong{font-size:22px;letter-spacing:-.7px}.settings-brand small{display:block;color:var(--muted);font-size:12px;margin-top:3px}.settings-links{display:flex;gap:10px;border-top:1px solid var(--line);padding-top:20px}.provider-options{display:flex;flex-direction:column;gap:10px;margin:20px 0}.provider-option{display:flex;gap:14px;align-items:center;padding:15px 16px;background:var(--field);border:1px solid transparent;border-radius:12px}.provider-option:hover{border-color:#bdcffa;background:var(--bg)}.provider-option>span:nth-child(2){flex:1}.provider-option strong{display:block;font-size:13px}.provider-option small{display:block;font-size:12px;color:var(--muted);margin-top:4px}.provider-logo{display:grid;place-items:center;width:38px;height:38px;border-radius:9px;background:white;border:1px solid #e8e9ee;flex-shrink:0;color:#5782c5}.provider-logo.google{font-size:26px;font-weight:650;color:#4285f4}.ms-squares{display:grid;grid-template-columns:1fr 1fr;gap:2px;width:20px;height:20px}.ms-squares i:nth-child(1){background:#f25022}.ms-squares i:nth-child(2){background:#7fba00}.ms-squares i:nth-child(3){background:#00a4ef}.ms-squares i:nth-child(4){background:#ffb900}.connected-account{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.connected-account>div{flex:1;min-width:0}.connected-account strong{font-size:12px;overflow-wrap:anywhere}.connected-account small{display:block;margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.connect-intro{display:flex;align-items:center;gap:14px;margin-bottom:20px}.connect-intro p{font-size:12px;color:var(--muted);margin-top:4px}.setup-guide{padding:15px 17px;border-radius:11px;background:var(--field);margin-bottom:20px;font-size:12px;color:var(--secondary);line-height:1.85}.setup-guide summary{font-size:12px;font-weight:600;cursor:pointer}.setup-guide p{margin:10px 0}.setup-guide ol{padding-left:18px;margin:10px 0}.setup-guide li{margin-bottom:7px}.inline-error,.error-text{color:#de5960!important;font-size:12px;line-height:1.8;overflow-wrap:anywhere}.inline-error:empty{display:none}#toast{position:fixed;top:calc(var(--topbar) + 14px);left:50%;transform:translate(-50%,-12px);opacity:0;pointer-events:none;z-index:50;background:rgba(42,48,62,.94);color:#fff;box-shadow:0 6px 25px #0002;border:1px solid #ffffff22;border-radius:11px;padding:11px 18px;font-size:12px;max-width:calc(100% - 40px);text-align:center;transition:opacity .16s,transform .16s;backdrop-filter:blur(20px)}#toast.show{opacity:1;transform:translate(-50%,0)}#toast.error{background:rgba(137,47,55,.96)}
 .widget-body{background:transparent!important;padding:0}.widget-surface{height:100%;overflow:hidden;position:relative;display:flex;flex-direction:column}.widget-head{height:48px;padding:10px 15px 3px 19px;display:flex;align-items:center;justify-content:space-between;-webkit-app-region:drag;user-select:none;flex-shrink:0}.widget-drag-label{display:flex;align-items:center;gap:7px;min-width:0}.widget-drag-label strong{font-size:15px;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.widget-kind{color:var(--blue)}.widget-controls{display:flex;opacity:0;transition:opacity .15s}.widget-surface:hover .widget-controls,.widget-controls:focus-within{opacity:1}.widget-controls .icon-button{width:25px;height:25px}.widget-controls svg{width:15px}.widget-task-content{display:flex;flex-direction:column;flex:1;min-height:0;padding:3px 20px 17px}.widget-date{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}.widget-date strong{font-size:36px;line-height:1;font-weight:300;color:var(--blue);font-variant-numeric:tabular-nums}.widget-tasks{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto}.widget-tasks .task-row{min-height:59px;padding:12px 0 10px;gap:10px}.widget-tasks .task-check{width:19px;height:19px}.widget-tasks .task-title{font-size:13px}.widget-tasks .task-meta{font-size:12px;margin-top:2px;min-height:0}.widget-tasks .row-more{width:18px}.widget-tasks .row-more svg{width:18px;height:18px}.widget-task-content .quick-add{margin-top:12px;border-radius:10px;background:rgba(255,255,255,.45)}.widget-task-content .quick-main{padding:7px 9px;gap:6px}.widget-task-content .quick-input{font-size:12px}.widget-task-content .quick-submit{width:22px;height:22px}.widget-empty{height:100%;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);font-size:12px}.widget-empty svg{color:#95b7ca}.widget-calendar-content{padding:6px 21px 15px;overflow:auto}.widget-calendar-content .month-heading{margin-bottom:12px}.widget-calendar-content .calendar-day{min-height:34px}.widget-calendar-content .day-number{font-size:12px;width:29px;height:29px}.widget-calendar-content .weekday{font-size:12px}.widget-agenda-title{font-size:12px;color:var(--secondary);border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.widget-calendar-content .event-row strong{font-size:12px}.note-widget .widget-kind{color:#af8a33}.note-widget .note-editor{border:0;border-radius:0;background:transparent;padding:10px 21px 19px}.note-widget .note-title-input{font-size:19px;padding-bottom:13px}.note-widget .note-body{font-size:13px;color:#736a52;line-height:1.9}.widget-resize-hint{position:absolute;right:9px;bottom:8px;width:10px;height:10px;border-right:2px solid #a2a9b340;border-bottom:2px solid #a2a9b340;border-radius:1px;opacity:0;pointer-events:none}.widget-surface:hover .widget-resize-hint{opacity:1}.widget-body .dialog{border-radius:15px;max-height:100%}.widget-body .dialog-header{padding:13px 16px}.widget-body .dialog-header h2{font-size:14px}.widget-body .dialog-body{padding:15px 16px}.widget-body .field{margin-bottom:12px}.widget-body .form-input{font-size:12px;padding:8px 10px}.widget-body .dialog-footer{margin-top:14px}.widget-body .dialog-body>.dialog-footer{margin:4px -16px -15px;padding:10px 16px 15px}.widget-body .button{padding:7px 12px;font-size:12px}.widget-body .field-help{font-size:12px}.widget-body #toast{font-size:12px;top:calc(var(--w-margin) + 56px)}
 [data-theme=dark]{--bg:#24262b;--side:rgba(34,36,42,.94);--text:#e9eaf0;--muted:#858a97;--secondary:#b2b7c1;--line:rgba(225,230,255,.08);--hover:rgba(200,215,255,.065);--field:#30333b;--glass:rgba(40,43,51,.97);--note:#353226;color-scheme:dark}[data-theme=dark] .smart-tile{background:#363a43}[data-theme=dark] .smart-tile.selected{background:var(--accent)}[data-theme=dark] .account-button{background:transparent}[data-theme=dark] .context-pane{background:linear-gradient(145deg,#272a30,#24262b)}[data-theme=dark] .context-note{background:#343023}[data-theme=dark] .context-note p{color:#bfb59a}[data-theme=dark] .empty-symbol{background:#2d3544;border-color:#3a4558;color:#91a5c4}[data-theme=dark] .note-card.selected{background:#45402c;border-color:#71633b}[data-theme=dark] .day-event{background:#54432b;color:#e1b36d}[data-theme=dark] .dialog{border-color:#ffffff12}[data-theme=dark] .widget-task-content .quick-add{background:#ffffff05}
@@ -14,7 +14,7 @@
 @media(max-width:930px){.context-pane{display:none}.main-content{min-width:0}.widget-gallery{gap:12px}.widget-preview{padding:15px 11px}.widget-stage{height:210px}}
 @media(max-width:650px){.sidebar{width:170px;padding:var(--content-top) 10px 10px}.topbar{background:var(--side)}.topbar-brand{width:170px;padding:0 12px;font-size:15px}.smart-grid{gap:6px}.smart-tile{padding:9px}.tile-top strong{font-size:21px}.tile-icon{width:23px;height:23px}.search kbd{display:none}.nav-item{font-size:12px;padding:9px 8px;gap:7px}.sidebar-section-head{margin-left:7px}.list-nav{padding:8px 6px;gap:7px}.list-dot{width:23px;height:23px}.list-name{font-size:12px}.content-heading{margin-bottom:12px}h1{font-size:26px}.eyebrow{font-size:12px}.heading-count{font-size:35px}.task-title{font-size:12px}.task-row{gap:8px}.task-check{width:18px;height:18px}.quick-bottom{padding-left:12px}.quick-input{font-size:12px}.widget-gallery{grid-template-columns:1fr}.widget-stage{height:220px}.widget-preview{max-width:210px}.notes-layout{flex-direction:column;gap:12px}.note-cards{flex-direction:row;width:auto;min-height:80px;max-height:90px}.note-card{min-height:78px;width:160px;padding:10px}.note-card p{-webkit-line-clamp:1}.note-card>span{display:none}.note-editor{padding:16px}.calendar-bottom{grid-template-columns:1fr}.large .calendar-day{min-height:53px;padding:3px}.large .day-items{display:none}.calendar-view>.content-heading{align-items:flex-start}.calendar-view>.content-heading>.inline-actions{flex-direction:column}.form-columns{gap:12px}}
 @media(max-width:450px){body:not(.widget-body) .sidebar{width:70px;padding:var(--content-top) 8px 10px}body:not(.widget-body) .topbar-brand{width:70px;padding:0;justify-content:center}body:not(.widget-body) .brand-name,body:not(.widget-body) .search,body:not(.widget-body) .smart-tile>span,body:not(.widget-body) .tile-top strong{display:none}body:not(.widget-body) .smart-grid{grid-template-columns:1fr;margin:0 0 14px;gap:5px}body:not(.widget-body) .smart-tile{padding:9px}body:not(.widget-body) .tile-top{justify-content:center;margin:0}body:not(.widget-body) .main-nav .nav-item{font-size:0;justify-content:center;padding:10px;gap:0}body:not(.widget-body) .sidebar-section-head>span,body:not(.widget-body) .list-name,body:not(.widget-body) .list-count{display:none}body:not(.widget-body) .sidebar-section-head{justify-content:center;margin:15px 0 5px}body:not(.widget-body) .list-nav{justify-content:center;padding:9px 3px}body:not(.widget-body) .account-button{padding:8px}body:not(.widget-body) .account-button .status-text,body:not(.widget-body) .account-button small{display:none}body:not(.widget-body) .sidebar-bottom{justify-content:center}body:not(.widget-body) .content-heading{gap:8px}.task-meta{flex-wrap:wrap;gap:5px}.quick-bottom>span{display:none}.quick-list{max-width:100%}.row-more{display:none}.calendar-view>.content-heading .button{padding:5px 8px;font-size:12px;min-height:28px}.dialog-body{padding:18px}.dialog-header{padding:15px 18px}.modal-overlay{padding:14px}.form-columns{flex-direction:column;align-items:stretch}.form-columns .field{margin-bottom:12px}.connected-account{flex-wrap:wrap}.widget-body .form-columns{flex-direction:row}.widget-body .widget-head{padding-left:18px}.widget-body .note-editor{padding-left:19px}.widget-body .note-title-input{font-size:19px}.widget-body .task-row{gap:9px}.widget-body .task-title{font-size:12px}.widget-body .row-more{display:flex}}
-@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}button:active{transform:none}}@media(prefers-reduced-transparency:reduce){.widget-surface,.dialog{background:var(--bg)!important;backdrop-filter:none}}@media(prefers-contrast:more){:root{--muted:#505764;--line:#7c8392}.widget-surface{background:var(--bg)!important;border-color:currentColor}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}button:active{transform:none}}@media(prefers-reduced-transparency:reduce){.widget-surface,.dialog{background:var(--bg)!important;backdrop-filter:none}}
 
 .widget-resize-handle{position:absolute;right:3px;bottom:3px;width:24px;height:24px;cursor:nwse-resize;touch-action:none;z-index:3;opacity:.6;-webkit-app-region:no-drag}.widget-resize-handle::after{content:"";position:absolute;right:7px;bottom:7px;width:9px;height:9px;border-right:2px solid #8c96a6;border-bottom:2px solid #8c96a6;border-radius:1px}.widget-resize-handle:hover,.widget-resize-handle:focus-visible{opacity:1}.widget-resize-handle:active{transform:none}
 
@@ -25,19 +25,19 @@
 [data-theme=dark] .text-button,[data-theme=dark] .day-tasks,[data-theme=dark] .quick-plus,[data-theme=dark] .task-dot{color:#7fa8ff;background-color:transparent}[data-theme=dark] .task-dot{background:#7fa8ff}[data-theme=dark] .context-note .context-heading{color:#d8c48a}
 
 /* Sidebar: everything under the search field scrolls together; lists are grouped by source and optional folders. */
-.sidebar-scroll{flex:1;min-height:0;overflow:auto;margin:0 -6px;padding:0 6px 6px}.smart-grid{margin:16px 0 12px;gap:8px}.smart-tile{padding:10px 12px 9px;border-radius:12px}.tile-top{margin-bottom:6px}.tile-top strong{font-size:22px}.tile-icon{width:24px;height:24px}.main-nav .nav-item{padding:8px 12px;font-size:13px}.sidebar-section-head{margin:16px 6px 4px}.sidebar-section-head .inline-actions{gap:2px}.sidebar-section-head .icon-button{width:26px;height:26px}
+.sidebar-scroll{flex:1;min-height:0;overflow:auto;margin:0 -6px;padding:0 6px 6px}.smart-grid{margin:16px 0 12px;gap:8px}.smart-tile{padding:10px 12px 9px;border-radius:12px}.tile-top{margin-bottom:6px}.tile-top strong{font-size:22px}.tile-icon{width:24px;height:24px}.main-nav .nav-item{padding:8px 12px;font-size:13px}.sidebar-section-head{margin:16px 6px 4px 10px}.sidebar-section-head .inline-actions{gap:2px}.sidebar-section-head .icon-button{width:26px;height:26px}
 .lists-nav{flex:none;overflow:visible;gap:1px;min-height:0}.list-section{margin-bottom:4px}.section-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:7px 6px 5px;color:var(--muted);font-size:12px;font-weight:600;border-radius:8px}.section-toggle:hover{background:var(--hover)}.section-name{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.group-chevron{display:inline-flex;color:var(--muted);transition:transform .15s}.group-chevron.open{transform:rotate(90deg)}
-.list-nav-wrap{position:relative;display:flex;align-items:center}.list-nav{flex:1;min-width:0;min-height:36px;padding:5px 30px 5px 8px;gap:9px;border-radius:8px}.list-dot{width:24px;height:24px;background:var(--list-color,#3478f6)}.list-dot.emoji{background:color-mix(in srgb,var(--list-color,#3478f6) 16%,transparent);color:inherit}.list-emoji{font-size:14px;line-height:1}.list-name{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.group-chevron{display:inline-flex;width:16px;justify-content:center;color:var(--muted);transition:transform .15s}.group-chevron.open{transform:rotate(90deg)}
+.list-nav-wrap{position:relative;display:flex;align-items:center}.list-nav{flex:1;min-width:0;min-height:36px;padding:5px 30px 5px 10px;gap:9px;border-radius:8px}.list-dot{width:24px;height:24px;background:var(--list-color,#3478f6)}.list-dot.emoji{background:color-mix(in srgb,var(--list-color,#3478f6) 16%,transparent);color:inherit}.list-emoji{font-size:14px;line-height:1}.list-name{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .list-more{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:26px;height:26px;opacity:0;color:var(--muted)}.list-nav-wrap:hover .list-more,.list-nav-wrap:focus-within .list-more{opacity:1}
-.group-row{display:flex;align-items:center;gap:7px;flex:1;min-height:34px;padding:5px 30px 5px 6px;border-radius:8px;font-size:13px;color:var(--secondary)}.group-row:hover{background:var(--hover)}.group-icon{color:var(--muted);display:inline-flex}.group-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-lists{margin-left:14px;padding-left:8px;border-left:1px solid var(--line)}
+.group-row{display:flex;align-items:center;gap:7px;flex:1;min-height:34px;padding:5px 30px 5px 14px;border-radius:8px;font-size:13px;color:var(--secondary)}.group-row:hover{background:var(--hover)}.group-icon{color:var(--muted);display:inline-flex}.group-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-lists{margin-left:22px;padding-left:4px;border-left:1px solid var(--line)}.group-lists .list-nav{padding-left:6px}
 .swatches{display:flex;flex-wrap:wrap;gap:9px;padding:2px 0}.swatch{width:26px;height:26px;border-radius:50%;flex-shrink:0;border:0}.swatch.selected{box-shadow:0 0 0 2px var(--bg),0 0 0 4px currentColor}.icon-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}.icon-choice{display:grid;place-items:center;height:34px;border-radius:9px;background:var(--field);color:var(--secondary)}.icon-choice:hover{background:var(--hover)}.icon-choice.selected{background:var(--blue);color:#fff}
 .provider-logo.google{font-size:0}
 [data-theme=dark] .list-dot.emoji{background:color-mix(in srgb,var(--list-color,#3478f6) 28%,transparent)}
 @media(max-width:450px){body:not(.widget-body) .section-toggle,body:not(.widget-body) .group-row,body:not(.widget-body) .list-more{display:none}}
 
 /* Symbol picker (icon or emoji) and a quieter sidebar scrollbar. */
-.symbol-picker{display:flex;flex-direction:column;gap:8px}.picker-label{font-size:12px;color:var(--muted)}.emoji-grid .icon-choice{font-size:17px;line-height:1}.emoji-input{max-width:200px;font-size:14px}.emoji-custom{display:flex;align-items:center;gap:8px}.emoji-custom .emoji-input{flex:1 1 auto;min-width:0}.emoji-more{flex:none}
+.symbol-picker{display:flex;flex-direction:column;gap:8px}.picker-label{font-size:12px;color:var(--muted)}.emoji-grid .icon-choice{font-size:17px;line-height:1}.emoji-input{max-width:200px;font-size:13px}.emoji-custom{display:flex;align-items:center;gap:8px}.emoji-custom .emoji-input{flex:1 1 auto;min-width:0}.emoji-more{flex:none}
 .sidebar-scroll::-webkit-scrollbar-thumb{background:transparent}.sidebar-scroll:hover::-webkit-scrollbar-thumb{background:#9199ab33}
 .widget-body .icon-grid{grid-template-columns:repeat(6,1fr)}
 
@@ -46,13 +46,13 @@
 
 /* Typography: Apple-like weight and contrast; captions are secondary, never faint. */
 :root{font-weight:450;--muted:#6f7584;--secondary:#50566a}[data-theme=dark]{--muted:#9ba1ae;--secondary:#c9cdd6}
-.eyebrow{font-size:13px;color:var(--secondary);font-weight:500;margin-bottom:3px}.task-toolbar{font-size:13px;color:var(--secondary);font-weight:500}.text-button{font-size:13px;font-weight:600}.task-meta{font-size:13px;color:var(--secondary);gap:10px}.task-meta .list-label{color:var(--muted)}.no-events{font-size:13px;color:var(--secondary)}.view-description{font-size:14px;color:var(--secondary)}.context-heading h3{font-size:14px}.event-row span:not(.event-line),.event-row small{font-size:12px;color:var(--secondary)}.sync-status{font-size:12px;color:var(--secondary)}.list-count{font-size:12px;font-weight:500}.sidebar-section-head{font-size:12px;color:var(--secondary)}.note-card>span,.note-footer{font-size:12px;color:var(--secondary)}.field-help{font-size:12px;color:var(--secondary)}.quick-bottom{font-size:12px;color:var(--secondary);padding:0 14px 10px 41px}.heading-count{font-weight:400}.task-title{font-weight:500}.nav-item{font-weight:500}.section-toggle{color:var(--secondary)}.context-note p{color:#6b6450}.context-note>span{display:none}.empty-state h2{font-size:20px}.empty-state p{font-size:13px;color:var(--secondary)}
+.eyebrow{font-size:13px;color:var(--secondary);font-weight:500;margin-bottom:3px}.task-toolbar{font-size:13px;color:var(--secondary);font-weight:500}.text-button{font-size:13px;font-weight:600}.task-meta{font-size:13px;color:var(--secondary);gap:10px}.task-meta .list-label{color:var(--muted)}.no-events{font-size:13px;color:var(--secondary)}.view-description{font-size:14px;color:var(--secondary)}.context-heading h3{font-size:14px}.event-row span:not(.event-line,.event-title),.event-row small{font-size:12px;color:var(--secondary)}.sync-status{font-size:12px;color:var(--secondary)}.list-count{font-size:12px;font-weight:500}.sidebar-section-head{font-size:12px;color:var(--secondary)}.note-card>span,.note-footer{font-size:12px;color:var(--secondary)}.field-help{font-size:12px;color:var(--secondary)}.quick-bottom{font-size:12px;color:var(--secondary);padding:0 14px 10px 41px}.heading-count{font-weight:400}.task-title{font-weight:500}.nav-item{font-weight:500}.section-toggle{color:var(--secondary)}.context-note p{color:#6b6450}.context-note>span{display:none}.empty-state h2{font-size:20px}.empty-state p{font-size:13px;color:var(--secondary)}
 .notes-view .empty-state{flex:1}
-.sync-toggles{display:flex;gap:14px;margin-top:7px}.sync-toggle{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--secondary)}.sync-toggle input{accent-color:var(--blue);width:14px;height:14px;margin:0}
+.sync-toggles{display:flex;flex-direction:column;gap:0;margin-top:8px;flex:1 0 100%}.sync-toggle{display:flex;align-items:center;min-height:32px;font-size:13px;color:var(--text);margin:0}.sync-toggle+.sync-toggle{box-shadow:0 -1px 0 var(--line)}
 .reminder-label{display:inline-flex;align-items:center;gap:3px;color:#b8721a}
 .list-nav.dragging{opacity:.35}.list-nav.drop-before{box-shadow:inset 0 2px 0 var(--blue)}.group-row.drop-into,.list-section.drop-into{background:color-mix(in srgb,var(--blue) 10%,transparent);border-radius:8px}
 .list-emoji,.emoji-choice{font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif}
-.main-nav{margin:14px 0 4px}.main-nav .nav-item{padding:9px 12px;font-size:13.5px}.smart-grid{margin:10px 0 12px}
+.main-nav{margin:14px 0 4px}.main-nav .nav-item{padding:8px 12px;font-size:14px;line-height:22px}.smart-grid{margin:10px 0 12px}
 [data-theme=dark] .context-note p{color:#c9bd9a}
 
 /* Task rows size to their content: a single-line task has no empty meta line beneath it. */
@@ -152,8 +152,8 @@
    so the card's backdrop-filter blurs the real wallpaper and its corners/shadow are anti-aliased.
    --w-margin 14px and --w-radius 26px must match SURFACE_MARGIN_DIP / SURFACE_RADIUS_DIP in lib/desktop.cjs (tests/widget-shape.test.cjs reads both). */
 .widget-body{--w-margin:14px;--w-radius:26px}
-.widget-body,.widget-stage{--w-text:#1c1d22;--w-secondary:rgba(44,48,60,.74);--w-tertiary:rgba(44,48,60,.62);--w-line:rgba(28,34,48,.09);--w-red:#e8574a;--w-fill:linear-gradient(180deg,rgba(255,255,255,calc(var(--w-a,.6) + .02)),rgba(255,255,255,calc(var(--w-a,.6) - .01)));--w-solid:rgba(250,251,253,var(--glass-alpha,.94));--w-opaque:#fafbfd;--w-sheen:radial-gradient(130% 70% at 12% -12%,rgba(255,255,255,.42),rgba(255,255,255,0) 58%);--w-shadow:0 4px 10px rgba(16,24,40,.16),0 1px 2px rgba(16,24,40,.1);--w-button:rgba(255,255,255,.62);--w-hover:rgba(255,255,255,.42)}
-[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]{--w-text:#f3f4f7;--w-secondary:rgba(236,238,245,.72);--w-tertiary:rgba(236,238,245,.6);--w-line:rgba(255,255,255,.1);--w-red:#ff6a5c;--w-fill:linear-gradient(180deg,rgba(44,46,54,calc(var(--w-da,.56) + .04)),rgba(30,32,38,calc(var(--w-da,.56) - .04)));--w-solid:rgba(36,39,47,var(--glass-alpha,.94));--w-opaque:#24272f;--w-sheen:radial-gradient(130% 70% at 12% -12%,rgba(255,255,255,.1),rgba(255,255,255,0) 58%);--w-shadow:0 4px 12px rgba(0,0,0,.32),0 1px 2px rgba(0,0,0,.22);--w-button:rgba(255,255,255,.14);--w-hover:rgba(255,255,255,.08)}
+.widget-body,.widget-stage{--w-text:#1c1d22;--w-secondary:rgba(44,48,60,.74);--w-tertiary:rgba(44,48,60,.62);--w-line:rgba(28,34,48,.09);--w-red:#ff3b30;--w-today:#ff3b30;--w-note:#8a6604;--w-check-mix:65%;--w-check-with:#3a3f4a;--w-fill:linear-gradient(180deg,rgba(255,255,255,calc(var(--w-a,.6) + .02)),rgba(255,255,255,calc(var(--w-a,.6) - .01)));--w-solid:rgba(250,251,253,var(--glass-alpha,.94));--w-opaque:#fafbfd;--w-sheen:radial-gradient(130% 70% at 12% -12%,rgba(255,255,255,.42),rgba(255,255,255,0) 58%);--w-shadow:0 4px 10px rgba(16,24,40,.16),0 1px 2px rgba(16,24,40,.1);--w-button:rgba(255,255,255,.62);--w-hover:rgba(255,255,255,.42)}
+[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]{--w-text:#f3f4f7;--w-secondary:rgba(236,238,245,.72);--w-tertiary:rgba(236,238,245,.6);--w-line:rgba(255,255,255,.1);--w-red:#ff453a;--w-today:#ff453a;--w-note:#f6cf5c;--w-check-mix:45%;--w-check-with:#fff;--w-fill:linear-gradient(180deg,rgba(44,46,54,calc(var(--w-da,.56) + .04)),rgba(30,32,38,calc(var(--w-da,.56) - .04)));--w-solid:rgba(36,39,47,var(--glass-alpha,.94));--w-opaque:#24272f;--w-sheen:radial-gradient(130% 70% at 12% -12%,rgba(255,255,255,.1),rgba(255,255,255,0) 58%);--w-shadow:0 4px 12px rgba(0,0,0,.32),0 1px 2px rgba(0,0,0,.22);--w-button:rgba(255,255,255,.14);--w-hover:rgba(255,255,255,.08)}
 .widget-body #app{padding:var(--w-margin);height:100%;box-sizing:border-box}
 #backdrop{position:fixed;inset:0;z-index:-1;pointer-events:none}
 .widget-body:not(.has-backdrop) #backdrop{display:none}
@@ -203,7 +203,7 @@
 .widget-calendar-content .calendar-day:hover{background:var(--w-hover)}
 .widget-calendar-content .day-number{width:28px;height:28px;font-size:14px;font-weight:500;color:var(--w-text)}
 .widget-calendar-content .outside .day-number{color:var(--w-tertiary)}
-.widget-calendar-content .is-today .day-number{background:var(--w-red);color:#fff;font-weight:700}
+.widget-calendar-content .is-today .day-number{background:var(--w-today);color:#fff;font-weight:700}
 .widget-calendar-content .is-selected:not(.is-today) .day-number{background:var(--w-button);outline:0;box-shadow:inset 0 0 0 1px var(--w-line)}
 .widget-calendar-content .day-dots{height:5px;gap:2px;margin-top:1px}
 .widget-calendar-content .day-dots i{width:4px;height:4px}
@@ -220,7 +220,7 @@
 .widget-agenda .event-row:hover{background:var(--w-hover)}
 .widget-agenda .event-line{width:3.5px}
 .widget-agenda .event-row strong{font-size:14px;font-weight:600;color:var(--w-text)}
-.widget-agenda .event-row span:not(.event-line),.widget-agenda .event-row small{font-size:12px;color:var(--w-secondary)}
+.widget-agenda .event-row span:not(.event-line,.event-title),.widget-agenda .event-row small{font-size:12px;color:var(--w-secondary)}
 .widget-agenda .no-events{font-size:13px;color:var(--w-secondary);padding:4px 4px}
 .widget-agenda .text-button{font-size:12px}
 
@@ -277,11 +277,11 @@
 .preview-month{display:flex;gap:5px;align-items:baseline;margin-bottom:8px}
 .preview-month strong{font-size:14px;font-weight:700;color:var(--w-red)}
 .preview-month span{font-size:14px;font-weight:500;color:var(--w-tertiary)}
-.widget-preview .mini-preview-calendar{gap:2px 0;font-size:12px;color:var(--w-text)}
+.widget-preview .mini-preview-calendar{gap:0;font-size:12px;color:var(--w-text)}
 .widget-preview .mini-preview-calendar b{font-weight:600;color:var(--w-tertiary);line-height:18px}
 .widget-preview .mini-preview-calendar b.sunday{color:color-mix(in srgb,var(--w-red) 75%,transparent)}
-.widget-preview .mini-preview-calendar span{line-height:18px;width:20px;margin:0 auto;border-radius:50%}
-.widget-preview .mini-preview-calendar .active{background:var(--w-red);color:#fff;font-weight:700}
+.widget-preview .mini-preview-calendar span{line-height:20px;width:20px;height:20px;margin:0 auto;border-radius:50%}
+.widget-preview .mini-preview-calendar .active{background:var(--w-today);color:#fff;font-weight:700}
 .preview-note-label{font-size:13px;font-weight:700;color:#a57a06;margin-right:auto;margin-left:8px}
 .preview-note-title{font-size:14px;font-weight:700;margin-top:8px}
 .widget-preview.preview-note p{font-size:12px;line-height:1.7;color:var(--w-secondary);white-space:pre-wrap;max-height:84px;overflow:hidden;margin-top:6px}
@@ -300,15 +300,12 @@
 /* ===== Glass strength, list menu (2026-10-20 17:00) ===== */
 .widget-body,.widget-stage{--w-rim-line:inset 0 0 0 1px rgba(255,255,255,.22),inset 0 1px 0 rgba(255,255,255,.45)}
 [data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]{--w-rim-line:inset 0 0 0 1px rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.12)}
-.glass-control{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:14px 18px;margin:0 0 18px;border-radius:14px;background:var(--field)}
-.glass-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
-.glass-copy strong{font-size:14px;font-weight:650;letter-spacing:-.2px}
-.glass-copy span{font-size:12px;color:var(--muted);line-height:1.5}
+/* .glass-control is only a hook for the smoke test; the row is .appearance-row */
 .glass-slider{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--secondary);flex:0 1 360px;min-width:220px}
-.glass-slider input[type=range]{flex:1;min-width:0;accent-color:var(--blue,#3478f6)}
+/* Liquid Glass slider (2026-11-02 review widget-tab-3, owner: 「유리효과가 들어가는」): 6px track filled up to the thumb's centre (--p 0–1), a white 30×20 capsule at rest that turns into a clear lens, 1.2× larger, while it is held. */.glass-slider input[type=range]{flex:1;min-width:0;height:24px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;--track:color-mix(in srgb,var(--text) 12%,transparent)}.glass-slider input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--blue) calc(15px + (100% - 30px) * var(--p,.5)),var(--track) 0)}.glass-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;box-sizing:border-box;width:30px;height:20px;margin-top:-7px;border-radius:10px;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 3px rgba(0,0,0,.22);transition:transform .16s ease-out,background-color .16s ease-out,box-shadow .16s ease-out}[data-theme=dark] .glass-slider input[type=range]::-webkit-slider-thumb{background:#f2f3f7;box-shadow:0 0 0 .5px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.4)}.glass-slider input[type=range]:focus-visible{outline:none}.glass-slider input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 35%,transparent),0 0 0 .5px rgba(0,0,0,.12),0 1px 3px rgba(0,0,0,.22)}.glass-slider input[type=range]:active::-webkit-slider-thumb{transform:scale(1.2);background:rgba(255,255,255,.22);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.85),inset 0 1px 1.5px rgba(255,255,255,.7),inset 0 -1px 1px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.16)}[data-theme=dark] .glass-slider input[type=range]:active::-webkit-slider-thumb{background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.85),inset 0 1px 1.5px rgba(255,255,255,.7),inset 0 -1px 1px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.4)}@media(prefers-reduced-motion:reduce){.glass-slider input[type=range]:active::-webkit-slider-thumb{transform:none}}@media(prefers-reduced-transparency:reduce){.glass-slider input[type=range]:active::-webkit-slider-thumb,[data-theme=dark] .glass-slider input[type=range]:active::-webkit-slider-thumb{background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 2px 6px rgba(0,0,0,.24)}[data-theme=dark] .glass-slider input[type=range]:active::-webkit-slider-thumb{background:#f2f3f7}}@media(prefers-contrast:more){.glass-slider input[type=range]{--track:color-mix(in srgb,var(--text) 30%,transparent)}.glass-slider input[type=range]::-webkit-slider-thumb{border:1px solid currentColor}}
 .glass-slider span{white-space:nowrap}
 .field .glass-slider{flex:none;min-width:0}
-@media(max-width:930px){.glass-control{flex-direction:column;align-items:stretch;gap:12px}.glass-slider{flex:1 1 auto}}
+@media(max-width:930px){.glass-slider{flex:1 1 auto}}
 /* Quick add: focus shows on the whole rounded box, not as a square ring inside it (2026-10-20 user screenshot). */
 .quick-input:focus-visible{outline:none}
 .quick-add{transition:border-color .15s,box-shadow .15s}
@@ -345,7 +342,7 @@
 .update-block{display:flex;flex-direction:column;gap:4px;padding:10px 14px;margin:-10px 0 22px;border-radius:12px;background:var(--field)}
 .update-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px}
 .update-status{font-size:13px;line-height:1.5;color:var(--secondary)}
-.update-block .checkbox-field{margin:0}
+.update-row>.text-button:only-child{margin-left:auto} /* 「새 기능 보기」 alone on its row keeps the right edge (2026-11-02: 새 버전 자동 확인 went to the settings switches) */
 .update-block .text-button{font-size:12px;flex-shrink:0;padding:5px 14px} /* same right edge as the 업데이트 확인 button's text (2026-10-21 user; 14px like the 32px buttons since the 2026-10-26 design review) */
 .update-block .button{flex-shrink:0}
 /* Calendar widget: event dots in the event's (or calendar's) colour, up to 3 per day (renderer/app.js dayDots). */
@@ -456,7 +453,7 @@ body.cal-denied,body.cal-denied *{cursor:not-allowed!important}
 .time-view.week .time-day:not(.is-today):hover .time-date{background:var(--hover)}
 .time-day.is-today .time-weekday{color:var(--blue);font-weight:600}
 .time-day.is-today .time-date{background:var(--blue);color:#fff}
-.time-day.sunday:not(.is-today) .time-weekday{color:#e5534b}
+.time-day.sunday:not(.is-today) .time-weekday{color:var(--sunday)}
 .time-day.weekend,.time-col.weekend,.allday-cell.weekend{background-color:var(--weekend)}
 .time-gutter-cell{min-width:0}
 .time-allday{display:grid;grid-template-columns:var(--gut) minmax(0,1fr);border-top:1px solid var(--line)}
@@ -484,10 +481,10 @@ body.cal-denied,body.cal-denied *{cursor:not-allowed!important}
 .now-pill{position:absolute;right:4px;top:calc(var(--now,0) * var(--hour));transform:translateY(-50%);z-index:5;background:#ff3b30;color:#fff;font-size:12px;font-weight:600;line-height:18px;padding:0 6px;border-radius:9px;white-space:nowrap;pointer-events:none}
 .time-cols{display:grid;grid-template-columns:repeat(var(--days),minmax(0,1fr));position:relative;background-image:linear-gradient(to bottom,var(--line) 0,var(--line) 1px,transparent 1px),linear-gradient(to bottom,transparent calc(50% - .5px),var(--half-line) calc(50% - .5px),var(--half-line) calc(50% + .5px),transparent calc(50% + .5px));background-size:100% var(--hour)}
 .time-col{position:relative;border-left:1px solid var(--line);min-width:0}
-.time-event{position:absolute;z-index:1;top:calc(var(--top) * var(--hour) + 1px);height:max(20px,calc(var(--len) * var(--hour) - 2px));left:calc((100% - 8px) * var(--col) / var(--cols) + 1px);width:calc((100% - 8px) * var(--span) / var(--cols) - 2px);display:flex;flex-direction:column;gap:0;padding:2px 6px 2px 7px;overflow:hidden;border-radius:5px;border-left:3px solid var(--cal-color,var(--blue));background:color-mix(in srgb,var(--cal-color,var(--blue)) 18%,var(--bg));box-shadow:0 0 0 1px var(--bg);font-size:12px;line-height:16px;cursor:pointer;text-align:left}
+.time-event{position:absolute;z-index:1;top:calc(var(--top) * var(--hour) + 1px);height:max(20px,calc(var(--len) * var(--hour) - 2px));left:calc((100% - 8px) * var(--col) / var(--cols) + 1px);width:calc((100% - 8px) * var(--span) / var(--cols) - 2px);display:flex;flex-direction:column;gap:0;padding:2px 6px 2px 7px;overflow:hidden;border-radius:5px;border-left:3px solid var(--cal-color,var(--blue));background:color-mix(in srgb,var(--cal-color,var(--blue)) 18%,var(--bg));box-shadow:0 0 0 1px var(--bg);font-size:12px;line-height:16px;cursor:pointer;text-align:left;container-type:inline-size}
 [data-theme=dark] .time-event{background:color-mix(in srgb,var(--cal-color,var(--blue)) 30%,var(--bg))}
 .time-event:hover{filter:brightness(.98)}
-.time-event-title{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.time-event-title{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:var(--title-rows,2);-webkit-box-orient:vertical;word-break:break-word}
 .time-event.one-line{flex-direction:row;align-items:center;padding-top:0;padding-bottom:0}
 .time-event.one-line .time-event-title{display:block;white-space:nowrap}
 .time-event-inline,.time-event-title .cont{font-weight:400;color:var(--secondary)}
@@ -514,7 +511,7 @@ body.cal-denied,body.cal-denied *{cursor:not-allowed!important}
 .card-spacer{flex:1}
 .card-color{width:16px;height:16px;min-height:0;padding:0;border-radius:5px;background:var(--dot);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
 .card-color:hover{transform:scale(1.12)}
-.card-title{display:block;width:100%;margin:0 0 6px;padding:2px 0;border:0;outline:none;resize:none;overflow:hidden;background:transparent;font:inherit;font-size:18px;font-weight:650;line-height:24px;color:var(--text)}
+.card-title{display:block;width:100%;margin:0 0 6px;padding:2px 0;border:0;outline:none;resize:none;overflow:hidden;background:transparent;font:inherit;font-size:17px;font-weight:650;line-height:24px;color:var(--text)}
 .card-title::placeholder{color:var(--muted);font-weight:500}
 .card-title.static{overflow-wrap:anywhere}
 .card-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;min-height:34px;font-size:13px}
@@ -532,7 +529,7 @@ body.cal-denied,body.cal-denied *{cursor:not-allowed!important}
 .card-chip input{margin:0;accent-color:var(--blue)}
 .card-chip.static{cursor:default}
 .card-repeat,.card-select{height:28px;max-width:100%;padding:0 8px;border:0;border-radius:14px;background:var(--field);font:inherit;font-size:12px;font-weight:500;color:var(--secondary);cursor:pointer}
-.card-select{border-radius:7px;max-width:calc(100% - 30px)}
+.card-select{max-width:calc(100% - 30px)}
 .card-input{flex:1;min-width:0;height:28px;padding:0 7px;border:0;border-radius:6px;background:transparent;font:inherit;font-size:13px;color:var(--text)}
 .card-input:hover,.card-input:focus{background:var(--hover);outline:none}
 .card-input::placeholder{color:var(--muted)}
@@ -597,7 +594,7 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
    Default: rows of one height in rounded groups (title, then date and the first line), headed 고정됨 · 오늘 · 어제 · 이전 7일 ·
    이전 30일 · month. The card view keeps one height too. */
 .note-cards.compact{gap:0;width:226px}
-.note-group-head{font-size:13px;font-weight:700;color:var(--text);margin:16px 4px 6px;flex-shrink:0}
+.note-group-head{font-size:13px;font-weight:700;color:var(--text);margin:16px 14px 6px;flex-shrink:0}
 .note-group-head:first-child{margin-top:0}
 .note-group{background:var(--field);border-radius:12px;overflow:hidden;flex-shrink:0;display:flex;flex-direction:column}
 .note-group+.note-group{margin-top:12px}
@@ -696,11 +693,12 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 .tour-card .tour-skip,[data-theme=dark] .tour-card .tour-skip{color:var(--secondary)}
 .note-group .note-card.compact:focus-visible{outline-offset:-3px}
 .in-trash .note-group .note-card.compact.selected,[data-theme=dark] .in-trash .note-group .note-card.compact.selected{background:color-mix(in srgb,var(--secondary) 16%,var(--field))}
-/* Glass review fixes (2026-10-21): accents follow the glass tone (blue +, rings, dots and reds sank into a blue wallpaper under
-   dark glass; light glass needs them a little deeper), secondary text a step stronger on glass, placeholders themed, and the
-   gallery stage shapes moved under the cards so the preview headers sit on a calm part of the stage. */
-.widget-body.tone-dark{--w-red:#ff8f84;--w-secondary:rgba(236,238,245,.84);--w-tertiary:rgba(236,238,245,.72)}
-.widget-body.tone-light{--w-red:#c4372b;--w-secondary:rgba(44,48,60,.82);--w-tertiary:rgba(44,48,60,.7)}
+/* Glass review fixes (2026-10-21): accents follow the glass tone (blue +, rings and dots sank into a blue wallpaper under dark
+   glass), secondary text a step stronger on glass, placeholders themed, and the gallery stage shapes moved under the cards so the
+   preview headers sit on a calm part of the stage. The reds of both tones are Apple's system red, the stage's own (2026-11-02 owner:
+   the deeper light / paler dark tone reds of 1.2.6 out): only the ink ramp below moves --w-red, never --w-today, the today fill. */
+.widget-body.tone-dark{--w-red:#ff453a;--w-today:#ff453a;--w-secondary:rgba(236,238,245,.84);--w-tertiary:rgba(236,238,245,.72)}
+.widget-body.tone-light{--w-red:#ff3b30;--w-today:#ff3b30;--w-secondary:rgba(44,48,60,.82);--w-tertiary:rgba(44,48,60,.7)}
 /* The text and accents on the wallpaper glass follow its ink strength (domain.js glassInks, set by app.js applyGlass on the body —
    2026-10-28: they deepen a little per step as the glass nears the change of text colour); the values here are the plain ones. */
 .widget-body.tone-dark .widget-task-content .quick-plus{color:color-mix(in srgb,var(--accent,#3478f6) var(--w-plus-mix,45%),var(--w-plus-with,#fff))}
@@ -709,10 +707,9 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 .widget-body.tone-light .widget-tasks .task-check{border-color:color-mix(in srgb,var(--task-color) var(--w-check-mix,65%),var(--w-check-with,#3a3f4a))}
 .widget-body.tone-dark .widget-calendar-content .task-dot{background:var(--w-dot,#9dbdff)}
 .widget-body.tone-light .widget-calendar-content .task-dot{background:var(--w-dot,#2a5fc4)}
-.widget-body.tone-dark .widget-calendar-content .is-today .day-number{background:#e5483b}
 .widget-body.tone-dark.note-widget .widget-title{color:var(--w-note,#f6cf5c)}
 .widget-body.tone-light.note-widget .widget-title{color:var(--w-note,#8a6604)}
-.note-body::placeholder{color:var(--muted)}
+.note-body::placeholder,.search input::placeholder,.quick-input::placeholder,.form-input::placeholder,.step-input::placeholder,.note-find-input::placeholder{color:var(--muted)}
 .widget-body.note-widget .note-body::placeholder,.widget-body.note-widget .note-title-input::placeholder{color:var(--w-tertiary)}
 [data-theme=dark] .preview-note-label{color:#f3c64e}
 /* Sidebar foot (2026-10-26): the account button is an icon like ? and the gear; its badge shows only while syncing or on an error. */
@@ -730,7 +727,7 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 :root{--r-sheet:16px;--r-pop:12px;--r-card:12px}
 .dialog,.tour-card{border-radius:var(--r-sheet)}
 .help-pop,.event-card,.context-menu,#toast{border-radius:var(--r-pop)}
-.quick-add,.context-note,.note-editor,.glass-control,.update-block,.widget-tip{border-radius:var(--r-card)}
+.quick-add,.context-note,.note-editor,.update-block{border-radius:var(--r-card)}
 .widget-stage{border-radius:30px}
 /* Buttons: one height and one label size wherever they sit (the top bar already is 32/13). */
 .button,.widget-gallery .button,.trash-head .button,.trash-banner .button,.account-notice .button{min-height:32px;padding:6px 14px;font-size:13px}
@@ -919,18 +916,15 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
    switch rows one height and one 13px size (the two at the end were 12px beside 13px account rows), and the update box set by
    spacing rather than a negative margin. */
 .settings-brand{margin-bottom:18px}
-.settings-body .update-block{margin:0 0 22px}
-.settings-body .field{gap:8px;margin-bottom:20px}
+.settings-body .update-block{margin:0 0 20px}
+.settings-body .field{gap:8px;margin:0}
 .settings-body .field-help{margin:0;line-height:1.6}
 .settings-body .section-visibility .checkbox-field{margin:0;min-height:32px}
-.settings-body>.checkbox-field{font-size:13px;margin:0;min-height:34px}
-.settings-body>.checkbox-field+.settings-links{margin-top:14px}
+.settings-body>.checkbox-field{font-size:13px;margin:0}
+.settings-body .settings-group+.settings-links{margin-top:0}
 .settings-body .settings-links{padding-top:18px}
-/* Every switch in the sheet at the right edge: 「새 버전 자동 확인」's sat beside its words, under the 업데이트 확인 button's edge. */
-.settings-body .update-row>.checkbox-field{flex:1}
 /* An ON switch is blue in dark mode too: the dark track rule (same specificity, later) painted ON and OFF the same grey. */
 [data-theme=dark] .checkbox-field input[type=checkbox]:checked{background:var(--blue)}
-.settings-body .update-block .checkbox-field{font-size:13px}
 /* 2026-10-30 This PC's tasks to an account list (app.js transferListDialog): the count, then why the rest stay, in the sheet's rhythm. */
 .transfer-body .move-summary{display:flex;flex-direction:column;gap:4px;margin:0 0 14px}
 .transfer-body .move-count{font-size:13px;color:var(--text);line-height:1.6}
@@ -989,8 +983,351 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 .calendar-grid.large.rolling .month-weekdays{position:relative;z-index:1;box-shadow:0 1px 0 var(--line)}
 
 /* Widget appearance is independent of the app: the selected theme also colours its preview. */
-.widget-appearance{margin-top:18px;display:grid;grid-template-columns:minmax(160px,190px) minmax(0,1fr);gap:16px;align-items:center}
-.widget-appearance>.field{margin:0}.widget-appearance .glass-control{margin:0;min-width:0}
+.widget-appearance{display:block;margin-top:0;padding:0;background:var(--field);border-radius:var(--r-card)}
+.appearance-row{position:relative;min-height:44px;padding:0 16px;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:16px}.appearance-row+.appearance-row::before{content:"";position:absolute;left:16px;right:0;top:0;height:1px;background:var(--line)}.appearance-row>span{font-size:13px;font-weight:500;color:var(--text)}.appearance-row .form-input{justify-self:end;width:180px;max-width:100%;min-height:32px;padding:5px 32px 5px 12px;font-size:13px;border-radius:8px;background:var(--bg)}.appearance-row .glass-slider{justify-self:end;width:100%;max-width:280px;min-width:0;flex:none}
 .widget-stage .preview-note-label{color:var(--w-note,#8a6604)}
 .widget-stage .preview-task i{border-color:color-mix(in srgb,var(--task-color) var(--w-check-mix,65%),var(--w-check-with,#3a3f4a))}
-@media(max-width:1000px){.widget-appearance{grid-template-columns:1fr}.widget-appearance>.field{max-width:240px}}
+/* r60-F */
+/* 2026-11-02 review app-design-1: an overflowing month cell squashed the 27px day number (today's circle 27×18); it never shrinks now — calMonthLimit counts the rows that fit. */
+.large .day-number{flex-shrink:0}
+/* usability-4: the block's width picks the time (container query on .time-event; its content box is the block − 16px). At 12px Pretendard 「오전 10:00–오후 12:00」 is 113.4px and 「오전 10:00」 54px, with ~2px to spare. A one-line block shares the row with its title, so it takes 「10:00」 as soon as the range would not fit. */
+.time-event .t-start,.time-event .t-bare{display:none}
+@container (max-width:115.98px){.time-event .t-full{display:none}.time-event .t-start,.time-event-inline .t-bare{display:inline}}
+/* the bare time from 58.98px: 24-hour 「until 20:40」 is 58.27px and was cut to 「until 20:0…」 under the old 56.98 line; 「오전 10:00」 54 and 「10:00까지」 51 still fit above it (2026-11-02 r60 carry-over F-3) */@container (max-width:58.98px){.time-event .t-start{display:none}.time-event .t-bare{display:inline}}
+/* app-design-10: one Sunday red, ≥4.5:1 — light 4.70 on the weekend shade #f6f6f8 (5.08 on white), dark #ff6a5c, 4.84 on #2c2e32 (the widget keeps Apple's #ff453a, about 3.99 there — too low for Sunday words; comment corrected 2026-11-02 r60 integration). The widget rules keep --w-red (more specific). */
+:root{--sunday:#bd4552}
+[data-theme=dark]{--sunday:#ff6a5c}
+.sunday{color:var(--sunday)}
+/* app-design-11: the mini calendar's colour dots at the widget's size (3px read as dust); .large .calendar-day keeps min-height 0. */
+.day-dots{height:5px}
+.day-dots i{width:4px;height:4px}
+.calendar-day{min-height:30px}
+/* app-design-12: 「Nov 2026」 instead of 「November 2026」 cut to 「November 2…」 — calTitleFit sets .tight while the long title and its chevron do not fit (calTitleNode, data-short). */
+.title-text::after{content:attr(data-short);display:none}
+.topbar-main h1 .title-text.tight .title-long{display:none}.topbar-main h1 .title-text.tight::after{display:inline}
+/* app-design-1: the month cell's vertical padding 7/7 → 6/4, so the default 1180×780 window holds three lines (109px cells, three need 107.6px; they squeezed today's circle to 27×25.5) and the 650px minimum two (87.5px, two need 85.4px). calMonthLimit counts with the same numbers. */
+.large .calendar-day{padding-top:6px;padding-bottom:4px}
+/* r60-T (2026-11-02 review usability-8): the toolbar's left caption is empty outside a search, so the span keeps one line (13px × 1.5 = 19.5px) and
+   the toolbar stays 32.5px (19.5 + 12 padding + 1 border) in 오늘/전체/목록 even when 「완료 n개」 is absent too — the first task row never moves
+   (min-height on .task-toolbar itself would make it 32px and shift the row 0.5px in 오늘). The actions stay right even if the caption is removed. */
+.task-toolbar>span{min-height:1.5em}.task-toolbar>.inline-actions{margin-left:auto}
+/* the no-match title holds the search term: a long unbroken one wraps instead of running past the box (2026-11-02 r60 carry-over T-1) */
+.empty-state h2{overflow-wrap:anywhere}
+/* r60-D */
+/* Dialog controls one height (2026-11-02 review app-design-8): the 「모든 이모지」 button stretches to the emoji field (41px, the 「이름」 field), date and datetime-local inputs lose Chromium's 1px wrapper padding so they measure 41.1px like text and select — no fixed height, which would enlarge the widget forms' inputs. */
+.emoji-custom{align-items:stretch}.emoji-more{min-height:0}
+.form-input::-webkit-datetime-edit-fields-wrapper{padding:0}
+/* Task editor 반복|목록 row (2026-11-02 review usability-7): the 중요 switch keeps its 18px gap under the row whether the custom-repeat panel between them is shown or hidden. A list that cannot be changed stays one line there — the name ellipsizes (full name and account in the tooltip), no account tag — and is exactly as tall as the 반복 select beside it in the window (41px) and in widgets (36px) because both columns stretch (fix-D review: it wrapped onto 2–3 lines, and a fixed 41px overshot the widget's select). */
+.task-repeat-row{align-items:stretch}.task-repeat-row .task-detail-source{flex:1;min-width:0}.task-repeat-row .task-detail-source .list-name{margin-left:0;color:inherit;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-repeat-row+.checkbox-field,.task-repeat-row+.repeat-panel+.checkbox-field{margin-top:0}
+/* r60-D2 */
+/* 2026-11-02 review app-design-14: the account card wraps — row 1 is logo · name/status · 연결 해제 (top-aligned so the button stays the header's trailing action while the status column grows), row 2 the full-width .sync-toggles switch rows (32px each, the app's .checkbox-field switch). `.connected-account>div{flex:1}` (line 9) would otherwise keep the toggles on the first line, so the full-width basis is restated with the child selector. row-gap 0: the 12px flex gap would add to the toggles' 8px margin and float the rows 30px under the status line, detached from their account. */
+.connected-account{flex-wrap:wrap;align-items:flex-start;row-gap:0}
+.connected-account>.sync-toggles{flex:1 0 100%;padding-left:50px}
+/* 2026-11-02 D2 review: the rows touch (32px apart, hairline to hairline) whatever is merged after this file's line 51 — area C's one-switch-row rule .checkbox-field{…margin:0 0 12px} is one class, so this reset weighs two (without it each row got a 12px bottom margin: Google card 172→208px). */
+.sync-toggles>.sync-toggle{margin:0}
+/* Inset like an Apple grouped list: the rows start at the account name (logo 38 + gap 12 above), so their hairlines read as the account's own and only the card's full-width rule divides accounts; 「연결 해제」's letters end on the switches' right edge (its 6px padding outside). */
+.connected-account>.text-button{margin-right:-6px}
+/* 「연결 해제」's letters on the account name's line: the button box's top met the logo's and its 13px words sat 3.5px under the name (2026-11-02 r60 carry-over D2-2) */
+.connected-account>.text-button{margin-top:-4px}
+/* no account yet (a new user's first view): the provider list starts and ends on the body's 23px like every other sheet, not 43/44px where the deleted intro sentence stood (2026-11-02 r60 carry-over D2-1) */
+.accounts-body>.provider-options:first-child{margin-top:0}.accounts-body>.provider-options:last-child{margin-bottom:0}
+/* r60-B */
+/* Widget gallery proportions (2026-11-02 review widget-tab-4): the preview card stops at 340px (2:1 like the stage, not a 489×170 strip at 1920px; ≤650px keeps 210px), caption 15/13px (Apple title/subtitle pair) on an 8-pt rhythm card→32→gallery. The stage gap goes through --wp-gap so the shared wallpaper panorama still lines up (only above 1080px; 15/12px below stay). The button keeps margin-top:auto so the three line up when a description wraps; the paragraph's 16px keeps the gap. */
+@media(min-width:651px){.widget-preview{max-width:340px}}
+.widget-gallery{margin-top:32px}@media(min-width:1081px){.widget-gallery{--wp-gap:24px}}
+.widget-gallery h2{font-size:15px;font-weight:650;letter-spacing:-.3px;margin-top:16px}
+.widget-gallery-item>p{font-size:13px;color:var(--secondary);margin:4px 0 16px;line-height:1.5}
+/* Windows contrast themes (forced colors) drop the glass slider's gradient track and the thumb's fill and shadow, so it vanished where 1.2.6's stock range drew in system colours: the same track and capsule in system colours, :root so they beat the dark and :active rules (2026-11-02 r60 carry-over B-1). */
+@media(forced-colors:active){:root .glass-slider input[type=range]::-webkit-slider-runnable-track{forced-color-adjust:none;background:linear-gradient(90deg,Highlight calc(15px + (100% - 30px) * var(--p,.5)),GrayText 0)}:root .glass-slider input[type=range]::-webkit-slider-thumb,:root .glass-slider input[type=range]:active::-webkit-slider-thumb{forced-color-adjust:none;background:ButtonFace;border:1px solid ButtonText;box-shadow:none}:root .glass-slider input[type=range]:focus-visible::-webkit-slider-thumb{border:2px solid Highlight}}
+/* r60-C — the settings sheet as macOS System Settings (2026-11-02 review app-design-4/-6/-8, usability-2): grouped cards of 44px rows,
+   the label left in the text colour and the control at the right edge (the 2026-10-21 rule for every switch, now for the selects too),
+   hairlines from the label's edge instead of group titles, one 20px step between groups. A select hugs its value (base-select, the
+   chevron note above) but keeps 168px, so the row does not jump between 「한국어」 and 「시스템 언어 (한국어)」; the label keeps its one
+   line and the select may take the rest of the row, where a longer value ends in 「…」 (its <selectedcontent>, app.js openSettings —
+   a 240px cap cut note and list titles mid-word, r60-C review follow-up). */
+.settings-body .settings-group{background:var(--field);border-radius:var(--r-card);margin:0 0 20px;padding:0}
+.settings-body .settings-group>*{position:relative}
+.settings-body .settings-group>.field:not(.section-visibility),.settings-body .settings-group>.checkbox-field{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;min-height:44px;margin:0;padding:0 16px}
+.settings-body .settings-group>.field:not(.section-visibility){grid-template-columns:auto minmax(min(168px,100%),1fr)}
+.settings-body .settings-group>*+*::before{content:"";position:absolute;left:16px;right:0;top:0;height:1px;background:var(--line)}
+.settings-body .settings-group .field>span{font-size:13px;font-weight:450;color:var(--text)}
+.settings-body .settings-group>.checkbox-field input[type=checkbox]{justify-self:end}
+.settings-body .settings-group select.form-input{justify-self:end;width:auto;min-width:min(168px,100%);max-width:100%;min-height:32px;padding:5px 32px 5px 12px;font-size:13px;border-radius:8px;background:var(--bg)}
+.settings-body .settings-group selectedcontent{display:block;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.settings-body selectedcontent .option-more{display:none}
+/* 목록에 표시할 계정 · 숨긴 목록 inside the card: a 12px caption over a list of switch rows split by the card's hairline, so the block
+   does not read as a row without its control above rows of another rule (r60-C review follow-up) */
+.settings-body .settings-group>.field.section-visibility{display:flex;flex-direction:column;align-items:stretch;gap:0;margin:0;padding:12px 16px 4px}
+.settings-body .settings-group>.field.section-visibility>span{font-size:12px;color:var(--secondary);margin-bottom:2px}
+.settings-body .settings-group>.section-visibility>.checkbox-field{position:relative;min-height:36px;margin:0}
+.settings-body .settings-group>.section-visibility>.checkbox-field+.checkbox-field::before{content:"";position:absolute;left:0;right:-16px;top:0;height:1px;background:var(--line)}
+/* 업데이트 확인 at the brand's right end while no card is open; its words end where the rows' controls end (16px in) */
+.settings-brand>.text-button{margin:0 6px 0 auto;padding:5px 10px;font-size:13px}
+.settings-brand>.text-button[hidden]{display:none}
+/* the footer without its 닫기 (app-design-6): no height of its own, at the sheet's bottom edge — it still carries the bottom fade and
+   rule while more is below, and its 23px top margin keeps the body's bottom space under 문의 */
+.dialog-body>.dialog-footer.bare{padding:0;margin:23px -24px -23px;min-height:0}
+/* app-design-8 ①: one switch row everywhere — settings, 「중요한 할 일」, 「하루 종일」 — 13px words on a 32px row (the switch centred
+   in it, the next field 12px on: the same 18px from the words as before); widget windows keep their 12px form scale */
+.checkbox-field{font-size:13px;min-height:32px;margin:0 0 12px}
+.widget-body .checkbox-field{font-size:12px}
+
+/* r60-X text size (2026-11-02 owner: text size) — every widget's 글자 크기 (settings.widgetTextSize, renderer/domain.js TEXT_SIZES 1 / 1.125 /
+   1.25; app.js puts the factor in --wz on the widget's body and on the 위젯 tab gallery). The card's CONTENT zooms — CSS zoom is real layout,
+   so the head, the rows, the month grid, the note and the quick-add keep their proportions and what no longer fits scrolls inside the card
+   (hidden bars, as before) — and the card does not: #backdrop is painted from the window's DIP bounds and the Liquid Glass lens, rim and
+   sheen are sized to .widget-surface, so they stay pixel-identical at every size; the resize grip and the edge bands keep their size. The
+   gallery's preview cards zoom their content by the same factor and keep their card size. The widget toast moves down with the taller head
+   (body.widget-body outranks r60-E's line height). The main window is not styled here: main.cjs zooms it whole (settings.textSize). */
+.widget-body .widget-surface>:not(.widget-resize-handle){zoom:var(--wz,1)}
+.widget-gallery .widget-preview>*{zoom:var(--wz,1)}
+.widget-gallery .widget-preview [data-fit-hidden]{display:none} /* the fitter's hidden rows: .preview-task's display:flex outranks [hidden] (2026-11-03 Codex review I1) */
+body.widget-body #toast{top:calc(var(--w-margin) + 56px * var(--wz,1));font-size:calc(12px * var(--wz,1));line-height:calc(18px * var(--wz,1))}
+/* Below 900 CSS px, which only a zoomed main window reaches (크게: 800 at the 900 DIP minimum, 더 크게: 720×520), the calendar bar had 8px
+   for its title in Korean and pushed 일정 추가 under the window buttons in English. From 860 down: 일정 추가 keeps its 32px button without
+   the word (as English does from 1040px), 일·주·월 its 28px segments (English shows the D/W/M key letters, the full name stays its label and
+   tooltip), the bar's gap 4, the gutter token 16 and the sidebar 200 (from 225) — so the title (calTitleFit: long, short, then the month alone),
+   오늘, the arrows, the panel button and the window buttons stay whole at 720. The first-of-month label stays on one line (it wrapped to two
+   in the 64px cells and pushed the chips out), and so do 「할 일 n개」 and 「+n개」, which end in 「…」 rather than take a second line the
+   line budget has no room for. The 650/450 rules below them keep their own values (min-width bounds). */
+.calendar-grid.rolling .day-number.first{white-space:nowrap}
+.calendar-grid.rolling .day-tasks,.calendar-grid.rolling .day-more{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-main h1 .title-text.tiny .title-long{display:none}.topbar-main h1 .title-text.tiny::after{content:attr(data-tiny);display:inline}
+@media(max-width:860px){.topbar .event-add-button .button-label{display:none}.topbar .event-add-button{padding:0;width:32px;justify-content:center}.topbar-main{gap:4px}.view-switch-item{min-width:28px;padding:0 6px}html:not(:lang(ko)) .view-switch-item{font-size:0}html:not(:lang(ko)) .view-switch-item::after{content:attr(data-short);font-size:12px}}
+@media(min-width:651px) and (max-width:860px){:root{--gutter:16px}.sidebar{width:200px}.topbar{background:linear-gradient(90deg,var(--side) 0 200px,var(--bg) 200px)}.topbar-brand{width:200px}}
+
+/* r60-int — 2026-11-02 r60 integration, round 1 (after r60-X; r60-E stays last).
+   widget-ui-1: 「열려 있는 위젯」 is one grouped card of 44px rows like the appearance card above it — 13px words 16px in, the hairlines from
+   the name after the 20px icon (16 + 20 + 12 = 48), 「위젯 제거」's letters on the 16px inset, a 15/650 title like the gallery's, 32px under
+   the gallery. It was the last flat list: 12px words on 48.5px rows with edge-to-edge rules, 24px under the gallery. */
+.active-widgets{margin-top:32px}
+.active-widgets h3{font-size:15px;font-weight:650;letter-spacing:-.3px;line-height:22px;margin:0 0 8px}
+.active-widget-list{background:var(--field);border-radius:var(--r-card)}
+.active-widget-row{position:relative;min-height:44px;padding:0 16px;border-bottom:0;font-size:13px}
+.active-widget-row+.active-widget-row::before{content:"";position:absolute;left:48px;right:0;top:0;height:1px;background:var(--line)}
+.active-widget-row>small{font-size:13px;color:var(--secondary)}
+.active-widget-row>.text-button{margin-right:-6px}
+/* widget-ui-4/5/6: the gallery captions on whole pixels (15px × 1.5 put the paragraph on y 504.5), the three preview cards one height (the
+   calendar's content is 175px: it stood 2.5px proud of the others, on a half pixel), the note card's head like the tasks card's — 8px from
+   its glyph, 14px. The captions' 9px inset stays (the owner's choice B, 2026-10-27). */
+.widget-gallery h2{line-height:22px}.widget-gallery-item>p{line-height:20px}
+.widget-preview{min-height:176px}
+.preview-note-label{margin-left:0;font-size:14px}
+/* app-ui-7: a task toolbar with nothing in it (오늘 without 「완료 n개」) keeps its height, so the first row stays put, but not its lone rule. */
+.task-toolbar.bare{border-bottom-color:transparent}
+/* app-ui-3: the smart tiles' columns cannot grow past the sidebar (「133」 pushed the right column out and was cut), the count keeps 6px from
+   its icon and three digits step down (app.js marks them .long); in the 200px sidebar of a zoomed narrow window (크게/더 크게, 651–860 CSS px)
+   the tile is compact, as the old 650px rule made it. */
+.smart-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.tile-top{gap:6px}.tile-top strong{min-width:0}
+.tile-top strong.long{font-size:18px;letter-spacing:-.6px}
+@media(min-width:651px) and (max-width:860px){.smart-tile{padding:10px 9px 9px}.tile-top strong{font-size:20px}.tile-top strong.long{font-size:16px}}
+/* cal-2: a one-line week block (30/45 minutes) is a row that wraps away what does not fit: the name first (ellipsized alone when it is wider
+   than the block), its repeat glyph, then the start time only when it fits whole beside them — 「30분 통화 · …」 and 「회의 · 3…」 are gone
+   (calendar.js calTimeBlock, .time-event-name). */
+.time-event.one-line .time-event-title{display:flex;flex-wrap:wrap;align-items:center;column-gap:4px;flex:1;min-width:0;height:16px;overflow:hidden}
+.time-event.one-line .time-event-name{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.time-event.one-line .time-event-inline,.time-event.one-line .chip-repeat{flex:none;white-space:nowrap;margin-left:0}
+/* cal-3: a block too narrow for even 「–12:30」 (35.6px; two or three events side by side in the default window) shows no time rather than
+   「1…」; the tooltip and the event card keep it. */
+@container (max-width:36.98px){.time-event .time-event-time,.time-event .time-event-inline{display:none}}
+/* widget-ui-2: a calendar widget's agenda row is two lines — the title, then the time and the place on one line, the place cut with 「…」 —
+   so the card at its open size (360×440) shows one of today's events and 「+n개 더 보기」, not the button over empty glass (a row with a place
+   was three lines, 73px); no padding under the last row (the fitted agenda scrolled 5px). When the agenda folds (더 크게), the weeks share
+   the card's height instead of leaving a band of glass. */
+.widget-body .widget-agenda .event-row>div{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:6px;align-items:baseline;min-width:0}
+.widget-body .widget-agenda .event-row>div>strong{grid-column:1/-1}
+.widget-body .widget-agenda .event-row>div>span{white-space:nowrap}
+.widget-body .widget-agenda .event-row>div>small{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.widget-body .widget-agenda .event-row>div>small::before{content:"·";margin-right:6px}
+.widget-body .widget-agenda .agenda{padding-bottom:0}
+.widget-calendar-content:has(>.widget-agenda[hidden])>.calendar-grid{flex:1;grid-template-rows:auto;grid-auto-rows:1fr}
+/* app-ui-2: the task editor's 메모 starts as one line, as tall as the text fields above it (13px × 1.5 + 22), and grows as it is typed in up
+   to eight lines — Apple Reminders' notes field. With a reminder, a weekly repeat and two steps the editor fits the default 1180×780 window
+   (the four-line box made it scroll 64px; the 중요 switch stays, owner decision). */
+.dialog-body textarea.form-input[name=notes]{field-sizing:content;min-height:0;line-height:1.5;max-height:calc(8lh + 22px);resize:none}
+/* X-4: a widget's right-click menu follows its 글자 크기 like the card and the toast (app.js contextMenu divides its window position by the
+   zoom); its height still stops at the window. The widget sheets keep their compact size: zoomed, the 360px sheet cut its date and time
+   fields (CONTRACT widgetTextSize). */
+body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) / var(--wz,1))}
+/* app-ui-9: the account glyph on the sidebar's glyph line (x 38, where the nav icons, the group chevrons and the brand sit; it was 32). */
+@media(min-width:451px){body:not(.widget-body) .sidebar-bottom .account-button{margin-left:6px}}
+/* cal-5: English at 더 크게 in the smallest window (720 CSS px) — 「Today」 is 14px wider than 「오늘」 and left the tiny title 「Nov」 6px short of
+   its ▾, which wrapped away; the bar's gaps 4 → 2 give it back (calTitleFit still picks the tier). */
+@media(max-width:760px){html:not(:lang(ko)) .topbar-main{gap:2px}}
+/* r60-int round 2 — 2026-11-02 r60 integration, round 2 (after round 1; r60-E stays last).
+   widget-ui-rr-1: a calendar widget's agenda title is one line — a long one (「2026년 하반기 노동시장 동향 점검 및 대응 방향 회의」) took three
+   lines, did not fit and left 「+n개 더 보기」 over 67px of empty glass. The title's own span takes the 「…」 (the strong is a flex box, so
+   an ellipsis on it never drew) and the repeat glyph stays whole beside it; the hover and the event card show the whole title. */
+.widget-body .widget-agenda .event-row>div>strong{min-width:0}
+.widget-body .widget-agenda .event-row>div>strong>.event-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.widget-body .widget-agenda .event-row>div>strong>.chip-repeat{flex:none}
+/* rr-app-ui-4: the shortcut sheet stacks its groups per column (help.js .shortcut-col), so no 180px hole opens under 할 일. */
+.shortcut-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+/* rr-app-ui-1: the date parts of the two-column date fields drop Chromium's 1px side padding, so 「2026-11-02 오후 03:00」 keeps clear space
+   before the picker icon at 100% (its last 0 was cut, owner report 2026-10-20); the columns stay even (반복|목록 shares their line). */
+.form-columns .form-input:is([type=date],[type=datetime-local])::-webkit-datetime-edit-year-field,.form-columns .form-input:is([type=date],[type=datetime-local])::-webkit-datetime-edit-month-field,.form-columns .form-input:is([type=date],[type=datetime-local])::-webkit-datetime-edit-day-field{padding:0}
+/* cal-rr-3: a week block too narrow for one whole syllable (three or four events side by side) shows its colour only, not a cut 「ㄱ」;
+   the tooltip and the event card keep the name. After cal-3: the time goes first, then the name and the place. */
+@container (max-width:10.98px){.time-event .time-event-title,.time-event .time-event-place{visibility:hidden}}
+/* cal-rr-1: the week's 「+n개」 and 「할 일 n개」 lines 2px closer to the column edges, so 「할 일 12개」 fits the default window; where a line
+   still does not, the row takes a shorter form (calendar.js calTasksFit). */
+.allday-more,.allday-tasks{margin:0 2px;padding:0 5px}
+/* cal-rr-2: the window buttons keep Windows' 46 DIP at every 글자 크기, as Windows' own do — the zoom grew them to 51.75 / 57.5 (app.js
+   puts the main window's factor in --app-zoom) — and at 760 CSS px and less, which only 더 크게 reaches (900 DIP ÷ 1.25 = 720), the Korean
+   bar's gaps go to 2 as the English ones did (cal-5): another year's title (「27년 12월」, 「Dec ’27」) fits whole with its ▾, not 「27년 …」. */
+.window-actions .icon-button{width:calc(46px / var(--app-zoom,1))}
+@media(max-width:760px){.topbar-main{gap:2px}}
+
+/* r60-apple — one surface rule (2026-11-02 owner: Apple surfaces — 「음영있는 pill 안에 흰색을 넣는건 좀 애플 스타일이 아닌거 같아. 전반적으로 다시
+   봐줘. 애플 스타일에 맞춰줘.」, after 「설정창 … 투톤 같아서 좀 촌스럽고 난잡해보이던데」), as macOS System Settings · Calendar · Reminders:
+   no control stands on more than two layers. Layer 1 is a surface (window --bg, sheet --sheet, popover --glass, note paper). Layer 2 is
+   EITHER a grouped card (--field) OR a control's own fill (--field) — never a filled control inside a filled box.
+   · inside a grouped card or any filled box a pop-up is borderless: the value (--secondary) + the up/down chevron; --hover only under the
+     pointer or while its menu is open; the keyboard focus keeps the soft field ring (2026-10-26 recipe), a click shows none;
+   · a box that must group filled controls is a hairline outline (the .update-block rule), not a fill;
+   · every borderless control (inline values, rows, text actions) has one hover/pressed fill: --hover.
+   Unchanged on purpose (locked): switches, the segmented 일/주/월, blue primary and grey push buttons, fields on a sheet, the open menus
+   (::picker — only their anchor moves), widget glass, the radii tokens, the 글자 크기 rows. No new colour token: everything is
+   --field/--hover/--line/--secondary/--muted/--blue/--sunday/--sheet or the widget ink (--w-text) tints. Ids S1–S12, C1–C8: the audit's
+   change list (artifacts/r60-apple). The earlier rules they override (the selects on lines 986 and 1055, the repeat panel on 129–130,
+   the pills on 527–531) stay as they were: equal or lower specificity, earlier in the file. */
+
+/* S1 · pop-ups in grouped rows — the settings sheet and the 위젯 tab's 화면 모드 · 글자 크기: the value and its chevron on the card, no
+   white (dark: darker) box. The chevron's right edge sits on the 16px inset of the switches (−6px margin, chevron 6px in); the 168px
+   value column (line 1051) stays, so a long label wraps before a value is cut. */
+.settings-body .settings-group select.form-input,.appearance-row select.form-input{width:auto;min-width:0;max-width:100%;min-height:28px;margin-right:-6px;padding:4px 20px 4px 8px;--chevron-x:6px;border:0;border-radius:6px;background-color:transparent;color:var(--secondary);font-size:13px;font-weight:450;transition:background-color .12s ease-out}
+.settings-body .settings-group select.form-input:is(:hover,:open),.appearance-row select.form-input:is(:hover,:open){background-color:var(--hover)}
+.settings-body .settings-group select.form-input:is(:focus,:open),.appearance-row select.form-input:is(:focus,:open){border-color:transparent;box-shadow:none}
+.settings-body .settings-group select.form-input:focus-visible,.appearance-row select.form-input:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--blue) 55%,transparent)}
+/* the menu opens under the value, trailing-aligned, so it stays inside the sheet; above it when there is no room below */
+.settings-body .settings-group select.form-input::picker(select),.appearance-row select.form-input::picker(select){position-area:block-end span-inline-start;position-try-fallbacks:block-start span-inline-start}
+
+/* S4 · a widget's 위젯 설정 (app.js openWidgetSettings: .widget-settings, <selectedcontent> for 「…」): the main sheet's grouped rows — one
+   card of 44px rows, the label left, the borderless pop-up right, a hairline from the label. The value comes first: it takes its whole
+   width up to 66% of the row and the label wraps in what is left, so at the smallest note card (280px) 「Untitled note」 is not cut
+   after 52 of its 76px beside a one-line 「Note to show」; 66% still fits 「Always on top」 there, and a longer title ends in 「…」. A
+   wrapped label keeps tight lines (2 × 17px in the 44px row). The value column is sized by the pop-up's margin box, 6px under its
+   border box (the −6px margin), so the pop-up may reach 6px past the column */
+.dialog-body.widget-settings>.field{position:relative;display:grid;grid-template-columns:minmax(min-content,1fr) fit-content(66%);align-items:center;gap:12px;min-height:44px;margin:0;padding:0 12px;background:var(--field)}
+.dialog-body.widget-settings>.field:not(.field+.field){border-top-left-radius:var(--r-card);border-top-right-radius:var(--r-card)}
+.dialog-body.widget-settings>.field:not(:has(+.field)){border-bottom-left-radius:var(--r-card);border-bottom-right-radius:var(--r-card);margin-bottom:14px}
+.dialog-body.widget-settings>.field+.field::before{content:"";position:absolute;left:12px;right:0;top:0;height:1px;background:var(--line)}
+.dialog-body.widget-settings>.field>span{font-size:13px;line-height:1.3;font-weight:450;color:var(--text)}
+.dialog-body.widget-settings>.field>select.form-input{justify-self:end;width:auto;min-width:0;max-width:calc(100% + 6px);min-height:28px;margin-right:-6px;padding:4px 20px 4px 8px;--chevron-x:6px;border:0;border-radius:6px;background-color:transparent;color:var(--secondary);font-size:13px;font-weight:450;transition:background-color .12s ease-out}
+.dialog-body.widget-settings>.field>select.form-input:is(:hover,:open){background-color:var(--hover)}
+.dialog-body.widget-settings>.field>select.form-input:is(:focus,:open){border-color:transparent;box-shadow:none}
+.dialog-body.widget-settings>.field>select.form-input:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--blue) 55%,transparent)}
+.dialog-body.widget-settings selectedcontent{display:block;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dialog-body.widget-settings>.field>select.form-input::picker(select){position-area:block-end span-inline-start;position-try-fallbacks:block-start span-inline-start}
+/* Windows contrast themes drop box-shadow, so the borderless pop-ups (S1, S4) would lose their only focus mark: an outline in the system
+   highlight there (the rings above stay box-shadows for everyone else) */
+@media(forced-colors:active){.settings-body .settings-group select.form-input:focus-visible,.appearance-row select.form-input:focus-visible,.dialog-body.widget-settings>.field>select.form-input:focus-visible{outline:2px solid Highlight;outline-offset:1px}}
+
+/* S2 · the event card: 하루 종일 · 반복 · 알림 are inline values like the date and time above them — no pills; 하루 종일 is a checkbox
+   (macOS Calendar's popover; the event dialog keeps its switch), the row starts on the values' 26px column. The read-only 반복 일정
+   (.static) gets neither a hover nor a box. The keyboard ring (line 831) and the chevron (line 852) are unchanged. */
+.event-card .card-chips{padding-left:26px;gap:2px}
+.event-card .card-chip{height:28px;padding:0 7px;gap:7px;border-radius:6px;background:transparent;font-size:13px;font-weight:450;color:var(--text)}
+.event-card .card-chip:not(.static):hover{background:var(--hover)}
+.event-card .card-chip:not(.static)::before{content:"";flex:none;width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--muted)}
+.event-card .card-chip.on{background:transparent;color:var(--text)}
+.event-card .card-chip.on:hover{background:var(--hover)}
+.event-card .card-chip.on::before{box-shadow:none;background:var(--blue) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.6 6.3 5 8.6l4.4-5' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px no-repeat}
+.event-card select:is(.card-repeat,.card-select){padding-left:7px;border-radius:6px;background-color:transparent;font-size:13px;font-weight:450;color:var(--text)}
+.event-card select:is(.card-repeat,.card-select):is(:hover,:open){background-color:var(--hover)}
+
+/* S3 · S6 · S7 · boxes that hold filled controls are hairline outlines: the custom-repeat panel (its fields and weekday circles take the
+   editor's own --field, white while focused like every field), the connect guide (the client-ID field had no edge on a guide of its
+   colour), and the trashed note's banner — a status line over a hairline, not a white plate on the grey paper. */
+.repeat-panel{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.repeat-row .form-input{background-color:var(--field)}
+.repeat-row .form-input:focus{background-color:var(--bg)}
+.weekday-toggle{background:var(--field);border-color:transparent}
+.weekday-toggle.on{background:var(--blue);border-color:var(--blue)}
+.setup-guide{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.trash-banner{background:transparent;border-radius:0;padding:0 0 12px;box-shadow:inset 0 -1px 0 var(--line)}
+.trash-banner .button.danger-quiet{margin-right:-12px}
+
+/* S5 · 계정 추가: one grouped list (Internet Accounts › Add Account), bare logos — 38px kept, .sync-toggles' 50px inset (line 1025)
+   counts on it — hairlines from the name (16 + 38 + 12), the --hover row fill instead of a white card with a blue rim */
+.provider-options{gap:0;background:var(--field);border-radius:var(--r-card);overflow:hidden}
+.provider-option{position:relative;padding:12px 16px;gap:12px;border:0;border-radius:0;background:transparent}
+.provider-option+.provider-option::before{content:"";position:absolute;left:66px;right:0;top:0;height:1px;background:var(--line)}
+.provider-option:hover{background:var(--hover)}
+/* the list clips its corners (overflow), which cut the global 3px ring drawn 3px outside a full-width row down to a stray line: the ring
+   goes inside the row, rounded like the card (line 694's note cards; an outline, so a contrast theme keeps it) */
+.provider-option:focus-visible{outline-offset:-3px;border-radius:var(--r-card)}
+.provider-logo{background:transparent;border:0}
+
+/* S11 · quick add: the blue send circle only once something is typed (Messages; the widget keeps its own rule, line 249); Enter still adds */
+body:not(.widget-body) .quick-add .quick-input:placeholder-shown+.quick-submit{visibility:hidden}
+/* S8 · the note find bar: a sunken tint of the paper, not a white plate with a rule; its count in --secondary (--muted gave 4.0:1 on the
+   tint, 6.3 now). The smallest bar (192px: 900×650 at 더 크게) left the query an 8px sliver beside 「결과 없음」 and three buttons: when its
+   content box is 240px or less, the decorative glass and the count step aside — the count stays for screen readers (aria-live), the marks
+   in the note still show the matches — and the query keeps 80px (크게 at 900×650, a 272px bar, keeps all of it) */
+.note-find{background:var(--hover);box-shadow:none;container-type:inline-size}
+.note-find .note-find-count{color:var(--secondary)}
+@container (max-width:240px){.note-find>svg{display:none}.note-find .note-find-count{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
+
+/* S9 · S10 · widgets: a fill on the opaque card or the calendar is a tint of the widget's ink, not a white lift that vanished on #fafbfd;
+   glass, its rim and lens, the red today disc and the 오늘 capsule are unchanged */
+:is(.widget-body.glass-solid,.widget-body:not(.has-backdrop)) .widget-controls .icon-button{background:color-mix(in srgb,var(--w-text) 6%,transparent);box-shadow:none;backdrop-filter:none}
+:is(.widget-body.glass-solid,.widget-body:not(.has-backdrop)) .widget-controls .icon-button:hover{background:color-mix(in srgb,var(--w-text) 10%,transparent)}
+.widget-body .widget-calendar-content .calendar-day:hover,.widget-body .widget-agenda .event-row:hover,.widget-body .widget-agenda-title .agenda-add:hover{background:color-mix(in srgb,var(--w-text) 7%,transparent)}
+.widget-body .widget-calendar-content .is-selected:not(.is-today) .day-number{background:color-mix(in srgb,var(--w-text) 10%,transparent);box-shadow:none}
+
+/* S12 · C8 · dates and times readable: a widget's 시작|종료 stack (Calendar's Starts / Ends rows), and the task editor's 날짜 | 알림 each
+   carry their own quick choices (app.js editTask .task-date-row), so a widget stacks 날짜 + 오늘·내일·날짜 없음, then 알림 + 알림 없음;
+   the main window keeps its two columns. The picker glyph sits tight to the value. The 시작|종료 row is known by its field, not its type:
+   하루 종일 turns both into type=date, and the row jumped back to two columns (Calendar's Starts / Ends rows do not move). */
+.widget-body .form-columns:has(input[name=start]){flex-direction:column;align-items:stretch;gap:0}
+.form-input::-webkit-calendar-picker-indicator{margin-inline-start:2px;padding:0}
+/* stretch, not .form-columns' centre: the two columns top-align when one is shorter (a To Do repeat has no date choices), in a row or a column */
+.task-date-row{align-items:stretch}.task-date-row>.date-col{flex:1;min-width:0}
+.widget-body .task-date-row{flex-direction:column;align-items:stretch;gap:0}
+/* a To Do repeat keeps no date choices: its empty row takes no room, so 알림 keeps the fields' 18px under 날짜 */
+.task-date-row .date-presets:empty{display:none}
+
+/* C1–C7 · quieter extras */
+/* C1 shortcut keys as menu text 「Ctrl+Shift+Z」, no key caps (help.js helpKeys unchanged) */
+.keys{gap:0}
+.keys kbd{display:inline;min-width:0;height:auto;padding:0;border-radius:0;background:none;box-shadow:none;font-weight:500;color:var(--secondary);font-variant-numeric:tabular-nums}
+.keys kbd+kbd::before{content:"+";padding:0 1px;color:var(--muted);font-weight:400}
+.keys-or{padding:0 6px}
+/* C2 a destructive confirm is a red label on the grey push button (light --sunday 4.58:1 on --field; dark #ff6b6b 4.55:1, where
+   --sunday's #ff6a5c gives 4.49) — it replaces the solid #e64d52 fill, so no tone is added */
+.button.danger{background:var(--field);color:var(--sunday)}
+[data-theme=dark] .button.danger{color:#ff6b6b}
+/* C3 「모든 이모지」 is a text action beside its field (as 「새 그룹 만들기」 below it), not a second grey box */
+.emoji-custom .button.emoji-more{background:none;color:var(--blue);padding-left:8px;padding-right:8px}
+.emoji-custom .button.emoji-more:hover{background:var(--hover)}
+[data-theme=dark] .emoji-custom .button.emoji-more{color:#7fa8ff}
+/* C4 the selected colour's gap ring is cut from the sheet, not the window (a darker halo on the dark sheet) */
+.dialog .swatch.selected{box-shadow:0 0 0 2px var(--sheet,var(--bg)),0 0 0 4px currentColor}
+/* C5 the sidebar search keeps its fill when focused (NSSearchField); only the soft field ring comes in */
+.search:focus-within{background:rgba(130,140,160,.09);border-color:color-mix(in srgb,var(--blue) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent)}
+/* C6 the selected smart tile is the list colour alone, no coloured glow; the dark account glyph gets the hover fill of its neighbours */
+.smart-tile.selected{box-shadow:none}
+[data-theme=dark] .account-button:hover{background:var(--hover)}
+/* C7 the date panel's 기본 · 읽기 전용 are secondary words, not tinted pills */
+.cal-badge,.cal-badge.muted{background:none;padding:0;color:var(--muted);font-weight:500}
+
+/* r60-E (keep last) — 2026-11-02 review app-design-5/9/13, widget-tab-6.
+   Type ladder (app-design-9): line 49 sets .empty-state h2 back to 20px after line 6's 19px, so screen titles return to 19 (ladder 15/17/19/22); the toast follows
+   the 13px button rule (.widget-body #toast on line 10 keeps widgets at 12 by specificity). Whole-pixel line heights (28, toast 20 → a 44px box; 13 × 1.5
+   put the toast's bottom edge on a half pixel), and the widget toast keeps its 18 (12 × 1.5) so widgets do not change.
+   Sidebar (app-design-5): the account-section toggles' chevron stood in one column with the group chevrons (28) before, so it moves with them to the
+   glyph line 38 (same 16px box, line 30) and its label to the text line 59. Nested lists (line 33): tree line at 38 under the chevron, but only 4px to the
+   row and a 6px inset to the dot, so the child dots sit under the folder icon (cx 61) and names start at 82 — 22px + 8 + 10 put them at 90 and cut
+   「제주 여행 준비」 at 1000px (fix-E review). At ≤450px the icon-only nav row keeps its 40px (label hidden by font-size:0 on line 16; line 55's 22px
+   line-height would add 2px) and nested lists keep the 14px + 8px indent of the 70px sidebar (22px made the 23px dots overflow).
+   prefers-contrast (app-design-13, widget-tab-6): this used to sit on line 17 where line 48's :root{--muted} overrode it at equal specificity, so only --line
+   darkened; it must stay AFTER every :root / [data-theme] token rule, hence this block is last. Border, not box-shadow, so it survives forced-colors. Windows
+   only matches prefers-contrast:more under a contrast theme (forced-colors), so this is hygiene, not a visible change for normal use. */
+.empty-state h2{font-size:19px;line-height:28px}
+#toast{font-size:13px;line-height:20px}.widget-body #toast{line-height:18px}
+.section-toggle{padding-left:14px}.section-toggle .group-chevron{margin-right:7px}
+@media(max-width:450px){body:not(.widget-body) .main-nav .nav-item{line-height:0}body:not(.widget-body) .group-lists{margin-left:14px;padding-left:8px}}
+@media(prefers-contrast:more){:root{--muted:#505764;--secondary:#3f4556;--line:#7c8392}[data-theme=dark]{--muted:#c3c8d2;--secondary:#e2e5ec;--line:#8a91a0}.widget-surface{background:var(--w-opaque,var(--bg))!important;backdrop-filter:none!important}.widget-preview,.widget-preview.lg{background:var(--w-opaque,var(--bg))!important;backdrop-filter:none!important;box-shadow:none!important;border:1px solid color-mix(in srgb,currentColor 40%,transparent)!important}.widget-preview.lg::before,.widget-surface.lg::before{opacity:0!important}}

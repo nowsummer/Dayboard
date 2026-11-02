@@ -22,7 +22,7 @@ const shownNote = publicNote;
 const textIdOf = value => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z~[0-9a-f]{16}$/.test(value) ? value : null);
 // Widgets of notes moved to the trash, so 되돌리기 brings them back where they were (2026-10-21 review round 4).
 const trashedWidgets = new Map();
-const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, WIDGET_MIN, panelWidth, scopeChoices, CONTACT_EMAIL } = require('./renderer/domain.js');
+const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, panelWidth, scopeChoices, CONTACT_EMAIL, TEXT_SIZES, textScale, WIDGET_OPEN, widgetMinimum } = require('./renderer/domain.js');
 const { createWallpaper, backdropPayload } = require('./lib/wallpaper.cjs');
 const { providerStatus } = require('./lib/providers/oauth.cjs');
 const i18n = require('./lib/i18n.cjs');
@@ -302,10 +302,39 @@ function ensureStartMenu() {
     createStartMenu({ programsDir: path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'), userData, iconSource: windowIcon, execPath: process.execPath, appId: 'com.dayboard.desktop', shell }).ensure();
   } catch (error) { console.warn('Start Menu shortcut:', error.message); }
 }
-function commonWindow() {
+function commonWindow(extra = {}) {
   return { frame: false, show: false, backgroundColor: '#f5f5f7', roundedCorners: true, icon: windowIcon,
     // Smoke windows may sit behind other windows; Chromium then pauses requestAnimationFrame for them and the checks stall (2026-10-20).
-    webPreferences: { preload: preloadFile, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, spellcheck: false, ...(smoke ? { backgroundThrottling: false } : {}) } };
+    webPreferences: { preload: preloadFile, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, spellcheck: false, ...(smoke ? { backgroundThrottling: false } : {}), ...extra } };
+}
+// The widgets' 글자 크기 changed (r60-X): each card's smallest size follows it (renderer/domain.js widgetMinimum), and a card below it grows
+// to it where it is, kept on its screen — its content zooms and the smallest card shows what it showed at 기본. A card is never made
+// smaller here. Desktop cards (attached to the wallpaper) are moved by the desktop manager and get their wallpaper slice again. The
+// window itself keeps no minimum to change (it is not resizable): widget:resize and the grip clamp with the same rule.
+function applyWidgetMinimums() {
+  if (!store) return;
+  for (const widget of store.get().widgets) {
+    const win = widgetWindows.get(widget.id);
+    if (!win || win.isDestroyed()) continue;
+    const minimum = widgetMinimum(widget.type, store.get().settings.widgetTextSize);
+    try {
+      const current = desktop.getBounds(win, screen);
+      if (current.width < minimum.minWidth || current.height < minimum.minHeight) { desktop.setBounds(win, clampBounds(current, screen.getAllDisplays(), current, minimum), screen); queueBackdrop(win); }
+    } catch (error) { console.error('widget minimum not applied:', error.message); }
+  }
+}
+// 글자 크기 of the main window (2026-11-02 owner: text size): the whole page is zoomed, as a browser does, so every proportion the
+// review fixed (the 52px bar, 32px controls, 44px rows, the month budget measured from real cells) holds at each size — only the CSS px
+// per DIP change (the 900×650 minimum is 720×520 CSS px at 더 크게). The setting is the only source: the first paint gets it
+// (webPreferences.zoomFactor), a change and every load set it again, and so does Ctrl+wheel, which Electron reports (zoom-changed)
+// without zooming — a precision touchpad's pinch arrives as Ctrl+wheel, and a persisted three-step setting must not move under a
+// scroll of the month board. The default menu's Ctrl+-/Ctrl+0/Ctrl++ zoom never fires: the renderer takes those keys (app.js).
+// Widgets are never zoomed this way: their wallpaper slice is painted from the window's DIP bounds and the glass lens is sized to the
+// card; their content scales inside the card instead (styles.css r60-X, settings.widgetTextSize).
+function applyTextSize(win = mainWindow) {
+  if (!store || !win || win.isDestroyed() || win.webContents.isDestroyed()) return;
+  const factor = textScale(store.get().settings.textSize);
+  if (Math.abs(win.webContents.getZoomFactor() - factor) > 1e-6) win.webContents.setZoomFactor(factor);
 }
 // Reopen the main window where the user left it, as long as that spot is still on a display.
 function savedMainBounds() {
@@ -318,7 +347,7 @@ function savedMainBounds() {
 let mainBoundsTimer;
 function showMain() {
   if (!mainWindow || mainWindow.isDestroyed()) {
-    mainWindow = new BrowserWindow({ ...commonWindow(), width: 1180, height: 780, minWidth: 900, minHeight: 650, title: 'Dayboard', ...savedMainBounds() });
+    mainWindow = new BrowserWindow({ ...commonWindow({ zoomFactor: textScale(store?.get().settings.textSize) }), width: 1180, height: 780, minWidth: 900, minHeight: 650, title: 'Dayboard', ...savedMainBounds() });
     secureWindow(mainWindow);
     taskbarIcon.watch(mainWindow, windowIcon);
     mainWindow.once('ready-to-show', () => mainWindow.show());
@@ -335,6 +364,9 @@ function showMain() {
     const windowState = () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dayboard:window', { maximized: mainWindow.isMaximized() }); };
     for (const name of ['maximize', 'unmaximize', 'restore']) mainWindow.on(name, windowState);
     mainWindow.webContents.on('did-finish-load', windowState);
+    const zoomed = mainWindow;
+    mainWindow.webContents.on('did-finish-load', () => applyTextSize(zoomed));
+    mainWindow.webContents.on('zoom-changed', () => applyTextSize(zoomed));
     mainWindow.on('close', event => {
       if (!quitting) { event.preventDefault(); closeWindow(mainWindow).catch(error => dialog.showErrorBox(tr('변경 사항을 저장하지 못했습니다'), error.message)); }
     });
@@ -362,8 +394,8 @@ async function openWidget(widget) {
   if (widgetWindows.has(widget.id)) { widgetWindows.get(widget.id).show(); return widget; }
   if (quitting) { const cancelled = new Error(tr('위젯을 여는 중에 닫혔어요.')); cancelled.cancelled = true; throw cancelled; } // no new window once the quit began
   const area = screen.getPrimaryDisplay().workArea;
-  const size = { width: 360, height: widget.type === 'calendar' ? 440 : widget.type === 'note' ? 330 : 450 };
-  const minimum = WIDGET_MIN[widget.type] || WIDGET_MIN.note;
+  const size = { ...(WIDGET_OPEN[widget.type] || WIDGET_OPEN.note) };
+  const minimum = widgetMinimum(widget.type, store.get().settings.widgetTextSize); // WIDGET_MIN at the widgets' text size (r60-X)
   const displays = screen.getAllDisplays();
   // A widget whose screen is not connected (second monitor off or undocked) waits in a free spot on the main screen,
   // never piled on another widget, and keeps its own place (homeBounds) for when that screen returns (rehomeWidgets),
@@ -412,6 +444,8 @@ async function openWidget(widget) {
   win.webContents.on('render-process-gone', hideWhileReloading);
   win.webContents.on('did-start-loading', hideWhileReloading);
   win.webContents.on('did-finish-load', () => {
+    // A widget page is never zoomed (applyTextSize): a zoom left from an earlier load would misplace the wallpaper slice and the lens.
+    if (Math.abs(win.webContents.getZoomFactor() - 1) > 1e-6) win.webContents.setZoomFactor(1);
     backdropKeys.delete(win.id);
     if (desktop.isAttached(win)) perWidget(widget.id, () => revealOnDesktop(win, { hide: true }).then(backdrop => setWidgetBackdrop(widget.id, backdrop))).catch(() => {});
   });
@@ -601,7 +635,7 @@ function rehomeWidgets() {
   for (const widget of store.get().widgets) {
     const win = widgetWindows.get(widget.id);
     if (!win || win.isDestroyed()) continue;
-    const minimum = WIDGET_MIN[widget.type] || WIDGET_MIN.note;
+    const minimum = widgetMinimum(widget.type, store.get().settings.widgetTextSize);
     try {
       if (widget.homeBounds && onScreen(widget.homeBounds, displays)) {
         desktop.setBounds(win, clampBounds(widget.homeBounds, displays, widget.homeBounds, minimum), screen);
@@ -1283,6 +1317,11 @@ async function command(commandName, payload, sourceWindow) {
         if (!['app', 'auto', 'light', 'dark'].includes(payload.widgetTheme)) throw new Error(tr('지원하지 않는 테마입니다.'));
         settings.widgetTheme = payload.widgetTheme;
       }
+      // 글자 크기 (2026-11-02 owner: text size): the main window's and the widgets', each one of renderer/domain.js TEXT_SIZES.
+      for (const key of ['textSize', 'widgetTextSize']) if (key in payload) {
+        if (typeof payload[key] !== 'string' || !Object.hasOwn(TEXT_SIZES, payload[key])) throw new Error(tr('지원하지 않는 글자 크기입니다.'));
+        settings[key] = payload[key];
+      }
       if ('glassLevel' in payload) {
         if (typeof payload.glassLevel !== 'number' || !Number.isFinite(payload.glassLevel) || payload.glassLevel < 0 || payload.glassLevel > 1) throw new Error(tr('유리 효과는 0~1 사이로 설정해 주세요.'));
         settings.glassLevel = Math.round(payload.glassLevel * 100) / 100;
@@ -1370,6 +1409,8 @@ async function command(commandName, payload, sourceWindow) {
         if (settings.launchAtLogin !== store.get().settings.launchAtLogin) setLogin(settings.launchAtLogin);
       }
       commit(state => { state.settings = settings; });
+      if ('textSize' in payload) applyTextSize();
+      if ('widgetTextSize' in payload) applyWidgetMinimums();
       if ('autoUpdate' in payload) updater?.setEnabled(settings.autoUpdate);
       if (languageChanged) applyLanguage();
       return store.publicState();
@@ -1458,7 +1499,7 @@ async function command(commandName, payload, sourceWindow) {
       const held = key ? resizeAnchors.get(widget.id) : null;
       const current = held && held.key === key ? held.bounds : desktop.getBounds(win, screen);
       if (key && !(held && held.key === key)) resizeAnchors.set(widget.id, { key, bounds: current });
-      const bounds = resizedBounds(current, { width: payload.width, height: payload.height, edge }, screen.getAllDisplays(), WIDGET_MIN[widget.type]);
+      const bounds = resizedBounds(current, { width: payload.width, height: payload.height, edge }, screen.getAllDisplays(), widgetMinimum(widget.type, store.get().settings.widgetTextSize));
       desktop.setBounds(win, bounds, screen);
       return bounds;
     }
@@ -1492,7 +1533,16 @@ async function command(commandName, payload, sourceWindow) {
       else commit(state => { state.widgets = state.widgets.filter(w => w.id !== widget.id); });
       return store.publicState();
     }
-    case 'window:main': showMain(); return true;
+    case 'window:main': {
+      showMain();
+      // 「위젯 모양 설정…」 in a widget's settings sheet (2026-11-02 review usability-2): the window opens on the widgets tab. Only that literal
+      // view is accepted; a window made by this call is still loading, so the message waits for its page (as the open-day click does).
+      if (payload && payload.view === 'widgets') {
+        const send = () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dayboard:open-view', 'widgets'); };
+        if (mainWindow && mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send); else send();
+      }
+      return true;
+    }
     case 'window:minimize': sourceWindow?.minimize(); return true;
     case 'window:maximize': if (sourceWindow === mainWindow) sourceWindow.isMaximized() ? sourceWindow.unmaximize() : sourceWindow.maximize(); return true;
     case 'window:close': {
@@ -1509,7 +1559,11 @@ async function command(commandName, payload, sourceWindow) {
       const url = new URL(text(payload.url, tr('주소'), 2048));
       // Mail to Dayboard's own address (settings 「문의」), nothing else: no other address, no subject or body from the page.
       if (url.protocol === 'mailto:' && decodeURIComponent(url.pathname) === CONTACT_EMAIL && !url.search && !url.hash) { await shell.openExternal(`mailto:${CONTACT_EMAIL}`); return true; }
-      if (url.protocol !== 'https:' || url.username || url.password || /^(localhost|127\.|\[?::1)/i.test(url.hostname)) throw new Error(tr('안전한 HTTPS 웹 주소만 열 수 있습니다.'));
+      // Only the https hosts the page links to (renderer/app.js connectAccount: Apple account, Google Cloud console, Microsoft Entra) — defence in
+      // depth against a page gone wrong (2026-11-02 review security-7); a new external link is added here too (CONTRACT.md). The loopback test
+      // stays, and the list also closes the forms it misses, such as [::ffff:7f00:1].
+      const ALLOWED_HOSTS = new Set(['account.apple.com', 'console.cloud.google.com', 'entra.microsoft.com']);
+      if (url.protocol !== 'https:' || url.username || url.password || /^(localhost|127\.|\[?::1)/i.test(url.hostname) || !ALLOWED_HOSTS.has(url.hostname)) throw new Error(tr('안전한 HTTPS 웹 주소만 열 수 있습니다.'));
       await shell.openExternal(url.href); return true;
     }
     case 'backup:export': {
@@ -1586,7 +1640,7 @@ function createUpdater() {
     if (tray && current.status !== trayUpdateStatus) { trayUpdateStatus = current.status; trayMenu(); }
   });
   updater.on('downloaded', ({ version }) => announceOnce(`downloaded:${version}`, tr("Dayboard {0} 준비 완료", [version]), tr('설정에서 「지금 다시 시작해 적용」을 누르면 업데이트돼요.')));
-  updater.on('available', ({ version, selfUpdating }) => { if (!selfUpdating) announceOnce(`available:${version}`, tr("Dayboard {0}이(가) 나왔어요", [version]), tr('설정의 업데이트에서 설치 파일을 받을 수 있어요.')); });
+  updater.on('available', ({ version, selfUpdating }) => { if (!selfUpdating) announceOnce(`available:${version}`, tr("Dayboard {0} 버전이 나왔어요", [version]) /* no 「이(가)」 after the number (2026-11-02 r60 integration app-ui-11) */, tr('설정의 업데이트에서 설치 파일을 받을 수 있어요.')); });
   updater.on('install-failed', () => broadcast());
   updater.setEnabled(store.get().settings.autoUpdate !== false);
   // 0.2.0 kept downloaded updates in %LOCALAPPDATA%\dayboard-updater; from 1.0.0 they share the installer's own
@@ -1658,7 +1712,8 @@ function applyLanguage() {
 async function runSmokeTest() {
   const output = process.env.DAYBOARD_SMOKE_OUTPUT ? path.resolve(process.env.DAYBOARD_SMOKE_OUTPUT) : path.join(userData, 'smoke');
   fs.mkdirSync(output, { recursive: true });
-  const report = { userData, output, checks: [], errors: smokeErrors };
+  // versions: the engine this run really has, so a bundle's smoke proves its Electron (2026-11-02 review security-6).
+  const report = { userData, output, versions: { electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node }, checks: [], errors: smokeErrors };
   try {
     if (mainWindow.webContents.isLoading()) await new Promise(resolve => mainWindow.webContents.once('did-finish-load', resolve));
     const invoke = (name, payload = {}) => mainWindow.webContents.executeJavaScript(`window.dayboard.invoke(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
@@ -1729,14 +1784,26 @@ async function runSmokeTest() {
 // normal way (drafts and open event cards saved, the 「저장하지 못한 변경」 question when something cannot be), instead of
 // being killed with unsaved changes (Codex review 2026-10-26). Started with it while nothing runs, it just ends.
 const QUIT_FOR_INSTALL = '--quit-for-install';
-if (!app.requestSingleInstanceLock()) app.quit();
-else if (process.argv.includes(QUIT_FOR_INSTALL)) app.exit(0);
-else {
+// The fuses shut the Node inspector (--inspect), not Chromium's DevTools protocol: a shipped Dayboard.exe started with
+// --remote-debugging-port / -pipe would let a local program drive its pages and their IPC, so it does not start (no script uses CDP on the
+// packaged exe; the smoke run keeps its switches; no lock, no window: the chain below never registers whenReady) (2026-11-02 r60 carry-over S2-1).
+const DEVTOOLS_SWITCH = app.isPackaged && !smoke && (app.commandLine.hasSwitch('remote-debugging-port') || app.commandLine.hasSwitch('remote-debugging-pipe'));
+if (DEVTOOLS_SWITCH) app.exit(1);
+else if (!app.requestSingleInstanceLock()) app.quit();
+else if (process.argv.includes(QUIT_FOR_INSTALL)) {
+  // The packaging trial run (scripts/bundle-swap.cjs probeBundle, its own DAYBOARD_USER_DATA profile) reads back the engine this exe really
+  // started with (2026-11-02 review security-6); the installer's close request, which runs in the user's profile, leaves nothing behind.
+  if (process.env.DAYBOARD_USER_DATA) { try { fs.mkdirSync(userData, { recursive: true }); fs.writeFileSync(path.join(userData, 'engine.json'), JSON.stringify({ electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node })); } catch { /* the trial run then fails on the missing file */ } }
+  app.exit(0);
+} else {
   // 'second-instance' comes synchronously from Chromium's WM_COPYDATA handler, which can run inside
   // a native call that pumps messages; creating the window there would nest koffi calls (crash).
   app.on('second-instance', (_event, argv) => setImmediate(() => { if (Array.isArray(argv) && argv.includes(QUIT_FOR_INSTALL)) app.quit(); else showMain(); }));
   app.whenReady().then(async () => {
     if (startupError) throw startupError;
+    // No application menu (2026-11-03 Codex review F1): Electron's default one carries reload, DevTools and page-zoom accelerators
+    // the shipped app should not have; the renderer's own keys (글자 크기 Ctrl+= / Ctrl+- / Ctrl+0) and text editing work without it.
+    Menu.setApplicationMenu(null);
     applyLanguage();
     store = createStore(userData);
     // A move to a connected list that was under way when Dayboard stopped may have gone through: it waits for the user (lib/taskmove.cjs).

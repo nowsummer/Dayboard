@@ -74,8 +74,12 @@ async function github(token, method, url, body, headers = {}) {
     const source = at(file);
     if (fs.existsSync(source)) assert.equal(file === 'package.json' ? hash : digest(source), hash, `Source changed since the build: ${file}. Run npm run package and npm run dist again.`);
   }
+  // The runtime libraries inside the installer are the ones the lockfile names (2026-11-02 review security-8): the lockfile and koffi's
+  // native module on this PC must still be what the verified build recorded.
+  assert.equal(digest(at('package-lock.json')), check.bundle.lockfileSha256, 'package-lock.json changed since the build. Run npm run package and npm run dist again.');
+  assert.equal(digest(at('node_modules', '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node')), check.bundle.koffiNodeSha256, 'koffi.node changed since the build. Run npm run package and npm run dist again.');
   const tag = `v${version}`;
-  if (args.has('--dry')) { console.log(JSON.stringify({ version, tag, repository: `${owner}/${repo}`, assets: assets.map(file => ({ name: path.basename(file), size: fs.statSync(file).size, sha256: digest(file) })), notes }, null, 2)); return; }
+  if (args.has('--dry')) { const { app: _app, ...bundle } = check.bundle; console.log(JSON.stringify({ version, tag, repository: `${owner}/${repo}`, assets: assets.map(file => ({ name: path.basename(file), size: fs.statSync(file).size, sha256: digest(file) })), bundle, notes }, null, 2)); return; }
 
   const login = getToken(!args.has('--no-login'));
   if (!login) throw new Error('No GitHub sign-in on this PC. Run: npm run release -- --login');

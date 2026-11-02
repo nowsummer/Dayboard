@@ -10,13 +10,15 @@ const { execFileSync } = require('node:child_process');
 const firstLine = error => String(error && error.message || error).split('\n')[0];
 
 // Runs the new Dayboard.exe with --quit-for-install alone, which ends at once (main.cjs). Its own profile keeps it from the
-// single-instance lock of a running Dayboard (that would quit it) and from the user's data.
+// single-instance lock of a running Dayboard (that would quit it) and from the user's data. Returns the engine the exe really started
+// with ({electron, chrome, node}, written by that branch into the profile's engine.json — 2026-11-02 review security-6).
 function probeBundle(directory, scratch, run = execFileSync) {
   const profile = path.join(scratch, 'probe-profile');
   fs.mkdirSync(profile, { recursive: true });
   const env = { ...process.env, DAYBOARD_USER_DATA: profile };
   delete env.ELECTRON_RUN_AS_NODE; // would start the exe as plain Node
   delete env.DAYBOARD_SMOKE_TEST;
+  fs.rmSync(path.join(profile, 'engine.json'), { force: true }); // only this run's record counts
   try {
     run(path.join(directory, 'Dayboard.exe'), ['--quit-for-install'], { env, stdio: 'pipe', windowsHide: true, timeout: 60000 });
   } catch (error) {
@@ -26,6 +28,11 @@ function probeBundle(directory, scratch, run = execFileSync) {
       ? `새로 만든 Dayboard.exe를 이 PC의 앱 제어 정책(스마트 앱 컨트롤)이 실행하지 못하게 합니다 (${firstLine(error)}). 기존 앱 번들을 그대로 둡니다.`
       : `새로 만든 Dayboard.exe가 시험 실행에서 정상적으로 끝나지 않았습니다 (${firstLine(error)}). 기존 앱 번들을 그대로 둡니다.`);
   }
+  // No engine.json: the exe ended without reaching the --quit-for-install branch, so nothing proves which Electron it is.
+  let engine = null;
+  try { engine = JSON.parse(fs.readFileSync(path.join(profile, 'engine.json'), 'utf8')); } catch { engine = null; }
+  if (!engine || typeof engine.electron !== 'string' || !engine.electron) throw new Error('시험 실행한 Dayboard.exe가 엔진 기록(engine.json)을 남기지 않았습니다 (--quit-for-install 분기에 이르지 못함). 기존 앱 번들을 그대로 둡니다.');
+  return engine;
 }
 
 // OneDrive can hold a file of the folder for a moment while it syncs: a few tries, a second apart.

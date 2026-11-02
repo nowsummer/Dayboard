@@ -25,5 +25,9 @@ test('settings shows it, main opens mail to it alone, the public README names it
   assert.match(app, /class:'settings-contact'/);
   const main = fs.readFileSync(path.join(root, 'main.cjs'), 'utf8');
   assert.match(main, /url\.protocol === 'mailto:' && decodeURIComponent\(url\.pathname\) === CONTACT_EMAIL && !url\.search && !url\.hash/);
-  for (const file of ['docs/public/README.md', 'docs/public/README.ko.md']) assert.ok(fs.readFileSync(path.join(root, file), 'utf8').includes(CONTACT_EMAIL), file);
+  // The public export moves docs/public/README*.md to the repository root, so a public copy reads them there (2026-11-02 r60 integration).
+  for (const name of ['README.md', 'README.ko.md']) {
+    const file = fs.existsSync(path.join(root, 'docs/public', name)) ? 'docs/public/' + name : name;
+    assert.ok(fs.readFileSync(path.join(root, file), 'utf8').includes(CONTACT_EMAIL), file);
+  }
 });

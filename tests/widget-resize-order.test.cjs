@@ -12,7 +12,7 @@ const begin = source.indexOf('function widgetResizer(w){'), end = source.indexOf
 function rig() {
   const calls = [], replies = [], timers = new Map(); let next = 1;
   const context = vm.createContext({
-    Promise, Math, window: { outerWidth: 300, outerHeight: 300 }, widgetMin: [280, 220], resizingWidget: false,
+    Promise, Math, window: { outerWidth: 300, outerHeight: 300 }, widgetMin: () => [280, 220], resizingWidget: false, // widgetMin is a function since r60-X (the minimum follows the widget text size); resizingWidget back in the code, not the comment (2026-11-02 r60 integration)
     renderPending: false, renders: 0, errors: [], render() { context.renders++; }, toast(message) { context.errors.push(message); },
     setTimeout: fn => { const id = next++; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id),
     api: { invoke(name, payload) {

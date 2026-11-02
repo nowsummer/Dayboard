@@ -52,6 +52,13 @@ contextBridge.exposeInMainWorld('dayboard', Object.freeze({
     ipcRenderer.on('dayboard:open-day', listener);
     return () => ipcRenderer.removeListener('dayboard:open-day', listener);
   },
+  // 「위젯 모양 설정…」 in a widget's settings sheet (2026-11-02 review usability-2): the main window opens on the widgets tab. Only that
+  // view is passed on. No TypeError here: preload strings have no tr() and the one caller (app.js) always passes a function.
+  onOpenView(callback) {
+    const listener = (_event, view) => { if (view === 'widgets' && typeof callback === 'function') callback(view); };
+    ipcRenderer.on('dayboard:open-view', listener);
+    return () => ipcRenderer.removeListener('dayboard:open-view', listener);
+  },
   // The main window's glass slider being dragged (2026-10-28): widgets show the level before it is saved.
   onGlassPreview(callback) {
     if (typeof callback !== 'function') throw new TypeError('유리 미리보기 함수가 필요합니다.');

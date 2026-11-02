@@ -66,7 +66,8 @@ function keptExecutable() {
   if (!fs.existsSync(exe) || !fs.existsSync(infoFile)) throw new Error('DAYBOARD_KEEP_EXE: 앱/에 지금 번들이 없습니다.');
   const info = JSON.parse(fs.readFileSync(infoFile, 'utf8'));
   const sha = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  if (info.electron !== manifest.devDependencies.electron) throw new Error(`DAYBOARD_KEEP_EXE: 지금 번들의 Electron ${info.electron}이 새 버전 ${manifest.devDependencies.electron}과 다릅니다.`);
+  const electron = info.electronMeasured || info.electron; // measured by the trial run since 1.2.7 (2026-11-02 review security-6); older build-info has the declared string only
+  if (electron !== manifest.devDependencies.electron) throw new Error(`DAYBOARD_KEEP_EXE: 지금 번들의 Electron ${electron}이 새 버전 ${manifest.devDependencies.electron}과 다릅니다.`);
   if (sha(exe) !== info.executableSha256) throw new Error('DAYBOARD_KEEP_EXE: 지금 번들의 Dayboard.exe가 build-info.json과 다릅니다.');
   const icon = path.join(sourceDir, 'assets', 'icon.ico');
   if (info.iconSha256 ? info.iconSha256 !== sha(icon) : fs.statSync(icon).mtimeMs > Date.parse(info.builtAt)) throw new Error('DAYBOARD_KEEP_EXE: 아이콘이 지금 번들을 만든 뒤 바뀌었을 수 있습니다.');
@@ -87,6 +88,28 @@ async function stampFileVersion(exe, version) {
   info.outputToResourceEntries(resources.entries);
   resources.outputResource(image);
   fs.writeFileSync(exe, Buffer.from(image.generate()));
+}
+
+// The fuse wire of the exe that ships, read back after the flip in main() — so also of a kept exe (DAYBOARD_KEEP_EXE): the three developer
+// back doors DISABLE, cookie encryption ENABLE (2026-11-02 review security-2). Every named fuse is returned as it is, for build-info.json
+// `fuses`. @electron/fuses 1.8.0 exports FuseState only from dist/constants.
+async function assertFuses(exe) {
+  const { getCurrentFuseWire, FuseV1Options } = require('@electron/fuses');
+  const { FuseState } = require('@electron/fuses/dist/constants');
+  const wire = await getCurrentFuseWire(exe);
+  const fuses = {};
+  for (const [index, value] of Object.entries(wire)) if (index !== 'version' && FuseV1Options[index]) fuses[FuseV1Options[index]] = FuseState[value] || String(value);
+  const expected = { RunAsNode: 'DISABLE', EnableNodeOptionsEnvironmentVariable: 'DISABLE', EnableNodeCliInspectArguments: 'DISABLE', EnableCookieEncryption: 'ENABLE' };
+  for (const [option, state] of Object.entries(expected)) if (fuses[option] !== state) throw new Error(`Dayboard.exe의 fuse ${option}이 ${fuses[option]}입니다(${state}이어야 함).`);
+  return fuses;
+}
+
+// Every file under a folder, as '/'-separated paths relative to it, sorted.
+function filesUnder(root) {
+  const list = [];
+  const walk = folder => { for (const entry of fs.readdirSync(folder, { withFileTypes: true })) { const full = path.join(folder, entry.name); if (entry.isDirectory()) walk(full); else list.push(path.relative(root, full).split(path.sep).join('/')); } };
+  walk(root);
+  return list.sort();
 }
 
 function verifyBundle(directory) {
@@ -113,6 +136,43 @@ function verifyBundle(directory) {
     'node_modules/electron', 'node_modules/@electron/packager']) {
     if (fs.existsSync(path.join(appDir, unwanted))) throw new Error(`개발 전용 파일이 패키지에 포함됐습니다: ${unwanted}`);
   }
+  // The Electron really in the bundle, from the Electron zip's own `version` file — build-info's `electron` was only package.json's string
+  // (2026-11-02 review security-6); the trial run measures it once more (probeBundle → electronMeasured).
+  const electronFile = fs.readFileSync(path.join(directory, 'version'), 'utf8').trim().replace(/^v/, '');
+  if (electronFile !== manifest.devDependencies.electron) throw new Error(`번들의 Electron(version 파일 ${electronFile})이 package.json의 ${manifest.devDependencies.electron}과 다릅니다.`);
+  // The runtime libraries in the bundle match package-lock.json by version and npm's integrity record — file contents are compared for
+  // koffi.node only, so a same-version package edited in place is not caught here (2026-11-02 review security-8; wording 2026-11-02 r60
+  // integration X-10): node_modules on this PC (npm's own
+  // record of what it installed, node_modules/.package-lock.json) must match the lockfile for every non-dev package, nothing may be installed
+  // that the lockfile does not know, and every package in the bundle must be in the lockfile at that version. node_modules lives in a OneDrive
+  // folder, so the release checklist has no routine `npm ci`: a mismatch stops here instead and asks for one.
+  const sha = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  const hint = 'npm ci 뒤 다시 npm run package 하세요.';
+  const lock = JSON.parse(fs.readFileSync(path.join(sourceDir, 'package-lock.json'), 'utf8'));
+  const installed = JSON.parse(fs.readFileSync(path.join(sourceDir, 'node_modules', '.package-lock.json'), 'utf8'));
+  for (const [name, entry] of Object.entries(lock.packages)) {
+    if (!name || entry.dev) continue;
+    const have = installed.packages[name];
+    if (!have) { if (entry.optional) continue; throw new Error(`node_modules에 잠금파일의 ${name}이(가) 없습니다. ${hint}`); }
+    if (have.version !== entry.version || have.integrity !== entry.integrity) throw new Error(`node_modules의 ${name.slice('node_modules/'.length)}이(가) 잠금파일과 다릅니다(${have.version === entry.version ? `${have.version}, integrity 다름` : `${have.version} ≠ ${entry.version}`}). ${hint}`);
+  }
+  for (const name of Object.keys(installed.packages)) if (name && !lock.packages[name]) throw new Error(`node_modules에 잠금파일에 없는 ${name}이(가) 있습니다. ${hint}`);
+  const modulesDir = path.join(appDir, 'node_modules');
+  const moduleFiles = filesUnder(modulesDir);
+  const bundled = new Set();
+  for (const file of moduleFiles) {
+    const folder = file.replace(/\/package\.json$/, ''); // a package root: name, @scope/name, or those under a nested node_modules
+    if (folder === file || !/^(@[^/]+\/)?[^/@][^/]*(\/node_modules\/(@[^/]+\/)?[^/@][^/]*)*$/.test(folder)) continue;
+    const key = `node_modules/${folder}`, entry = lock.packages[key];
+    if (!entry || entry.dev) throw new Error(`번들의 ${key}이(가) 잠금파일에 없거나 개발 전용입니다. ${hint}`);
+    const { version } = JSON.parse(fs.readFileSync(path.join(modulesDir, file), 'utf8'));
+    if (version !== entry.version) throw new Error(`번들의 ${key}(${version})이 잠금파일(${entry.version})과 다릅니다. ${hint}`);
+    bundled.add(key);
+  }
+  for (const [name, entry] of Object.entries(lock.packages)) if (name && !entry.dev && installed.packages[name] && !bundled.has(name)) throw new Error(`잠금파일의 ${name}이(가) 번들에 없습니다. ${hint}`);
+  const koffiNode = ['@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node'];
+  const koffiNodeSha256 = sha(path.join(sourceDir, 'node_modules', ...koffiNode));
+  if (sha(path.join(modulesDir, ...koffiNode)) !== koffiNodeSha256) throw new Error(`번들의 koffi.node가 node_modules의 것과 다릅니다. ${hint}`);
   return {
     product: 'Dayboard',
     version: manifest.version,
@@ -120,8 +180,12 @@ function verifyBundle(directory) {
     platform: 'win32',
     arch: 'x64',
     builtAt: new Date().toISOString(),
-    executableSha256: createHash('sha256').update(fs.readFileSync(executable)).digest('hex'),
+    executableSha256: sha(executable),
     runtimeDependencies: manifest.dependencies,
+    lockfileSha256: sha(path.join(sourceDir, 'package-lock.json')),
+    koffiNodeSha256,
+    // sha256 over the sorted list of (path, sha256) of every file under the bundle's node_modules; npm run dist recomputes it.
+    bundledModulesSha256: createHash('sha256').update(moduleFiles.map(file => `${file} ${sha(path.join(modulesDir, file))}\n`).join('')).digest('hex'),
   };
 }
 
@@ -249,6 +313,10 @@ async function main() {
       platform: 'win32',
       arch: 'x64',
       electronVersion: manifest.devDependencies.electron,
+      // The Electron zip is checked against the checksums the electron npm package ships (pinned by package-lock.json), as Electron's own
+      // install does, instead of a SHASUMS256.txt fetched afresh on every build (2026-11-02 review security-8); with the zip in the download
+      // cache, packaging then needs no network at all.
+      download: { checksums: JSON.parse(fs.readFileSync(path.join(sourceDir, 'node_modules', 'electron', 'checksums.json'), 'utf8')) },
       appVersion: manifest.version,
       icon: path.join(sourceDir, 'assets', 'icon.ico'),
       overwrite: true,
@@ -262,9 +330,21 @@ async function main() {
     if (results.length !== 1 || path.resolve(results[0]) !== staged) throw new Error('패키지 출력 경로가 예상과 다릅니다.');
     if (kept) { fs.copyFileSync(kept.exe, path.join(staged, 'Dayboard.exe')); console.log(`Dayboard.exe: 지금 번들의 것을 그대로 씀(${kept.version}, DAYBOARD_KEEP_EXE)`); }
     else await stampFileVersion(path.join(staged, 'Dayboard.exe'), manifest.version);
+    // Electron's developer back doors are shut in the exe that ships (2026-11-02 review security-2): ELECTRON_RUN_AS_NODE made Dayboard.exe run
+    // any script as plain Node, NODE_OPTIONS loaded code before the app, --inspect attached a debugger — Dayboard uses none of them.
+    // GrantFileProtocolExtraPrivileges stays on (the renderer is loaded from file://); the ASAR fuses stay off (asar: false, 2026-10-21).
+    // Flipping is idempotent, so a kept exe (DAYBOARD_KEEP_EXE) that already carries these fuses keeps its hash.
+    const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
+    const exe = path.join(staged, 'Dayboard.exe');
+    await flipFuses(exe, { version: FuseVersion.V1, [FuseV1Options.RunAsNode]: false, [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false, [FuseV1Options.EnableNodeCliInspectArguments]: false, [FuseV1Options.EnableCookieEncryption]: true });
+    const fuses = await assertFuses(exe);
     writeUpdateFeed(staged);
     const result = verifyBundle(staged);
-    probeBundle(staged, scratch);
+    result.fuses = fuses;
+    // The trial run reports the engine it really started with (main.cjs --quit-for-install writes engine.json — 2026-11-02 review security-6).
+    const engine = probeBundle(staged, scratch);
+    if (engine.electron !== manifest.devDependencies.electron) throw new Error(`시험 실행한 Dayboard.exe의 Electron ${engine.electron}이 package.json의 ${manifest.devDependencies.electron}과 다릅니다.`);
+    result.electronMeasured = engine.electron; result.engine = engine;
     fs.mkdirSync(outputDir, { recursive: true });
     replaceBundle(staged, bundleDir);
     result.launcherSha256 = portableLayout ? buildLauncher() : null;

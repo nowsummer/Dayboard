@@ -14,7 +14,7 @@ const start = src.indexOf('function widgetResizer(w){'), end = src.indexOf('// T
 function harness() {
   const calls = []; const held = [];
   const box = {
-    Promise, Math, setTimeout, clearTimeout, window: { outerWidth: 300, outerHeight: 300 }, widgetMin: [280, 220],
+    Promise, Math, setTimeout, clearTimeout, window: { outerWidth: 300, outerHeight: 300 }, widgetMin: () => [280, 220], // a function since r60-X (the minimum follows the widget text size)
     resizingWidget: false, renderPending: false, rendered: 0, toast: () => {},
     api: { invoke: (name, payload) => { calls.push(payload); return new Promise(resolve => held.push(resolve)); } },
   };

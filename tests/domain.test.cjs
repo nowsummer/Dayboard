@@ -266,6 +266,33 @@ test('Korean quick add turns 오전/오후 N시 and HH:MM into a reminder on tha
     ['03:30 알람', '알람', '2026-10-21', '2026-10-21 03:30'],
     ['오전 12시 알람', '알람', '2026-10-21', '2026-10-21 00:00'],
     ['다음 주 금요일 오후 2시에 발표', '발표', '2026-10-30', '2026-10-30 14:00'],
+    // Period words decide AM/PM and leave the title (2026-11-02 review usability-3: 「밤 11시」 was 11:00 AM with 「밤」 kept); 「밤 12시」
+    // and 「자정」 are 00:00 of the next day, 「낮 12시」「정오」 12:00; 06:00 and 09:00 today have passed at 10:00, so tomorrow.
+    ['밤 11시 약 먹기', '약 먹기', '2026-10-20', '2026-10-20 23:00'],
+    ['새벽 6시 기상', '기상', '2026-10-21', '2026-10-21 06:00'],
+    ['아침 9시 회의', '회의', '2026-10-21', '2026-10-21 09:00'],
+    ['저녁 7시 반 식사', '식사', '2026-10-20', '2026-10-20 19:30'],
+    ['낮 12시 점심', '점심', '2026-10-20', '2026-10-20 12:00'],
+    ['밤 12시 마감', '마감', '2026-10-21', '2026-10-21 00:00'],
+    ['저녁 12시 마감', '마감', '2026-10-21', '2026-10-21 00:00'],
+    ['정오에 점심', '점심', '2026-10-20', '2026-10-20 12:00'],
+    ['자정 마감', '마감', '2026-10-21', '2026-10-21 00:00'],
+    ['내일 밤 11시 약', '약', '2026-10-21', '2026-10-21 23:00'],
+    ['내일밤11시 약', '약', '2026-10-21', '2026-10-21 23:00'],
+    ['내일 새벽 6시 기상', '기상', '2026-10-21', '2026-10-21 06:00'],
+    ['내일 자정 마감', '마감', '2026-10-22', '2026-10-22 00:00'],
+    // A period word before H:MM decides too, never the bare-clock guess (「오후 3:30」 kept 「오후」 in the title).
+    ['밤 11:30 약', '약', '2026-10-20', '2026-10-20 23:30'],
+    ['오후 3:30 회의', '회의', '2026-10-20', '2026-10-20 15:30'],
+    ['밤 12시 반 정리', '정리', '2026-10-21', '2026-10-21 00:30'],
+    // 「밤 1–5시」 are the small hours of that night, never 1–5 PM; 「낮 11시」 is 11 AM, 「낮 2시」 2 PM.
+    ['밤 1시 불 끄기', '불 끄기', '2026-10-21', '2026-10-21 01:00'],
+    ['밤 2시 반 백업', '백업', '2026-10-21', '2026-10-21 02:30'],
+    ['내일 밤 1시 백업', '백업', '2026-10-22', '2026-10-22 01:00'],
+    ['오늘 밤 12시 마감', '마감', '2026-10-21', '2026-10-21 00:00'],
+    ['밤 6시 산책', '산책', '2026-10-20', '2026-10-20 18:00'],
+    ['낮 11시 미팅', '미팅', '2026-10-20', '2026-10-20 11:00'],
+    ['낮 2시 미팅', '미팅', '2026-10-20', '2026-10-20 14:00'],
   ];
   for (const [text, title, dueDate, at] of cases) {
     const r = quickKo(text);
@@ -275,6 +302,144 @@ test('Korean quick add turns 오전/오후 N시 and HH:MM into a reminder on tha
   }
   // A time already past on the day given is not a reminder: the words stay in the title.
   assert.deepEqual(quickKo('오늘 오전 9시 산책'), { title: '오전 9시 산책', dueDate: '2026-10-20', reminderAt: '' });
+  // Typed after midnight with no date, a night hour is the one still ahead: 「밤 1시」 at 00:30 is in half an hour, 「자정」 the next one.
+  const late = new Date('2026-10-21T00:30:00');
+  assert.equal(localTime(quickKo('밤 1시 약', '2026-10-21', late).reminderAt), '2026-10-21 01:00');
+  assert.equal(localTime(quickKo('자정 마감', '2026-10-21', late).reminderAt), '2026-10-22 00:00');
+  assert.deepEqual(quickKo('내일 밤 12시 75분 마감'), { title: '밤 12시 75분 마감', dueDate: '2026-10-21', reminderAt: '' }, 'no time, so the date does not move');
+});
+
+// ---- 2026-11-02 review usability-3: 「다음 달 N일」「이번 달 N일」, a period word never falls into the bare-clock guess, English mirrors ----
+test('quick add reads 「다음 달 N일」 and a still-ahead 「이번 달 N일」; a contradictory period word or an invalid day stays in the title', () => {
+  assert.deepEqual(quickKo('다음 달 1일 월세'), { title: '월세', dueDate: '2026-11-01', reminderAt: '' });
+  assert.deepEqual(quickKo('이번 달 25일 카드값'), { title: '카드값', dueDate: '2026-10-25', reminderAt: '' });
+  assert.equal(quickKo('이번 달 20일 마감').dueDate, '2026-10-20', 'today still counts');
+  assert.equal(quickKo('다음 달 5일 월세', '2026-12-20', new Date('2026-12-20T10:00:00')).dueDate, '2027-01-05', 'December rolls to January');
+  for (const text of ['이번 달 15일 송금', '밤 15시 회의', '다음 달 31일 결제', '다음 달 월세', '밤 12시 75분 마감']) {
+    assert.deepEqual(quickKo(text), { title: text, dueDate: '', reminderAt: '' }, text);
+  }
+  assert.deepEqual(quickKo('매일 밤 11시 약'), { title: '매일 밤 11시 약', dueDate: '', reminderAt: '' }, 'a repeat is still not a date');
+  assert.equal(R.parseGoDate('다음 달 1일', '2026-10-20'), '2026-11-01', '날짜로 이동 reads the same word');
+});
+
+test('English quick add reads "tonight at 11" / "7 tonight" / "this morning 9" with the period word, "next month N", and midnight as the next day', () => {
+  const meds = quickEn('tonight at 11 meds');
+  assert.deepEqual([meds.title, meds.dueDate, localTime(meds.reminderAt)], ['meds', '2026-10-20', '2026-10-20 23:00']);
+  assert.deepEqual([quickEn('this evening 7 dinner').title, localTime(quickEn('this evening 7 dinner').reminderAt)], ['dinner', '2026-10-20 19:00']);
+  assert.deepEqual([quickEn('at 11 tonight meds').title, localTime(quickEn('at 11 tonight meds').reminderAt)], ['meds', '2026-10-20 23:00'], 'the period word after the hour');
+  assert.equal(localTime(quickEn('7:30 tonight dinner').reminderAt), '2026-10-20 19:30');
+  assert.equal(localTime(quickEn('this morning at 9 standup').reminderAt), '2026-10-21 09:00', 'AM; 09:00 has passed, so tomorrow');
+  assert.equal(localTime(quickEn('tonight at 12 backup').reminderAt), '2026-10-21 00:00', 'tonight at 12 is midnight, the next day');
+  assert.equal(localTime(quickEn('this evening at 12 party').reminderAt), '2026-10-21 00:00', 'so is this evening at 12');
+  assert.equal(localTime(quickEn('tonight at 1 backup').reminderAt), '2026-10-21 01:00', 'tonight at 1 is the small hours, like 「밤 1시」');
+  assert.equal(localTime(quickEn('tomorrow night at 2 backup').reminderAt), '2026-10-22 02:00', 'the night of tomorrow');
+  assert.equal(localTime(quickEn('dinner tonight at 5').reminderAt), '2026-10-20 17:00', 'dinner tonight at 5 stays 5 PM');
+  assert.equal(localTime(quickEn('this afternoon at 12 lunch').reminderAt), '2026-10-20 12:00');
+  assert.equal(localTime(quickEn('tomorrow at midnight backup').reminderAt), '2026-10-22 00:00', 'midnight ends the given day, like 자정');
+  const night = quickEn('tomorrow night at 11 meds');
+  assert.deepEqual([night.title, localTime(night.reminderAt)], ['meds', '2026-10-21 23:00'], 'like 「내일 밤 11시」');
+  assert.deepEqual(quickEn('next month 1 rent'), { title: 'rent', dueDate: '2026-11-01', reminderAt: '' });
+  assert.deepEqual(quickEn('this month 25 bill'), { title: 'bill', dueDate: '2026-10-25', reminderAt: '' });
+  for (const text of ['this month 15 transfer', 'tonight at 15 meds', 'this evening walk']) {
+    assert.deepEqual(quickEn(text), { title: text, dueDate: '', reminderAt: '' }, text);
+  }
+});
+
+// Fix review of area G: only "tonight" / "this evening" etc. take a bare hour; a bare noun needs "at N", so a count stays a word.
+test('English quick add: a count next to a bare night/morning/evening/afternoon stays a word; am/pm after the hour leaves the period word', () => {
+  for (const text of ['book 2 night stay', 'buy 2 night tickets', 'write 3 morning pages', 'read 10 morning emails', 'plan 3 afternoon sessions',
+    '5 evening classes', '1 night trip planning', 'night 2 of conference', 'afternoon 2 meetings', 'morning 5 km run', 'evening 5 km run',
+    'tonight at 8am meds', 'this morning at 9pm call']) {
+    assert.deepEqual(quickEn(text), { title: text, dueDate: '', reminderAt: '' }, text);
+  }
+  assert.deepEqual(quickEn('tomorrow morning 3 reports'), { title: 'morning 3 reports', dueDate: '2026-10-21', reminderAt: '' }, 'a bare number after a date word stays a word (2026-10-27)');
+  assert.deepEqual(quickEn('tomorrow evening 7 dinner'), { title: 'evening 7 dinner', dueDate: '2026-10-21', reminderAt: '' });
+  for (const [text, title, at] of [
+    ['tomorrow morning at 9 standup', 'standup', '2026-10-21 09:00'],
+    ['call mom tonight at 8pm', 'call mom', '2026-10-20 20:00'],
+    ['tomorrow morning at 9am standup', 'standup', '2026-10-21 09:00'],
+    ['tonight 11pm meds', 'meds', '2026-10-20 23:00'],
+    ['11pm tonight meds', 'meds', '2026-10-20 23:00'],
+    ['this afternoon 3pm call', 'call', '2026-10-20 15:00'],
+    ['tonight at 12am backup', 'backup', '2026-10-21 00:00'],
+    ['tonight at 1am backup', 'backup', '2026-10-21 01:00'],
+  ]) {
+    const r = quickEn(text);
+    assert.deepEqual([r.title, localTime(r.reminderAt)], [title, at], text);
+  }
+});
+
+// 2026-11-02 r60 carry-over G-1/G-2/G-3: a 24-hour H:MM that agrees with its period word is read as written (1.2.6 read it, keeping
+// the word); a real clash stays a word. A bare period noun takes its 「in the」 along; a bare small hour around a period word with
+// no at / :MM / am-pm ("buy 2 tonight") is a count, not 02:00.
+test('quick add reads a 24-hour H:MM after a period word that agrees with it; a clash stays a word', () => {
+  for (const [text, title, dueDate, at] of [
+    ['내일 오후 14:00 회의', '회의', '2026-10-21', '2026-10-21 14:00'],
+    ['오늘 저녁 18:30 회식', '회식', '2026-10-20', '2026-10-20 18:30'],
+    ['내일 밤 22:30 약', '약', '2026-10-21', '2026-10-21 22:30'],
+    ['낮 13:00 점심', '점심', '2026-10-20', '2026-10-20 13:00'],
+    ['밤 0:30 백업', '백업', '2026-10-21', '2026-10-21 00:30'],
+    ['내일 밤 0:30 백업', '백업', '2026-10-22', '2026-10-22 00:30'],
+    ['내일 새벽 0:30 알람', '알람', '2026-10-21', '2026-10-21 00:30'],
+  ]) {
+    const r = quickKo(text);
+    assert.deepEqual([r.title, r.dueDate, localTime(r.reminderAt)], [title, dueDate, at], text);
+  }
+  for (const [text, title, dueDate, at] of [
+    ['tonight at 21:00 meds', 'meds', '2026-10-20', '2026-10-20 21:00'],
+    ['tomorrow night at 21:00 movie', 'movie', '2026-10-21', '2026-10-21 21:00'],
+    ['this evening 18:30 dinner', 'dinner', '2026-10-20', '2026-10-20 18:30'],
+    ['meds at 21:00 tonight', 'meds', '2026-10-20', '2026-10-20 21:00'],
+    ['this afternoon at 15:30 call', 'call', '2026-10-20', '2026-10-20 15:30'],
+    ['tonight at 0:30 backup', 'backup', '2026-10-21', '2026-10-21 00:30'],
+  ]) {
+    const r = quickEn(text);
+    assert.deepEqual([r.title, r.dueDate, localTime(r.reminderAt)], [title, dueDate, at], text);
+  }
+  for (const text of ['오전 13:00 회의', '아침 21:00 약', '저녁 0:30 정리', '밤 24:00 마감']) assert.deepEqual(quickKo(text), { title: text, dueDate: '', reminderAt: '' }, text);
+  for (const text of ['this morning 21:00 call', 'this morning at 13:30 call', 'tonight at 21:00am meds', 'this evening 0:30 party']) assert.deepEqual(quickEn(text), { title: text, dueDate: '', reminderAt: '' }, text);
+});
+
+test('English quick add: a bare period noun leaves with its 「in the」; a bare small hour beside a period word is a count', () => {
+  for (const [text, title, dueDate, at] of [
+    ['call bank in the morning at 9', 'call bank', '2026-10-21', '2026-10-21 09:00'],
+    ['pick up kids in the afternoon at 3', 'pick up kids', '2026-10-20', '2026-10-20 15:00'],
+    ['tomorrow in the evening at 7 dinner', 'dinner', '2026-10-21', '2026-10-21 19:00'],
+    ['dinner 7 tonight', 'dinner', '2026-10-20', '2026-10-20 19:00'],
+    ['at 2 tonight backup', 'backup', '2026-10-21', '2026-10-21 02:00'],
+    ['2am tonight backup', 'backup', '2026-10-21', '2026-10-21 02:00'],
+  ]) {
+    const r = quickEn(text);
+    assert.deepEqual([r.title, r.dueDate, localTime(r.reminderAt)], [title, dueDate, at], text);
+  }
+  for (const text of ['buy 2 tonight', 'finish 3 tonight', 'this morning 3 reports']) assert.deepEqual(quickEn(text), { title: text, dueDate: '', reminderAt: '' }, text);
+});
+
+// 2026-11-02 r60 integration cal-1: the hour followed by its period phrase, English's most common order — "at 7 in the morning" was 7 PM
+// and "at 11 at night" 11 AM (the bare "at N" guess), the words left in the title. The phrase (and a bare noun a date word leaves behind,
+// "at 7 tomorrow morning") follows "at N", "N:MM" or "Nam/pm" only, so counts stay words. Clock 2026-11-02 09:41 unless given.
+test('English quick add: "at 7 in the morning", "at 11 at night", "at 7 tomorrow morning"', () => {
+  const at = (text, clock = '09:41') => { const r = R.parseQuickEn(text, '2026-11-02', new Date(`2026-11-02T${clock}:00`)); return [r.title, r.dueDate, r.reminderAt ? localTime(r.reminderAt) : '']; };
+  for (const [text, clock, title, dueDate, time] of [
+    ['gym at 7 in the morning', '09:41', 'gym', '2026-11-03', '2026-11-03 07:00'],
+    ['meds at 11 at night', '09:41', 'meds', '2026-11-02', '2026-11-02 23:00'],
+    ['run at 6 in the morning', '16:11', 'run', '2026-11-03', '2026-11-03 06:00'],
+    ['call mom at 8 in the evening', '05:30', 'call mom', '2026-11-02', '2026-11-02 20:00'],
+    ['dentist at 3 in the afternoon', '09:41', 'dentist', '2026-11-02', '2026-11-02 15:00'],
+    ['call bank at 9 in the morning', '09:41', 'call bank', '2026-11-03', '2026-11-03 09:00'],
+    ['gym at 7:30 in the morning', '09:41', 'gym', '2026-11-03', '2026-11-03 07:30'],
+    ['meds at 10 at night', '22:30', 'meds', '2026-11-03', '2026-11-03 22:00'],
+    ['at 12 at night backup', '09:41', 'backup', '2026-11-03', '2026-11-03 00:00'],
+    ['tomorrow at 7 in the morning gym', '09:41', 'gym', '2026-11-03', '2026-11-03 07:00'],
+    ['gym at 7 tomorrow morning', '09:41', 'gym', '2026-11-03', '2026-11-03 07:00'],
+    ['meds at 11 tomorrow night', '09:41', 'meds', '2026-11-03', '2026-11-03 23:00'],
+    ['dinner at 7 tomorrow evening', '09:41', 'dinner', '2026-11-03', '2026-11-03 19:00'],
+  ]) assert.equal(at(text, clock).join(' | '), [title, dueDate, time].join(' | '), text);
+  // counts stay words: no "at" right before the number (an "at" after it, as in "at night", does not count)
+  for (const text of ['take 2 at night', 'take 2 in the evening', 'do 10 in the morning', 'take 3 this evening', 'read 2 this afternoon', 'book 2 night stay', 'gym at 7pm in the morning']) {
+    assert.equal(at(text).join(' | '), [text, '', ''].join(' | '), text);
+  }
+  assert.equal(at('tomorrow morning 3 reports').join(' | '), 'morning 3 reports | 2026-11-03 | ', 'a bare number after a date word stays a word (2026-10-27)');
 });
 
 test('English quick add mirrors the Korean rules', () => {
@@ -491,11 +656,12 @@ test('WIDGET_MIN is the one table of smallest widget sizes; localKey gives the l
 
 test('a sheet\'s overlay scroll thumb stays between its pinned header and footer and tracks the scroll (2026-10-30 owner)', () => {
   const { scrollThumb } = require('../renderer/domain.js');
-  // The settings sheet at the 900×650 window: 600px in view, 1245px of content, header 59px, the 닫기 bar 67px.
+  // A sheet at the 900×650 window: 600px in view, 1245px of content, a 59px header and a 67px footer (the settings sheet's 닫기 bar
+  // was removed in r60-C; the numbers stay a generic sheet — 2026-11-02 r60 integration).
   const sheet = { view: 600, content: 1245, head: 59, foot: 67 };
   const top = scrollThumb({ ...sheet, top: 0 }), end = scrollThumb({ ...sheet, top: 645 }), mid = scrollThumb({ ...sheet, top: 322.5 });
   assert.equal(top.top, 65, 'starts 6px below the header (the system bar ran into the header and the rounded corner)');
-  assert.equal(end.top + end.length, 600 - 67 - 6, 'ends 6px above the 닫기 bar');
+  assert.equal(end.top + end.length, 600 - 67 - 6, 'ends 6px above the footer');
   assert.equal(top.length, end.length, 'one length all the way');
   assert.equal(top.length, Math.round(top.track * (600 - 59 - 67) / (600 - 59 - 67 + 645)), 'the length is the part of the scrolling body in view');
   assert.ok(Math.abs(mid.top - (top.top + end.top) / 2) <= 1, 'halfway down the sheet, halfway down the track');

@@ -78,7 +78,7 @@ test('the calendar title keeps its words and gains a muted chevron inside the sa
   const { h, bar } = calendarHarness('month');
   const button = bar.querySelector('h1 .title-button');
   assert.ok(button);
-  assert.equal(button.textContent, h.eval('calendarTitle')(), 'no new text');
+  assert.equal(button.querySelector('.title-long').textContent, h.eval('calendarTitle')(), 'no new text'); // the short name (English, narrow) is a ::after of data-short (2026-11-02 review app-design-12)
   const chevron = button.querySelector('svg[data-icon="chevdown"]');
   assert.ok(chevron, 'a chevron inside the click target');
   assert.equal(chevron.getAttribute('aria-hidden'), 'true');

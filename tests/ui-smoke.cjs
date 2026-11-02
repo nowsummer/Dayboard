@@ -181,12 +181,13 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
     await new Promise(resolve => setTimeout(resolve, 60));
     const dialog = document.querySelector('#modal-root .dialog');
-    const result = { version: dialog?.querySelector('.settings-brand small')?.textContent || '', block: Boolean(dialog?.querySelector('#update-block')), history: [...(dialog?.querySelectorAll('#update-block button') || [])].map(node => node.textContent) };
+    const result = { version: dialog?.querySelector('.settings-brand small')?.textContent || '', block: Boolean(dialog?.querySelector('#update-block')), news: Boolean(state.app?.update && updateNews(state.app.update)), history: [...(dialog?.querySelectorAll('#update-block button') || [])].map(node => node.textContent) };
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     return result;`);
   const appVersion = (await invoke('state:get')).app?.version;
   const hasUpdater = Boolean((await invoke('state:get')).app?.update);
-  expect(appVersion && updateInfo.version === `버전 ${appVersion}` && updateInfo.block === hasUpdater && !updateInfo.history.includes('업데이트 기록'), `설정의 버전·업데이트 ${JSON.stringify({ appVersion, hasUpdater, updateInfo })}`);
+  // r60 C: 「버전 1.2.6 · 최신」 / 「· 확인 중…」 may follow, and the card shows only for news (updateNews), not for every updater (2026-11-02 r60 carry-over C-2)
+  expect(appVersion && updateInfo.version.startsWith(`버전 ${appVersion}`) && updateInfo.block === updateInfo.news && !updateInfo.history.includes('업데이트 기록'), `설정의 버전·업데이트 ${JSON.stringify({ appVersion, hasUpdater, updateInfo })}`);
   checks.push('settings-version-update-block');
 
   // The toast's 되돌리기 is really clickable (the toast used to be pointer-events:none) and Ctrl+Z runs it exactly once.
@@ -1909,8 +1910,10 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       checks.push('widget-task-menu-quick-add-toast');
       // No × on hover (Apple widgets have none): right-click the widget for 위젯 설정… / Dayboard 열기 / 위젯 제거, while a task row keeps
       // its own menu and the quick-add field its text right-click. The sheet lists lists in sidebar order (grouped by account when there
-      // are several), has 위젯 제거 … 적용 on one row, no status line unless the desktop fallback explains something, and Dayboard 열기 closes it.
+      // are several), has 위젯 제거 … 적용 on one row, no status line unless the desktop fallback explains something, and 위젯 모양 설정… closes it and
+      // brings the main window up on the widgets tab, the one home of 화면 모드·유리 효과 (2026-11-02 review usability-2; the view is put back after).
       const sidebarOrder = await run(mainWindow, `return [...document.querySelectorAll('.sidebar .list-nav .list-name')].map(node => node.textContent);`);
+      const viewBeforeLink = await run(mainWindow, 'return view;');
       const sheet = await run(win, `
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         const labels = () => [...document.querySelectorAll('.context-menu .menu-item span')].map(node => node.textContent);
@@ -1934,13 +1937,15 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
         const select = [...(dialog?.querySelectorAll('.field') || [])].find(node => node.querySelector('span')?.textContent === '표시할 목록')?.querySelector('select');
         result.sections = sectionsOf().length; result.optgroups = select ? select.querySelectorAll('optgroup').length : -1;
         result.order = select ? [...select.options].filter(option => listBy(option.value)).map(option => listVisual(listBy(option.value)).title) : [];
-        [...(dialog?.querySelectorAll('button') || [])].find(node => node.textContent.includes('Dayboard 열기'))?.click();
+        result.link = Boolean([...(dialog?.querySelectorAll('button') || [])].find(node => node.textContent.includes('위젯 모양 설정'))); [...(dialog?.querySelectorAll('button') || [])].find(node => node.textContent.includes('위젯 모양 설정'))?.click();
         await wait(60);
         result.closedByOpen = !document.querySelector('#modal-root .dialog');
         return result;`);
       const menuOk = !sheet.close && sheet.more && JSON.stringify(sheet.surface) === JSON.stringify(['위젯 설정…', 'Dayboard 열기', '위젯 제거']) && (sheet.row === undefined || sheet.row === '편집') && sheet.input === 0;
-      const sheetOk = sheet.dialog === '위젯 설정' && JSON.stringify(sheet.footer) === JSON.stringify(['위젯 제거', '적용']) && sheet.oneRow && sheet.status === (widget.desktopStatus === 'fallback' ? 1 : 0) && sheet.optgroups === (sheet.sections > 1 ? sheet.sections : 0) && JSON.stringify(sheet.order) === JSON.stringify(sidebarOrder) && sheet.closedByOpen;
-      expect(menuOk && sheetOk, `위젯 오른쪽 클릭 메뉴·위젯 설정 ${JSON.stringify({ sheet, sidebarOrder })}`);
+      const viewAfterLink = await run(mainWindow, `for (let i = 0; i < 40 && view !== 'widgets'; i++) await new Promise(resolve => setTimeout(resolve, 50)); return view;`);
+      await run(mainWindow, `goto(${JSON.stringify(viewBeforeLink)}); return true;`);
+      const sheetOk = viewAfterLink === 'widgets' && sheet.link && sheet.dialog === '위젯 설정' && JSON.stringify(sheet.footer) === JSON.stringify(['위젯 제거', '적용']) && sheet.oneRow && sheet.status === (widget.desktopStatus === 'fallback' ? 1 : 0) && sheet.optgroups === (sheet.sections > 1 ? sheet.sections : 0) && JSON.stringify(sheet.order) === JSON.stringify(sidebarOrder) && sheet.closedByOpen;
+      expect(menuOk && sheetOk, `위젯 오른쪽 클릭 메뉴·위젯 설정 ${JSON.stringify({ sheet, sidebarOrder, viewAfterLink })}`);
       checks.push('widget-context-menu-settings-sheet');
       await run(win, `document.querySelector('.widget-task-content').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 150 })); await new Promise(resolve => setTimeout(resolve, 40)); return true;`);
       await shot(win, 'widget-context-menu');
@@ -2275,7 +2280,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 40));
     const heading = day => { selectedDate = day; render(); return document.querySelector('.context-heading h3')?.textContent; };
     return { labels, tomorrow: heading(D.dayOffset(D.dateKey(), 1)), yesterday: heading(D.dayOffset(D.dateKey(), -1)), other: heading(D.dayOffset(D.dateKey(), 5)), today: heading(D.dateKey()) };`);
-  expect(englishBits.labels.slice(0, 6).join('|') === 'Title|Date|Reminder|Repeat|Subtasks|Notes' /* 반복 and 하위 할 일 since 1.1.3 */ && englishBits.tomorrow === 'Tomorrow’s events' && englishBits.yesterday === 'Yesterday’s events' && /^Events on [A-Z]/.test(englishBits.other) && englishBits.today === 'Today’s events', `영어 편집기 라벨·일정 제목 ${JSON.stringify(englishBits)}`);
+  expect(englishBits.labels.slice(0, 7).join('|') === 'Title|Date|Reminder|Repeat|List|Subtasks|Notes' /* 반복 and 하위 할 일 since 1.1.3; 반복|목록 share a row since 2026-11-02 (review usability-7) */ && englishBits.tomorrow === 'Tomorrow’s events' && englishBits.yesterday === 'Yesterday’s events' && /^Events on [A-Z]/.test(englishBits.other) && englishBits.today === 'Today’s events', `영어 편집기 라벨·일정 제목 ${JSON.stringify(englishBits)}`);
   await run(mainWindow, `editTask(state.tasks.find(task => task.title === '스모크 지난 날짜')); await new Promise(resolve => setTimeout(resolve, 40)); return true;`);
   await shot(mainWindow, 'task-editor-english');
   await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true;`);
@@ -2563,8 +2568,10 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
 
   // The settings sheet scrolls as an Apple sheet (2026-10-30 owner: 「설정 창에서 스크롤이 너무 완성도가 낮게 디자인 되어 있는데 수정해줘.
   // 애플 최신 디자인 컨셉에 맞고」): no system bar (no gutter), a thin overlay thumb hidden at rest, shown while the sheet moves or the
-  // pointer is on it, kept between the header and the 닫기 bar, 3-5px from the edge, draggable with the real mouse; the header's rule
-  // only once something is under it, the footer's rule and fade only while more is below.
+  // pointer is on it, kept between the header and the sheet's bottom edge (the empty footer since the 닫기 bar left, 2026-11-02 review
+  // app-design-6), 3-5px from the edge, draggable with the real mouse; the header's rule only once something is under it, the footer's
+  // rule and fade only while more is below. The grouped sheet fits the default window and all but fits the smallest (900×650 scrolls
+  // 27px here, app-design-4), so this runs in a 900×500 one, under the window's minimum for the while.
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   const sheetAt = () => run(mainWindow, `const d = document.querySelector('#modal-root .dialog'), hd = d.querySelector('.dialog-header'), ft = d.querySelector('.dialog-body>.dialog-footer'), th = d.querySelector('.sheet-thumb');
     const r = th.getBoundingClientRect(), dr = d.getBoundingClientRect();
@@ -2572,6 +2579,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       thumb: [Math.round(r.top - dr.top), Math.round(r.bottom - dr.top)], right: Math.round(dr.right - r.right), width: Math.round(r.width), center: [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)],
       head: Math.round(hd.getBoundingClientRect().bottom - dr.top), foot: Math.round(ft.getBoundingClientRect().top - dr.top), focus: document.activeElement?.tagName,
       headRule: getComputedStyle(hd).boxShadow !== 'none', footRule: getComputedStyle(ft).boxShadow !== 'none', footFade: getComputedStyle(ft, '::before').opacity };`);
+  const prevSize = mainWindow.getContentSize(), prevMin = mainWindow.getMinimumSize(); mainWindow.setMinimumSize(600, 400); mainWindow.setContentSize(900, 500); await pause(250);
   await run(mainWindow, `openSettings(); await new Promise(resolve => setTimeout(resolve, 300)); return true;`);
   const sheetScroll = { rest: await sheetAt() };
   await run(mainWindow, `const d = document.querySelector('#modal-root .dialog'); d.scrollTop = Math.round((d.scrollHeight - d.clientHeight) / 2); return true;`);
@@ -2588,6 +2596,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await run(mainWindow, `const d = document.querySelector('#modal-root .dialog'); d.scrollTop = d.scrollHeight; return true;`);
   await pause(300); sheetScroll.end = await sheetAt();
   await run(mainWindow, `closeModal(true); return true;`);
+  mainWindow.setContentSize(prevSize[0], prevSize[1]); mainWindow.setMinimumSize(prevMin[0], prevMin[1]); await pause(250);
   const inTrack = s => s.thumb[0] >= s.head + 4 && s.thumb[1] <= s.foot - 4 && s.right >= 2 && s.right <= 6;
   const per = sheetScroll.still.range / ((sheetScroll.still.foot - 6) - (sheetScroll.still.head + 6) - (sheetScroll.still.thumb[1] - sheetScroll.still.thumb[0]));
   expect(sheetScroll.rest.gutter <= 2 && sheetScroll.rest.range > 40 && !sheetScroll.rest.on && sheetScroll.rest.opacity === 0 && !sheetScroll.rest.headRule && sheetScroll.rest.footRule && sheetScroll.rest.footFade === '1'
@@ -2597,6 +2606,29 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     && sheetScroll.end.headRule && !sheetScroll.end.footRule && sheetScroll.end.footFade === '0' && inTrack(sheetScroll.end), `설정 창 스크롤 ${JSON.stringify(sheetScroll)}`);
   checks.push('settings-sheet-scroll');
 
+  // Long values in the sheet's selects (r60-C review follow-up): a long note title in 할 일 화면 메모 ends in 「…」 inside its row with the
+  // label on one line (base-select's own label was cut mid-word at a 240px cap), and a hidden default list reads 「{title} · 숨김」 closed
+  // with the why only in the open list (renderer-only list state, put back after).
+  const longNote = await invoke('note:save', { title: '스모크 아주 긴 메모 제목 — 할 일 화면 메모 칸에서 줄임표로 끝나야 함', body: 'x', color: 'yellow' });
+  await invoke('settings:update', { sideNote: longNote.id });
+  const longValues = await run(mainWindow, `openSettings(); await new Promise(resolve => setTimeout(resolve, 200));
+    const rowOf = text => [...document.querySelectorAll('#modal-root .settings-group>.field')].find(f => f.querySelector(':scope>span')?.textContent === text);
+    const row = rowOf('할 일 화면 메모'), s = row?.querySelector('select'), sc = s?.querySelector('selectedcontent'), rr = row?.getBoundingClientRect(), sr = s?.getBoundingClientRect();
+    const result = { note: sc ? { cut: sc.scrollWidth > sc.clientWidth, ellipsis: getComputedStyle(sc).textOverflow, /* the borderless value's box ends 10px in, its chevron on the switches' 16px inset (r60-apple S1, 2026-11-02 owner: Apple surfaces) */inRow: sr.left >= rr.left && sr.right <= rr.right - 9, label: Math.round(row.querySelector(':scope>span').getBoundingClientRect().height) } : null };
+    closeModal(true); await new Promise(resolve => setTimeout(resolve, 60));
+    const keep = { lists: state.lists, allLists: state.allLists, settings: state.settings };
+    const l = state.lists.find(x => D.taskList(x) && x.kind !== 'defaultList') || state.lists.find(x => D.taskList(x));
+    state.settings = { ...state.settings, defaultListId: l.id }; state.lists = state.lists.filter(x => x.id !== l.id);
+    if (!state.allLists?.some(x => x.id === l.id)) state.allLists = [...(state.allLists || []), l];
+    openSettings(); await new Promise(resolve => setTimeout(resolve, 200));
+    const d = rowOf('새 할 일 기본 목록')?.querySelector('select'), dc = d?.querySelector('selectedcontent');
+    result.hidden = { title: listVisual(l).title, shows: dc?.innerText || '', option: d?.selectedOptions[0]?.textContent || '', cut: dc ? dc.scrollWidth > dc.clientWidth : null };
+    closeModal(true); Object.assign(state, keep); await new Promise(resolve => setTimeout(resolve, 60)); return result;`);
+  await invoke('settings:update', { sideNote: 'auto' }); await invoke('note:delete', { id: longNote.id });
+  expect(longValues.note?.cut && longValues.note.ellipsis === 'ellipsis' && longValues.note.inRow && longValues.note.label <= 20
+    && longValues.hidden.shows === `${longValues.hidden.title} · 숨김` && !longValues.hidden.cut && longValues.hidden.option.endsWith('다시 표시할 때까지 자동 목록 사용'), `설정 긴 값 ${JSON.stringify(longValues)}`);
+  checks.push('settings-long-values');
+
   // Where questions go (2026-10-30 owner): settings ends with 문의 and Dayboard's address; main opens mail to that address alone — any
   // other mailto is refused (not opened here: the real address would start the PC's mail app). No account list here, so the list menu
   // offers no move to one (2026-10-30, lib/taskmove.cjs).
@@ -2605,8 +2637,45 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     closeModal(true); listMenu(listBy('local-inbox'), 200, 200); await new Promise(resolve => setTimeout(resolve, 60));
     result.move = [...document.querySelectorAll('.context-menu .menu-item')].some(n => n.textContent.includes('계정 목록으로 옮기기')); closeMenu(); return result;`);
   const otherMail = await invoke('external:open', { url: 'mailto:someone@example.com' }).then(() => 'opened', error => error.message);
-  expect(contact.text === 'nowsummer.apps@gmail.com' && contact.href === 'mailto:nowsummer.apps@gmail.com' && contact.label === '문의' && !contact.move && /HTTPS/.test(otherMail), `설정 문의 줄 ${JSON.stringify({ contact, otherMail })}`);
+  // An https host the page never links to is refused too (2026-11-02 review security-7, main.cjs ALLOWED_HOSTS); an allowed one is never
+  // invoked here — it would open the real browser.
+  const otherSite = await invoke('external:open', { url: 'https://example.com/' }).then(() => 'opened', error => error.message);
+  expect(contact.text === 'nowsummer.apps@gmail.com' && contact.href === 'mailto:nowsummer.apps@gmail.com' && contact.label === '문의' && !contact.move && /HTTPS/.test(otherMail) && /HTTPS/.test(otherSite), `설정 문의 줄 ${JSON.stringify({ contact, otherMail, otherSite })}`);
   checks.push('settings-contact');
+
+  // r60 X 글자 크기 (2026-11-02 owner: text size): 더 크게 zooms the main window whole (factor 1.25, the CSS viewport the window ÷ 1.25) with
+  // nothing wider than the window, the bar's buttons clear of the window buttons and no month cell cut, then back to 기본; the widgets'
+  // 더 크게 zooms a card's content (CSS zoom 1.25 on its head and body) while the page stays at 1 and its wallpaper slice and card keep
+  // their size (artifacts/r60-fix/X/measure.cjs compares their pixels).
+  {
+    const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const VIEWPORT = `const edge = document.querySelector('.window-actions').getBoundingClientRect().left; const bar = [...document.querySelectorAll('.topbar-main button')].filter(node => node.offsetParent);
+      return { inner: innerWidth, x: document.documentElement.scrollWidth - document.documentElement.clientWidth, over: Math.round(Math.max(...bar.map(node => node.getBoundingClientRect().right)) - edge),
+        clipped: [...document.querySelectorAll('.calendar-grid.large .calendar-day')].filter(node => node.scrollHeight > node.clientHeight + 0.5).length, cells: document.querySelectorAll('.calendar-grid.large .calendar-day').length };`;
+    const width = mainWindow.getContentSize()[0];
+    await run(mainWindow, `goto('calendar'); setCalMode('month'); goToday(); return true;`); await settle(mainWindow);
+    const before = { zoom: mainWindow.webContents.getZoomFactor(), ...await run(mainWindow, VIEWPORT) };
+    await invoke('settings:update', { textSize: 'larger' }); await pause(350); await settle(mainWindow);
+    const larger = { zoom: mainWindow.webContents.getZoomFactor(), ...await run(mainWindow, `await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); ${VIEWPORT}`) };
+    await invoke('settings:update', { textSize: 'default' }); await pause(350); await settle(mainWindow);
+    const back = { zoom: mainWindow.webContents.getZoomFactor(), ...await run(mainWindow, VIEWPORT) };
+    await run(mainWindow, `goto('today'); return true;`);
+    const textWidget = await invoke('widget:open', { type: 'tasks' }); const textWin = widgetWindows.get(textWidget.id);
+    await pause(400); await settle(textWin);
+    const CARD = `const s = document.querySelector('#app > .widget-surface'), b = document.getElementById('backdrop').getBoundingClientRect(), r = s.getBoundingClientRect();
+      return { head: getComputedStyle(s.querySelector(':scope > .widget-head')).zoom, body: getComputedStyle(s.children[1]).zoom, surface: getComputedStyle(s).zoom, backdrop: b.width + 'x' + b.height, card: r.width + 'x' + r.height };`;
+    const card = await run(textWin, CARD);
+    await invoke('settings:update', { widgetTextSize: 'larger' }); await pause(400); await settle(textWin);
+    const cardLarger = { ...await run(textWin, CARD), page: textWin.webContents.getZoomFactor() };
+    await invoke('settings:update', { widgetTextSize: 'default' }); await pause(200);
+    await invoke('widget:close', { id: textWidget.id });
+    const textSize = { width, before, larger, back, card, cardLarger };
+    expect(before.zoom === 1 && larger.zoom === 1.25 && back.zoom === 1 && Math.abs(larger.inner - width / 1.25) <= 1 && back.inner === before.inner
+      && larger.x === 0 && larger.over <= 0 && larger.cells === 42 && larger.clipped === 0 && back.x === 0
+      && card.head === '1' && cardLarger.head === '1.25' && cardLarger.body === '1.25' && cardLarger.surface === '1' && cardLarger.page === 1
+      && cardLarger.backdrop === card.backdrop && cardLarger.card === card.card, `글자 크기 ${JSON.stringify(textSize)}`);
+    checks.push('text-size-zoom-widget-content');
+  }
 
   // Drop-downs open as Apple pop-up menus drawn in the page (2026-10-28 owner request, area H): every select is base-select, the
   // card's 반복 menu opens inside the window, 「매일」 chosen with the mouse is saved, and keys inside an open menu stay with it — the
@@ -2814,6 +2883,55 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   expect(keyPaths.cells === 42 && keyPaths.stops.length === 1 && keyPaths.stops[0] === keyPaths.selected && keyPaths.strayStops === 0 && keyPaths.radioStops.join() === 'view-month' && keyPaths.afterLeft === 'week' && keyPaths.focusFollows === 'view-week' && keyPaths.daySame && keyPaths.chevron && keyPaths.dot.w === 14 && keyPaths.dot.h === 14 && keyPaths.dot.left && keyPaths.dot.right && keyPaths.dot.above && keyPaths.dot.far && keyPaths.focusRule, `달력 키보드 경로·색 점 ${JSON.stringify(keyPaths)}`);
   checks.push('calendar-roving-tabindex-colour-dot');
 
+  // r60 F (2026-11-02 review app-design-1, usability-6, app-design-2): at small and middle windows no month cell clips its last
+  // line and every day number keeps its 27px circle (a busy day: three events and two tasks); at the 650px minimum no week block
+  // squeezes its rows — the title takes whole 16px lines and the time and the place one each, inside the block.
+  {
+    const fitDay = D.dayOffset(D.dateKey(), 1);
+    const fitIso = hour => new Date(`${fitDay}T${String(hour).padStart(2, '0')}:00:00`).toISOString();
+    const fitEvents = [], fitTasks = [];
+    for (const [i, hour] of [9, 10, 11].entries()) fitEvents.push(await invoke('event:add', { title: `스모크 칸 맞춤 ${i + 1}`, calendarId: 'local-calendar', start: fitIso(hour), end: fitIso(hour + 1), allDay: false, location: i === 0 ? '스모크 회의실' : '', color: '#34c759' }));
+    for (const n of [1, 2]) fitTasks.push(await invoke('task:add', { title: `스모크 칸 맞춤 할 일 ${n}`, dueDate: fitDay }));
+    const fitBounds = mainWindow.getBounds(), fitSizes = [];
+    for (const [w, hgt] of [[900, 650], [1180, 700], [1180, 780], [1366, 728], [1600, 900]]) {
+      mainWindow.setContentSize(w, hgt); await new Promise(resolve => setTimeout(resolve, 300)); await settle(mainWindow);
+      fitSizes.push(await run(mainWindow, `
+        goto('calendar'); setCalMode('month'); calRollReset(); goToday(); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const cells = [...document.querySelectorAll('.calendar-grid.large .calendar-day')];
+        const busy = document.querySelector('.calendar-grid.large .calendar-day[data-day="${fitDay}"] .day-items');
+        return { size: '${w}x${hgt}', inner: [innerWidth, innerHeight], limit: calMonthLimit(), cells: cells.length, clipped: cells.filter(node => node.scrollHeight > node.clientHeight).map(node => node.dataset.day + ':' + node.scrollHeight + '/' + node.clientHeight), numbers: [...new Set([...document.querySelectorAll('.calendar-grid.large .day-number')].map(node => Math.round(node.getBoundingClientRect().height)))], busy: busy ? [...busy.children].map(node => node.textContent) : null };`));
+    }
+    mainWindow.setContentSize(900, 650); await new Promise(resolve => setTimeout(resolve, 300)); await settle(mainWindow);
+    // Every part of a block takes whole 16px rows (a two-line title 32) inside the block; a squeezed one measured 17/8.5/8.5.
+    const fitRows = pattern => `const blocks = [...document.querySelectorAll('.time-col .time-event')].filter(node => ${pattern}.test(node.querySelector('.time-event-title')?.textContent || ''));
+      const bad = blocks.map(node => { const parts = ['.time-event-title', '.time-event-time', '.time-event-place'].map(q => node.querySelector(q)).filter(Boolean); const hs = parts.map(p => Math.round(p.getBoundingClientRect().height * 10) / 10); const room = node.clientHeight - 4;
+        const whole = hs.every((v, i) => i === 0 ? v === 16 || v === 32 : v === 16) && parts.slice(1).every(p => p.scrollHeight <= p.clientHeight);
+        return whole && hs.reduce((a, b) => a + b, 0) <= room + 0.5 ? null : { title: node.querySelector('.time-event-title').textContent.slice(0, 12), hs, room }; }).filter(Boolean);
+      return { calHour, blocks: blocks.length, bad };`;
+    const fitWeek = await run(mainWindow, `
+      setCalMode('week'); selectedDate = ${JSON.stringify(fitDay)}; calSyncMonth(); render(); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      ${fitRows('/스모크 칸 맞춤/')}`);
+    // The recheck of app-design-2: a grid drawn at one hour height and shown at another is drawn again — the window changed while
+    // another tab was open (the 1-hour blocks ran title, time and place over each other), and height-only resizes, where 45- and
+    // 90-minute blocks change their rows at heights that no 1-hour band marks.
+    const fitAt = (hh, mm) => new Date(`${fitDay}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`).toISOString();
+    for (const [title, a, b, location] of [['스모크 블록 45분', [13, 0], [13, 45], ''], ['스모크 블록 90분', [14, 0], [15, 30], '스모크 회의실']]) fitEvents.push(await invoke('event:add', { title, calendarId: 'local-calendar', start: fitAt(...a), end: fitAt(...b), allDay: false, location, color: '#ff9500' }));
+    const fitStale = [];
+    const fitStep = async (label, w, hgt, before = '', after = '') => { if (before) await run(mainWindow, before); mainWindow.setContentSize(w, hgt); await new Promise(resolve => setTimeout(resolve, 300)); await settle(mainWindow);
+      fitStale.push({ label, ...await run(mainWindow, `${after} await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); ${fitRows('/스모크 (칸 맞춤|블록)/')}`) }); };
+    await run(mainWindow, `render(); return true;`); await settle(mainWindow);
+    await fitStep('tall', 1180, 900);
+    await fitStep('via-tab', 900, 650, `goto('today'); return true;`, `goto('calendar');`);
+    // drawn afresh at 1180×810 (about 52px an hour), then 760 (48): a 45-minute block loses its time row there (the review's 830→780 case)
+    for (const [hgt, before] of [[700], [810], [760, 'render(); return true;'], [830], [780]]) await fitStep('height-' + hgt, 1180, hgt, before);
+    mainWindow.setBounds(fitBounds); await new Promise(resolve => setTimeout(resolve, 300)); await settle(mainWindow);
+    for (const e of fitEvents) await invoke('event:delete', { id: e.id });
+    for (const t of fitTasks) await invoke('task:delete', { id: t.id });
+    await run(mainWindow, `setCalMode('month'); calRollReset(); goToday(); render(); return true;`);
+    expect(fitSizes.every(s => s.cells === 42 && !s.clipped.length && s.numbers.join() === '27' && s.busy && s.busy.length >= 2 && s.busy.length <= s.limit) && fitWeek.blocks === 3 && !fitWeek.bad.length && fitStale.length === 7 && fitStale.every(s => s.blocks === 5 && !s.bad.length) && new Set(fitStale.map(s => s.calHour)).size >= 4, `월 칸 줄 맞춤·주간 블록 줄 ${JSON.stringify({ fitSizes, fitWeek, fitStale })}`);
+  }
+  checks.push('calendar-month-fit');
+
   // D07: a note that fails to save on this PC says 저장 실패 with 다시 시도, and keeps saying it through a redraw; the retry sends the
   // same text by the same path without more typing, and the text stays as typed. 다시 시도 is read as drawn (its boxes), not by its
   // hidden property: .text-button's display once beat [hidden] and every saved note showed it (2026-10-28 review).
@@ -2926,6 +3044,8 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const [narrowPanel, widePanel, drawerPanel, englishPanel] = panelSizes;
   // Every row: whole name, the 기본 / 읽기 전용 badges, no provider word, a mark named after its service (also first in the tooltip);
   // marks lists the shown marks, null where either is right (the Gmail-style row at 1180 is within 1px of fitting its mark).
+  // The iCloud row at 1180 is either too since 기본 · 읽기 전용 became plain words (r60-apple C7, 2026-11-02 owner: Apple surfaces): the
+  // badge's 12px of pill padding went to the row, and its mark now fits; the long row below still steps its mark aside.
   const services = ['Google', 'Google', 'iCloud'];
   const wholeNames = (at, marks) => at.rows.length === 4 && at.rows.slice(0, 3).every((row, i) => row && !row.cut && !row.word && row.label === services[i] && row.title.startsWith(services[i] + ' · ') && (marks[i] == null || row.mark === marks[i]))
     && at.rows.slice(0, 3).map(row => row.badge).join('|') === '기본|읽기 전용|읽기 전용';
@@ -2934,7 +3054,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   expect(narrowPanel.width >= 1144 && narrowPanel.width <= 1180 && narrowPanel.docked && narrowPanel.panel === 264 && narrowPanel.gap === 20 && narrowPanel.day >= 83.5
     && narrowPanel.title >= 155 && narrowPanel.lines === 1 && narrowPanel.more === 0 && widePanel.title >= 155 && widePanel.more === 0
     && widePanel.width >= 1600 && widePanel.docked && widePanel.panel === 300 && widePanel.gap === 28
-    && wholeNames(narrowPanel, [null, 'Google', '']) && wholeNames(widePanel, services) && drawerPanel.width < 1144 && !drawerPanel.docked && wholeNames(drawerPanel, services)
+    && wholeNames(narrowPanel, [null, 'Google', null]) && wholeNames(widePanel, services) && drawerPanel.width < 1144 && !drawerPanel.docked && wholeNames(drawerPanel, services)
     && longRow(narrowPanel, '') && longRow(widePanel, 'Google') && longRow(drawerPanel, '')
     && englishPanel.width === narrowPanel.width && Boolean(englishPanel.rows[0]) && !englishPanel.rows[0].cut && englishPanel.rows[0].badge === 'Default'
     && /^제주 여행 준비 체크에 추가\u00a0· .+ 날짜$/.test(narrowPanel.hint) && narrowPanel.hintLines === 2 && narrowPanel.dateLines === 1 && narrowPanel.dotFirst && widePanel.dateLines === 1, `달력 오른쪽 패널 너비 ${JSON.stringify(panelSizes)}`);

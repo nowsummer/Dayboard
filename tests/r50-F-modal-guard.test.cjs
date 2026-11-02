@@ -128,3 +128,28 @@ test('계속 편집 after X goes back to the field being edited, not the first o
     h.eval('closeModal')(true);
   }
 });
+
+// 2026-11-02 review regressions-2: the widget settings sheet's 「화면 모드」 select saved at once (data-instant, like the glass slider), but
+// formSnapshot took only input[data-instant] as instant and still read the select, so Esc asked 「변경 버리기 / 계속 편집」 for a change
+// that was already applied — and 변경 버리기 did not undo it. A select[data-instant] must not dirty the form; a saved-on-적용 select must.
+test('a select[data-instant] changed does not dirty the form (Esc closes at once); the same select without data-instant still asks', async () => {
+  const h = dialogHarness();
+  const hh = h.eval('h');
+  for (const instant of [true, false]) {
+    const pick = hh('select', { class: 'form-input', ...(instant ? { 'data-instant': '' } : {}) }, hh('option', { value: 'app' }, '앱과 같게'), hh('option', { value: 'dark' }, '다크'));
+    pick.value = 'app';
+    const form = hh('form', { class: 'dialog-body', onsubmit: e => e.preventDefault() }, h.eval('field')('화면 모드', pick), h.eval('actionFooter')(() => h.eval('closeModal')(), '적용'));
+    h.eval('modal')('위젯 설정', form, false, {});
+    await h.tick();
+    pick.value = 'dark'; pick.dispatchEvent(new h.dom.globals.Event('change', { bubbles: true }));
+    h.esc();
+    const guard = h.modalRoot.querySelector('.dialog-guard'), dialog = h.modalRoot.querySelector('.dialog');
+    // Booleans only in the assertions: a failing assert.equal(element, null) hands the jsdom element to the reporter, which inspects the
+    // whole document and runs out of memory (seen 2026-11-02 on the baseline). The dialog is closed again whatever happens.
+    try {
+      if (instant) { assert.ok(!guard, 'instant select: no 변경 버리기 for a change that is already saved'); assert.ok(!dialog, 'instant select: Esc closes the sheet'); }
+      else { assert.ok(Boolean(guard), 'control: a select saved on 적용 still asks'); assert.ok(Boolean(dialog), 'control: the sheet stays'); assert.deepEqual(labels(guard), ['변경 버리기', '계속 편집']); }
+    } finally { if (h.modalRoot.querySelector('.dialog')) h.eval('closeModal')(true); }
+  }
+  assert.deepEqual(h.toasts, []);
+});

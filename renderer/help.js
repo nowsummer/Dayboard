@@ -16,7 +16,11 @@ function shortcutGroups(){
       [tr('방금 한 일 되돌리기'),[['Ctrl','Z']]],
       [tr('다시 실행'),[['Ctrl','Shift','Z'],['Ctrl','Y']]],
       [tr('닫기·취소'),[['Esc']]],
-      [tr('키보드 단축키 보기'),[['?']]]]],
+      [tr('키보드 단축키 보기'),[['?']]],
+      // 글자 크기 of the main window (2026-11-02 owner: text size; app.js takes the keys, the settings sheet has the same choice)
+      [tr('글자 크게'),[['Ctrl','+']]],
+      [tr('글자 작게'),[['Ctrl','-']]],
+      [tr('글자 기본 크기'),[['Ctrl','0']]]]],
     [tr('할 일'),[
       [tr('입력한 할 일 추가'),[['Enter']]],
       [tr('고른 할 일 위·아래로 옮기기'),[['Alt','↑'],['Alt','↓']]],
@@ -48,7 +52,10 @@ function usefulShortcuts(){
 }
 function openShortcuts(){
   helpClose();
-  modal(tr('키보드 단축키'),h('div',{class:'dialog-body shortcuts-body'},shortcutGroups().map(([title,rows])=>h('section',{class:'shortcut-group'},h('h3',{},title),h('dl',{},rows.map(([label,combos])=>h('div',{class:'shortcut-row'},h('dt',{},label),h('dd',{},helpKeys(combos)))))))),true);
+  const groups=shortcutGroups().map(([title,rows])=>h('section',{class:'shortcut-group'},h('h3',{},title),h('dl',{},rows.map(([label,combos])=>h('div',{class:'shortcut-row'},h('dt',{},label),h('dd',{},helpKeys(combos)))))));
+  // Two stacked columns, 어디서나 + 할 일 | 달력 + 메모: rows of the 2×2 grid left 180px empty under 할 일 once 어디서나 had nine rows, and the
+  // sheet scrolled 105px in the 900×650 window (2026-11-02 r60 integration rr-app-ui-4). The order stays the reading order; ≤720px stacks them.
+  modal(tr('키보드 단축키'),h('div',{class:'dialog-body shortcuts-body'},h('div',{class:'shortcut-col'},groups.slice(0,2)),h('div',{class:'shortcut-col'},groups.slice(2))),true);
 }
 
 // ---- The ? button and its card ----
@@ -108,7 +115,7 @@ function tourSteps(){
     {target:'.main-nav .nav-item:nth-child(2)',title:tr('달력'),text:tr('일·주·월로 보고, 일정을 끌어서 옮기거나 늘려요.')},
     {target:'.main-nav .nav-item:nth-child(3)',title:tr('메모'),text:tr('생각을 적고 Ctrl+F로 찾아요. 고정과 이전 버전도 있어요.')},
     {target:'.main-nav .nav-item:nth-child(4)',title:tr('바탕화면 위젯'),text:tr('할 일·달력·메모를 바탕화면에 놓아 늘 볼 수 있어요.')},
-    {target:'.account-button',title:tr('계정 연결'),text:tr('Outlook·Google·iCloud의 할 일과 달력을 함께 봐요.')},
+    {target:'.account-button',title:tr('계정 연결'),text:tr('Outlook·Google의 할 일과 달력, iCloud 달력을 함께 봐요.')}, // iCloud gives the calendar only: no 미리 알림 claim (CLAUDE.md; 2026-11-02 r60 integration)
     {target:'.help-button',title:tr('단축키와 도움말'),text:tr('여기에 마우스를 올리면 단축키가 보여요. 둘러보기도 여기서 다시 볼 수 있어요.')},
   ];
 }

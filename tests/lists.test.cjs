@@ -225,9 +225,27 @@ test('the widget CSS draws the text and accents from the ink variables, its own 
   for (const theme of ['light', 'dark']) {
     const k = D.glassLook(1, navySpread, 'dark', theme);
     assert.equal(k.tone, theme, 'the opaque end is the app theme');
-    const circle = theme === 'dark' ? cssProp('.widget-body.tone-dark .widget-calendar-content .is-today .day-number', 'background') : D.glassInks('light', k.ink)['--w-red'];
-    assert.ok(wcag([1, 1, 1], cssColour(circle).rgb) >= 3, `white on the today circle at the opaque end (${theme}): ${wcag([1, 1, 1], cssColour(circle).rgb).toFixed(2)}`);
+    const circle = cssProp('.widget-body.tone-' + theme, '--w-today');
+    assert.ok(wcag([1, 1, 1], cssColour(circle).rgb) >= 3.3, `white on the today circle at the opaque end (${theme}): ${wcag([1, 1, 1], cssColour(circle).rgb).toFixed(2)}`);
   }
+  // The today circle's fill is its own token, --w-today, never a value of the ink ramp (2026-11-02 review widget-tab-1 / regressions-1:
+  // the gallery card and the light-tone widget filled it with --w-red, the text red, which the ramp darkens on light glass and lightens
+  // on dark glass, so white digits on it fell to 2.21:1 and lower). The fill is Apple's system red (owner 2026-11-02: 「애플에서 원래
+  // 달력에서 쓰는 빨강」), light #ff3b30 / dark #ff453a in every token rule: white digits 3.55 / 3.41, Apple's own ratio (WCAG 1.4.11 3:1).
+  assert.equal(cssProp('.widget-preview .mini-preview-calendar .active', 'background'), 'var(--w-today)');
+  assert.equal(cssProp('.widget-calendar-content .is-today .day-number', 'background'), 'var(--w-today)');
+  assert.ok(!('--w-today' in D.glassInks('light', 0)) && !('--w-today' in D.glassInks('dark', 1)), 'glassInks never emits the fill token');
+  for (const selector of ['.widget-body,.widget-stage', '[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]', '.widget-body.tone-dark', '.widget-body.tone-light']) {
+    const fill = cssProp(selector, '--w-today');
+    assert.ok(wcag([1, 1, 1], cssColour(fill).rgb) >= 3.3, `white on the today fill of ${selector}: ${fill} ${wcag([1, 1, 1], cssColour(fill).rgb).toFixed(2)}`);
+    assert.equal(fill, /dark/.test(selector) ? '#ff453a' : '#ff3b30', `${selector}: Apple systemRed`);
+  }
+  assert.equal(cssProp('.widget-body.tone-light', '--w-today'), cssProp('.widget-body,.widget-stage', '--w-today'), 'the light fill is the stage red, not the deeper text red');
+  // The red text base is Apple's system red too, on the stage and as the plain end of the glass ramp (owner 2026-11-02: the deep red
+  // 「어두운 색이 좀 섞인 너무 짙은 빨강」 of 1.2.6 out); only the ramp deepens or lightens it toward the change of text colour.
+  assert.equal(cssProp('.widget-body,.widget-stage', '--w-red'), '#ff3b30'); assert.equal(D.glassInks('light', 0)['--w-red'], '#ff3b30');
+  assert.equal(cssProp('[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]', '--w-red'), '#ff453a'); assert.equal(D.glassInks('dark', 0)['--w-red'], '#ff453a');
+  assert.doesNotMatch(STYLES, /\n\.widget-body\.tone-dark \.widget-calendar-content \.is-today \.day-number\{/, 'no per-tone fill override: the token carries it');
   const app = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
   const apply = app.slice(app.indexOf('function applyGlass('), app.indexOf('\n', app.indexOf('function applyGlass(')));
   assert.match(apply, /D\.glassInks\(k\.tone,k\.ink\)/, 'applyGlass sets the ink variables');
@@ -260,6 +278,52 @@ test('the gallery previews follow the widgets\' glass curve and widgets redraw w
   const previews = glass.slice(glass.indexOf('function glassPreviews('), glass.indexOf('function glassStretch('));
   assert.match(previews, /DayboardDates\.glassLook\(level, \{ mean: L, low: L, high: L \}, stage, theme\)/, 'previews use glassLook on the theme stage');
   assert.match(previews, /glassMount\(el, 'preview-' \+ type, level, L, params\)/);
+  // The cards as glassPreviews colours them, run on a stand-in gallery: both app themes x the three widget-theme choices x five slider
+  // steps. On the theme's own stage a card keeps the stage tokens (2026-11-02 review usability-1, owner decision: the 1.2.5 colours,
+  // not the ramp's darker ones); a card of the other theme is glass over the opposite tone and takes the widget's inks (re-review of
+  // r60 A: with no ink at all its 「오늘 3」, 「메모」 and circles fell to 1.1–1.9:1, and the dark default took the light 「메모」 and
+  // circle colours, 2.3:1). The stage is the grey glassPreviews solves for (L .82 / .23); the 「오늘」 label starts with the colour
+  // app.js widgetPreview gives it by the app theme. The later .widget-stage rules for 「메모」 and the circles win the cascade.
+  const LIGHT = '.widget-body,.widget-stage', DARK = '[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]';
+  const tokens = selector => Object.fromEntries(cssRule(selector).split(';').map(d => [d.slice(0, d.indexOf(':')), d.slice(d.indexOf(':') + 1)]).filter(([n]) => n.startsWith('--')));
+  const solidOf = { light: cssColour(tokens(LIGHT)['--w-opaque']).rgb, dark: cssColour(tokens(DARK)['--w-opaque']).rgb };
+  for (const [theme, selector] of [['light', LIGHT], ['dark', DARK]]) {
+    const plain = D.glassInks(theme, 0), own = tokens(selector);
+    for (const name of ['--w-note', '--w-check-with']) assert.deepEqual(cssColour(own[name] || 'unset').rgb, cssColour(plain[name]).rgb, `${theme} stage ${name}: the plain ink`);
+    assert.equal(own['--w-check-mix'], plain['--w-check-mix'], `${theme} stage --w-check-mix: the plain ink`);
+  }
+  const runPreviews = new Function('glassSolid', 'appTheme', 'widgetThemeNow', 'DayboardDates', 'glassMount', previews + '\nreturn glassPreviews;');
+  const fakeStyle = () => ({ props: {}, color: '', setProperty(n, v) { this.props[n] = v; }, removeProperty(n) { delete this.props[n]; } });
+  const TODAY = '#3478f6';
+  for (const stage of ['light', 'dark']) for (const choice of ['app', 'light', 'dark']) for (const level of [0, 0.25, 0.5, 0.75, 1]) {
+    const theme = D.widgetTheme(choice, stage, stage), where = `${choice} (${theme}) previews in the ${stage} app at ${level}`;
+    const label = { dataset: { previewInk: TODAY }, style: fakeStyle() };
+    label.style.color = stage === 'dark' ? D.inkOn(TODAY, 'dark', 0) : TODAY;
+    const cards = ['tasks', 'calendar', 'note'].map(type => ({ classList: { contains: c => c === 'preview-' + type, remove() {} }, style: fakeStyle(), parentElement: { dataset: {} }, querySelectorAll: () => type === 'tasks' ? [label] : [] }));
+    runPreviews(l => l >= 0.995, () => stage, () => theme, D, () => {})({ classList: { toggle() {} }, querySelectorAll: () => cards }, level);
+    const L = stage === 'dark' ? 0.23 : 0.82, k = D.glassLook(level, { mean: L, low: L, high: L }, stage, theme);
+    for (const card of cards) {
+      assert.equal(card.parentElement.dataset.widgetTheme, theme, `${where}: the chosen theme picks the token set`);
+      const inline = Object.fromEntries(Object.entries(card.style.props).filter(([n]) => n !== '--w-a' && n !== '--w-da'));
+      assert.deepEqual(inline, theme === stage ? {} : D.glassInks(k.tone, k.ink), `${where}: ${theme === stage ? 'the stage tokens' : 'the widget inks'}`);
+    }
+    const vars = { ...tokens(LIGHT), ...(theme === 'dark' ? tokens(DARK) : {}), '--task-color': TODAY, ...cards[0].style.props };
+    const resolve = value => { for (let i = 0; i < 3; i++) value = value.replace(/var\((--[a-z-]+)(?:,([^()]+))?\)/g, (m, n, f) => vars[n] ?? f ?? m); return value.trim(); };
+    const colourOf = value => { const v = resolve(value), m = v.match(/^color-mix\(in srgb,(#[0-9a-f]+) (\d+)%,(#[0-9a-f]+)\)$/i); if (!m) return cssColour(v).rgb; const a = cssColour(m[1]).rgb, b = cssColour(m[3]).rgb; return a.map((x, i) => m[2] / 100 * x + (1 - m[2] / 100) * b[i]); };
+    const bg = k.solid ? solidOf[theme] : glassFilterSim([L * 255, L * 255, L * 255], k), on = c => wcag(c, bg);
+    const text = on(colourOf('var(--w-text)')), note = on(colourOf(cssProp('.widget-stage .preview-note-label', 'color'))), circle = on(colourOf(cssProp('.widget-stage .preview-task i', 'border-color')));
+    const title = on(hexRgb(label.style.color)), red = on(colourOf('var(--w-red)')), digits = wcag([1, 1, 1], colourOf('var(--w-today)'));
+    assert.ok(text >= 4.5, `text on ${where}: ${text.toFixed(2)}`);
+    assert.ok(note >= 3, `「메모」 on ${where}: ${note.toFixed(2)}`);
+    assert.ok(circle >= 3, `task circles on ${where}: ${circle.toFixed(2)}`);
+    assert.ok(digits >= 3.3, `white digits on the today circle, ${where}: ${digits.toFixed(2)}`);
+    // A light card in the light app shows Apple's colours as they are (owner decision; on this grey 「오늘」 2.85–3.93 and the month
+    // 2.49–3.43, on the painted pastel card 3.6–3.9); every other card holds the glass rules (titles 3:1, accents 3:1 from the middle).
+    if (theme === 'light' && stage === 'light') { assert.equal(label.style.color, TODAY, `${where}: 「오늘」 #3478f6`); assert.equal(resolve('var(--w-red)'), '#ff3b30', `${where}: Apple red`); continue; }
+    if (theme === stage) assert.equal(label.style.color, D.inkOn(TODAY, 'dark', 0), `${where}: 「오늘」 lightened as on the dark widget`);
+    assert.ok(title >= 3, `「오늘」 on ${where}: ${title.toFixed(2)}`);
+    if (level >= 0.5) assert.ok(red >= 3, `the red month on ${where}: ${red.toFixed(2)}`);
+  }
   // On the theme's own stage the preview only grows toward the theme card: no change of tone, no step bigger than the others.
   for (const [theme, L] of [['light', 0.82], ['dark', 0.23]]) {
     let last = null;
@@ -273,6 +337,41 @@ test('the gallery previews follow the widgets\' glass curve and widgets redraw w
   const app = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
   const measure = app.slice(app.indexOf('function measureGlass('), app.indexOf('\n', app.indexOf('function measureGlass(')));
   assert.match(measure, /\(now\?\.tone\|\|null\)!==was\.tone\)/, 'a move that changes the text colour redraws (its strength follows in applyGlass)');
+  // Without a backdrop (an always-on-top card) a light card has no tone class, so the stage colours apply as in 1.2.5 (owner decision,
+  // usability-1); a dark card keeps tone-dark, so list colours as text are lightened on it (re-review of r60 A: an indigo list title
+  // 2.34:1, 「오늘」 3.25:1 on the dark card without it). Its red is the stage red either way.
+  const toneNow = app.slice(app.indexOf('function glassToneNow('), app.indexOf('\n', app.indexOf('function glassToneNow('))).trimEnd();
+  const toneOf = (look, theme) => new Function('glassLevel', 'glassLookNow', 'widgetThemeNow', toneNow + '\nreturn glassToneNow;')(() => 0.5, () => look, () => theme)();
+  assert.equal(toneOf({ tone: 'dark' }, 'light'), 'dark', 'a backdrop: the tone of its glass');
+  assert.equal(toneOf({ tone: 'light' }, 'dark'), 'light');
+  assert.equal(toneOf(null, 'light'), null, 'no backdrop, light: no tone class');
+  assert.equal(toneOf(null, 'dark'), 'dark', 'no backdrop, dark: tone-dark');
+  assert.equal(cssProp('.widget-body.tone-dark', '--w-red'), cssProp(DARK, '--w-red'), 'the dark card keeps the stage red');
+  for (const color of [...D.LIST_PALETTE, TODAY]) {
+    const ink = hexRgb(D.inkOn(color, toneOf(null, 'dark'), 0));
+    assert.ok(wcag(ink, solidOf.dark) >= 4.5, `${color} as a title on the dark always-on-top card: ${wcag(ink, solidOf.dark).toFixed(2)}`);
+  }
+});
+
+test('applyGlass recolours list titles with the tone the render used, so a resize or slider step keeps them (2026-11-02 r60 carry-over A-1)', () => {
+  // Without a backdrop applyGlass used tone null, so a dark always-on-top card's indigo title went back to #5856d6 (2.64:1) on every
+  // window resize and live slider step until the next render. Stubs only; the test compares strings, never DOM-like objects.
+  const app = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+  const start = app.indexOf('function applyGlass(');
+  const src = app.slice(start, app.indexOf('\n', start)).trimEnd();
+  const run = (look, tone) => {
+    const tones = [];
+    const el = { dataset: { ink: '#5856d6' }, style: { color: '' } };
+    const document = { body: { style: { setProperty() {}, removeProperty() {} } }, querySelectorAll: () => [el] };
+    const Dstub = { glassInks: () => ({}), inkOn: (color, t, ink) => { tones.push(String(t)); return D.inkOn(color, t, ink); } };
+    const applyGlass = new Function('document', 'D', 'glassLevel', 'glassVars', 'glassBasis', 'glassLookNow', 'glassToneNow', 'glassTune', 'glassSurfaceParams', 'isWidget', 'GLASS_INK_VARS', src + '\nreturn applyGlass;')(
+      document, Dstub, () => 0.5, () => ({}), () => null, () => look, () => tone, () => {}, () => ({}), true, []);
+    applyGlass();
+    return { tones: tones.join(), color: el.style.color };
+  };
+  assert.deepEqual(run(null, 'dark'), { tones: 'dark', color: D.inkOn('#5856d6', 'dark', 0) }, 'dark always-on-top card: lightened like the render');
+  assert.deepEqual(run(null, null), { tones: 'null', color: '#5856d6' }, 'light always-on-top card: the raw colour like the render');
+  assert.deepEqual(run({ tone: 'light', ink: 0.4 }, 'light'), { tones: 'light', color: D.inkOn('#5856d6', 'light', 0.4) }, 'on a backdrop: the glass look');
 });
 
 test('list colours as text on glass are mixed only as far as they need (inkOn)', () => {

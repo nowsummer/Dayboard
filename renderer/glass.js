@@ -158,7 +158,8 @@ function glassAfterRender() {
     return;
   }
   const gallery = document.querySelector('.widget-gallery');
-  if (gallery) glassPreviews(gallery, glassLevel());
+  // the cards first keep their 기본 size at a larger widget text size (app.js fitWidgetPreviews, r60-X), then the lens is cut for them
+  if (gallery) { if (typeof fitWidgetPreviews === 'function') fitWidgetPreviews(gallery); glassPreviews(gallery, glassLevel()); }
   else glassDropPreviews();
 }
 // The gallery's filters leave with it: three filters and their lens maps stayed in <defs> for the rest of the session
@@ -173,15 +174,20 @@ function glassPreviews(gallery, level) {
   const stage = appTheme(), theme = widgetThemeNow(stage), L = stage === 'dark' ? 0.23 : 0.82;
   const k = DayboardDates.glassLook(level, { mean: L, low: L, high: L }, stage, theme);
   const params = k ? { tint: k.tint, t: k.t, sat: k.sat, blur: k.blur } : null;
+  // On the theme's own stage a card keeps the stage tokens (2026-11-02 review usability-1, owner decision: the 1.2.5 colours, not the
+  // ramp's darker ones). A card of the other theme is glass over a stage of the opposite tone, the wallpaper case the ink ramp is for,
+  // so it takes the widget's inks (re-review: without them 「오늘 3」, 「메모」 and the circles fell to 1.1–1.9:1). The 「오늘」 title
+  // gets the colour the widget gives it: the ramp's there, otherwise lightened on a dark card as the dark always-on-top card does
+  // (app.js glassToneNow) — app.js widgetPreview colours it by the app theme. The today circle is --w-today either way.
+  const inks = k && k.tone !== stage ? DayboardDates.glassInks(k.tone, k.ink) : null, names = Object.keys(DayboardDates.glassInks('light', 0));
+  const labelTone = inks ? k.tone : theme === 'dark' ? 'dark' : null, labelInk = inks ? k.ink : 0;
   gallery.classList.toggle('solid', solid);
   for (const el of gallery.querySelectorAll('.widget-preview')) {
     const type = ['tasks', 'calendar', 'note'].find(t => el.classList.contains('preview-' + t)) || 'tasks';
     el.parentElement.dataset.widgetTheme = theme;
-    if (k) {
-      for (const [name,value] of Object.entries(DayboardDates.glassInks(k.tone,k.ink))) el.style.setProperty(name,value);
-      el.style.setProperty('--w-a',String(k.t)); el.style.setProperty('--w-da',String(k.t));
-      for (const label of el.querySelectorAll('[data-preview-ink]')) label.style.color=DayboardDates.inkOn(label.dataset.previewInk,k.tone,k.ink);
-    }
+    if (k) { el.style.setProperty('--w-a',String(k.t)); el.style.setProperty('--w-da',String(k.t)); }
+    for (const name of names) if (inks) el.style.setProperty(name, inks[name]); else el.style.removeProperty(name);
+    for (const label of el.querySelectorAll('[data-preview-ink]')) label.style.color = DayboardDates.inkOn(label.dataset.previewInk, labelTone, labelInk);
     if (solid) { el.classList.remove('lg'); el.style.removeProperty('--lg-filter'); continue; }
     glassMount(el, 'preview-' + type, level, L, params);
   }

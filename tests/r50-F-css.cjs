@@ -17,7 +17,8 @@ const sheet = (() => {
 const specificity = selector => { const s = selector.replace(/\[[^\]]*\]/g, ' [a] ').replace(/:(?:not|is|has)\(/g, ' ').replace(/[()]/g, ' '); return [(s.match(/#[\w-]+/g) || []).length, (s.match(/\.[\w-]+|\[a\]|:[\w-]+/g) || []).length, (s.match(/(?:^|[\s>+~])[a-z][\w-]*/gi) || []).length]; };
 function computed(el, prop) {
   if (el.hidden) el.setAttribute('hidden', ''); else el.removeAttribute('hidden'); // the browser reflects the property; this DOM does not
-  const names = prop === 'font-size' ? ['font-size', 'font'] : [prop];
+  // background-color also reads the background shorthand (r60-apple: a transparent select over an older background:var(--bg))
+  const names = prop === 'font-size' ? ['font-size', 'font'] : prop === 'background-color' ? ['background-color', 'background'] : [prop];
   const won = [];
   for (const rule of sheet) for (const selector of rule.selectors) {
     if (selector.startsWith('@') || selector.includes('::')) continue;
