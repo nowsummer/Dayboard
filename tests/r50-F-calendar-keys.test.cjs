@@ -91,7 +91,7 @@ test('colour swatches: human names, one Tab stop, arrows move the selection and 
   const picker = h.eval('swatchPicker')('#007aff');
   h.app.append(picker.node);
   const radios = () => [...picker.node.querySelectorAll('[role=radio]')];
-  assert.equal(radios().length, D.LIST_PALETTE.length);
+  assert.equal(radios().length, D.LIST_PALETTE.length + 1, 'the palette and 「다른 색…」 last (2026-11-03)');
   assert.ok(radios().every(r => !/^#/.test(r.getAttribute('aria-label'))), 'no hex codes as names');
   const blue = radios().find(r => r.getAttribute('aria-checked') === 'true');
   assert.equal(blue.getAttribute('aria-label'), '파랑');

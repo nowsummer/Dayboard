@@ -159,10 +159,17 @@ app.whenReady().then(async () => {
     // The widget's own frames from here; where it sits, as the app saved it (its window is a child of the desktop now).
     const widgetWin = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w.webContents.getURL().includes('widget=tasks'));
     if (!widgetWin) throw new Error('the tasks widget did not open');
+    // Moved the app's way (2026-11-03): an attached widget is a child of the desktop window, whose origin is the left-most screen's corner,
+    // so BrowserWindow.setBounds left it where it was with a second screen left of the main one (it stayed at x=-452). main.cjs widget:resize
+    // (lib/desktop.cjs setBounds maps the desktop window's coordinates) from the widget itself: the left edge out to the slot, then the
+    // right edge back in — the same size, at the slot.
     const opened = widgetWin.getBounds();
-    widgetWin.setBounds({ x: slotX, y: area.y + 16, width: opened.width, height: opened.height });
+    const widgetId = (await invoke('state:get')).widgets.find(w => w.type === 'tasks').id;
+    const resize = payload => widgetWin.webContents.executeJavaScript(`window.dayboard.invoke('widget:resize', ${JSON.stringify({ id: widgetId, ...payload })})`);
+    const here = await resize({ width: opened.width, height: opened.height, edge: 'se' });
+    await resize({ width: here.width + (here.x - slotX), height: here.height, edge: 'w' });
+    const widgetBounds = await resize({ width: here.width, height: here.height, edge: 'e' });
     await wait(1500); // the widget is sent the wallpaper behind its new place (main.cjs queueBackdrop) and paints it
-    const widgetBounds = widgetWin.getBounds();
     if (Math.abs(widgetBounds.x - slotX) > 2) throw new Error(`the tasks widget stayed at x=${widgetBounds.x}, not ${slotX}`);
     widgetWin.webContents.setBackgroundThrottling(false);
     subscribe(widgetWin, 'widget', () => widgetBounds);

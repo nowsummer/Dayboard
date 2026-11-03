@@ -167,7 +167,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => setTimeout(resolve, 30));
     const toastNode = document.getElementById('toast');
     result.closed = !document.querySelector('#modal-root .dialog');
-    result.warned = Boolean(document.querySelector('#modal-root .dialog-guard')) || (toastNode.classList.contains('show') && toastNode.textContent.includes('저장하지 않은')); // a live dialog never asks 변경 버리기 / 계속 편집 (2026-10-28 review D06)
+    result.warned = Boolean(document.querySelector('#modal-root .dialog-guard')) || (toastNode.classList.contains('show') && toastNode.textContent.includes('저장하지 않은')); // a live dialog never asks 변경 취소 / 계속 편집 (2026-10-28 review D06)
     result.released = document.getElementById('app').inert === false;
     return result;`);
   const clockApplied = (await invoke('state:get')).settings.timeFormat;
@@ -267,9 +267,9 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     return { open: Boolean(dialog), swatches: dialog ? dialog.querySelectorAll('.swatch').length : 0, icons: dialog ? dialog.querySelectorAll('.icon-choice').length : 0 };`);
   expect(editInfo.open && editInfo.swatches >= 10 && editInfo.icons >= 12, `목록 편집 대화상자 ${JSON.stringify(editInfo)}`);
   await shot(mainWindow, 'list-edit');
-  // A colour pick counts as an unsaved edit: an outside click keeps the dialog and asks 변경 버리기 / 계속 편집 (2026-10-28 review D06).
+  // A colour pick counts as an unsaved edit: an outside click keeps the dialog and asks 변경 취소 / 계속 편집 (2026-10-28 review D06).
   // 새 그룹 만들기 stacks on 목록 편집: Esc returns with the edit intact, and a group made there is selected in 그룹 without
-  // reopening the dialog; Esc on the edited dialog asks again, and 변경 버리기 closes it.
+  // reopening the dialog; Esc on the edited dialog asks again, and 변경 취소 closes it.
   const stacked = await run(mainWindow, `
     const dialog = document.querySelector('#modal-root .dialog');
     const swatch = [...dialog.querySelectorAll('.swatch')].find(node => !node.classList.contains('selected'));
@@ -300,13 +300,13 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 30));
     result.askedAgain = Boolean(dialog.querySelector('.dialog-guard')) && document.querySelector('#modal-root .dialog') === dialog;
-    dialog.querySelector('.dialog-guard .discard')?.click(); // 변경 버리기
+    dialog.querySelector('.dialog-guard .discard')?.click(); // 변경 취소
     await new Promise(resolve => setTimeout(resolve, 30));
     result.closed = !document.querySelector('#modal-root .dialog');
     return result;`);
   const madeGroup = (await invoke('state:get')).groups.find(item => item.name === '스모크 새 그룹');
   if (madeGroup) await invoke('group:delete', { id: madeGroup.id });
-  expect(stacked.kept && stacked.asked === '변경 버리기|계속 편집' && stacked.askedFocus === '계속 편집' && stacked.resumed && stacked.sub === '새 그룹' && stacked.back && stacked.returned && stacked.selected === '스모크 새 그룹' && stacked.colourKept && stacked.askedAgain && stacked.closed && madeGroup, `목록 편집 위 새 그룹 ${JSON.stringify(stacked)}`);
+  expect(stacked.kept && stacked.asked === '변경 취소|계속 편집' && stacked.askedFocus === '계속 편집' && stacked.resumed && stacked.sub === '새 그룹' && stacked.back && stacked.returned && stacked.selected === '스모크 새 그룹' && stacked.colourKept && stacked.askedAgain && stacked.closed && madeGroup, `목록 편집 위 새 그룹 ${JSON.stringify(stacked)}`);
   checks.push('list-edit-stacked-group');
   // 저장 sends only what the user changed in the dialog (2026-10-30 review R5b, lib/viewsync.cjs): a symbol that changed elsewhere while
   // the dialog was open (another PC's look laid on by a view run, here a direct update) stays, the colour picked is saved, the group too.
@@ -328,6 +328,68 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const afterSave = (await invoke('state:get')).lists.find(item => item.id === seeded[1].id);
   expect(partial.closed && afterSave.color === partial.picked && afterSave.icon === 'gift' && afterSave.groupId === group.id && afterSave.name === '📚 독서', `목록 편집 저장은 바꾼 것만 ${JSON.stringify({ partial, afterSave })}`);
   checks.push('list-edit-sends-changes-only');
+  // 「다른 색…」 (2026-11-03 owner: 「다양한 색상을 선택할 수 있는 팔레트」): the last swatch opens the system picker over itself (one hidden colour
+  // input in the page); a picked colour is selected as 「사용자 지정 색」, counts as an unsaved edit (Esc asks), and is saved kept readable —
+  // white comes back as a grey; the reopened dialog shows it selected.
+  const customPick = await run(mainWindow, `
+    const open = async () => { const row = [...document.querySelectorAll('.list-nav')].find(node => node.textContent.includes('독서')); row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 30)); [...document.querySelectorAll('.context-menu .menu-item')].find(node => node.textContent.includes('목록 편집'))?.click(); await new Promise(resolve => setTimeout(resolve, 30)); return document.querySelector('#modal-root .dialog'); };
+    let dialog = await open();
+    const slot = dialog.querySelector('.swatch.custom');
+    const result = { label: slot?.getAttribute('aria-label'), last: slot === dialog.querySelector('.swatches').querySelectorAll('[role=radio]')[dialog.querySelector('.swatches').querySelectorAll('[role=radio]').length - 1] };
+    slot.click();
+    const input = document.querySelector('body > input.color-chooser');
+    const r = input.getBoundingClientRect(), s = slot.getBoundingClientRect();
+    result.over = Math.abs(r.left - s.left) <= 1 && Math.abs(r.top - s.top) <= 1;
+    input.value = '#ffffff'; input.dispatchEvent(new Event('change'));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    const now = dialog.querySelector('.swatch.custom');
+    result.picked = now.getAttribute('aria-checked') === 'true' && now.getAttribute('aria-label') === '사용자 지정 색';
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    result.asked = Boolean(dialog.querySelector('.dialog-guard'));
+    dialog.querySelector('.dialog-guard .button.primary')?.click(); // 계속 편집
+    dialog.querySelector('button[type=submit]').click();
+    await new Promise(resolve => setTimeout(resolve, 300));
+    dialog = await open();
+    const again = dialog.querySelector('.swatch.custom');
+    result.reopened = again?.getAttribute('aria-checked') === 'true' && again.style.getPropertyValue('--fill') === D.clampColor('#ffffff');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); // unchanged: closes at once
+    await new Promise(resolve => setTimeout(resolve, 60));
+    result.closed = !document.querySelector('#modal-root .dialog');
+    return result;`);
+  const customSaved = (await invoke('state:get')).lists.find(item => item.id === seeded[1].id);
+  expect(customPick.label === '다른 색…' && customPick.last && customPick.over && customPick.picked && customPick.asked && customPick.reopened && customPick.closed && customSaved.color === require('../renderer/domain.js').clampColor('#ffffff') && customSaved.color !== '#ffffff',
+    `다른 색 고르기 ${JSON.stringify({ customPick, color: customSaved.color })}`);
+  await invoke('list:update', { id: seeded[1].id, color: afterSave.color });
+  checks.push('list-custom-colour');
+  // The real picker (final review C3): a real click on 「다른 색…」 opens Chromium's popup; it has no OK button, and the click outside that
+  // closes it reaches the page too. The colour set in the popup must be taken before that press — so the dialog, now changed, asks
+  // 변경 취소 / 계속 편집 instead of closing and dropping the colour.
+  const realPicker = await (async () => {
+    const at = await run(mainWindow, `const row = [...document.querySelectorAll('.list-nav')].find(node => node.textContent.includes('독서')); row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 30)); [...document.querySelectorAll('.context-menu .menu-item')].find(node => node.textContent.includes('목록 편집'))?.click(); await new Promise(resolve => setTimeout(resolve, 400));
+      const r = document.querySelector('#modal-root .dialog .swatch.custom').getBoundingClientRect(), d = document.querySelector('#modal-root .dialog').getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), outX: Math.max(4, Math.round(d.left / 2)), outY: Math.round(d.top + 40) };`);
+    mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: at.x, y: at.y });
+    mainWindow.webContents.sendInputEvent({ type: 'mouseDown', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+    mainWindow.webContents.sendInputEvent({ type: 'mouseUp', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+    await new Promise(resolve => setTimeout(resolve, 600));
+    await run(mainWindow, `document.querySelector('body > input.color-chooser').value = '#2d6a4f'; return true;`); // as the popup sets it while one drags
+    mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: at.outX, y: at.outY });
+    mainWindow.webContents.sendInputEvent({ type: 'mouseDown', x: at.outX, y: at.outY, button: 'left', clickCount: 1 });
+    mainWindow.webContents.sendInputEvent({ type: 'mouseUp', x: at.outX, y: at.outY, button: 'left', clickCount: 1 });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const after = await run(mainWindow, `const dialog = document.querySelector('#modal-root .dialog'); const slot = dialog && dialog.querySelector('.swatch.custom');
+      const result = { open: Boolean(dialog), asked: Boolean(dialog && dialog.querySelector('.dialog-guard')), fill: slot ? slot.style.getPropertyValue('--fill') : '', checked: slot ? slot.getAttribute('aria-checked') : '' };
+      dialog?.querySelector('.dialog-guard .discard')?.click(); await new Promise(resolve => setTimeout(resolve, 60));
+      if (document.querySelector('#modal-root .dialog')) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 60)); document.querySelector('#modal-root .dialog .dialog-guard .discard')?.click(); await new Promise(resolve => setTimeout(resolve, 60)); }
+      result.closed = !document.querySelector('#modal-root .dialog');
+      return result;`);
+    return after;
+  })();
+  const realPickerList = (await invoke('state:get')).lists.find(item => item.id === seeded[1].id);
+  expect(realPicker.open && realPicker.asked && realPicker.fill === '#2d6a4f' && realPicker.checked === 'true' && realPicker.closed && realPickerList.color === afterSave.color,
+    `실제 색 선택 창 바깥 클릭 ${JSON.stringify({ realPicker, color: realPickerList.color })}`);
+  checks.push('custom-colour-real-picker');
   // The symbol picker by keyboard and its typed emoji (2026-10-30 Codex review U01, R04): one Tab stop per grid, the arrows and End move
   // the choice with the focus, a click keeps the focus on the same button, an emptied field chooses the icon again, and text with no
   // emoji is cleared when left. Saved: the icon, the name without an emoji.
@@ -518,7 +580,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => setTimeout(resolve, 30));
     const menu = document.querySelector('.context-menu');
     return { open: Boolean(menu), swatches: menu ? menu.querySelectorAll('.menu-swatch').length : 0, items: menu ? [...menu.querySelectorAll('.menu-item > span')].map(node => node.textContent) : [] };`);
-  expect(menu.open && menu.swatches === 12 && menu.items.includes('편집') && menu.items.includes('복제') && menu.items.includes('삭제'), `일정 우클릭 메뉴 ${JSON.stringify(menu)}`);
+  expect(menu.open && menu.swatches === 13 && menu.items.includes('편집') && menu.items.includes('복제') && menu.items.includes('삭제'), `일정 우클릭 메뉴 ${JSON.stringify(menu)}`);
   await shot(mainWindow, 'calendar-menu');
   const menuClosed = await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 30)); return !document.querySelector('.context-menu');`);
   expect(menuClosed, '우클릭 메뉴 Escape 닫기');
@@ -530,11 +592,37 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   expect(calendarColored.customColor === '#5856d6', `달력 색 지정 ${JSON.stringify(calendarColored)}`);
   const calendarRows = await run(mainWindow, `return { rows: document.querySelectorAll('.calendar-list .calendar-row').length, check: document.querySelector('.calendar-list .cal-check')?.style.getPropertyValue('--cal-color') || '' };`);
   expect(calendarRows.rows >= 1 && calendarRows.check === '#5856d6', `달력 목록 색 반영 ${JSON.stringify(calendarRows)}`);
+  // The calendar's right-click colour row ends in 「다른 색…」 too (2026-11-03): the picker's colour is saved as the calendar's, kept visible
+  // on the dark theme — black comes back as a dark grey — and the row then shows it selected.
+  const menuCustom = await run(mainWindow, `
+    const rowNow = () => [...document.querySelectorAll('.calendar-list .calendar-row')].find(node => node.textContent.includes('개인 일정')) || document.querySelector('.calendar-list .calendar-row');
+    rowNow().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 900, clientY: 500 })); await new Promise(resolve => setTimeout(resolve, 30));
+    const swatch = document.querySelector('.context-menu .menu-swatch.custom');
+    const result = { label: swatch?.getAttribute('aria-label'), last: swatch === [...document.querySelectorAll('.context-menu .menu-swatch')].pop() };
+    swatch.click(); await new Promise(resolve => setTimeout(resolve, 30));
+    result.menuClosed = !document.querySelector('.context-menu');
+    const input = document.querySelector('body > input.color-chooser'); input.value = '#000000'; input.dispatchEvent(new Event('change'));
+    await new Promise(resolve => setTimeout(resolve, 300));
+    rowNow().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 900, clientY: 500 })); await new Promise(resolve => setTimeout(resolve, 30)); // the list was drawn anew with the colour
+    const again = document.querySelector('.context-menu .menu-swatch.custom');
+    result.selected = Boolean(again && again.classList.contains('selected') && again.getAttribute('aria-label') === '사용자 지정 색');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 30));
+    return result;`);
+  const menuCustomCal = (await invoke('state:get')).calendars.find(item => item.id === 'local-calendar');
+  expect(menuCustom.label === '다른 색…' && menuCustom.last && menuCustom.menuClosed && menuCustom.selected && menuCustomCal.customColor === require('../renderer/domain.js').clampColor('#000000') && menuCustomCal.customColor !== '#000000',
+    `달력 메뉴 다른 색 ${JSON.stringify({ menuCustom, customColor: menuCustomCal.customColor })}`);
   await invoke('calendar:update', { id: 'local-calendar', color: null });
   // Hiding a calendar drops its events from the grid; the default calendar cannot be deleted, only archives and other local ones.
   await invoke('settings:update', { hiddenCalendars: ['local-calendar'] });
-  const hiddenView = await run(mainWindow, `return { chips: [...document.querySelectorAll('.calendar-grid.large .day-event')].filter(node => node.textContent.includes('스모크 반복')).length, rows: document.querySelectorAll('.calendar-list .calendar-row.hidden').length, agenda: document.querySelectorAll('.day-panel .event-row').length };`);
-  expect(hiddenView.chips === 0 && hiddenView.rows === 1 && hiddenView.agenda === 0, `달력 숨기기 ${JSON.stringify(hiddenView)}`);
+  const hiddenView = await run(mainWindow, `return { chips: [...document.querySelectorAll('.calendar-grid.large .day-event')].filter(node => node.textContent.includes('스모크 반복')).length, rows: document.querySelectorAll('.calendar-list .calendar-row.hidden').length, toggle: document.querySelector('.calendar-list .cal-hidden-toggle')?.textContent || '', agenda: document.querySelectorAll('.day-panel .event-row').length };`);
+  expect(hiddenView.chips === 0 && hiddenView.rows === 0 && /1/.test(hiddenView.toggle) && hiddenView.agenda === 0, `달력 숨기기 ${JSON.stringify(hiddenView)}`);
+  // 2026-11-03 owner 「숨긴달력은 안 보였으면」: the row waits behind 「숨긴 달력 1개」, which opens it (unchecked) to show it again.
+  // The row stays last and under the pointer, the hidden calendar opening above it (2026-11-03 review U3).
+  const openedHidden = await run(mainWindow, `const before = Math.round(document.querySelector('.calendar-list .cal-hidden-toggle').getBoundingClientRect().top);
+    document.querySelector('.calendar-list .cal-hidden-toggle').click(); await new Promise(r => setTimeout(r, 150));
+    const toggle = document.querySelector('.calendar-list .cal-hidden-toggle'), row = document.querySelector('.calendar-list .calendar-row.hidden');
+    return { rows: document.querySelectorAll('.calendar-list .calendar-row.hidden').length, open: toggle?.getAttribute('aria-expanded'), moved: Math.round(toggle.getBoundingClientRect().top) - before, last: toggle === toggle.parentElement.lastElementChild, above: Boolean(row) && row.getBoundingClientRect().bottom <= toggle.getBoundingClientRect().top + 1 };`);
+  expect(openedHidden.rows === 1 && openedHidden.open === 'true' && Math.abs(openedHidden.moved) <= 1 && openedHidden.last && openedHidden.above, `숨긴 달력 펼치기 ${JSON.stringify(openedHidden)}`);
   await shot(mainWindow, 'calendar-hidden');
   await invoke('settings:update', { hiddenCalendars: [] });
   const shownAgain = await run(mainWindow, `return [...document.querySelectorAll('.calendar-grid.large .day-event')].filter(node => node.textContent.includes('스모크 반복')).length;`);
@@ -552,7 +640,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const selects = dialog ? [...dialog.querySelectorAll('.field select')] : [];
     const repeat = selects.find(select => [...select.options].some(option => option.value === 'custom'));
     return { open: Boolean(dialog), preset: repeat ? repeat.value : '', panel: Boolean(dialog && dialog.querySelector('.repeat-panel') && !dialog.querySelector('.repeat-panel').hidden), summary: dialog ? dialog.querySelector('.repeat-summary')?.textContent || '' : '', swatches: dialog ? dialog.querySelectorAll('.event-swatches .swatch').length : 0 };`);
-  expect(sheet.open && sheet.preset === 'custom' && sheet.panel && /매주/.test(sheet.summary) && /4회/.test(sheet.summary) && sheet.swatches === 12, `반복 편집 시트 ${JSON.stringify(sheet)}`);
+  expect(sheet.open && sheet.preset === 'custom' && sheet.panel && /매주/.test(sheet.summary) && /4회/.test(sheet.summary) && sheet.swatches === 13, `반복 편집 시트 ${JSON.stringify(sheet)}`);
   await shot(mainWindow, 'event-dialog-repeat');
   await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));`);
   // Saving a repeating event without changing anything just closes (Apple, Notion): no scope question, no exception, no split.
@@ -588,7 +676,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const back = document.querySelector('#modal-root input[name=title]')?.value || '';
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 30));
-    const asked = Boolean(document.querySelector('#modal-root .dialog-guard')); // the changed title: Esc asks, 변경 버리기 closes (2026-10-28 review D06)
+    const asked = Boolean(document.querySelector('#modal-root .dialog-guard')); // the changed title: Esc asks, 변경 취소 closes (2026-10-28 review D06)
     document.querySelector('#modal-root .dialog-guard .discard')?.click();
     await new Promise(resolve => setTimeout(resolve, 30));
     return { options, back, asked, closed: asked && !document.querySelector('#modal-root .dialog') };`);
@@ -1747,7 +1835,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const stillOpen = Boolean(document.querySelector('#modal-root .dialog'));
     return { before, held, on, released, stays, leaves, labels: presets.map(node => node.textContent), tomorrow, expected: D.dayOffset(today, 1), none, filled, noAlert, stillOpen };`);
   await shot(mainWindow, 'task-editor-shortcuts');
-  flagHold.closed = await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 200)); const asked = Boolean(document.querySelector('#modal-root .dialog-guard')); document.querySelector('#modal-root .dialog-guard .discard')?.click(); await new Promise(resolve => setTimeout(resolve, 60)); return asked && !document.querySelector('#modal-root .dialog');`); // the presets changed the form: Esc asks, 변경 버리기 closes (2026-10-28 review D06)
+  flagHold.closed = await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 200)); const asked = Boolean(document.querySelector('#modal-root .dialog-guard')); document.querySelector('#modal-root .dialog-guard .discard')?.click(); await new Promise(resolve => setTimeout(resolve, 60)); return asked && !document.querySelector('#modal-root .dialog');`); // the presets changed the form: Esc asks, 변경 취소 closes (2026-10-28 review D06)
   expect(flagHold.before.join() === '깃발 하나,깃발 둘,깃발 셋' && flagHold.held.join() === flagHold.before.join() && flagHold.on && flagHold.released[0] === '깃발 셋', `깃발 누른 줄 제자리 ${JSON.stringify(flagHold)}`);
   expect(flagHold.stays && flagHold.leaves, `중요 화면에서 해제한 줄 유지 ${JSON.stringify(flagHold)}`);
   expect(flagHold.labels.join() === '오늘,내일,날짜 없음,알림 없음' && flagHold.tomorrow === flagHold.expected && flagHold.none === '' && flagHold.filled === '2030-01-02' && flagHold.noAlert === '' && flagHold.stillOpen && flagHold.closed, `할 일 편집 날짜 바로 가기 ${JSON.stringify(flagHold)}`);
@@ -1774,7 +1862,9 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     // The opaque end (2026-10-26 user): no glass at all — a solid card in the app theme, like the first widgets.
     expect(!tinted.lg && !tinted.filter.includes('#lg-surface') && tinted.solid && tinted.tone === 'light', `불투명 끝 = 유리 없는 카드 ${JSON.stringify(levels)}`);
     // The glass follows the wallpaper (2026-10-21 user choice): dark glass with white text on a dark one, light on a light one.
-    if (middle.backdrop) expect(middle.tone === 'light' && middle.toneClass && clear.tone === middle.tone, `기본 유리는 앱 테마 유지 ${JSON.stringify(levels)}`);
+    // 「앱과 같게」 (2026-11-03 owner: 「투명 쪽은 바탕화면 따라 … 애플에 맞춰서」): up to the middle the wallpaper's glass — dark glass with white
+    // text over a dark wallpaper (this PC's navy), light glass over a light one — the page theme and its tone class with it.
+    if (middle.backdrop) { const wall = middle.L < 0.46 ? 'dark' : middle.L > 0.54 ? 'light' : null; expect(middle.toneClass && clear.toneClass && clear.tone === middle.tone && (wall === null || middle.tone === wall), `앱과 같게: 투명 쪽은 바탕화면을 따름 ${JSON.stringify(levels)}`); }
     await invoke('settings:update', { glassLevel: 7 }).then(() => { throw new Error('범위 밖 유리 효과가 통과했습니다.'); }, error => expect(/유리 효과는 0~1/.test(error.message), `유리 효과 검증: ${error.message}`));
     const slider = await run(mainWindow, `document.querySelector('.main-nav .nav-item:nth-child(4)').click(); await new Promise(resolve => setTimeout(resolve, 40)); const range = document.querySelector('.glass-control input[type=range]'); return range ? range.value : '';`);
     expect(slider === '0.5', `위젯 화면 유리 효과 슬라이더 ${slider}`);
@@ -1795,8 +1885,10 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     for(const appTheme of ['light','dark'])for(const widgetTheme of ['app','light','dark','auto']){
       await invoke('settings:update',{theme:appTheme,widgetTheme,glassLevel:.5});
       const got=await glassOf();
-      const want=widgetTheme==='app'?appTheme:widgetTheme==='auto'?(got.backdrop&&got.L!==null?(got.L<.5?'dark':'light'):appTheme):widgetTheme;
+      // at the middle 앱과 같게 shows the wallpaper's glass like 바탕화면에 맞춤 (2026-11-03); at the opaque end it is the app's card
+      const want=widgetTheme==='app'||widgetTheme==='auto'?(got.backdrop&&got.L!==null?(got.L<.5?'dark':'light'):appTheme):widgetTheme;
       expect(got.tone===want,`위젯 독립 테마 ${appTheme}/${widgetTheme}: ${got.tone}`);
+      if(widgetTheme==='app'){await invoke('settings:update',{glassLevel:1});const solid=await glassOf();expect(solid.solid&&solid.tone===appTheme,`앱과 같게 불투명 끝 ${appTheme}: ${solid.tone}`);}
     }
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[]});win.webContents.debugger.detach();
     await invoke('settings:update',{theme:'light',widgetTheme:'app',glassLevel:.5});
@@ -1804,13 +1896,19 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const ramp=[];
     for(let i=0;i<=100;i++){
       await invoke('widget:glass-preview',{level:i/100});
-      ramp.push(await run(win,`await new Promise(r=>requestAnimationFrame(r));return {level:glassLevel(),tone:document.documentElement.dataset.theme,t:glassLookNow()?.t,blur:glassLookNow()?.blur};`));
+      ramp.push(await run(win,`await new Promise(r=>requestAnimationFrame(r));return {level:glassLevel(),tone:document.documentElement.dataset.theme,wall:backdrop?wallTone:null,t:glassLookNow()?.t,blur:glassLookNow()?.blur};`));
       if([0,25,50,75,100].includes(i))await shot(win,'polish-glass-'+i);
     }
+    // 앱과 같게 in light mode (2026-11-03): the wallpaper's tone up to the middle, one change of text tone at most, the app's light card at the
+    // opaque end; every step thickens the glass — the stretch where neither text colour reads is skipped, not held (final review G1) — and the blur grows.
+    let toneChanges=0;
     for(let i=1;i<ramp.length;i++){
-      expect(ramp[i].level===i/100&&ramp[i].tone==='light','유리 미리보기 입력·테마 유지 '+i);
-      if(ramp[i].t!=null)expect(ramp[i].t>ramp[i-1].t&&ramp[i].blur>ramp[i-1].blur,'유리 미리보기 연속 변화 '+i);
+      expect(ramp[i].level===i/100,'유리 미리보기 입력 '+i);
+      if(ramp[i].tone!==ramp[i-1].tone)toneChanges++;
+      if(i<=50&&ramp[i].wall)expect(ramp[i].tone===ramp[i].wall,'앱과 같게: 가운데까지 바탕화면 톤 '+i+' '+ramp[i].tone);
+      if(ramp[i].t!=null&&ramp[i-1].t!=null)expect(ramp[i].t>ramp[i-1].t&&ramp[i].blur>ramp[i-1].blur,'유리 미리보기 연속 변화 '+i+' '+ramp[i-1].t+'→'+ramp[i].t);
     }
+    expect(toneChanges<=1&&ramp[100].tone==='light',`앱과 같게: 글자 톤 한 번 이하, 불투명 끝은 라이트 ${toneChanges} ${ramp[100].tone}`);
     expect((await invoke('state:get')).settings.glassLevel===.5,'미리보기는 저장값을 바꾸지 않음');
     fs.writeFileSync(path.join(output,'glass-live-ramp.json'),JSON.stringify(ramp,null,2));
     await invoke('settings:update',{glassLevel:.5,widgetTheme:'app'});
@@ -2463,7 +2561,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     dateInput.focus(); dateInput.value = ''; dateInput.dispatchEvent(new Event('change', { bubbles: true })); dateInput.dispatchEvent(new FocusEvent('blur'));
     result.cleared2 = repeatOf();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(120);
-    result.asked = Boolean(document.querySelector('#modal-root .dialog-guard')); // the date changed: Esc asks, 변경 버리기 closes (2026-10-28 review D06)
+    result.asked = Boolean(document.querySelector('#modal-root .dialog-guard')); // the date changed: Esc asks, 변경 취소 closes (2026-10-28 review D06)
     document.querySelector('#modal-root .dialog-guard .discard')?.click(); await wait(60);
     result.closed = result.asked && !document.querySelector('#modal-root .dialog');
     row('손 셋').querySelector('.steps-toggle').click(); await wait(80);
@@ -2818,7 +2916,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   checks.push('english-1-1-3');
 
   // ---------------- 2026-10-28 Codex review, area F ----------------
-  // D06: the task editor's X, Esc and outside click ask the same question once the form changed — 변경 버리기 / 계속 편집 inside
+  // D06: the task editor's X, Esc and outside click ask the same question once the form changed — 변경 취소 / 계속 편집 inside
   // the dialog, the keyboard on 계속 편집, no toast; Esc on the choice keeps editing with the keyboard back on the field; an
   // unchanged editor closes at once.
   const guardTask = await invoke('task:add', { title: '스모크 초안 보호', dueDate: D.dateKey() });
@@ -2854,7 +2952,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     result.discarded = !document.querySelector('#modal-root .dialog') && document.getElementById('app').inert === false;
     return result;`);
   state = await invoke('state:get');
-  expect(guard.cleanClosed && guard.escAsks === '변경 버리기|계속 편집' && guard.escFocus === '계속 편집' && !guard.toast && guard.footerHidden && guard.keptEditing && /^notes( \(focusin sent\))?$/.test(guard.xBack) && guard.xAsks === '변경 버리기|계속 편집' && guard.outsideKeepsChoice && guard.discarded && state.tasks.find(task => task.id === guardTask.id)?.title === '스모크 초안 보호', `수정 창 초안 보호 ${JSON.stringify(guard)}`);
+  expect(guard.cleanClosed && guard.escAsks === '변경 취소|계속 편집' && guard.escFocus === '계속 편집' && !guard.toast && guard.footerHidden && guard.keptEditing && /^notes( \(focusin sent\))?$/.test(guard.xBack) && guard.xAsks === '변경 취소|계속 편집' && guard.outsideKeepsChoice && guard.discarded && state.tasks.find(task => task.id === guardTask.id)?.title === '스모크 초안 보호', `수정 창 초안 보호 ${JSON.stringify(guard)}`);
   await invoke('task:delete', { id: guardTask.id });
   checks.push('dialog-discard-choice');
 
@@ -3123,6 +3221,116 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     && panelKeyed === panelWidest.panel - 16 && panelKeyedNow.panel === panelKeyed && panelStored === panelKeyed
     && !panelReset.sized && panelReset.saved == null && panelResetStored == null && panelReset.panel === panelStart.panel, `달력 패널 끌어서 너비 조절 ${JSON.stringify(panelDrag)}`);
   checks.push('calendar-panel-drag');
+
+  // 2026-11-03 owner 「할 일 탭에서도 우측탭 좁히는 기능 있는 게 좋지 않을까?」: the 할 일 screen's right panel as the calendar's. The toolbar's
+  // last button and \ hide it and bring it back (saved); its edge takes a real drag, narrower by the distance and saved, but never so wide
+  // that the list drops under 420px; a double-click gives back the window's width. In a window too narrow to dock it, the button opens a
+  // drawer under the top bar (the setting is left alone) that Esc and a click beside it close.
+  const taskPanelBounds = mainWindow.getBounds();
+  mainWindow.setBounds({ ...taskPanelBounds, width: 1100 });
+  await new Promise(resolve => setTimeout(resolve, 400));
+  await run(mainWindow, `hideToast(); goto('today'); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); return true;`);
+  const taskPanelNow = () => run(mainWindow, `const grip = document.querySelector('.ctx-panel-resizer'), pane = document.querySelector('.app-layout>.context-pane'), list = document.querySelector('.main-content'), toggle = document.querySelector('[data-focus-key="panel-toggle"]');
+    const g = grip && grip.offsetParent ? grip.getBoundingClientRect() : null, p = pane ? pane.getBoundingClientRect() : null;
+    return { grip: g ? [Math.round(g.left + g.width / 2), Math.round(g.top + g.height / 2)] : null, gripAt: g ? Math.round(g.left + 6) : 0, pane: p ? Math.round(p.width) : 0, left: p ? Math.round(p.left) : 0, top: p ? Math.round(p.top) : 0,
+      bar: Math.round(document.querySelector('.topbar').getBoundingClientRect().bottom), list: Math.round(list.getBoundingClientRect().width), drawer: Boolean(pane && pane.classList.contains('drawer')), sized: Boolean(pane && pane.classList.contains('sized')),
+      label: toggle ? toggle.getAttribute('aria-label') : null, active: Boolean(toggle && toggle.classList.contains('active')), last: Boolean(toggle && toggle === toggle.parentElement.lastElementChild),
+      narrow: matchMedia('(max-width:930px)').matches, setting: state.settings.taskPanel, width: state.settings.taskPanelWidth, role: grip ? grip.getAttribute('role') : null };`);
+  const taskPanelClick = selector => run(mainWindow, `document.querySelector('${selector}').click(); await new Promise(resolve => setTimeout(resolve, 250)); return true;`);
+  const taskPanelKey = (code, key) => run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { code: '${code}', key: '${key}', bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 250)); return true;`);
+  const tpStart = await taskPanelNow();
+  await taskPanelClick('[data-focus-key="panel-toggle"]');
+  const tpHidden = await taskPanelNow();
+  const tpHiddenStored = (await invoke('state:get')).settings.taskPanel;
+  await taskPanelKey('Backslash', '₩');
+  const tpShown = await taskPanelNow();
+  const tpShownStored = (await invoke('state:get')).settings.taskPanel;
+  expect(tpStart.pane === 272 && tpStart.active && tpStart.last && tpStart.label === '오른쪽 패널 숨기기' && tpStart.role === 'separator' && Math.abs(tpStart.gripAt - tpStart.left) <= 1 && tpStart.setting === 'auto'
+    && tpHidden.pane === 0 && !tpHidden.active && tpHidden.label === '오른쪽 패널 보이기' && tpHidden.grip === null && tpHidden.list > tpStart.list && tpHiddenStored === 'closed'
+    && tpShown.pane === 272 && tpShown.active && tpShownStored === 'auto', `할 일 오른쪽 패널 숨기기·보이기 ${JSON.stringify({ tpStart, tpHidden, tpHiddenStored, tpShown, tpShownStored })}`);
+  const dragTaskPanel = async dx => {
+    const at = await taskPanelNow(); const [x, y] = at.grip;
+    mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x, y });
+    mainWindow.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+    for (let i = 1; i <= 8; i++) { mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: x + Math.round(dx * i / 8), y, button: 'left', modifiers: ['leftButtonDown'] }); await new Promise(resolve => setTimeout(resolve, 16)); }
+    mainWindow.webContents.sendInputEvent({ type: 'mouseUp', x: x + dx, y, button: 'left', clickCount: 1 });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return taskPanelNow();
+  };
+  const tpNarrower = await dragTaskPanel(24);
+  const tpFloor = await dragTaskPanel(100); // never under 240px: the mini calendar's seven days keep their gap (2026-11-03 review U6)
+  const tpWidest = await dragTaskPanel(-700);
+  const tpWidestStored = (await invoke('state:get')).settings.taskPanelWidth;
+  await run(mainWindow, `document.querySelector('.ctx-panel-resizer').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 400)); return true;`);
+  const tpReset = await taskPanelNow();
+  const tpResetStored = (await invoke('state:get')).settings.taskPanelWidth;
+  expect(tpNarrower.sized && Math.abs(tpNarrower.pane - (tpStart.pane - 24)) <= 1 && tpNarrower.width === tpNarrower.pane && tpNarrower.list > tpStart.list
+    && tpFloor.pane === 240 && tpFloor.width === 240
+    && tpWidest.list >= 419 && tpWidest.pane > tpNarrower.pane && tpWidest.pane <= 480 && tpWidest.width === tpWidest.pane && tpWidestStored === tpWidest.pane
+    && !tpReset.sized && tpReset.pane === tpStart.pane && tpReset.width == null && tpResetStored == null, `할 일 오른쪽 패널 끌어서 너비 조절 ${JSON.stringify({ tpNarrower, tpFloor, tpWidest, tpWidestStored, tpReset, tpResetStored })}`);
+  // 2026-11-03 review R6: the grip's → key narrows by 16px and saves; a state broadcast in the middle of a held drag does not replace the
+  // edge (the panel follows the pointer to the end and that width is saved once), as the calendar panel's check.
+  const tpKeyed = await run(mainWindow, `const grip = document.querySelector('.ctx-panel-resizer'); grip.focus(); grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 400));
+    return { saved: state.settings.taskPanelWidth, pane: Math.round(document.querySelector('.app-layout>.context-pane').getBoundingClientRect().width), focused: document.activeElement === document.querySelector('.ctx-panel-resizer') };`);
+  await run(mainWindow, `document.querySelector('.ctx-panel-resizer').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 400)); return true;`);
+  const tpHeld = await (async () => {
+    const at = await taskPanelNow(); const [x, y] = at.grip;
+    const move = async (from, to) => { for (let i = 1; i <= 4; i++) { mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: x + Math.round(from + (to - from) * i / 4), y, button: 'left', modifiers: ['leftButtonDown'] }); await new Promise(resolve => setTimeout(resolve, 16)); } };
+    mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x, y });
+    mainWindow.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+    await move(0, -30);
+    const mid = await taskPanelNow();
+    await invoke('settings:update', { collapsedSections: [] });
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const afterBroadcast = await taskPanelNow();
+    await move(-30, -60);
+    mainWindow.webContents.sendInputEvent({ type: 'mouseUp', x: x - 60, y, button: 'left', clickCount: 1 });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const end = await taskPanelNow();
+    const stored = (await invoke('state:get')).settings.taskPanelWidth;
+    await run(mainWindow, `document.querySelector('.ctx-panel-resizer').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 400)); return true;`);
+    return { start: at.pane, mid: mid.pane, afterBroadcast: afterBroadcast.pane, end: end.pane, saved: end.width, stored, reset: (await taskPanelNow()).width };
+  })();
+  expect(tpKeyed.saved === tpStart.pane - 16 && tpKeyed.pane === tpKeyed.saved && tpKeyed.focused
+    && Math.abs(tpHeld.mid - (tpHeld.start + 30)) <= 1 && tpHeld.afterBroadcast === tpHeld.mid && Math.abs(tpHeld.end - (tpHeld.start + 60)) <= 1 && tpHeld.saved === tpHeld.end && tpHeld.stored === tpHeld.end && tpHeld.reset == null,
+    `할 일 오른쪽 패널 키·끄는 중 상태 갱신 ${JSON.stringify({ tpKeyed, tpHeld })}`);
+  mainWindow.setBounds({ ...taskPanelBounds, width: 900 });
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const tpNarrow = await taskPanelNow();
+  await taskPanelClick('[data-focus-key="panel-toggle"]');
+  const tpDrawer = await taskPanelNow();
+  // review U1/U2/U8: the sidebar takes a click while the drawer is open; a redraw keeps the drawer still (no second slide-in); Esc with the
+  // keyboard inside the drawer gives it back to the panel button.
+  const tpDrawerLife = await run(mainWindow, `const nav = document.querySelector('.sidebar .nav-item, .sidebar button'); const r = nav.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const first = document.querySelector('.app-layout>.context-pane.drawer'); const firstSettled = first.classList.contains('settled');
+    render(); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const again = document.querySelector('.app-layout>.context-pane.drawer');
+    const result = { sidebar: Boolean(hit && hit.closest('.sidebar')), firstSettled, settled: again.classList.contains('settled'), animations: again.getAnimations().length };
+    again.querySelector('button').focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 250));
+    result.closed = !document.querySelector('.app-layout>.context-pane.drawer'); result.focus = document.activeElement?.dataset?.focusKey || document.activeElement?.tagName;
+    return result;`);
+  await taskPanelKey('Escape', 'Escape');
+  const tpEsc = await taskPanelNow();
+  await taskPanelClick('[data-focus-key="panel-toggle"]');
+  await run(mainWindow, `document.querySelector('.ctx-scrim').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 250)); return true;`);
+  const tpScrim = await taskPanelNow();
+  const tpNarrowStored = (await invoke('state:get')).settings.taskPanel;
+  // a window widened past 930px while the drawer is open closes it and docks the panel (review R6)
+  await taskPanelClick('[data-focus-key="panel-toggle"]');
+  mainWindow.setBounds({ ...taskPanelBounds, width: 1100 });
+  await new Promise(resolve => setTimeout(resolve, 600));
+  const tpWidened = await taskPanelNow();
+  expect(tpNarrow.narrow && tpNarrow.pane === 0 && tpNarrow.grip === null && !tpNarrow.active
+    && tpDrawer.drawer && tpDrawer.pane === 300 && tpDrawer.top === tpDrawer.bar && tpDrawer.active && tpDrawer.label === '오른쪽 패널 숨기기'
+    && tpDrawerLife.sidebar && !tpDrawerLife.firstSettled && tpDrawerLife.settled && tpDrawerLife.animations === 0 && tpDrawerLife.closed && tpDrawerLife.focus === 'panel-toggle'
+    && !tpEsc.drawer && tpEsc.pane === 0 && !tpScrim.drawer && tpScrim.pane === 0 && tpNarrowStored === 'auto'
+    && !tpWidened.narrow && !tpWidened.drawer && tpWidened.pane === 272 && tpWidened.active, `할 일 오른쪽 패널 좁은 창 서랍 ${JSON.stringify({ tpNarrow, tpDrawer, tpDrawerLife, tpEsc, tpScrim, tpNarrowStored, tpWidened })}`);
+  mainWindow.setBounds(taskPanelBounds);
+  await invoke('settings:update', { taskPanel: 'auto', taskPanelWidth: null });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  checks.push('task-panel');
 
   // 1.2.6: the task sidebar's mini calendar uses the same real event colours as the widget.
   // Exercise persisted events, then reserve one of the three dots for an unfinished task.

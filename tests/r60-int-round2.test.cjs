@@ -91,8 +91,8 @@ test('widget-ui-rr-2: a held glass thumb defers redraws until it is let go, then
   g.range.dispatchEvent(new g.h.context.Event('change'));
   assert.equal(g.held(), false, 'the change lets go');
   assert.equal(g.h.calls.filter(c => c.name === 'settings:update').map(c => c.payload.glassLevel).join(), '0.05', 'saved once, with the final value');
-  // the real render() defers while held, as for a resize, the IME or a calendar hold
-  assert.ok(app.includes('function render(){if(!state)return;if(resizingWidget||composing||calHolding()||glassHeld){renderPending=true;return;}'));
+  // the real render() defers while held, as for a resize, the IME, a calendar hold or the 할 일 panel's edge (2026-11-03)
+  assert.ok(app.includes('function render(){if(!state)return;if(resizingWidget||composing||calHolding()||glassHeld||ctxDragging){renderPending=true;return;}'));
 });
 
 test('code-1: the 위젯 tab selects carry focus keys, so a redraw puts the keyboard back on them', () => {

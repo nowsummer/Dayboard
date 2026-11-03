@@ -93,6 +93,34 @@ test('glass on the wallpaper follows its brightness, with a little hysteresis (2
   assert.equal(D.glassLook(1, { mean: 0.9, low: 0.85, high: 0.95 }, 'light', 'dark').tone, 'dark', 'opaque in dark mode: dark, on a light wallpaper too');
   assert.equal(D.glassLook(0.2, navy, 'dark', 'light').tone, 'light', 'toward clear: the selected theme remains');
   assert.equal(D.glassLook(0.7, null, 'dark', 'light'), null, 'nothing painted: the caller uses the theme');
+  // 「앱과 같게」 (2026-11-03 owner: 「투명 쪽은 바탕화면 따라 … 애플에 맞춰서」): the wallpaper's glass up to the middle — over this PC's navy
+  // thin dark glass with white text, as Apple's clear widgets — then step by step the app's own card; a wallpaper of the app's tone: glassLook.
+  const app = (level, spread, wall, theme, previous) => D.glassLookApp(level, spread, wall, theme, previous);
+  assert.equal(app(0, navy, 'dark', 'light').tone, 'dark', 'clear end over navy in light mode: dark glass, white text');
+  assert.equal(app(0.2, navy, 'dark', 'light').t, D.glassLook(0.2, navy, 'dark', 'dark').t, 'toward clear it is 「바탕화면에 맞춤」 exactly');
+  assert.equal(app(0.5, navy, 'dark', 'light').tone, 'dark');
+  assert.equal(app(0.5, navy, 'dark', 'light').t, D.glassLook(0.5, navy, 'dark', 'dark').t, 'the middle too');
+  assert.equal(app(1, navy, 'dark', 'light').tone, 'light', 'opaque in light mode: white');
+  assert.equal(app(1, navy, 'dark', 'light').tint.join(), '1,1,1');
+  assert.equal(app(1, navy, 'dark', 'light').solid, true);
+  assert.equal(app(0, { mean: 0.9, low: 0.85, high: 0.95 }, 'light', 'dark').tone, 'light', 'clear end over a light wallpaper in dark mode: light glass');
+  assert.equal(app(1, { mean: 0.9, low: 0.85, high: 0.95 }, 'light', 'dark').tone, 'dark', 'opaque in dark mode: dark');
+  for (const g of [0, 0.3, 0.5, 0.7, 1]) assert.equal(app(g, navy, 'dark', 'dark').t, D.glassLook(g, navy, 'dark', 'dark').t, 'same tone: glassLook itself at ' + g);
+  assert.equal(app(0.7, null, 'dark', 'light'), null, 'nothing painted: the caller uses the theme');
+  // one text change along the slider, never before the middle; the tint only thickens
+  let flips = 0, before = null, lastT = 0;
+  for (let i = 0; i <= 100; i++) { const k = app(i / 100, navy, 'dark', 'light'); if (before && k.tone !== before) { flips++; assert.equal(i > 50, true, 'the text changes after the middle'); } before = k.tone; assert.equal(k.t >= lastT - 1e-9, true, 'the glass only thickens at ' + i); lastT = k.t; }
+  assert.equal(flips, 1);
+  // Windows transparency effects off: an opaque card, the app's own (final review G4, as Apple under Reduce Transparency)
+  const appSrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+  assert.equal(/widgetThemeChoice\(\)==='app'&&!reducedGlass\.matches\?D\.glassLookApp\(level,glassSpread,wallTone,appTheme\(\),glassHold&&glassHold\.level===level\?glassHold\.tone:null\)/.test(appSrc), true);
+  assert.equal(/glassHold=k\?\{level,tone:k\.tone\}:null;/.test(appSrc), true, 'applyGlass records the tone shown');
+  // the tone shown is held for .02 of the slider past the change while only the wallpaper measure moves (2026-11-03 final review G2)
+  let change = null;
+  for (let i = 51; i <= 100 && change === null; i++) if (app(i / 100, navy, 'dark', 'light').tone !== app((i - 1) / 100, navy, 'dark', 'light').tone) change = i / 100;
+  assert.equal(app(change, navy, 'dark', 'light', 'dark').tone, 'dark');
+  assert.equal(app(change + 0.03, navy, 'dark', 'light', 'dark').tone, 'light', 'held for .02 only');
+  assert.equal(app(change - 0.01, navy, 'dark', 'light', 'light').tone, 'light');
   // Near the middle the current tone stays until the wallpaper is clearly brighter or darker.
   assert.equal(D.glassTone(0.53, 'dark'), 'dark'); assert.equal(D.glassTone(0.55, 'dark'), 'light');
   assert.equal(D.glassTone(0.47, 'light'), 'light'); assert.equal(D.glassTone(0.45, 'light'), 'dark');
@@ -157,13 +185,13 @@ test('glass text stays readable on the filtered glass over flat and two-tone wal
   const luma = rgb => (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
   for (const [name, parts] of Object.entries(walls)) {
     const Ls = parts.map(luma), mean = Ls.reduce((s, v) => s + v, 0) / Ls.length;
-    // domain glassLook: the wallpaper's tone up to the middle, then step by step the app theme's card (2026-10-28) — so both tones
-    // meet every wallpaper on the opaque side, at every step of the slider.
-    for (const theme of ['light', 'dark']) {
+    // domain glassLook (a chosen theme on every step) and glassLookApp (「앱과 같게」, 2026-11-03: the wallpaper's tone up to the middle, then
+    // step by step the app theme's card) — so both tones meet every wallpaper on the opaque side, at every step of the slider.
+    for (const kind of ['fixed', 'app']) for (const theme of ['light', 'dark']) {
       const shade = [], inks = [];
       for (let step = 0; step <= 100; step++) {
       const level = step / 100;
-      const look = D.glassLook(level, { mean, low: Math.min(...Ls), high: Math.max(...Ls) }, D.glassTone(mean, null), theme);
+      const look = (kind === 'app' ? D.glassLookApp : D.glassLook)(level, { mean, low: Math.min(...Ls), high: Math.max(...Ls) }, D.glassTone(mean, null), theme);
       const dark = look.tone === 'dark';
       shade.push(mean * (1 - look.t) + look.t * (0.2126 * look.tint[0] + 0.7152 * look.tint[1] + 0.0722 * look.tint[2]));
       if (!look.solid) inks.push(look);
@@ -172,7 +200,7 @@ test('glass text stays readable on the filtered glass over flat and two-tone wal
         const colours = inkAt(look.tone, look.ink), text = colours.text.rgb;
         const secondOnGlass = colours.second.rgb.map((v, i) => colours.second.alpha * v + (1 - colours.second.alpha) * bg[i]);
         const title = hexRgb(D.inkOn('#3478f6', dark ? 'dark' : 'light', look.mid));
-        const where = `${name} at level ${level} (${theme} theme)`;
+        const where = `${name} at level ${level} (${theme} theme, ${kind})`;
         assert.ok(wcag(text, bg) >= 4.5, `text on ${where}: ${wcag(text, bg).toFixed(2)}`);
         assert.ok(wcag(secondOnGlass, bg) >= (level >= 0.5 ? 4.5 : 3.5), `secondary text on ${where}: ${wcag(secondOnGlass, bg).toFixed(2)}`);
         assert.ok(wcag(title, bg) >= 3, `list title on ${where}: ${wcag(title, bg).toFixed(2)}`);
@@ -197,9 +225,13 @@ test('glass text stays readable on the filtered glass over flat and two-tone wal
       // middle; every other step moves the glass a little.
       // The text and accent strength too moves in steps, within a text colour (2026-10-28 re-review: the dark ramp .3–.42 moved
       // ~2/3 of the way in one step).
-      for (let i = 1; i < inks.length; i++) if (inks[i].tone === inks[i - 1].tone) assert.ok(Math.abs(inks[i].ink - inks[i - 1].ink) <= 0.45, `${name} (${theme} theme) ink at step ${i}: ${inks[i - 1].ink} -> ${inks[i].ink}`);
+      for (let i = 1; i < inks.length; i++) if (inks[i].tone === inks[i - 1].tone) assert.ok(Math.abs(inks[i].ink - inks[i - 1].ink) <= 0.45, `${name} (${theme} theme, ${kind}) ink at step ${i}: ${inks[i - 1].ink} -> ${inks[i].ink}`);
       const moves = shade.slice(1).map((v, i) => Math.abs(v - shade[i]));
-      assert.ok(moves.filter(m => m > 0.12).length <= 1 && Math.max(...moves) <= 0.3, `${name} (${theme} theme) changes in small steps: ${moves.map(m => m.toFixed(2)).join(' ')}`);
+      // 「앱과 같게」: every 1% step past the middle thickens the glass — where neither text colour reads it is skipped, not held (final review G1)
+      if (kind === 'app') for (let i = 51; i < inks.length; i++) assert.ok(inks[i].t > inks[i - 1].t, `${name} (${theme} theme, app) thickens at step ${i}: ${inks[i - 1].t} -> ${inks[i].t}`);
+      // 「앱과 같게」 changes the text colour once on its way to the app card; over a wallpaper half white and half black that one step must
+      // take the glass from where white text reads on the white half to where black text reads on the black half (0.32–0.34, 2026-11-03).
+      assert.ok(moves.filter(m => m > 0.12).length <= 1 && Math.max(...moves) <= (kind === 'app' ? 0.35 : 0.3), `${name} (${theme} theme, ${kind}) changes in small steps: ${moves.map(m => m.toFixed(2)).join(' ')}`);
     }
   }
 });

@@ -36,7 +36,7 @@
     '색상':'Color','기본 색':'Default color','달력 색 사용':'Use calendar color','편집':'Edit','상세 보기':'Details','복제':'Duplicate','이 일정만':'This event only','삭제':'Delete','일정을 복제했어요.':'Event duplicated.','원래 색':'Original color','취소':'Cancel',
     '「{0}」 반복 일정을 삭제할까요?':'Delete repeating event “{0}”?','이 일정만 삭제':'Delete this event only','이후 모든 일정 삭제':'Delete all future events','모든 일정 삭제':'Delete all events','「{0}」 일정을 이 날만 삭제할까요?':'Delete “{0}” on this day only?','「{0}」 일정을 삭제할까요?':'Delete “{0}”?','제목 없는 일정':'Untitled event','이 PC의 개인 달력에서 삭제합니다.':'It will be removed from the personal calendar on this PC.',
     '반복':'Repeat','안 함':'Never','매일':'Every day','매주':'Every week','매월':'Every month','매년':'Every year','격주':'Every 2 weeks','사용자 지정…':'Custom…','간격':'Interval','없음':'Never','날짜':'Date','날짜 지정':'On date','횟수':'After','종료 날짜':'End date','빈도':'Every','종료':'End','시작':'Starts',
-    '달력 색':'Calendar color','색 바꾸기':'Change color','달력 숨기기':'Hide calendar','달력 표시':'Show calendar','숨긴 달력 「{0}」에 저장했어요.':'Saved to the hidden calendar “{0}”.','달력 숨기기: ':'Hide calendar: ','달력 표시: ':'Show calendar: ','색 바꾸기 · 오른쪽 클릭으로 메뉴':'Change color · right-click for the menu','달력 삭제':'Delete calendar','「{0}」 달력을 삭제할까요?':'Delete the calendar “{0}”?','이 달력의 일정 {0}개도 함께 삭제됩니다. 연결 해제로 남은 보관본이면 삭제해야 다시 연결한 달력과 겹치지 않습니다.':'Its {0|event|events} will be deleted too. If this is an archive left by a disconnect, deleting it stops the duplicates with the reconnected calendar.',' · 일정 {0}개':', {0|event|events}','두 번 누르면 일정 추가':'Double-click to add an event','+{0}개':'+{0} more','할 일 {0}개':'{0|task|tasks}','하루 종일':'All day','예정된 일정이 없어요':'No events','+{0}개 더 보기':'+{0} more',
+    '달력 색':'Calendar color','색 바꾸기':'Change color','달력 숨기기':'Hide calendar','달력 표시':'Show calendar','숨긴 달력 {0}개':'{0|hidden calendar|hidden calendars}','「{0}」 달력을 숨겼어요.':'Hid the calendar “{0}”.','숨긴 달력 「{0}」에 저장했어요.':'Saved to the hidden calendar “{0}”.','달력 숨기기: ':'Hide calendar: ','달력 표시: ':'Show calendar: ','색 바꾸기 · 오른쪽 클릭으로 메뉴':'Change color · right-click for the menu','달력 삭제':'Delete calendar','「{0}」 달력을 삭제할까요?':'Delete the calendar “{0}”?','이 달력의 일정 {0}개도 함께 삭제됩니다. 연결 해제로 남은 보관본이면 삭제해야 다시 연결한 달력과 겹치지 않습니다.':'Its {0|event|events} will be deleted too. If this is an archive left by a disconnect, deleting it stops the duplicates with the reconnected calendar.',' · 일정 {0}개':', {0|event|events}','두 번 누르면 일정 추가':'Double-click to add an event','+{0}개':'+{0} more','할 일 {0}개':'{0|task|tasks}','하루 종일':'All day','예정된 일정이 없어요':'No events','+{0}개 더 보기':'+{0} more',
     '오늘의 일정':'Today’s events','{0} 일정':'Events on {0}','메모 열기':'Open note','메모 화면에서 첫 메모를 적으면 여기에 표시됩니다.':'Your latest note appears here once you write one in Notes.','이날 일정 추가':'Add an event on this day','정해진 할 일이 없어요':'No tasks for this day',
     '일정 제목':'Event title','장소 (선택)':'Location (optional)','일정 편집':'Edit event','종료 시간을 시작 시간 뒤로 설정하세요.':'Set the end after the start.','종료 날짜를 시작 날짜와 같거나 뒤로 설정하세요.':'Set the end date on or after the start date.','반복 일정을 어떻게 저장할까요?':'Save changes to repeating event?','이 일정만 저장':'Save for this event only','이후 모든 일정에 저장':'Save for future events','모든 일정에 저장':'Save for all events',
     '장소':'Location','반복 일정':'Repeating event','이 일정의 색':'Color for this event','{0} · {1} · 읽기 전용 · 색은 Dayboard에만 저장됩니다.':'{0} · {1} · read-only · the color is stored only in Dayboard.',
@@ -244,7 +244,7 @@
     '끌어서 너비 조절 · 두 번 눌러 원래대로':'Drag to resize · double-click to reset',
     '패널 너비가 올바르지 않습니다.':'The panel width is not valid.',
     // ---- 2026-10-28 review (area F) ----
-    '변경 버리기':'Discard changes',
+    '변경 취소':'Discard changes',
     '계속 편집':'Keep editing',
     '저장하지 않은 변경':'Unsaved changes',
     '저장 실패':'Not saved',
@@ -261,7 +261,7 @@
     '보라':'Purple',
     '분홍':'Pink',
     '갈색':'Brown',
-    '회색':'Gray',
+    '회색':'Gray','다른 색…':'Other color…','사용자 지정 색':'Custom color',
     // ---- 2026-10-28 review (area M) ----
     '관리비 이체':'Pay the water bill',
     '세탁소 들르기':'Pick up dry cleaning',

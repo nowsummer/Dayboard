@@ -1390,6 +1390,16 @@ async function command(commandName, payload, sourceWindow) {
         if (width === undefined) throw new Error(tr('패널 너비가 올바르지 않습니다.'));
         settings.calendarPanelWidth = width;
       }
+      // The 할 일 screen's right panel (2026-11-03): hidden or not, and its dragged width (null: the width that follows the window).
+      if ('taskPanel' in payload) {
+        if (!['auto', 'closed'].includes(payload.taskPanel)) throw new Error(tr('지원하지 않는 패널 설정입니다.'));
+        settings.taskPanel = payload.taskPanel;
+      }
+      if ('taskPanelWidth' in payload) {
+        const width = panelWidth(payload.taskPanelWidth);
+        if (width === undefined) throw new Error(tr('패널 너비가 올바르지 않습니다.'));
+        settings.taskPanelWidth = width;
+      }
       if ('listOrder' in payload) settings.listOrder = idList(payload.listOrder, 500, tr('목록 순서가 올바르지 않습니다.'));
       if ('hiddenCalendars' in payload) settings.hiddenCalendars = idList(payload.hiddenCalendars, 500, tr('달력 표시 설정이 올바르지 않습니다.'));
       if ('hiddenSections' in payload) settings.hiddenSections = idList(payload.hiddenSections, 100, tr('계정 표시 설정이 올바르지 않습니다.'));

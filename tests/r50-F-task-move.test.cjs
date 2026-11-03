@@ -14,7 +14,7 @@ const { harness, I } = require('./r50-F-harness.cjs');
 function listHarness() {
   const h = harness({
     repeatDoneText: () => '', repeatWords: () => '', reminderLabel: () => '', dueLabel: () => '', undoToast() {}, deleteTaskFlow() {}, editTask() {}, taskMenu() {}, stepRow: () => null,
-    calendarToolbar: () => [], notesTrash: false, noteSortMenu() {}, newNote() {}, smartColor: () => '#3478f6', openWidgetFlow() {}, openingWidget: null, listMenu() {}, contextMenu() {}, releaseFlagHold() {},
+    calendarToolbar: () => [], ctxToggleButton: () => null, appTheme: () => 'light', notesTrash: false, noteSortMenu() {}, newNote() {}, smartColor: () => '#3478f6', openWidgetFlow() {}, openingWidget: null, listMenu() {}, contextMenu() {}, releaseFlagHold() {},
   });
   h.loadApp('const lingering=', 'const flagHold=', 'const openSteps=', 'const listBy=', 'function listColor(', 'function listVisual(', 'const smart=', 'const providerName=', 'const longDateFormats=', 'const koreanDate=',
     'function tasksFor(', 'function taskCount(', 'function taskSortOf(', 'const sortLabel=', 'const taskSortable=', 'function taskSortMenu(', 'function setTaskSort(', 'let dragTaskId=', 'function taskDragEnd(', 'function taskDrag(', 'function taskDropEnd(',

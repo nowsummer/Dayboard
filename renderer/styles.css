@@ -1180,6 +1180,33 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 .window-actions .icon-button{width:calc(46px / var(--app-zoom,1))}
 @media(max-width:760px){.topbar-main{gap:2px}}
 
+/* The 할 일 screen's right panel (2026-11-03 owner), as the calendar's: a dragged width (240px floor — the mini calendar's seven 25px days keep a
+   gap, review U6) that gives way before the list drops under 420px, a grip on its edge (the calendar's look), and in a window too narrow for it a
+   drawer under the top bar (fixed: .app-layout is not a positioned box). The width test is the exact complement of the 930px rule — a zoomed
+   window can measure 930.4px (review R4). While the drawer is open the sidebar stays above its scrim, so a list click works at once, as beside
+   the calendar's drawer (review U1: flex items take z-index without a position). The drawer's shadow is kept off the top bar (U5), and a drawer
+   already open does not slide in again on each redraw, here and in the calendar (U2: .settled). */
+.context-pane.sized{width:var(--ctx-panel);flex-shrink:1;min-width:240px}
+@media(width>930px){.app-layout>.main-content:not(.full-view){min-width:420px}}
+.ctx-panel-resizer{flex:0 0 12px;margin:0 -6px;position:relative;z-index:3;cursor:col-resize;touch-action:none;outline:none}
+.ctx-panel-resizer::after{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;border-radius:1px;background:transparent;transition:background .15s}
+.ctx-panel-resizer:hover::after,.ctx-panel-resizer.dragging::after,.ctx-panel-resizer:focus-visible::after{background:color-mix(in srgb,var(--blue) 55%,transparent)}
+@media(max-width:930px){.ctx-panel-resizer{display:none}}
+.context-pane.drawer{display:flex;position:fixed;top:var(--topbar);right:0;bottom:0;width:300px;max-width:calc(100% - 24px);z-index:12;box-shadow:0 8px 32px rgba(0,0,0,.16);clip-path:inset(0 0 0 -48px);animation:drawer-in .16s ease-out}
+.drawer-scrim.ctx-scrim{position:fixed;inset:var(--topbar) 0 0 0}.app-layout:has(>.ctx-scrim)>.sidebar{z-index:12}
+.context-pane.drawer.settled,.day-panel.drawer.settled{animation:none}
+@media(prefers-reduced-motion:reduce){.context-pane.drawer{animation:none}}
+/* 「다른 색…」 (2026-11-03 owner 「다양한 색상을 선택할 수 있는 팔레트」): the last swatch of each colour row — a thin hue ring, muted toward the
+   field colour (Apple's colour well, kept calm: the owner finds crisp colour circles casual), around the field colour or the colour of one's own;
+   the system picker's hidden input sits over the swatch that opened it, since its popup opens there. The event sheet's row keeps one line. */
+.swatch.custom,.menu-swatch.custom{border:0;background:radial-gradient(circle closest-side,var(--fill,var(--field)) calc(100% - 3.5px),transparent calc(100% - 3px)),linear-gradient(color-mix(in srgb,var(--field) 35%,transparent),color-mix(in srgb,var(--field) 35%,transparent)),var(--ring)}
+.menu-swatch.custom{background:radial-gradient(circle closest-side,var(--fill,var(--field)) calc(100% - 2.5px),transparent calc(100% - 2px)),linear-gradient(color-mix(in srgb,var(--field) 35%,transparent),color-mix(in srgb,var(--field) 35%,transparent)),var(--ring)}
+.color-chooser{position:fixed;opacity:0;pointer-events:none;border:0;padding:0;margin:0}
+.dialog:not(.wide) .event-swatches{gap:8px}
+
+/* Hidden calendars (2026-11-03 owner): one quiet row at the end of the list; opened, the hidden rows are unchecked and muted, not struck through. */
+.cal-hidden-toggle{display:flex;align-items:center;gap:9px;width:100%;margin-top:2px;padding:5px 6px;border-radius:7px;font-size:12px;color:var(--muted);background:transparent;text-align:left}.cal-hidden-toggle:hover{background:var(--hover);color:var(--secondary)}.cal-hidden-toggle .group-chevron{width:17px}.cal-hidden-toggle .group-chevron.open{transform:rotate(-90deg)}.calendar-row.hidden .cal-name{text-decoration:none}
+
 /* r60-apple — one surface rule (2026-11-02 owner: Apple surfaces — 「음영있는 pill 안에 흰색을 넣는건 좀 애플 스타일이 아닌거 같아. 전반적으로 다시
    봐줘. 애플 스타일에 맞춰줘.」, after 「설정창 … 투톤 같아서 좀 촌스럽고 난잡해보이던데」), as macOS System Settings · Calendar · Reminders:
    no control stands on more than two layers. Layer 1 is a surface (window --bg, sheet --sheet, popover --glass, note paper). Layer 2 is

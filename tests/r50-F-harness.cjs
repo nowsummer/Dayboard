@@ -25,7 +25,8 @@ function appLine(prefix, { optional = false, multi = false } = {}) {
 }
 // The builders every screen uses: $, h, icon (paths, fills), btn, ib, keyed.
 const UI_PREFIXES = ['const $=', 'const h=', 'const paths=', 'const fills=', 'function icon(', 'const btn=', 'const ib=', 'const keyed=',
-  { prefix: 'function radioKeys(', optional: true }, { prefix: 'const colorName=', optional: true }, { prefix: 'function gridTabStop(', optional: true }]; // the three area-F helpers: absent on the baseline
+  { prefix: 'function radioKeys(', optional: true }, { prefix: 'const colorName=', optional: true }, { prefix: 'function gridTabStop(', optional: true },
+  { prefix: 'const CUSTOM_RING=', optional: true }, { prefix: 'const chooseColor=', optional: true }, { prefix: 'function customSwatch(', optional: true }]; // the three area-F helpers: absent on the baseline
 
 // A VM with the DOM, the real domain and dictionary, recording stubs for toast() and run(), and the caller's globals.
 function harness(extra = {}) {

@@ -30,8 +30,9 @@ const flat = list => list.flat(Infinity).filter(c => c != null && c !== false).m
 const h = (tag, attrs, ...children) => { const el = new El(tag, attrs || {}); el.children = flat(children); return el; };
 const byClass = name => node => node.className.split(/\s+/).includes(name);
 
-function render(calendars, settings = {}) {
+function render(calendars, settings = {}, hiddenOpen = false) {
   const context = {
+    calHiddenOpen: hiddenOpen, render() {}, // 「숨긴 달력 N개」 open or closed (2026-11-03: hidden calendars wait behind it)
     D, h, console, state: { calendars, settings: { hiddenCalendars: [], ...settings }, events: [{ id: 'e1', calendarId: 'local-calendar' }], accounts: [] }, // one local event keeps 이 PC listed
     tr: (text, params) => params ? text.replace(/\{(\d+)\}/g, (m, i) => String(params[i])) : text,
     document: { createElementNS: (ns, tag) => new El(tag) },
@@ -110,8 +111,30 @@ test('the marks are the account screens\' shapes in the muted text colour, withi
   for (const [name] of googleParts) assert.ok(!JSON.stringify(marks).includes(name), `no brand colour ${name}`);
 });
 
+test('hidden calendars wait behind one 「숨긴 달력 N개」 row: closed they are out of the list, open they come in above it unchecked (2026-11-03 owner)', () => {
+  const closed = render(CALENDARS, { hiddenCalendars: ['m1', 'i1'] }).list;
+  const names = l => rowsOf(l).map(r => r.name);
+  assert.deepEqual(names(closed), ['haeun12@example.com', '생일', '개인 일정'], 'only the shown calendars are listed');
+  const toggle = closed.find(byClass('cal-hidden-toggle'));
+  assert.equal(toggle ? toggle.textContent : null, '숨긴 달력 2개');
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  const open = render(CALENDARS, { hiddenCalendars: ['m1', 'i1'] }, true).list;
+  const kids = open.children.filter(c => typeof c !== 'string').map(c => c.className.split(' ')[0]);
+  assert.deepEqual(kids, ['agenda-sub', 'calendar-row', 'calendar-row', 'calendar-row', 'calendar-row', 'calendar-row', 'cal-hidden-toggle'], 'shown rows, the hidden rows, then the toggle: it stays last, so it stays under the pointer (2026-11-03 review U3)');
+  assert.deepEqual(rowsOf(open).filter(r => byClass('hidden')(r.row)).map(r => r.name), ['생일', '가족']);
+  assert.equal(render(CALENDARS).list.find(byClass('cal-hidden-toggle')) === null, true, 'no toggle when nothing is hidden'); // primitives only in asserts (CLAUDE.md 1.2.7 ⑨)
+  const css = fs.readFileSync(path.join(project, 'renderer', 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(css, /\.calendar-row\.hidden \.cal-name\{text-decoration:none\}/, 'opened hidden rows are unchecked and muted, not struck through');
+  assert.match(css, /\.cal-hidden-toggle\{display:flex;align-items:center;gap:9px;/, 'its words start where the names do: 6 + 17 + 9 = 32px (review U10)');
+  assert.match(css, /\.cal-hidden-toggle \.group-chevron\.open\{transform:rotate\(-90deg\)\}/, 'opened, the chevron points up at the rows above');
+  // the service marks count the rows on show: Google rows shown and a Microsoft one hidden → no marks; opened → marks (review C3)
+  const two = CALENDARS.filter(c => c.provider === 'google' || c.id === 'm1');
+  assert.equal(rowsOf(render(two, { hiddenCalendars: ['m1'] }).list).every(r => r.button.children.length === 1), true, 'no marks while only Google rows are listed');
+  assert.equal(rowsOf(render(two, { hiddenCalendars: ['m1'] }, true).list).every(r => r.button.children.length === 2), true, 'the marks come back with the hidden Microsoft row');
+});
+
 test('a hidden calendar keeps its mark, dimmed like the badges', () => {
-  const { list } = render(CALENDARS, { hiddenCalendars: ['m1'] });
+  const { list } = render(CALENDARS, { hiddenCalendars: ['m1'] }, true);
   const row = rowsOf(list).find(r => r.mark.getAttribute('aria-label') === 'Microsoft');
   assert.ok(byClass('hidden')(row.row));
   const css = fs.readFileSync(path.join(project, 'renderer', 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

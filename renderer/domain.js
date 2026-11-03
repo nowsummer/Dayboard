@@ -388,6 +388,33 @@
     out.da=+clamp(L>dark?(L-dark)/Math.max(0.05,L-0.12):dlo,dlo,dhi).toFixed(3);
     return out;
   }
+  // A colour of one's own (2026-11-03 owner: 「할 일 목록이나 달력 등에서 색상 선택 시에 이런식으로 다양한 색상을 선택할 수 있는 팔레트를 주는거도
+  // 좋지 않을까?」), from the system colour picker of the 「다른 색…」 swatch: kept at most as light as the palette's lightest (노랑 #ffcc00) — a
+  // lighter one vanishes as a title, an icon circle or an event bar on the light theme's white — and at least 1.5:1 from the dark theme's page
+  // (#24262b), so it still shows there as a mark. Deep colours (navy, forest green, burgundy) stay as chosen. A colour out of that band moves
+  // toward black or white in 1% steps until it is in, keeping its hue; the result is what is saved (lib/validate.cjs takes any #rrggbb).
+  const lumOfHex=c=>{const n=parseInt(c.slice(1),16),lin=v=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;};return 0.2126*lin(n>>16&255)+0.7152*lin(n>>8&255)+0.0722*lin(n&255);};
+  const CUSTOM_LUM_MAX=lumOfHex('#ffcc00'),CUSTOM_LUM_MIN=1.5*(lumOfHex('#24262b')+0.05)-0.05;
+  const isCustomColor=c=>/^#[0-9a-f]{6}$/i.test(c||'')&&!LIST_PALETTE.includes(String(c).toLowerCase());
+  function clampColor(color){
+    if(!/^#[0-9a-f]{6}$/i.test(color||''))return null;
+    const hex=color.toLowerCase(),inBand=x=>{const l=lumOfHex(x);return l>=CUSTOM_LUM_MIN-1e-9&&l<=CUSTOM_LUM_MAX+1e-9;};
+    if(inBand(hex))return hex;
+    const n=parseInt(hex.slice(1),16),c=[n>>16&255,n>>8&255,n&255],to=lumOfHex(hex)<CUSTOM_LUM_MIN?255:0;
+    for(let i=1;i<=100;i++){const p=1-i/100,x='#'+c.map(v=>Math.round(p*v+(1-p)*to).toString(16).padStart(2,'0')).join('');if(inBand(x))return x;}
+    return '#8e8e93';
+  }
+  // A list's colour of one's own as its title on the dark page (2026-11-03 final review C5): the stored colour stays as chosen for its marks,
+  // and the title is lifted toward white only until it reads as well as the palette's weakest there (남보라 #5856d6 on #24262b). Palette colours,
+  // the light page (clampColor keeps every colour at least as dark as 노랑) and other values pass through.
+  const contrastHex=(a,b)=>{const x=lumOfHex(a),y=lumOfHex(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);};
+  const TITLE_DARK_MIN=contrastHex('#5856d6','#24262b');
+  function titleColor(color,theme){
+    if(theme!=='dark'||!isCustomColor(color)||contrastHex(color,'#24262b')>=TITLE_DARK_MIN-1e-9)return color;
+    const n=parseInt(color.slice(1),16),c=[n>>16&255,n>>8&255,n&255];
+    for(let i=1;i<=100;i++){const p=1-i/100,x='#'+c.map(v=>Math.round(p*v+(1-p)*255).toString(16).padStart(2,'0')).join('');if(contrastHex(x,'#24262b')>=TITLE_DARK_MIN-1e-9)return x;}
+    return '#ffffff';
+  }
   // A list colour as text on tinted glass (2026-10-21 review): mixed toward white on dark glass, toward black on light glass,
   // only as far as it needs for about 3:1 there (yellow and green need more than blue). Other values pass through.
   // `strength` (0..1, true = 1): on mid-tone glass near the change of text colour (glassLook ink) the colour is mixed further, to
@@ -432,6 +459,50 @@
     const ink=+Math.min(1,Math.max(0,dark?(brightness-0.2)/0.22:(1-brightness)/0.52)).toFixed(4);
     const sat=(dark?clear.dsat:clear.sat)+(100-(dark?clear.dsat:clear.sat))*g;
     return {tone,t:+t.toFixed(5),tint,sat:+sat.toFixed(3),blur:+(7+17*g).toFixed(3),solid:g>=0.995,ink,mid:ink>0};
+  }
+  // 「앱과 같게」 (2026-11-03 owner, shown his light app's widgets at 95% clear as near-white cards on his navy wallpaper: 「투명 쪽은
+  // 바탕화면 따라 (추천)하되 애플은 어떻게 하고 있는지 찾아보고 애플에 맞춰서 해줘」). Up to the slider's middle the glass is the
+  // wallpaper's, exactly 「바탕화면에 맞춤」 (glassLook in the wallpaper's tone): over a dark wallpaper thin dark glass with white text, which
+  // is how Apple's clear widgets look there (Apple support, HIG Widgets, WidgetKit accented rendering: clear widgets draw their text white);
+  // over a light wallpaper light glass with black text, where Apple keeps white text over a dimming layer and is called hard to read, so this
+  // follows the wallpaper as Apple's small glass controls do (judgement, WWDC25 219). From the middle to the opaque end the glass moves step by
+  // step to the app's own card (2026-10-28 owner: 「조금씩」, 「화이트 모드로 … 불투명한걸로 선택했다면 하얗게」): its strength and premultiplied
+  // colour blend in a line, as 1.2.5 did, and only the text colour changes at once. Where neither text colour reads (the glass between
+  // GLASS_DARK_MAX for white text and GLASS_APP_LIGHT for black) is skipped, not held: the upper half of the slider maps piecewise-linearly
+  // onto the stretch where the wallpaper's tone reads and the stretch where the app's does, each in proportion to its length, so every 1%
+  // step still thickens the glass and the gap is crossed in exactly one step (2026-11-03 final review G1: holding each position in the gap at
+  // its nearer edge gave ~15 slider steps of two looks, the flat run 1.2.6 removed). `previous`, the tone shown (app.js, only while the slider
+  // stays put), keeps that side for .02 of the slider past the change, as glassTone's band does, so a widget moved across a boundary does not
+  // flicker (G2). The text and accents reach full strength at the edge on either side; on the wallpaper's side they rise in a line from the
+  // middle's own strength, so the step past the middle does not jump (G3). A wallpaper of the app's own tone: glassLook. The dark edge is
+  // glassLook's (.42); the light one is brighter than glassLook's light ink edge (.48): there the 1.2.7 Apple red (#a8221a at full ink) fell to
+  // 1.7:1, and from .66 every accent keeps 3:1 over every wallpaper tests/lists.test.cjs sweeps (1.2.5 used .48 with a near-black red, which
+  // the owner called too dark).
+  const GLASS_DARK_MAX=0.42,GLASS_APP_LIGHT=0.66,GLASS_APP_HOLD=0.04; // the hold in the upper half's own 0–1 (.02 of the slider)
+  function glassLookApp(level,spread,wall,app,previous){
+    const own=app==='dark'?'dark':'light',g=typeof level==='number'&&Number.isFinite(level)?Math.min(1,Math.max(0,level)):0.5;
+    if((wall!=='dark'&&wall!=='light')||wall===own)return glassLook(g,spread,own,own);
+    if(g<=0.5)return glassLook(g,spread,wall,wall);
+    const mid=glassLook(0.5,spread,wall,wall);if(!mid)return null;
+    const low=Number.isFinite(spread.low)?spread.low:spread.mean,high=Number.isFinite(spread.high)?spread.high:spread.mean;
+    const luma=c=>0.2126*c[0]+0.7152*c[1]+0.0722*c[2],over=(L,x)=>L*(1-x.t)+x.t*luma(x.c);
+    const from={t:mid.t,c:mid.tint},to={t:0.97,c:own==='dark'?GLASS_SLATE:GLASS_WHITE}; // next to the solid card, as glassLook's own end
+    const at=w=>{const t=from.t+(to.t-from.t)*w,p=[0,1,2].map(i=>from.t*from.c[i]+(to.t*to.c[i]-from.t*from.c[i])*w);return {t,c:t>0?p.map(v=>Math.min(1,Math.max(0,v/t))):GLASS_WHITE};};
+    const reads=(tone,x)=>tone==='dark'?over(high,x)<=GLASS_DARK_MAX+1e-9:over(low,x)>=GLASS_APP_LIGHT-1e-9;
+    // the brightness over a pixel is a line in w, so each edge is one division: e1 where the wallpaper's tone stops reading, e2 where the
+    // app's starts (neither found: the whole way, or none of it)
+    const edge=(L,limit)=>{const a=over(L,at(0)),b=over(L,at(1))-a;if(Math.abs(b)<1e-9)return null;const e=(limit-a)/b;return e>=0&&e<=1?e:null;};
+    const ofTone=tone=>tone==='dark'?edge(high,GLASS_DARK_MAX):edge(low,GLASS_APP_LIGHT);
+    let e1=ofTone(wall),e2=ofTone(own);
+    if(e1===null)e1=reads(wall,at(0))?1:0;
+    if(e2===null)e2=reads(own,at(0))?0:1;
+    const E1=e1;if(e2<e1)e1=e2=(e1+e2)/2; // both read on a stretch: change in its middle
+    const u=(g-0.5)/0.5,gm=e1+1-e2>0?e1/(e1+1-e2):1;
+    const first=previous===wall&&u<=gm+GLASS_APP_HOLD?true:previous===own&&u>=gm-GLASS_APP_HOLD?false:u<=gm;
+    const w=first?(gm>0?e1*Math.min(u,gm)/gm:0):(gm<1?e2+(1-e2)*Math.max(0,u-gm)/(1-gm):1),x=at(w),tone=first?wall:own;
+    const ink=+Math.min(1,Math.max(0,first?mid.ink+(1-mid.ink)*(E1>0?Math.min(1,w/E1):1):own==='light'?(1-over(low,x))/(1-GLASS_APP_LIGHT):(over(high,x)-0.2)/(GLASS_DARK_MAX-0.2))).toFixed(4);
+    const clear=glassTint(0,wall==='dark'?high:low),base=wall==='dark'?clear.dsat:clear.sat; // the wallpaper glass's saturation curve, continued
+    return {tone,t:+x.t.toFixed(5),tint:x.c.map(v=>+v.toFixed(4)),sat:+(base+(100-base)*g).toFixed(3),blur:+(7+17*g).toFixed(3),solid:g>=0.995,ink,mid:ink>0};
   }
   // The widget text and accents on glass of a tone at an ink strength (glassLook ink): each between its plain colour (glass well
   // inside the tone, styles.css's own values) and its strong one (at the gap's edge: pure black or white text, secondary nearly as
@@ -781,7 +852,7 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,widgetTheme,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
+  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassLookApp,widgetTheme,isCustomColor,clampColor,titleColor,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);
