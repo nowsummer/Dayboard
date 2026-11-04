@@ -18,6 +18,8 @@ function dialogHarness() {
   h.loadApp('let restoreFocus=null;', 'const formSnapshot=', 'function sheetScroll(', 'function modal(', 'function dismissModal(', { prefix: 'function askCloseModal(', optional: true }, 'const field=', 'const input=', 'function actionFooter(',
     "document.addEventListener('keydown',e=>{if(calendarKey(e))return;", 'function confirmDelete(', 'function scopeChooser(',
     'const providerName=', 'const listBy=', 'function listColor(', 'function listVisual(', 'function toLocalInput(', 'const moveTargets=', 'function groupSelect(', 'function submitGuard(', 'function composeName(',
+    // where a task can go and the list select by account (2026-11-04: moving a task between any two lists)
+    'const movableList=', 'const moveDestinations=', 'const canOffer=', 'const movingIds=', 'const taskMoving=', 'const transferWaitingOf=', 'const accountKey=', 'const accountLabel=', 'function byAccount(',
     'function addList(', 'function editList(', 'function addGroup(', 'function editTask(');
   const c = h.context, el = (tag, cls) => { const n = h.document.createElement(tag); if (cls) n.className = cls; return n; };
   // Pickers that only draw: a node and a value, as the real ones return.
@@ -147,9 +149,10 @@ test('새 목록 and 새 그룹 carry at most one short line', async () => {
 test('할 일 편집: no standing reminder sentence, 반복|목록 share a row, the custom panel keeps the full width', async () => {
   const h = dialogHarness();
   const s = h.context.state;
-  s.lists = [{ id: 'l1', name: '장보기', provider: 'local' }, { id: 'l2', name: '업무', provider: 'local' }, { id: 'm1', name: '업무', provider: 'microsoft' }];
+  s.accounts = [{ id: 'a1', provider: 'microsoft', name: 'me@example.com' }];
+  s.lists = [{ id: 'l1', name: '장보기', provider: 'local' }, { id: 'l2', name: '업무', provider: 'local' }, { id: 'm1', name: '업무', provider: 'microsoft', accountId: 'a1', remoteId: 'M1' }];
   s.tasks = [{ id: 't1', listId: 'l1', title: '우유 사기', dueDate: '2026-11-03', reminderAt: '2026-11-03T00:30:00.000Z', rrule: 'FREQ=WEEKLY', steps: [] },
-    { id: 't2', listId: 'm1', title: '보고서', dueDate: '', steps: [] }];
+    { id: 't2', listId: 'm1', title: '보고서', dueDate: '', steps: [] }, { id: 't4', listId: 'm1', title: '끝낸 보고서', dueDate: '', steps: [], completed: true }];
   h.eval('editTask')(s.tasks[0]); await h.tick();
   const d = h.dialog();
   assert.ok(!h.helps().some(t => t.includes('알림')), 'the reminder sentence is gone (owner: one line or none)');
@@ -171,8 +174,22 @@ test('할 일 편집: no standing reminder sentence, 반복|목록 share a row, 
   const cloudReminder = [...h.dialog().querySelectorAll('.field')].find(f => labelOf(f) === '알림');
   assert.equal(cloudReminder.title, 'Outlook에 저장되어 To Do·아이폰에서도 울려요.', 'the Outlook fact moved to the 알림 field\'s tooltip');
   assert.ok(!h.helps().some(t => t.includes('알림')), 'no reminder sentence for a cloud task either');
-  // A list that cannot be changed (every To Do task, a lone local list) is one line in the row (in half a row the name and the
+  // 2026-11-04 (moving a task between any two lists): a To Do task gets the list choice too — its own list first, then the lists it can go
+  // to, under their accounts with the service in the name — and an empty why-line (role=status) under the field, inside the row.
+  const sel = h.dialog().querySelector('select[name=listId]');
+  assert.ok(sel !== null, 'a To Do task can change its list');
+  assert.equal(sel.value, 'm1', 'its own list is chosen');
+  assert.equal([...sel.querySelectorAll('optgroup')].map(g => g.getAttribute('label')).join('|'), 'Microsoft · me@example.com|이 PC', 'grouped by account, its own first');
+  assert.equal([...sel.querySelectorAll('option')].map(o => o.value + '=' + o.textContent).join('|'), 'm1=업무 · Microsoft|l1=장보기|l2=업무', 'the service in an account list\'s name');
+  const why = h.dialog().querySelector('p.move-why');
+  assert.ok(why !== null && why.getAttribute('role') === 'status' && why.textContent === '', 'the why-line is there and empty');
+  assert.ok(why.parentNode === sel.closest('.field').parentNode && why.previousElementSibling === sel.closest('.field'), 'right under the 목록 field');
+  assert.ok(why.closest('.task-repeat-row') !== null, 'beside 반복, in the row');
+  assert.ok(sel.closest('.field').contains(why) === false, 'not inside the label: it would join the select\'s name');
+  h.eval('closeModal')(true); await h.tick();
+  // A list that cannot be changed (a completed account task, a lone local list) is one line in the row (in half a row the name and the
   // account tag wrapped onto 2–3 lines — fix-D review): the name sits in its own span, ellipsized by CSS; the account is in the tooltip.
+  h.eval('editTask')(s.tasks[2]); await h.tick();
   const fixedList = (what, name, tip) => {
     const d2 = h.dialog(), src = d2.querySelector('.task-detail-source'), row2 = d2.querySelector('.task-repeat-row');
     assert.ok(row2 !== null && src !== null && row2.contains(src), what + ': the read-only list sits beside 반복');
@@ -180,15 +197,28 @@ test('할 일 편집: no standing reminder sentence, 반복|목록 share a row, 
     const spans = [...src.querySelectorAll('span')].map(n => n.className + '=' + n.textContent);
     assert.deepEqual(spans, ['list-name=' + name], what + ': just the name, no account tag to wrap');
     assert.equal(labelOf(src.closest('.field')), '목록', what + ': labelled like the select it stands for');
+    assert.ok(d2.querySelector('p.move-why') === null, what + ': no why-line without a choice');
   };
-  fixedList('a To Do task', '업무', '업무 · Microsoft');
+  fixedList('a completed To Do task (it moves only between this PC\'s lists)', '업무', '업무 · Microsoft');
   h.eval('closeModal')(true); await h.tick();
+  s.accounts = [];
   s.lists = [{ id: 'l1', name: '장보기', provider: 'local' }, { id: 'g1', name: '내 할 일 목록', provider: 'google' }];
   h.eval('editTask')(s.tasks[0]); await h.tick();
   fixedList('the only list on this PC', '장보기', '장보기 · 이 PC');
-  // Without a repeat picker (a Google task) there is no row: the source note stays full width under 메모, as before.
+  // Without a repeat picker (a Google task) there is no row: the list choice and its why-line sit full width under 메모; a task with nowhere
+  // to go (completed) keeps the read-only source line there, as before.
   h.eval('closeModal')(true); await h.tick();
+  s.accounts = [{ id: 'ga', provider: 'google', name: 'me@example.org' }];
+  s.lists = [{ id: 'l1', name: '장보기', provider: 'local' }, { id: 'g1', name: '내 할 일 목록', provider: 'google', accountId: 'ga', remoteId: 'G1' }];
   h.eval('editTask')({ id: 't3', listId: 'g1', title: '서류', dueDate: '', steps: [] }); await h.tick();
+  const d4 = h.dialog(), sel4 = d4.querySelector('select[name=listId]');
+  assert.ok(d4.querySelector('.task-repeat-row') === null && sel4 !== null, 'a Google task: the list choice, no row');
+  const notes4 = [...d4.querySelectorAll('.field')].find(f => labelOf(f) === '메모');
+  assert.ok(Boolean(notes4) && sel4.closest('.field').previousElementSibling === notes4, 'right under 메모');
+  assert.ok(sel4.closest('.field').nextElementSibling === d4.querySelector('p.move-why'), 'its why-line under it');
+  assert.equal([...sel4.querySelectorAll('option')].map(o => o.value).join('|'), 'g1|l1');
+  h.eval('closeModal')(true); await h.tick();
+  h.eval('editTask')({ id: 't3', listId: 'g1', title: '서류', dueDate: '', steps: [], completed: true }); await h.tick();
   const d3 = h.dialog(), src3 = d3.querySelector('.task-detail-source');
   assert.ok(d3.querySelector('.task-repeat-row') === null && src3 !== null && src3.closest('.field') === null, 'a Google task: one full-width source line');
   const notes3 = [...d3.querySelectorAll('.field')].find(f => labelOf(f) === '메모');

@@ -25,6 +25,8 @@ function shortcutGroups(){
       [tr('입력한 할 일 추가'),[['Enter']]],
       [tr('고른 할 일 위·아래로 옮기기'),[['Alt','↑'],['Alt','↓']]],
       [tr('고른 할 일 삭제'),[['Delete']]],
+      // the row's menu at the row (2026-11-04: the keyboard way to 「목록으로 옮기기」, then ↑ ↓ and Enter in the menu)
+      [tr('고른 할 일 메뉴 열기'),[['Shift','F10']]],
       [tr('오른쪽 패널'),[['\\']]]]],
     [tr('달력'),[
       [tr('오늘로 이동'),[['T'],['Ctrl','T']]],

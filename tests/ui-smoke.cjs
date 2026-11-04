@@ -2592,6 +2592,150 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await invoke('list:delete', { id: handList.id });
   checks.push('task-recheck-order-undo');
 
+  // Moving a task to another list (2026-11-04 owner request: 「a라는 목록에 있는 걸 끌어다가 b 목록으로 옮겨서 이동시키거나 혹은 a 목록에 있는
+  // 항목을 편집을 눌러서 목록을 변경시키는 기능」) — this PC's lists only (no account here; the account routes are unit-tested in
+  // tests/task-move-ui.test.cjs and the sync tests). A row of 오늘 dragged onto another list in the sidebar, on its name and on its ⋯ spot, moves
+  // there with 되돌리기 and Ctrl+Z puts it back; its own list refuses the drop; the drag carries Dayboard's own type, not the title as text; no
+  // mark is left behind.
+  const moveFrom = await invoke('list:add', { name: '스모크 옮기기 출발', color: '#34c759' });
+  const moveTo = await invoke('list:add', { name: '스모크 옮기기 도착', color: '#ff9500' });
+  const dropTask = await invoke('task:add', { title: '스모크 끌어 옮기기', listId: moveFrom.id, dueDate: D.dateKey() });
+  const holdOther = await invoke('task:add', { title: '스모크 끄는 중', listId: moveFrom.id, dueDate: D.dateKey() });
+  const MOVE_HELPERS = `
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const rowOf = title => [...document.querySelectorAll('.tasks-view .task-row')].find(node => node.querySelector('.task-title')?.textContent === title);
+    const wrapOf = id => [...document.querySelectorAll('.list-nav-wrap')].find(node => node.querySelector(':scope > .list-nav .list-name')?.textContent === listVisual(listBy(id)).title);
+    const listOf = () => state.tasks.find(task => task.id === ${JSON.stringify(dropTask.id)})?.listId;
+    const marks = () => document.querySelectorAll('.task-drop,.dragging,.drop-before,.drop-end,.drag-active').length;
+    const drag = target => { const data = new DataTransfer(); const row = rowOf('스모크 끌어 옮기기'); row.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: data })); const over = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data }); target.dispatchEvent(over); return { data, row, over }; };
+    const drop = (d, target) => { target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: d.data })); d.row.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: d.data })); };`;
+  const dropped = await run(mainWindow, `${MOVE_HELPERS}
+    hideToast(); goto('today'); await wait(120);
+    const result = {};
+    let d = drag(wrapOf(${JSON.stringify(moveFrom.id)}).querySelector('.list-nav'));
+    result.ownRefused = !d.over.defaultPrevented && !wrapOf(${JSON.stringify(moveFrom.id)}).classList.contains('task-drop');
+    result.types = [...d.data.types];
+    d.row.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: d.data })); await wait(60);
+    result.stayed = listOf();
+    d = drag(wrapOf(${JSON.stringify(moveTo.id)}).querySelector('.list-nav .list-name'));
+    result.accepted = d.over.defaultPrevented; result.marked = wrapOf(${JSON.stringify(moveTo.id)}).classList.contains('task-drop');
+    drop(d, wrapOf(${JSON.stringify(moveTo.id)}).querySelector('.list-nav .list-name')); await wait(400);
+    result.moved = listOf(); result.toast = document.getElementById('toast').textContent; result.undo = document.querySelector('#toast .toast-action')?.textContent || '';
+    result.marks = marks(); result.shown = Boolean(rowOf('스모크 끌어 옮기기')); // dated today: 오늘 still shows it, now in the other list
+    document.activeElement?.blur?.();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })); await wait(400);
+    result.back = listOf();
+    d = drag(wrapOf(${JSON.stringify(moveTo.id)}).querySelector('.list-more'));
+    result.moreAccepted = d.over.defaultPrevented;
+    drop(d, wrapOf(${JSON.stringify(moveTo.id)}).querySelector('.list-more')); await wait(400);
+    result.byMore = listOf(); result.marks2 = marks(); result.held = typeof dragTaskId === 'string';
+    hideToast(); return result;`);
+  expect(dropped.ownRefused && dropped.stayed === moveFrom.id && dropped.types.join() === 'application/x-dayboard-task' && dropped.accepted && dropped.marked && dropped.moved === moveTo.id && /「스모크 옮기기 도착」 목록으로 옮겼어요/.test(dropped.toast) && dropped.undo === '되돌리기'
+    && dropped.marks === 0 && dropped.shown && dropped.back === moveFrom.id && dropped.moreAccepted && dropped.byMore === moveTo.id && dropped.marks2 === 0 && !dropped.held, `할 일을 사이드바 목록으로 끌어 옮기기 ${JSON.stringify(dropped)}`);
+  checks.push('task-drop-sidebar');
+
+  // A state broadcast while a task is dragged (2026-11-04): render() waits, so the dragged row stays the same node (Chromium ends a drag whose
+  // source is gone); the change shows once the drag ends.
+  const dragHold = await run(mainWindow, `${MOVE_HELPERS}
+    goto('today'); await wait(120);
+    const row = rowOf('스모크 끌어 옮기기'); const data = new DataTransfer();
+    row.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: data }));
+    await window.dayboard.invoke('task:update', { id: ${JSON.stringify(holdOther.id)}, title: '스모크 끄는 중 바뀐 제목' }); await wait(300);
+    const result = { same: rowOf('스모크 끌어 옮기기') === row, connected: row.isConnected, pending: renderPending, held: !rowOf('스모크 끄는 중 바뀐 제목') };
+    row.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: data })); await wait(150);
+    result.after = { redrawn: rowOf('스모크 끌어 옮기기') !== row, changed: Boolean(rowOf('스모크 끄는 중 바뀐 제목')), pending: renderPending, marks: marks() };
+    return result;`);
+  expect(dragHold.same && dragHold.connected && dragHold.pending && dragHold.held && dragHold.after.redrawn && dragHold.after.changed && !dragHold.after.pending && dragHold.after.marks === 0, `끄는 동안 다시 그리지 않음 ${JSON.stringify(dragHold)}`);
+  checks.push('task-drag-render-hold');
+
+  // The keyboard path (2026-11-04): the row's menu without a pointer (Shift+F10 / the menu key send a contextmenu with no point) opens at the
+  // row with its first item focused (pushed up only when the row is near the window's bottom); ↓ reaches 「목록으로 옮기기」, its list menu
+  // takes ↓ too, and picking a list moves the task back to where it started — the keyboard stays on the moved row (오늘 still shows it).
+  // Enter on a focused menu item is the browser's own click.
+  const keyboardMove = await run(mainWindow, `${MOVE_HELPERS}
+    hideToast(); goto('today'); await wait(120);
+    const text = rowOf('스모크 끌어 옮기기').querySelector('.task-text'); text.focus();
+    text.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await wait(60);
+    const menu = document.querySelector('.context-menu'); const rowBox = rowOf('스모크 끌어 옮기기').getBoundingClientRect(), menuBox = menu?.getBoundingClientRect();
+    const result = { at: menuBox ? { dx: Math.round(menuBox.left - rowBox.left), dy: Math.round(menuBox.top - rowBox.bottom) } : null, first: document.activeElement?.textContent || '' };
+    const focused = () => document.activeElement?.closest('.menu-item')?.querySelector('span')?.textContent || '';
+    const down = () => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    for (let i = 0; i < 12 && focused() !== '목록으로 옮기기'; i++) down();
+    result.reached = focused();
+    document.activeElement.click(); await wait(60);
+    const target = listVisual(listBy(${JSON.stringify(moveFrom.id)})).title;
+    for (let i = 0; i < 30 && focused() !== target; i++) down();
+    result.list = focused(); result.target = target; result.bottom = Math.round(menuBox?.bottom || 0); result.limit = innerHeight;
+    document.activeElement.click(); await wait(400);
+    result.moved = listOf();
+    result.focus = document.activeElement?.closest('.task-row')?.querySelector('.task-title')?.textContent || '';
+    // Esc gives the keyboard back to the row, from its menu and from the list menu opened from it — never <body> (2026-11-04 fifth check W8).
+    const esc = () => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    const onRow = () => document.activeElement === rowOf('스모크 끌어 옮기기')?.querySelector('.task-text');
+    rowOf('스모크 끌어 옮기기').querySelector('.task-text').focus();
+    rowOf('스모크 끌어 옮기기').querySelector('.task-text').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); await wait(60);
+    esc(); await wait(30);
+    result.escMenu = !document.querySelector('.context-menu') && onRow();
+    rowOf('스모크 끌어 옮기기').querySelector('.task-text').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); await wait(60);
+    for (let i = 0; i < 12 && focused() !== '목록으로 옮기기'; i++) down();
+    document.activeElement.click(); await wait(60);
+    result.inList = Boolean(document.activeElement?.closest('.context-menu'));
+    esc(); await wait(30);
+    result.escList = !document.querySelector('.context-menu') && onRow();
+    hideToast(); return result;`);
+  expect(keyboardMove.at && Math.abs(keyboardMove.at.dx - 16) <= 2 && (Math.abs(keyboardMove.at.dy) <= 2 || (keyboardMove.at.dy < 0 && keyboardMove.bottom >= keyboardMove.limit - 10)) && keyboardMove.first === '편집' && keyboardMove.reached === '목록으로 옮기기' && keyboardMove.list === keyboardMove.target && keyboardMove.moved === moveFrom.id && keyboardMove.focus === '스모크 끌어 옮기기'
+    && keyboardMove.escMenu && keyboardMove.inList && keyboardMove.escList, `키보드로 목록 옮기기 ${JSON.stringify(keyboardMove)}`);
+  checks.push('task-move-menu-keyboard');
+
+  // A task on its way takes no change (2026-11-04 recheck of review R8): its open steps wait, the Delete key on its title does nothing, and
+  // its menu's items are there but greyed (default cursor, no click); freed, the steps work again. A move of this PC's lists is done at once,
+  // so the account move's wait is stood in for the way transferSend marks it (movingIds, markMoving). The task goes with its list below.
+  const holdTask = await invoke('task:add', { title: '스모크 옮기는 중', listId: moveFrom.id, dueDate: D.dateKey(), steps: [{ title: '스모크 단계', completed: false }] });
+  const rowHold = await run(mainWindow, `${MOVE_HELPERS}
+    hideToast(); goto('today'); await wait(120);
+    const id = ${JSON.stringify(holdTask.id)};
+    const now = () => rowOf('스모크 옮기는 중');
+    const stepsOff = () => [...(now()?.querySelectorAll('.task-steps .step-check,.task-steps .step-title') || [])].map(b => b.disabled).join();
+    openSteps.add(id); render(); await wait(80);
+    movingIds.add(id); markMoving(id);
+    const result = { moving: Boolean(now()?.classList.contains('moving')), steps: stepsOff() };
+    const text = now().querySelector('.task-text'); text.focus();
+    text.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true })); await wait(150);
+    result.kept = state.tasks.some(task => task.id === id); result.dialog = Boolean(document.querySelector('#modal-root .dialog'));
+    now().querySelector('.task-text').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 })); await wait(60);
+    const items = [...document.querySelectorAll('.context-menu .menu-item')];
+    result.items = items.map(node => (node.querySelector('span')?.textContent || '') + ':' + node.disabled);
+    const edit = items.find(node => node.querySelector('span')?.textContent === '편집');
+    result.cursor = edit ? getComputedStyle(edit).cursor : '';
+    edit?.click(); await wait(80);
+    result.opened = Boolean(document.querySelector('#modal-root .dialog'));
+    closeMenu();
+    movingIds.delete(id); markMoving(id);
+    result.freed = stepsOff();
+    openSteps.delete(id); render();
+    return result;`);
+  expect(rowHold.moving && rowHold.steps === 'true,true' && rowHold.kept && !rowHold.dialog && rowHold.items.length >= 3 && rowHold.items.every(item => item.endsWith(':true')) && rowHold.cursor === 'default' && !rowHold.opened && rowHold.freed === 'false,false', `옮기는 중인 할 일은 메뉴·하위 할 일·Delete를 받지 않음 ${JSON.stringify(rowHold)}`);
+  checks.push('task-move-row-holds');
+
+  // The edit dialog's 목록 between this PC's lists (2026-11-04): the move goes through moveTask, so it says so with 되돌리기 as a drag does
+  // (2026-11-04 fifth check W10); the why-line under the field stays empty.
+  const editMove = await run(mainWindow, `${MOVE_HELPERS}
+    goto('today'); await wait(120);
+    editTask(state.tasks.find(task => task.id === ${JSON.stringify(dropTask.id)})); await wait(80);
+    const select = document.querySelector('#modal-root select[name=listId]');
+    const result = { found: Boolean(select), value: select?.value, why: document.querySelector('#modal-root .move-why')?.textContent ?? null, role: document.querySelector('#modal-root .move-why')?.getAttribute('role') || '' };
+    select.value = ${JSON.stringify(moveTo.id)}; select.dispatchEvent(new Event('change', { bubbles: true })); await wait(300);
+    result.whyAfter = document.querySelector('#modal-root .move-why')?.textContent ?? null;
+    document.querySelector('#modal-root form button[type=submit]').click(); await wait(400);
+    result.closed = !document.querySelector('#modal-root .dialog'); result.list = listOf();
+    result.toast = document.getElementById('toast').textContent; result.undo = document.querySelector('#toast .toast-action')?.textContent || '';
+    hideToast(); return result;`);
+  expect(editMove.found && editMove.value === moveFrom.id && editMove.why === '' && editMove.role === 'status' && editMove.whyAfter === '' && editMove.closed && editMove.list === moveTo.id
+    && /「스모크 옮기기 도착」 목록으로 옮겼어요/.test(editMove.toast) && editMove.undo === '되돌리기', `편집에서 목록 바꾸기 ${JSON.stringify(editMove)}`);
+  await invoke('list:delete', { id: moveFrom.id }); await invoke('list:delete', { id: moveTo.id });
+  checks.push('task-move-edit-dialog');
+
   // Steps: added in the dialog (Enter, and a line left typed goes with 저장), the row counts them, its chevron opens them, a step
   // is checked off there.
   const steps = await run(mainWindow, `

@@ -28,6 +28,21 @@ test('every Korean literal in the app passes through tr()', () => {
   assert.deepEqual(left, []);
 });
 
+// One entry per key (2026-11-04 sixth check H7): the dictionary is one object literal, where a key written twice keeps its last English
+// silently, and two branches that each add the same sentence merge without a conflict (the fifth check's two subtask sentences, with two
+// English wordings). Read from the source with the extractor's tokenizer (comments skipped): every literal followed by ':' in EN is a key.
+test('the English dictionary has no key twice', () => {
+  const src = fs.readFileSync(path.join(root, 'renderer', 'i18n.js'), 'utf8');
+  const start = src.indexOf('const EN={'), end = src.indexOf('const NEUTRAL=');
+  assert.ok(start > 0 && end > start, 'the dictionary is found');
+  const block = src.slice(start, end);
+  const keys = extract.literals(block).filter(l => /^\s*:/.test(block.slice(l.end))).map(l => extract.keyOf(l));
+  const seen = new Set(), twice = [];
+  for (const key of keys) { if (seen.has(key)) twice.push(key); seen.add(key); }
+  assert.deepEqual(twice, []);
+  assert.equal(keys.length, Object.keys(shared.EN).length, 'every key the object holds was read');
+});
+
 test('English entries keep the same placeholders as their Korean keys', () => {
   for (const [key, value] of Object.entries(shared.EN)) assert.equal(placeholders(value), placeholders(key), key);
 });

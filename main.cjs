@@ -31,7 +31,7 @@ const { tr } = i18n;
 const { text, rawText, identifier, boolean, color, dateOnly, dateTime, reminderAt, idList, eventColor, rruleText, scopeOf, taskSorts, taskSteps, eventAlert, taskOrders } = require('./lib/validate.cjs');
 const { dueAlerts, alertLine, pruneFired } = require('./lib/alerts.cjs');
 const { setRepeat, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries } = require('./lib/tasks.cjs');
-const { isAccountList, moveSummary, settleMovesAtStart } = require('./lib/taskmove.cjs');
+const { WARNS, isAccountList, moveSummary, settleMovesAtStart } = require('./lib/taskmove.cjs');
 const { createCalendarHistory } = require('./lib/calhistory.cjs');
 const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, seriesAlert, ring, alertOtherKind, seriesAllDay, toFirstShown, shiftedForMaster, truncatedRule } = require('./lib/series.cjs');
 
@@ -177,6 +177,8 @@ function lookup(collection, id) {
   if (!item) throw new Error(tr('항목이 없거나 이미 삭제되었습니다. 화면을 새로 열어 주세요.'));
   return item;
 }
+// The move warnings a renderer says the user accepted (task:transfer, task:transfer-finish): known keys only, each once.
+const warnKeys = value => Array.isArray(value) ? [...new Set(value.filter(key => WARNS.includes(key)))] : [];
 // Fire Windows notifications for reminders that came due while Dayboard runs.
 // Each reminder fires once (reminderFiredAt stays internal) and only within 12 h of its time.
 function checkReminders() {
@@ -834,6 +836,10 @@ async function command(commandName, payload, sourceWindow) {
         const places = new Set(dropped); if (reopening && previous.nextId && !state.tasks.some(item => item.id === previous.nextId)) places.add(previous.nextId);
         const placed = list.provider === 'local' ? placeInOrder(order, { id: task.id, added: fresh ? added.id : '', dropped: places }) : order;
         if (placed !== order) state.settings.taskOrder = { ...state.settings.taskOrder, [task.listId]: placed };
+        // Moved between this PC's lists (2026-11-04): the record of a move that brought it here from an account follows it (its 「옮긴 결과
+        // 확인」 stays — 2026-11-04 critique E1). The list it left keeps its place in the hand-made order, as before this feature, so
+        // 되돌리기 puts it back where it was (2026-11-04 review R1); the moves in and out of an account list prune it (lib/sync.cjs).
+        if (task.listId !== previous.listId) for (const record of state.taskMoves || []) if (record.id === task.id && record.route === 'pull') record.listId = task.listId;
       });
       return publicRecord('tasks', task);
     }
@@ -844,19 +850,40 @@ async function command(commandName, payload, sourceWindow) {
     // the matches of a search. Read-only; nothing here waits for a service.
     case 'calendar:history': return history.query(payload.from, payload.to);
     case 'calendar:history-search': return history.search(typeof payload.text === 'string' ? payload.text : '');
+    // Since 2026-11-04 between any two lists (owner: 「a 목록에 있는 걸 끌어다가 b 목록으로 옮겨서 이동시키거나 … 편집을 눌러서 목록을
+    // 변경시키는 기능」): transfer-check of named tasks (ids) from any list but the target — one of them with the edit dialog's unsaved
+    // fields (`draft`), so the dialog says why before it saves —, transfer with the warnings the user accepted (`accept`, lib/taskmove.cjs
+    // WARNS) and `undo` (the move back of a move just made), transfer-finish to delete an original a move kept at its service. A whole
+    // list (listId) still goes from this PC to an account only.
     case 'task:transfer-check': {
       const list = lookup('lists', payload.to);
-      if (!isAccountList(list)) throw new Error(tr('옮길 계정 목록을 찾지 못했어요. 동기화한 뒤 다시 시도해 주세요.'));
+      if (!isAccountList(list) && list.provider !== 'local') throw new Error(tr('옮길 계정 목록을 찾지 못했어요. 동기화한 뒤 다시 시도해 주세요.'));
       const from = payload.listId === undefined ? null : lookup('lists', payload.listId);
-      if (from && from.provider !== 'local') throw new Error(tr('이 PC 목록의 할 일만 계정 목록으로 옮길 수 있어요.'));
+      if (from && (from.provider !== 'local' || !isAccountList(list))) throw new Error(tr('이 PC 목록의 할 일만 계정 목록으로 옮길 수 있어요.'));
       const ids = from ? null : new Set(Array.isArray(payload.ids) ? payload.ids.slice(0, 5000).map(identifier) : []);
+      let draft = null;
+      if (payload.draft !== undefined) {
+        if (!ids || ids.size !== 1 || !payload.draft || typeof payload.draft !== 'object' || Array.isArray(payload.draft)) throw new Error(tr('할 일 옮기기 요청이 올바르지 않습니다.'));
+        const fields = payload.draft; draft = {};
+        if ('dueDate' in fields) draft.dueDate = dateOnly(fields.dueDate);
+        if ('reminderAt' in fields) draft.reminderAt = reminderAt(fields.reminderAt);
+        if ('notes' in fields) draft.notes = rawText(fields.notes, tr('메모'), 20000);
+        if ('rrule' in fields) draft.rrule = rruleText(fields.rrule);
+      }
       return store.read(state => {
         const local = new Set(state.lists.filter(item => item.provider === 'local').map(item => item.id));
-        const tasks = state.tasks.filter(item => local.has(item.listId) && (from ? item.listId === from.id : ids.has(item.id)));
-        return moveSummary(tasks, list, state.taskMoves || []);
+        const tasks = state.tasks.filter(item => (from ? local.has(item.listId) && item.listId === from.id : ids.has(item.id) && item.listId !== list.id)).map(item => {
+          if (!draft) return item;
+          // The dialog's fields over the task as it is (a repeat goes with a cleared date, as task:update does).
+          const task = { ...item, ...draft };
+          if (!task.rrule || ('dueDate' in draft && !task.dueDate)) delete task.rrule;
+          return task;
+        });
+        return moveSummary(tasks, list, state.taskMoves || [], id => state.lists.find(item => item.id === id));
       });
     }
-    case 'task:transfer': return sync.moveTask(identifier(payload.id), identifier(payload.to), { resend: payload.resend === true });
+    case 'task:transfer': return sync.moveTask(identifier(payload.id), identifier(payload.to), { resend: payload.resend === true, accept: warnKeys(payload.accept), undo: payload.undo === true });
+    case 'task:transfer-finish': return sync.finishMove(identifier(payload.id), { accept: warnKeys(payload.accept) });
     case 'task:transfer-forget': sync.forgetMove(identifier(payload.id)); return true;
     case 'task:delete': {
       const task = lookup('tasks', payload.id), list = lookup('lists', task.listId);

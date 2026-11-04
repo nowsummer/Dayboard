@@ -1207,6 +1207,24 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 /* Hidden calendars (2026-11-03 owner): one quiet row at the end of the list; opened, the hidden rows are unchecked and muted, not struck through. */
 .cal-hidden-toggle{display:flex;align-items:center;gap:9px;width:100%;margin-top:2px;padding:5px 6px;border-radius:7px;font-size:12px;color:var(--muted);background:transparent;text-align:left}.cal-hidden-toggle:hover{background:var(--hover);color:var(--secondary)}.cal-hidden-toggle .group-chevron{width:17px}.cal-hidden-toggle .group-chevron.open{transform:rotate(-90deg)}.calendar-row.hidden .cal-name{text-decoration:none}
 
+/* Moving a task to another list (2026-11-04 owner request): a sidebar list a dragged task can go to is tinted as quietly as a group taking a
+   list (.group-row.drop-into) — one muted fill under the name, the ⋯ spot part of the same row, no ring; a task on its way is dimmed. The edit
+   dialog's why-line sits right under its field and takes no room while empty; the move question's lines read as one short paragraph. */
+.list-nav-wrap.task-drop>.list-nav{background:color-mix(in srgb,var(--blue) 14%,transparent)}
+.task-row.moving{opacity:.55}
+/* its tick and flag wait too (2026-11-04 review R8): disabled, with no hover, and the row's dimming stays the only one — no second fade on the
+   tick, no unflagged flag brought out by button:disabled */
+.task-row.moving>.task-check,.task-row.moving>.task-flag{pointer-events:none}.task-row.moving>.task-check:disabled{opacity:1}.task-row.moving>.task-flag:disabled:not(.on){opacity:0}
+/* the open steps and the row's menu wait too (2026-11-04 recheck of review R8): the steps with no second fade, the menu's items greyed in the
+   muted text of the theme, with no hover and no wait cursor */
+.task-row.moving .step-check,.task-row.moving .step-title{pointer-events:none}.task-row.moving .step-check:disabled,.task-row.moving .step-title:disabled{opacity:1}
+.context-menu .menu-item:disabled{color:var(--muted);opacity:.6;cursor:default;background:none}
+.move-field{min-width:0}
+.move-why{margin:-6px 0 12px;line-height:1.5}.move-why:empty{margin:0}
+.move-confirm>.view-description{margin-bottom:6px}.move-confirm>.view-description:last-of-type{margin-bottom:18px}
+/* the review's word on an answer that leaves the move waiting (2026-11-04 fifth check W4): a quiet line under its words, gone while empty */
+.move-status{margin:-6px 0 14px;line-height:1.5}.move-status:empty{display:none}
+
 /* r60-apple — one surface rule (2026-11-02 owner: Apple surfaces — 「음영있는 pill 안에 흰색을 넣는건 좀 애플 스타일이 아닌거 같아. 전반적으로 다시
    봐줘. 애플 스타일에 맞춰줘.」, after 「설정창 … 투톤 같아서 좀 촌스럽고 난잡해보이던데」), as macOS System Settings · Calendar · Reminders:
    no control stands on more than two layers. Layer 1 is a surface (window --bg, sheet --sheet, popover --glass, note paper). Layer 2 is

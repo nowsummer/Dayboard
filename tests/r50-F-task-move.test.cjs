@@ -15,9 +15,11 @@ function listHarness() {
   const h = harness({
     repeatDoneText: () => '', repeatWords: () => '', reminderLabel: () => '', dueLabel: () => '', undoToast() {}, deleteTaskFlow() {}, editTask() {}, taskMenu() {}, stepRow: () => null,
     calendarToolbar: () => [], ctxToggleButton: () => null, appTheme: () => 'light', notesTrash: false, noteSortMenu() {}, newNote() {}, smartColor: () => '#3478f6', openWidgetFlow() {}, openingWidget: null, listMenu() {}, contextMenu() {}, releaseFlagHold() {},
+    renderPending: false, dragListId: null, // read by the drag's end (dragFlush, 2026-11-04)
   });
   h.loadApp('const lingering=', 'const flagHold=', 'const openSteps=', 'const listBy=', 'function listColor(', 'function listVisual(', 'const smart=', 'const providerName=', 'const longDateFormats=', 'const koreanDate=',
-    'function tasksFor(', 'function taskCount(', 'function taskSortOf(', 'const sortLabel=', 'const taskSortable=', 'function taskSortMenu(', 'function setTaskSort(', 'let dragTaskId=', 'function taskDragEnd(', 'function taskDrag(', 'function taskDropEnd(',
+    'function tasksFor(', 'function taskCount(', 'function taskSortOf(', 'const sortLabel=', 'const taskSortable=', 'function taskSortMenu(', 'function setTaskSort(', 'let dragTaskId=', 'function taskDragEnd(',
+    { prefix: 'function dragFlush(', optional: true }, { prefix: 'const movingIds=', optional: true }, { prefix: 'const taskMoving=', optional: true }, { prefix: 'function taskDragStart(', optional: true }, { prefix: 'const reorderable=', optional: true }, 'function taskDrag(', 'function taskDropEnd(', // the four before taskDrag: 2026-11-04 (moving a task to another list)
     'function moveTaskRow(', { prefix: 'function taskRowKey(', optional: true }, 'function taskRow(', 'function bucketOf(', 'function renderTaskList(', 'function viewToolbar(');
   const s = h.context.state;
   s.lists = [{ id: 'l1', name: '장보기', provider: 'local', color: '#34c759' }];

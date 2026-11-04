@@ -5,72 +5,19 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { createStore } = require('../lib/store.cjs');
-const { createSync, replaceAccountSnapshot } = require('../lib/sync.cjs');
+const { replaceAccountSnapshot } = require('../lib/sync.cjs');
 const google = require('../lib/providers/google.cjs');
 const microsoft = require('../lib/providers/microsoft.cjs');
 const { laneOf, REMOTE, LOCAL } = require('../lib/lanes.cjs');
 const M = require('../lib/taskmove.cjs');
 
-const GL = { id: 'g-list', remoteId: 'gl1', accountId: 'acc-g', provider: 'google', name: '개인', kind: 'none' };
-const ML = { id: 'm-list', remoteId: 'ml1', accountId: 'acc-m', provider: 'microsoft', name: 'Tasks', kind: 'defaultList' };
-const FLAG = { id: 'm-flag', remoteId: 'mf1', accountId: 'acc-m', provider: 'microsoft', name: 'Flagged Emails', kind: 'flaggedEmails' };
-
-// One fake service for both: Google Tasks (tasks.googleapis.com) and To Do (graph.microsoft.com). `fail(match, how)` makes the next
-// request whose "METHOD path" matches go wrong: refuse (400, nothing written), busy (429, nothing written), down (503, nothing
-// written — the client cannot tell), lost (written, then no answer). `during(fn)` runs fn while the next write is in flight (another
-// window, a sync arriving first).
-function service() {
-  const tasks = new Map(); const checklist = new Map(); const calls = []; const traps = []; let n = 0; let during = null;
-  const id = prefix => `${prefix}${++n}`;
-  async function request(url, options = {}) {
-    const u = new URL(url); const method = options.method || 'GET'; const body = options.body ? JSON.parse(options.body) : undefined;
-    const line = `${method} ${u.pathname}`; calls.push({ line, query: Object.fromEntries(u.searchParams), body });
-    const trap = traps.findIndex(item => item.match.test(line)); const how = trap >= 0 ? traps.splice(trap, 1)[0].how : null;
-    if (method !== 'GET' && during) { const fn = during; during = null; await fn(); }
-    const refusal = { refuse: [400, 'Bad request'], busy: [429, 'Too many requests'], down: [503, 'Unavailable'] }[how];
-    if (refusal) { const error = new Error(`${refusal[1]} (HTTP ${refusal[0]})`); error.status = refusal[0]; throw error; }
-    let answer;
-    if (u.hostname === 'tasks.googleapis.com') {
-      const m = u.pathname.match(/\/lists\/([^/]+)\/tasks(?:\/([^/]+))?$/);
-      if (method === 'POST') { const item = { id: id('gt'), list: m[1], title: body.title, notes: body.notes, due: body.due, status: body.status, updated: new Date().toISOString(), ...(u.searchParams.get('parent') ? { parent: u.searchParams.get('parent') } : {}) }; tasks.set(item.id, item); answer = item; }
-      else if (method === 'GET') { answer = tasks.get(m[2]); if (!answer) { const error = new Error('Not found (HTTP 404)'); error.status = 404; throw error; } }
-      else if (method === 'PATCH') { const item = tasks.get(m[2]); Object.assign(item, body); answer = item; }
-      else if (method === 'DELETE') { tasks.delete(m[2]); answer = {}; }
-    } else {
-      const m = u.pathname.match(/\/me\/todo\/lists\/([^/]+)\/tasks(?:\/([^/]+))?(?:\/checklistItems(?:\/([^/]+))?)?$/);
-      if (/checklistItems/.test(u.pathname)) {
-        if (method === 'POST') { const item = { id: id('mc'), task: m[2], displayName: body.displayName, isChecked: body.isChecked }; checklist.set(item.id, item); answer = item; }
-        else if (method === 'DELETE') { checklist.delete(m[3]); answer = {}; }
-        else if (method === 'PATCH') { Object.assign(checklist.get(m[3]), body); answer = checklist.get(m[3]); }
-      } else if (method === 'POST') { const item = { id: id('mt'), list: m[1], ...body, createdDateTime: new Date().toISOString(), lastModifiedDateTime: new Date().toISOString() }; tasks.set(item.id, item); answer = item; }
-      else if (method === 'GET') { answer = tasks.get(m[2]); if (!answer) { const error = new Error('Not found (HTTP 404)'); error.status = 404; throw error; } }
-      else if (method === 'PATCH') { Object.assign(tasks.get(m[2]), body); answer = tasks.get(m[2]); }
-    }
-    if (how === 'lost') throw new Error('The connection was lost.');
-    return answer;
-  }
-  return { request, tasks, checklist, calls, fail: (match, how) => traps.push({ match, how }), during: fn => { during = fn; }, posts: re => calls.filter(c => c.line.startsWith('POST') && re.test(c.line)) };
-}
-
-function setup(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dayboard-move-'));
-  const svc = service(); const store = createStore(directory); const credentials = {};
-  const vault = { get: key => credentials[key], set: (key, value) => { credentials[key] = value; }, remove: key => { delete credentials[key]; } };
-  const auth = { authorize: async () => { throw new Error('no sign-in in tests'); }, refresh: async value => value, dispose() {} };
-  const sync = createSync({ store, userData: directory, dependencies: { vault, auth, resyncDelay: 3600000, providers: { google: () => google.createGoogle({ request: svc.request }), microsoft: () => microsoft.createMicrosoft({ request: svc.request }) } } });
-  t.after(() => { sync.dispose(); fs.rmSync(directory, { recursive: true, force: true }); });
-  for (const [accountId, provider] of [['acc-g', 'google'], ['acc-m', 'microsoft']]) vault.set(accountId, { provider, accessToken: 'mock', refreshToken: 'refresh', expiresAt: Date.now() + 3600000 });
-  store.mutate(state => {
-    state.accounts.push({ id: 'acc-g', provider: 'google', name: 'g@example.com', status: 'connected' }, { id: 'acc-m', provider: 'microsoft', name: 'm@example.com', status: 'connected' });
-    state.lists.push(GL, ML, FLAG);
-  });
-  const add = task => { store.mutate(state => { state.tasks.push({ listId: 'local-inbox', notes: '', dueDate: '', important: false, completed: false, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z', ...task }); }); return task.id; };
-  const get = taskId => store.get().tasks.find(item => item.id === taskId);
-  return { svc, store, sync, add, get, directory };
-}
+// The fake Tasks / To Do service, the store and the accounts (moved to tests/taskmove-harness.cjs on 2026-11-04 for the moves between
+// accounts, tests/taskmove-accounts.test.cjs). `fail(match, how)` makes the next request whose "METHOD path" matches go wrong: refuse
+// (400, nothing written), busy (429, nothing written), down (503, nothing written — the client cannot tell), lost (written, then no
+// answer). `during(fn)` runs fn while the next write is in flight (another window, a sync arriving first).
+const { setup, GL, ML, FLAG } = require('./taskmove-harness.cjs');
 
 test('what may go where: Google keeps no repeat, reminder or long notes; To Do takes a rule it can hold; done tasks stay', () => {
   assert.deepEqual(M.moveCheck({ completed: true }, GL), { ok: false, reason: 'done' });
@@ -85,7 +32,9 @@ test('what may go where: Google keeps no repeat, reminder or long notes; To Do t
   assert.equal(M.isAccountList(FLAG), false, 'Flagged Emails holds no tasks of ours');
   assert.equal(M.isAccountList({ id: 'local-inbox', provider: 'local' }), false);
   const summary = M.moveSummary([{ id: 'a' }, { id: 'b', completed: true }, { id: 'c', reminderAt: 'x' }, { id: 'd', important: true }, { id: 'e' }, { id: 'f' }], GL, [{ id: 'e', phase: 'unknown', listId: GL.id }, { id: 'f', phase: 'made', listId: GL.id }]);
-  assert.deepEqual(summary, { movable: ['a', 'd', 'f'], skipped: { done: 1, reminder: 1 }, keeps: { important: 1 }, waiting: ['e'], resume: ['f'] });
+  // Since 2026-11-04 the count also gives each reason's words (the screen keeps no copy of them), and which of those waiting are not known
+  // (unsure: an answer that never came — 2026-11-04 final review G1).
+  assert.deepEqual(summary, { movable: ['a', 'd', 'f'], skipped: { done: 1, reminder: 1 }, keeps: { important: 1 }, waiting: ['e'], unsure: ['e'], resume: ['f'], why: { done: '완료한 할 일은 옮기지 않아요.', reminder: 'Google Tasks에는 알림 시각을 담을 수 없어 이 PC에 남겨요.' } });
 });
 
 test('the copy sent carries nothing of an old account: no service ids of the task or its steps, no 되돌리기 hints', () => {
@@ -109,7 +58,8 @@ test('to Google: title, notes, date and every step with its tick; the task here 
   const { svc, sync, add, get, store } = setup(t);
   add({ id: 't1', title: '장보기', notes: '우유', dueDate: '2026-11-04', important: true, createdAt: '2026-09-01T00:00:00.000Z', steps: [{ id: 's1', title: '우유', completed: true }, { id: 's2', title: '빵', completed: false }] });
   store.mutate(state => { state.settings.taskOrder = { 'local-inbox': ['x', 't1', 'y'] }; });
-  assert.deepEqual(await sync.moveTask('t1', GL.id), { outcome: 'moved', task: 't1' });
+  // The answer names the task's id now, the list it left and the route (2026-11-04 contract): a push keeps its id.
+  assert.deepEqual(await sync.moveTask('t1', GL.id), { outcome: 'moved', id: 't1', from: 'local-inbox', route: 'push' });
   const parent = [...svc.tasks.values()].find(item => !item.parent);
   assert.deepEqual([parent.title, parent.notes, parent.due, parent.status], ['장보기', '우유', '2026-11-04T00:00:00.000Z', 'needsAction']);
   const subs = [...svc.tasks.values()].filter(item => item.parent === parent.id);
@@ -295,7 +245,7 @@ for (const list of [GL, ML]) {
     assert.equal(record.phase, 'unknown'); assert.equal(record.remoteId, parentsAt(svc)[0].id, 'the task made stays known');
     assert.deepEqual(record.steps.map(step => step.id), ['a'], 'the step confirmed stays known'); assert.deepEqual(record.unsure, ['b']);
     assert.equal(get('r3').listId, 'local-inbox');
-    assert.deepEqual(store.publicState().taskMoves, [{ id: 'r3', listId: list.id, phase: 'unknown', unsure: ['b'] }]);
+    assert.deepEqual(store.publicState().taskMoves, [{ id: 'r3', listId: list.id, accountId: list.accountId, fromAccountId: '', route: 'push', phase: 'unknown', unsure: ['b'] }]);
     const before = svc.calls.length;
     assert.equal((await sync.moveTask('r3', list.id)).outcome, 'unknown', 'pressed again: nothing sent');
     assert.equal(svc.calls.length, before);
@@ -477,7 +427,8 @@ test('transfer recovery renders no resend for unsafe journals and keeps the exis
     const context = {
       state: { allLists: [GL] }, transferWaitingOf: () => record, transferName: () => 'Google', shortTitle: x => x, tr: x => x,
       modal: (_title, body) => { content = body; }, closeModal() {},
-      h: (tag, props, ...children) => ({ tag, props, children: children.flat().filter(Boolean) }),
+      // querySelectorAll: the sheet holds its buttons while its request is out (2026-11-04 review R3); isConnected unset, so it closes nothing
+      h: (tag, props, ...children) => ({ tag, props, children: children.flat().filter(Boolean), querySelectorAll: () => [] }),
       btn: (label, onClick, style) => ({ label, onClick, style }),
       run: async (command, value) => { calls.push({ command, value }); },
     };

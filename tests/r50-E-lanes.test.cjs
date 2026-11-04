@@ -84,10 +84,11 @@ const LANED = ['state:get', 'task:add', 'task:update', 'task:delete', 'list:add'
   'note:pin', 'note:duplicate', 'note:history', 'note:revert', 'note:delete', 'event:add', 'event:update', 'event:color', 'calendar:update', 'calendar:delete', 'calendar:move', 'event:delete',
   'settings:update', 'account:update', 'account:disconnect', 'widget:update', 'external:open', 'backup:export', 'demo:load',
   'task:transfer', 'task:transfer-check', 'task:transfer-forget', // 2026-10-30: this PC's tasks to a connected list (lib/taskmove.cjs)
-  'calendar:history', 'calendar:history-search']; // 2026-10-30: the older calendar tier (lib/calhistory.cjs), read-only
+  'calendar:history', 'calendar:history-search', // 2026-10-30: the older calendar tier (lib/calhistory.cjs), read-only
+  'task:transfer-finish']; // 2026-11-04: an original a move kept at its service deleted (lib/sync.cjs finishMove)
 
-test('laneOf: a rule for each of the 36 commands that take a lane, none for the 20 direct ones; an unknown name is exclusive', () => {
-  assert.equal(DIRECT.length + LANED.length, 56);
+test('laneOf: a rule for each of the 37 commands that take a lane, none for the 20 direct ones; an unknown name is exclusive', () => {
+  assert.equal(DIRECT.length + LANED.length, 57);
   assert.deepEqual(Object.keys(COMMAND_LANES).sort(), [...LANED].sort());
   const store = fakeStore();
   for (const name of DIRECT) assert.equal(laneOf(name, {}, store), EXCLUSIVE, `${name} never comes to the lanes; conservative if it did`);
@@ -112,9 +113,15 @@ test('laneOf: this PC\'s items are local, connected items remote, connected list
   assert.equal(laneOf('task:update', { id: 'local-task', listId: 'cloud-list' }, s), EXCLUSIVE, 'a move into a connected list spans both');
   // A task of this PC made anew in a connected list: with the account's writes (the switch here checks nothing changed meanwhile).
   assert.equal(laneOf('task:transfer', { id: 'local-task', to: 'cloud-list' }, s), REMOTE);
-  assert.equal(laneOf('task:transfer', { id: 'cloud-task', to: 'cloud-list' }, s), EXCLUSIVE, 'not a task of this PC');
-  assert.equal(laneOf('task:transfer', { id: 'local-task', to: 'local-2' }, s), EXCLUSIVE, 'not to a connected list');
+  // Since 2026-11-04 from an account too — to this PC as well (it held this PC's edits for up to 25 s a request when exclusive) — and
+  // 「원래 목록에서 지우기」 with them; a move between this PC's lists is task:update's, not this command's.
+  assert.equal(laneOf('task:transfer', { id: 'cloud-task', to: 'local-2' }, s), REMOTE, 'an account\'s task to this PC');
+  assert.equal(laneOf('task:transfer', { id: 'cloud-task', to: 'cloud-list' }, s), REMOTE, 'already there: answered with the account\'s writes');
+  assert.equal(laneOf('task:transfer', { id: 'local-task', to: 'local-2' }, s), EXCLUSIVE, 'not by way of an account');
+  assert.equal(laneOf('task:transfer', { id: 'orphan-task', to: 'cloud-list' }, s), EXCLUSIVE, 'its list is gone');
   assert.equal(laneOf('task:transfer', { id: 'nope', to: 'cloud-list' }, s), EXCLUSIVE);
+  assert.equal(laneOf('task:transfer-finish', { id: 'cloud-task' }, s), REMOTE);
+  assert.equal(laneOf('task:transfer-forget', { id: 'cloud-task' }, s), LOCAL);
   assert.equal(laneOf('task:update', { id: 'cloud-task', listId: 'local-2' }, s), EXCLUSIVE);
   assert.equal(laneOf('task:update', { id: 'local-task', listId: 'nope' }, s), EXCLUSIVE);
   assert.equal(laneOf('task:update', { id: 'orphan-task', title: 'x' }, s), EXCLUSIVE, 'its list is gone');

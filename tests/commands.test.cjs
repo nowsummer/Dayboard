@@ -129,3 +129,61 @@ test('external:open allows exactly the https hosts renderer/app.js links to, and
   assert.ok(handler.indexOf('!ALLOWED_HOSTS.has(url.hostname)') < handler.indexOf('await shell.openExternal(url.href)'), 'checked before anything opens');
   assert.ok(handler.includes("decodeURIComponent(url.pathname) === CONTACT_EMAIL"), 'the contact mailto branch stays');
 });
+
+// A task moved between any two lists (2026-11-04, lib/taskmove.cjs): task:transfer takes the warnings the user accepted (known keys only)
+// and the undo flag, task:transfer-finish is a command of its own with the accounts' writes, the count takes the edit dialog's fields
+// (type-checked) and tasks of any list, and task:update keeps refusing a listId change that involves an account list — a move between
+// this PC's lists takes a pulled task's record along (critique E1) and leaves the order it left alone (the test below runs it).
+test('the task moves of 2026-11-04 in command(): accept and undo passed on, transfer-finish on the remote lane, the count with the dialog\'s fields, account lists still refused by task:update', () => {
+  const body = mainFunction('command');
+  assert.ok(body.includes("case 'task:transfer': return sync.moveTask(identifier(payload.id), identifier(payload.to), { resend: payload.resend === true, accept: warnKeys(payload.accept), undo: payload.undo === true });"));
+  assert.ok(body.includes("case 'task:transfer-finish': return sync.finishMove(identifier(payload.id), { accept: warnKeys(payload.accept) });"));
+  assert.ok(body.includes("case 'task:transfer-forget': sync.forgetMove(identifier(payload.id)); return true;"), 'forget unchanged');
+  assert.ok(source.includes('const warnKeys = value => Array.isArray(value) ? [...new Set(value.filter(key => WARNS.includes(key)))] : [];'));
+  assert.equal(COMMAND_LANES['task:transfer-finish']({}, null), 'remote');
+  const check = between("    case 'task:transfer-check': {", "    case 'task:transfer': ");
+  for (const part of ['dateOnly(fields.dueDate)', 'reminderAt(fields.reminderAt)', "rawText(fields.notes, tr('메모'), 20000)", 'rruleText(fields.rrule)', 'ids.size !== 1', 'item.listId !== list.id', 'moveSummary(tasks, list, state.taskMoves || [], id => state.lists.find(item => item.id === id))', "if (from && (from.provider !== 'local' || !isAccountList(list)))"]) assert.ok(check.includes(part), part);
+  const update = between("    case 'task:update': {", "    case 'calendar:history':");
+  assert.ok(update.includes("if (list.provider !== 'local' || target.provider !== 'local') throw new Error(tr('계정 목록 간 이동은 지원하지 않습니다. 새 목록에 추가해 주세요.'));"), 'only lib/sync.cjs moveTask moves a task in or out of an account list');
+  assert.equal(update.includes('pruneOrder('), false, 'the moves in and out of an account list prune the order (lib/sync.cjs), not task:update');
+  assert.ok(update.includes("for (const record of state.taskMoves || []) if (record.id === task.id && record.route === 'pull') record.listId = task.listId;"));
+});
+
+// main.cjs task:update itself, cut from the source and run over a real store (as tests/main-r31.test.cjs runs calendar:move): a move
+// between two of this PC's lists leaves the hand-made order of the list it left as it was, so 되돌리기 (the move back) puts the task back
+// in its place, as before 2026-11-04 (review R1: it was pruned, and the task came back last). A pulled task's record follows it.
+test('task:update between this PC\'s lists keeps the order of the list it left: moved away and back, the task is in its place again', async t => {
+  const os = require('node:os');
+  const { createStore, publicRecord } = require('../lib/store.cjs');
+  const V = require('../lib/validate.cjs');
+  const T = require('../lib/tasks.cjs');
+  const { tr } = require('../lib/i18n.cjs');
+  const { localKey } = require('../renderer/domain.js');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dayboard-commands-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const store = createStore(directory);
+  const at = '2026-10-01T00:00:00.000Z';
+  store.mutate(state => {
+    state.lists.push({ id: 'local-2', name: '둘째', color: '#3478f6', provider: 'local' });
+    for (const id of ['a', 'b', 'c']) state.tasks.push({ id, listId: 'local-inbox', title: id, notes: '', dueDate: '', important: false, completed: false, createdAt: at, updatedAt: at });
+    state.settings.taskOrder = { 'local-inbox': ['a', 'b', 'c'] };
+    state.taskMoves = [{ id: 'b', listId: 'local-inbox', route: 'pull', phase: 'kept', why: 'refused', at, from: { listId: 'gone-list', accountId: 'acc-g', remoteId: 'r-b' } }];
+  });
+  const context = {
+    store, tr, publicRecord, todayKey: () => localKey(new Date().toISOString()),
+    text: V.text, rawText: V.rawText, dateOnly: V.dateOnly, reminderAt: V.reminderAt, boolean: V.boolean, taskSteps: V.taskSteps, identifier: V.identifier,
+    setRepeat: T.setRepeat, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries,
+    lookup(collection, id) { const item = store.peek(collection, V.identifier(id)); if (!item) throw new Error('항목이 없거나 이미 삭제되었습니다.'); return item; },
+    commit: fn => store.mutate(fn),
+    sync: { async mutateTask() { throw new Error('no account list in this test'); } },
+  };
+  vm.createContext(context);
+  const from = source.indexOf("    case 'task:update': {"); const to = source.indexOf("    case 'calendar:history':", from);
+  assert.ok(from > 0 && to > from, 'main.cjs still has the task:update case');
+  const command = vm.runInContext(`(async function command(commandName, payload) { const now = () => new Date().toISOString(); switch (commandName) { ${source.slice(from, to)} } })`, context, { filename: 'main.cjs' });
+  const view = () => JSON.stringify([store.get().settings.taskOrder['local-inbox'], store.get().tasks.find(item => item.id === 'b').listId, store.get().taskMoves.map(item => item.listId)]);
+  await command('task:update', { id: 'b', listId: 'local-2' });
+  assert.equal(view(), JSON.stringify([['a', 'b', 'c'], 'local-2', ['local-2']]), 'the list it left keeps its order; the pulled task\'s record follows it');
+  await command('task:update', { id: 'b', listId: 'local-inbox' });
+  assert.equal(view(), JSON.stringify([['a', 'b', 'c'], 'local-inbox', ['local-inbox']]), 'moved back (되돌리기), it is between a and c again');
+});
