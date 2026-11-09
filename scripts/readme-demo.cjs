@@ -21,6 +21,9 @@ const WIDTH = 1260, HEIGHT = 810;
 const APP_DIR = path.resolve(__dirname, '..');
 const OUT = process.env.DAYBOARD_DEMO_OUT ? path.resolve(process.env.DAYBOARD_DEMO_OUT) : path.join(os.tmpdir(), 'dayboard-readme-demo', LANG);
 const ONLY = process.env.DAYBOARD_DEMO_ONLY ? process.env.DAYBOARD_DEMO_ONLY.split(',') : null;
+// The month of a calendar scene shows what the scenes before it saved: 「quick」 recorded alone lost the exam of 「entry」 for one scene of the film.
+const NEEDS = { quick: ['entry'], drag: ['entry', 'quick'] };
+for (const name of ONLY || []) for (const need of NEEDS[name] || []) if (!ONLY.includes(need)) { console.error(`[demo] DAYBOARD_DEMO_ONLY=${name} needs ${need} in the same run: its month shows what ${need} saved`); process.exit(1); }
 if (ONLY) for (const name of ONLY) fs.rmSync(path.join(OUT, name), { recursive: true, force: true });
 else fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
@@ -175,6 +178,20 @@ app.whenReady().then(async () => {
       await wait(clickRest);
       noHover(); // or the button's tooltip comes up while the scene goes on
     };
+    // A click on a sheet that opens or closes another sheet: the page paints without its blur for a few frames just then (a sharp month
+    // flashing between blurred ones in the film), so nothing is recorded from the press until it has settled; the frame before stays up.
+    const sheetClick = async (p, settle) => {
+      await glide(p);
+      await js(`__demo.ring(${p.x}, ${p.y}); true`);
+      await wait(130);
+      recording = false;
+      main.webContents.sendInputEvent({ type: 'mouseDown', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+      await wait(60);
+      main.webContents.sendInputEvent({ type: 'mouseUp', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+      await settle();
+      recording = true; main.webContents.invalidate();
+      noHover();
+    };
     // Twice on the spot, as a day cell takes a new event.
     const doubleClick = async p => {
       await glide(p, 300);
@@ -252,8 +269,8 @@ app.whenReady().then(async () => {
       await hold(60);
       await click(await point(`__demo.byText(${JSON.stringify(TEXT.weekLabel)}, '.view-switch button')`, 'the week button'));
       noHover();
-      // From 7 in the morning rather than the 9 the week opens on: the swim seen in the month is here too, and no evening block is cut at the foot.
-      await js(`document.querySelector('.time-scroll')?.scrollTo({ top: 6.85 * calHour, behavior: 'smooth' }); true`);
+      // From 8 in the morning rather than the 9 the week opens on: the working day's events are all in view, and no evening block is cut at the foot.
+      await js(`document.querySelector('.time-scroll')?.scrollTo({ top: 7.85 * calHour, behavior: 'smooth' }); true`);
       await hold(460);
       const block = await point(`__demo.blockMiddle(${JSON.stringify(title)})`, `「${title}」 in its week`);
       await js(`__demo.move(${block.x + 30}, ${block.y + 34}, 520); true`);
@@ -315,12 +332,15 @@ app.whenReady().then(async () => {
     await scene('quick', async () => {
       glideMs = 110; clickRest = 70;
       await caption(TEXT.captions.quickSet);
-      await hold(750);
+      await hold(1000);
+      // Settings reaches the window's foot, where the caption sits (it cut the last row in two): gone before the sheet is up, back with the list.
+      await js(`__demo.captionOff(); true`);
+      await hold(170);
       await click(await point(`__demo.bySel('.sidebar-tools .icon-button:last-child, .sidebar-tools button:last-child')`, 'the settings button'));
       await hold(110);
-      await click(await point(`__demo.bySel('.event-word-entry button')`, 'the Quick events row'));
-      await hold(110);
-      await click(await point(`__demo.bySel('.event-word-sheet .button.subtle')`, 'new word'));
+      await sheetClick(await point(`__demo.bySel('.event-word-entry button')`, 'the Quick events row'), async () => { await caption(TEXT.captions.quickSet); await wait(360); });
+      await hold(620); // the list, with the gym word made before: long enough to read that a word need not be a lunch (2026-11-09 owner)
+      await sheetClick(await point(`__demo.bySel('.event-word-sheet .button.subtle')`, 'new word'), () => wait(320));
       await hold(110);
       await click(await point(`__demo.bySel('.event-word-edit input[type=text], .dialog input[type=text]')`, 'the word'));
       await type(TEXT.wordAlone, 60);
@@ -335,10 +355,7 @@ app.whenReady().then(async () => {
       await click(await point(`__demo.byText(${JSON.stringify(TEXT.wordEmoji)}, 'button')`, 'the emoji'));
       await hold(220);
       noHover();
-      await click(await point(`__demo.bySel('.dialog .button.primary')`, 'save'));
-      await hold(200);
-      await key('Escape'); await hold(70); await key('Escape'); await hold(130);
-      noHover();
+      await sheetClick(await point(`__demo.bySel('.dialog .button.primary')`, 'save'), async () => { await wait(200); await key('Escape'); await wait(70); await key('Escape'); await wait(460); });
       glideMs = 320; clickRest = 140;
       await caption(TEXT.captions.quickUse);
       await hold(520);

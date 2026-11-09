@@ -33,27 +33,23 @@ const NOW = new Date(`${sample.DEMO_DAY}T09:41:00`);
 // The month view's six weeks (Sunday 27 September to Saturday 7 November): the whole picture.
 const GRID = Array.from({ length: 42 }, (_, i) => D.dayOffset('2026-09-27', i));
 const minutes = iso => Number(iso.slice(11, 13)) * 60 + Number(iso.slice(14, 16));
-const BYDAY = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-// Timed events as occurrences per day of the grid (weekly repeats expanded).
+// Timed events as occurrences per day of the grid, repeats expanded as the app expands them (a fortnightly one included).
 function occurrences({ events }) {
   const out = [];
-  for (const key of GRID) {
-    const dow = D.fromDate(key).getDay();
-    for (const e of events.filter(e => !e.allDay)) {
-      const first = e.start.slice(0, 10);
-      const days = e.rrule ? (e.rrule.match(/BYDAY=([A-Z,]+)/)?.[1] || '').split(',') : null;
-      if (days ? key >= first && days.includes(BYDAY[dow]) : key === first) out.push({ day: key, title: e.title, from: minutes(e.start), to: minutes(e.end), repeat: Boolean(e.rrule), event: e });
-    }
+  for (const e of events.filter(e => !e.allDay)) {
+    const days = e.rrule ? D.expandEvent(e, GRID[0], D.dayOffset(GRID.at(-1), 1)).map(o => D.localKey(o.start)) : GRID.includes(e.start.slice(0, 10)) ? [e.start.slice(0, 10)] : [];
+    for (const day of days) out.push({ day, title: e.title, from: minutes(e.start), to: minutes(e.end), repeat: Boolean(e.rrule), event: e });
   }
-  return out;
+  return out.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
 }
 const allDay = ({ events }, title) => events.find(e => e.allDay && e.title === title);
 const spanDays = e => { const days = []; for (let k = e.start; k < e.end; k = D.dayOffset(k, 1)) days.push(k); return days; };
+const hasTaskLine = (s, key) => s.tasks.some(t => t.dueDate === key && !t.completed);
 // A day's lines in the month: its timed events, its all-day events and bars, and one line for its open tasks. The month holds three
 // in the film's and the pictures' windows (renderer/calendar.js calMonthLimit; readme-demo.cjs stops if a cell folds).
 function linesOn(s, key, occ = occurrences(s)) {
   const timed = occ.filter(o => o.day === key).length, wide = s.events.filter(e => e.allDay && e.start <= key && key < e.end).length;
-  return timed + wide + (s.tasks.some(t => t.dueDate === key && !t.completed) ? 1 : 0);
+  return timed + wide + (hasTaskLine(s, key) ? 1 : 0);
 }
 const colourOf = e => sample.COLOURS.calendars[Object.keys(sample.CALENDAR_IDS).find(key => sample.CALENDAR_IDS[key] === e.calendarId)];
 const clean = s => s.toLowerCase().replace(/^[-•\d.\s]+/, '').replace(/[「」"“”.,:]/g, '').trim();
@@ -103,11 +99,28 @@ for (const lang of ['ko', 'en']) {
   });
 
   // 2026-11-09 owner: the month as a real person's, with no cell folding into 「+n개」, and the week's events carried over from it.
+  // And not a full one (same day, later: 「매일매일 다 있고 너무 많아서 좀 강조하고자 하는 일정들에 집중이 안 되는 거 같은데 … 그렇다고 스케줄이
+  // 너무 없어도 이상한데 지금은 좀 과한 거 같아」): most days of one line, some of two, many empty, so what the film points at stands out.
   test(`the sample's month looks lived in, and folds nowhere (${lang})`, async () => {
     for (const [mode, options] of [['pictures', {}], ['film', { demo: true }]]) {
       const s = await record(lang, options), occ = occurrences(s), lines = new Map(GRID.map(key => [key, linesOn(s, key, occ)]));
       for (const [key, count] of lines) assert.ok(count <= 3, `${mode}: ${count} lines on ${key} fold into 「+n개」`);
       assert.deepEqual([...new Set(lines.values())].sort(), [0, 1, 2, 3], `${mode}: days of none to three lines`);
+      const count = n => [...lines.values()].filter(v => v === n).length;
+      assert.ok(count(0) >= 16, `${mode}: ${count(0)} empty days of 42, not enough room for the eye`);
+      assert.ok(count(0) <= 24, `${mode}: ${count(0)} empty days of 42 reads as an unused calendar`);
+      assert.ok(count(3) <= 2, `${mode}: ${count(3)} full days`);
+      assert.ok(count(1) > count(2), `${mode}: mostly one line a day (${count(1)} of one, ${count(2)} of two)`);
+      const taskLines = GRID.filter(key => hasTaskLine(s, key)).length;
+      assert.ok(taskLines <= 6, `${mode}: 「할 일 n개」 on ${taskLines} days`);
+      // No daily habit filling the grid: the one repeat is the fortnightly team meeting.
+      assert.deepEqual([...new Set(occ.filter(o => o.repeat).map(o => o.title))], [T.events.weekly[0]], `${mode}: one repeat`);
+      assert.deepEqual(occ.filter(o => o.repeat).map(o => o.day), ['2026-10-05', '2026-10-19', '2026-11-02'], `${mode}: every other Monday`);
+      // 「웨이트」 only on the days one goes: not a rule, and not the same weekday each time.
+      const gym = occ.filter(o => o.title === T.events.gym);
+      assert.ok(gym.length >= 2 && gym.length <= 3, `${mode}: ${gym.length} gym evenings`);
+      assert.ok(gym.every(o => !o.repeat && o.from === 19 * 60 && o.to === 20 * 60 + 30 && colourOf(o.event) === sample.COLOURS.calendars.fitness), `${mode}: gym evenings are 7 to 8:30, on the exercise calendar, written one by one`);
+      assert.ok(new Set(gym.map(o => D.fromDate(o.day).getDay())).size >= 2, `${mode}: gym on different weekdays`);
       const colours = new Set(s.events.map(colourOf));
       assert.equal(colours.size, 4, `${mode}: every calendar in use`);
       assert.ok(s.events.every(e => colourOf(e) && colourOf(e).toLowerCase() !== '#5856d6'), `${mode}: calendar colours, no indigo`);
@@ -115,7 +128,7 @@ for (const lang of ['ko', 'en']) {
       assert.ok(s.events.some(e => e.allDay && spanDays(e).length === 1), `${mode}: a one-day all-day event`);
       // A day of two events is mostly of two colours, not two chips alike.
       const mixed = GRID.filter(key => new Set(occ.filter(o => o.day === key).map(o => colourOf(o.event))).size >= 2).length;
-      assert.ok(mixed >= 12, `${mode}: ${mixed} days of several colours`);
+      assert.ok(mixed >= 3, `${mode}: ${mixed} days of several colours`);
     }
   });
 
@@ -123,6 +136,7 @@ for (const lang of ['ko', 'en']) {
     const film = await record(lang, { demo: true }), occ = occurrences(film), demo = sample.demoText(lang);
     for (const key of [demo.entryDay, demo.wordDay]) {
       assert.equal(linesOn(film, key, occ), 0, `nothing on ${key} in the film: the new event is seen whole`);
+      for (const side of [D.dayOffset(key, -1), D.dayOffset(key, 1)]) assert.ok(linesOn(film, side, occ) <= 1, `${side}, beside ${key}, is light`);
     }
     const dragged = occ.filter(o => o.title === demo.dragTitle);
     assert.equal(dragged.length, 1, 'the event the film drags, once');
@@ -132,13 +146,14 @@ for (const lang of ['ko', 'en']) {
     const sundayOf = key => D.dayOffset(key, -D.fromDate(key).getDay());
     assert.equal(sundayOf(demo.dragFrom), sundayOf(demo.dragTo), 'moved within its week');
     assert.ok(linesOn(film, demo.dragTo, occ) <= 2, 'the day it lands on has room for it');
+    for (let key = demo.dragFrom; key <= demo.dragTo; key = D.dayOffset(key, 1)) assert.ok(linesOn(film, key, occ) <= 1, `${key}, on the way of the drag, is light`);
     assert.ok(dragged[0].from >= 9 * 60 && dragged[0].to + demo.stretchHours * 60 <= 18 * 60, 'in the hours the week view shows, stretched too');
     for (const o of occ.filter(o => o.day === demo.dragTo)) assert.ok(o.to <= dragged[0].from || o.from >= dragged[0].to + demo.stretchHours * 60, `it does not land on 「${o.title}」`);
     // And the week it lands in, and the exam's, have other events for the eye to carry over from the month.
-    for (const day of [demo.entryDay, demo.dragTo]) {
+    for (const [day, events, colours] of [[demo.entryDay, 3, 2], [demo.dragTo, 5, 3]]) {
       const sunday = D.dayOffset(day, -D.fromDate(day).getDay()), week = Array.from({ length: 7 }, (_, i) => D.dayOffset(sunday, i));
       const seen = occ.filter(o => week.includes(o.day));
-      assert.ok(seen.length >= 5 && new Set(seen.map(o => colourOf(o.event))).size >= 3, `the week of ${day} has events of several colours`);
+      assert.ok(seen.length >= events && new Set(seen.map(o => colourOf(o.event))).size >= colours, `the week of ${day} has ${events} events of ${colours} colours (${seen.length})`);
     }
   });
 
@@ -180,9 +195,17 @@ for (const lang of ['ko', 'en']) {
     assert.equal(line.title, demo.entryTitle, `only the title is left of 「${demo.entry}」`);
     assert.equal(line.date, demo.entryDay);
     assert.deepEqual([line.time, line.end], [{ h: 14, m: 0 }, { h: 15, m: 0 }]);
-    assert.equal(s.shortcuts.length, 1, 'the sample has its Quick event word');
-    assert.equal(D.cleanShortcuts(s.shortcuts).length, 1, 'and the app would keep it');
-    const filled = D.applyShortcut(demo.word, D.parseEvent(demo.word, NOW, {}), D.cleanShortcuts(s.shortcuts));
+    // Two words: a lunch whose name changes, and an evening at the gym written as it is on the days one goes (2026-11-09 owner:
+    // 「웨이트 트레이닝 적으면 항상 저녁 7시에서 8시 반 사이에 … 가는 날에만 웨이트 트레이닝 적어서 저장하는 용도로도 쓰는건데」).
+    assert.equal(s.shortcuts.length, 2, 'the sample has its Quick event words');
+    const words = D.cleanShortcuts(s.shortcuts);
+    assert.deepEqual(words.map(w => w.word), [T.gym, T.word[0]], 'the app keeps them, the gym listed first');
+    const gymFilled = D.applyShortcut(T.gym, D.parseEvent(T.gym, NOW, {}), words);
+    assert.equal(gymFilled.title, T.events.gym, `「${T.gym}」 fills in its title`);
+    assert.deepEqual([gymFilled.time, gymFilled.end], [{ h: 19, m: 0 }, { h: 20, m: 30 }], `「${T.gym}」 takes the word's hours`);
+    assert.equal(gymFilled.shortcut.calendarId, sample.CALENDAR_IDS.fitness, 'on the exercise calendar');
+    assert.ok(T.notes.some(([title]) => title.includes(T.events.weekly[0])), 'the notes call the meeting what the calendar calls it');
+    const filled = D.applyShortcut(demo.word, D.parseEvent(demo.word, NOW, {}), words);
     assert.equal(filled.title, demo.wordTitle, `「${demo.word}」 fills in its title`);
     assert.deepEqual([filled.time, filled.end], [{ h: 12, m: 0 }, { h: 13, m: 0 }], `「${demo.word}」 takes the word's hours`);
     assert.ok(occ.some(o => o.title === demo.wordTitle && o.day === demo.wordDay), 'the pictures have the lunch it makes');
@@ -190,7 +213,7 @@ for (const lang of ['ko', 'en']) {
     assert.equal(parsed.title, demo.quickTitle, 'the task the film then finds in its list');
     assert.ok(demo.wifi.title.toLowerCase().includes(demo.wifi.search), `searching 「${demo.wifi.search}」 finds 「${demo.wifi.title}」`);
     const film = await record(lang, { demo: true });
-    assert.equal(film.shortcuts.length, 0, 'the film sets the word up on the screen');
+    assert.deepEqual(film.shortcuts.map(w => w.word), [T.gym], 'the film has the gym word already, and sets the lunch up on the screen');
     assert.ok(!film.events.some(e => e.title === demo.entryTitle || e.title === demo.wordTitle), 'and types its two events');
     assert.ok(film.tasks.some(t => t.title === demo.planTitle && t.steps?.length), 'the task whose subtasks the film opens');
   });

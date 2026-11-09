@@ -13,15 +13,13 @@ A clean, Mac- and iPhone-style look for everything on your plate today.
 
 <img src="images/en/demo.webp" width="860" alt="A short tour: finishing a task, typing an event in one line, a Quick event, dragging an event, searching notes, and the desktop widgets">
 
-<img src="images/en/board.png" width="860" alt="The Dayboard board, with today's tasks, the calendar and notes on one screen">
-
 </div>
 
 ## Tasks: nothing slips through
 
 Write it down, then tick it off when it's done.
 
-- Today, Scheduled and Flagged fill themselves
+- Set a date and it sorts itself into Today or Scheduled. Flag it to send it to Flagged
 - Sort tasks into lists and groups, and break big ones into subtasks
 - Add dates, reminders and repeats
 
@@ -29,7 +27,7 @@ Write it down, then tick it off when it's done.
 
 ## Calendar: just type what's on your mind
 
-No hunting for the day, picking a time or filling in the place. Type it in one line and Dayboard works out the date, time, title and place, then puts it on your calendar.
+No hunting for the day, picking a time or filling in the place. Type it in one line and Dayboard works out the date, time and title, then puts it on your calendar. Add the place after a comma.
 
 `Oct 6, 2–3pm, Economics exam, Main Hall`<br>
 → Oct 6, 2:00–3:00 PM · Economics exam · Main Hall
@@ -40,12 +38,15 @@ Drag to move an event, stretch to change its time.
 
 <p align="center"><img src="images/en/clips/drag.webp" width="720" alt="Dragging an event to another day in the month view, then stretching its end in that week's view"></p>
 
-### Quick events: same plan, different person
+### Quick events: one word for the plans you repeat
 
-Some plans never change except for who you're meeting. Set up the word "lunch" once with its time and icon, and from then on that word is all you need.
+Lunch with a friend, the gym after work: some plans always happen at the same hours. Set up a word once with its time and icon, and from then on that word is all you need.
 
 `lunch Alex`<br>
 → 🍽️ Alex · 12:00–1:00 PM
+
+`gym`<br>
+→ 🏋️ gym · 7:00–8:30 PM
 
 <p align="center"><img src="images/en/clips/quick.webp" width="720" alt="Saving the word lunch with an icon and a time in Settings, then typing lunch Alex and seeing the event on the calendar"></p>
 
@@ -63,7 +64,7 @@ Keep your tasks, calendar and notes on the desktop. The Liquid Glass-style desig
 
 ## Accounts
 
-Connect Microsoft, Google or iCloud Calendar to stay in sync with your phone and other PCs. Or use it on this PC alone, no account needed.
+Connect a Microsoft or Google account to keep your tasks and calendars in sync with your phone and other PCs, and your notes between PCs. iCloud connects calendars only. Or use it on this PC alone, no account needed.
 
 ## Download
 

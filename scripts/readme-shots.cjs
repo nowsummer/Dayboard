@@ -71,7 +71,7 @@ app.whenReady().then(async () => {
     await shot(main, 'calendar');
     // The morning in view: the week opens at the current time, which at night shows only the small hours.
     // The week without the side panel: wider columns, so a long event reads as one (2026-10-27 user: the week looked like one-hour blocks).
-    await run(`setCalMode('week', ${JSON.stringify(EXAM_DAY)});if (document.querySelector('.panel-toggle.active')) calTogglePanel();await new Promise(r => requestAnimationFrame(r));const s = document.querySelector('.time-scroll');if (s) { s.scrollTop = 6.6 * calHour; s.dispatchEvent(new Event('scroll')); }`);
+    await run(`setCalMode('week', ${JSON.stringify(EXAM_DAY)});if (document.querySelector('.panel-toggle.active')) calTogglePanel();await new Promise(r => requestAnimationFrame(r));const s = document.querySelector('.time-scroll');if (s) { s.scrollTop = 7.85 * calHour; s.dispatchEvent(new Event('scroll')); }`);
     await shot(main, 'calendar-week');
     await run(`if (!document.querySelector('.panel-toggle.active')) calTogglePanel();`);
     await run(`setCalMode('month', D.dateKey());`);
