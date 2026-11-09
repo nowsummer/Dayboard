@@ -55,6 +55,7 @@
   .line { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 20px; }
   .line code { font-family: inherit; font-size: 17px; font-weight: 600; }
   .line span { color: var(--muted); font-size: 16px; }
+  .line + .line { margin-top: 10px; }
   .download .actions { margin-top: 16px; }
   .download p.fine { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
   footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 72px; }
@@ -84,13 +85,12 @@
   </header>
 
   <figure><img src="../images/en/demo.webp" alt="A short tour: finishing a task, typing an event in one line, a Quick event, dragging an event, searching notes, and the desktop widgets" width="1315" height="846"></figure>
-  <figure><img src="../images/en/board.png" alt="The Dayboard board, with today's tasks, the calendar and notes on one screen" loading="lazy" width="2478" height="1640"></figure>
 
   <section class="point">
     <h2>Tasks: nothing slips through</h2>
     <p>Write it down, then tick it off when it's done.</p>
     <ul>
-      <li>Today, Scheduled and Flagged fill themselves</li>
+      <li>Set a date and it sorts itself into Today or Scheduled. Flag it to send it to Flagged</li>
       <li>Sort tasks into lists and groups, and break big ones into subtasks</li>
       <li>Add dates, reminders and repeats</li>
     </ul>
@@ -99,7 +99,7 @@
 
   <section class="point">
     <h2>Calendar: just type what's on your mind</h2>
-    <p>No hunting for the day, picking a time or filling in the place. Type it in one line and Dayboard works out the date, time, title and place, then puts it on your calendar.</p>
+    <p>No hunting for the day, picking a time or filling in the place. Type it in one line and Dayboard works out the date, time and title, then puts it on your calendar. Add the place after a comma.</p>
   </section>
   <div class="lines">
     <div class="line"><code>Oct 6, 2–3pm, Economics exam, Main Hall</code><span>→ Oct 6, 2:00–3:00 PM · Economics exam · Main Hall</span></div>
@@ -112,11 +112,12 @@
   <figure class="clip"><img src="../images/en/clips/drag.webp" alt="Dragging an event to another day in the month view, then stretching its end in that week's view" loading="lazy" width="1100" height="706"></figure>
 
   <section class="point">
-    <h3>Quick events: same plan, different person</h3>
-    <p>Some plans never change except for who you're meeting. Set up the word "lunch" once with its time and icon, and from then on that word is all you need.</p>
+    <h3>Quick events: one word for the plans you repeat</h3>
+    <p>Lunch with a friend, the gym after work: some plans always happen at the same hours. Set up a word once with its time and icon, and from then on that word is all you need.</p>
   </section>
   <div class="lines">
     <div class="line"><code>lunch Alex</code><span>→ 🍽️ Alex · 12:00–1:00 PM</span></div>
+    <div class="line"><code>gym</code><span>→ 🏋️ gym · 7:00–8:30 PM</span></div>
   </div>
   <figure class="clip"><img src="../images/en/clips/quick.webp" alt="Saving the word lunch with an icon and a time in Settings, then typing lunch Alex and seeing the event on the calendar" loading="lazy" width="1100" height="706"></figure>
 
@@ -134,7 +135,7 @@
 
   <section class="point">
     <h2>Accounts</h2>
-    <p>Connect Microsoft, Google or iCloud Calendar to stay in sync with your phone and other PCs. Or use it on this PC alone, no account needed.</p>
+    <p>Connect a Microsoft or Google account to keep your tasks and calendars in sync with your phone and other PCs, and your notes between PCs. iCloud connects calendars only. Or use it on this PC alone, no account needed.</p>
   </section>
 
   <section class="point download">
