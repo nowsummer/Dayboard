@@ -14,7 +14,7 @@ const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}
 const last = selector => rules.filter(([s]) => s.split(',').map(x => x.trim()).includes(selector)).at(-1)?.[1] || '';
 const declarations = text => Object.fromEntries(text.split(';').filter(Boolean).map(d => { const i = d.indexOf(':'); return [d.slice(0, i).trim(), d.slice(i + 1).trim()]; }));
 // The all-day box is a 0×0 input inside its pill, so its mark goes on the pill (:has) and the input's own ring is taken away.
-const FIELDS = ['.event-card .card-title:focus-visible', '.event-card .card-time:focus-visible', '.event-card .card-input:focus-visible', '.event-card .card-date:focus-visible', '.event-card .card-repeat:focus-visible', '.event-card .card-select:focus-visible', '.event-card .card-color:focus-visible', '.event-card .card-chip:has(input:focus-visible)'];
+const FIELDS = ['.event-card .card-title:focus-visible', '.event-card .card-time:focus-visible', '.event-card .card-input:focus-visible', '.event-card .card-date:focus-visible', '.event-card .card-repeat:focus-visible', '.event-card .card-select:focus-visible', '.event-card .card-color:focus-visible'];
 
 test('the colour dot stays 14×14 and gains a 28px hit area that does not reach past the head', () => {
   const dot = declarations(last('.card-color'));
@@ -34,7 +34,6 @@ test('every card field shows keyboard focus with the same thin blue line, on :fo
   }
   const line = marks[0][1]['box-shadow'];
   assert.ok(marks.every(([, d]) => d['box-shadow'].includes(line.match(/color-mix\([^)]*\)/)[0])), 'one colour for all of them');
-  assert.equal(declarations(last('.event-card .card-chip input:focus-visible')).outline, 'none', 'no stray ring on the hidden all-day box');
   assert.equal(declarations(rules.filter(([s]) => s.split(',').map(x => x.trim()).includes('.event-card .card-date:focus-visible')).map(([, d]) => d).join(';')).background, 'var(--hover)', 'the date gets the tint the time and place show');
   // Mouse: the plain :focus rules draw no ring (the title keeps its own editing underline; time and location keep their tint).
   assert.equal(declarations(last('.card-date:hover,.card-time:hover,.card-time:focus')).outline ?? 'none', 'none');

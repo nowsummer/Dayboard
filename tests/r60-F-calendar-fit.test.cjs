@@ -16,7 +16,7 @@ const { harness, D, I } = require('./r50-F-harness.cjs');
 const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'styles.css'), 'utf8');
 
 function calendar(view = 'month', extra = {}) {
-  const h = harness({ eventsBetween: () => [], goToday() {}, addEvent() {}, dayDots: () => [], shortTitle: x => x, calendarMenu() {}, eventColor: () => '#3478f6', isLocalEvent: () => true, canEditEvent: () => true, writableCalendars: () => [], ...extra });
+  const h = harness({ eventsBetween: () => [], goToday() {}, addEvent() {}, dayDots: () => [], shortTitle: x => x, calendarMenu() {}, eventColor: () => '#3478f6', isLocalEvent: () => true, canEditEvent: () => true, writableCalendars: () => [], stepsFolded: () => false, ...extra });
   h.context.eventChip = (e) => { const n = h.document.createElement('button'); n.className = 'day-event'; n.textContent = e.title; return n; };
   h.context.view = 'calendar';
   h.context.state.settings.calendarView = view;
@@ -41,6 +41,42 @@ test('calMonthLimit counts the measured rows (header 39px, a row 22.2px): the 65
   // 더 크게 (r60-X, 2026-11-02 owner: text size): the 900×650 DIP minimum is 720×520 CSS px, cells 65.9px — one line, not two cut ones
   assert.equal(limit(394), 1, '900×650 at 더 크게');
   assert.equal(limit(300), 1, 'at least one, whatever the measurement says');
+});
+
+// 2026-11-08: a bar over several days takes the week's top lines; the cell spends what is left, and Codex's recheck N1: the 할 일 line was lost under a bar with a line to spare.
+test('a bar takes a line of each cell it crosses: the cell keeps its 할 일 line and its own chips under it', () => {
+  const h = calendar();
+  const first = D.dateKey().slice(0, 8) + '01';
+  h.context.selectedDate = first; h.context.month = D.fromDate(first);
+  const sunday = (() => { const d = D.fromDate(first); d.setDate(d.getDate() + 7 - d.getDay()); return D.dateKey(d); })();
+  const [a, b] = [1, 2].map(n => D.dayOffset(sunday, n));
+  h.context.eventsBetween = () => [{ id: 'trip', title: '출장', allDay: true, start: a, end: D.dayOffset(a, 3) }, { id: 'one', title: '치과', start: b + 'T09:00:00', end: b + 'T10:00:00' }];
+  h.context.state.tasks = [{ id: 't1', title: 'x', dueDate: a, completed: false }];
+  h.context.innerHeight = windowFor(527); // two lines a cell
+  const grid = h.eval('monthBoard')();
+  const lines = day => [...grid.querySelector(`[data-day="${day}"] .day-items`).children].map(n => n.textContent);
+  assert.equal(grid.querySelectorAll('.month-bar').length, 1, 'one bar, not a chip a day');
+  assert.deepEqual(lines(a), ['', '할 일 1개'], 'the room left for the bar, then the tasks');
+  assert.deepEqual(lines(b), ['', '치과']);
+  // Argon recheck GN3: a range drawn takes a lane of its own, over no other bar
+  h.eval(`calDraft = { start: '${a}', end: '${D.dayOffset(a, 2)}', allDay: true }`);
+  h.context.innerHeight = windowFor(777); // three lines
+  const drawing = h.eval('monthBoard')();
+  const lanes = [...drawing.querySelectorAll('.month-bar')].map(n => n.style.getPropertyValue('--lane')).sort().join();
+  assert.equal(lanes, '0,1');
+  assert.equal(drawing.querySelectorAll('.month-bar.draft').length, 1);
+  // Codex third check N1: the range being made is on top in any window, so it never goes when the pointer lets go
+  h.context.innerHeight = windowFor(527); // two lines: the trip gives way
+  const tight = h.eval('monthBoard')();
+  assert.equal(tight.querySelectorAll('.month-bar.draft').length, 1);
+  h.context.innerHeight = windowFor(420); // one line
+  const oneLine = h.eval('monthBoard')();
+  assert.equal(oneLine.querySelectorAll('.month-bar.draft').length, 1);
+  assert.equal([...oneLine.querySelector(`[data-day="${a}"] .day-items`).children].filter(n => n.textContent).length, 0, 'nothing under it');
+  h.eval('calDraft = null');
+  h.context.innerHeight = windowFor(420); // one line: no room for a bar and 「+n개」, each day keeps its chip as before
+  const narrow = h.eval('monthBoard')();
+  assert.equal(narrow.querySelectorAll('.month-bar').length, 0);
 });
 
 test('a month cell spends its line budget: the 할 일 line and 「+n개」 count, chips may go (Apple shows counts only in narrow cells)', () => {
@@ -88,28 +124,28 @@ test('a 1-hour week block: the title gets the rows the time and the place leave 
   const block = (calHour, event = e) => { h.eval(`calHour=${calHour}`); return h.eval('calTimeBlock')({ event, top: 600, bottom: 660, col: 0, cols: 1 }, day); };
   const rows = n => n.style.getPropertyValue('--title-rows');
   let n = block(40); // 900×650: a 38px block, two rows
-  assert.equal(rows(n), '1', '40px an hour: one title line and the time (the second title line ran over the time)');
+  assert.equal(rows(n), '2', '40px an hour: the title may take both rows; the time follows only when a whole line is left (styles.css, 2026-11-08 owner)');
   assert.ok(n.querySelector('.time-event-time') && !n.querySelector('.time-event-place'));
-  assert.equal(rows(block(53)), '1', 'still two rows below 54px');
-  assert.equal(rows(block(54)), '2', 'three rows: a two-line title and the time');
+  assert.equal(rows(block(53)), '2', 'still two rows below 54px');
+  assert.equal(rows(block(54)), '3', 'three rows');
   const placed = { ...e, location: '3층 회의실' };
   n = block(60, placed);
-  assert.equal(rows(n), '1', 'three rows with a place: title, time, place');
+  assert.equal(rows(n), '3', 'three rows with a place: the title first; the time and the place follow while whole lines are left');
   assert.ok(n.querySelector('.time-event-place'));
-  assert.equal(rows(block(70, placed)), '2', 'four rows: a two-line title, the time and the place');
+  assert.equal(rows(block(70, placed)), '4', 'four rows');
   const short = block(30); // a 28px block: one line, the time inline
   assert.ok(short.classList.contains('one-line') && !short.querySelector('.time-event-time'));
   assert.equal(rows(short), '1');
 });
 
-test('the block carries its time in three lengths for the container query: 「오전 10:00–오전 11:00」, 「오전 10:00」, 「10:00」', () => {
+test('the block carries its time in three lengths for the container query: 「오전 10:00\u2009–\u2009오전 11:00」, 「오전 10:00」, 「10:00」', () => {
   const h = calendar('week');
   const day = '2026-11-02';
   const e = { id: 'e1', title: '팀 주간 회의', start: `${day}T10:00:00`, end: `${day}T11:00:00`, calendarId: 'local' };
   h.eval('calHour=48');
   const texts = n => ['t-full', 't-start', 't-bare'].map(c => n.querySelector('.time-event-time .' + c)?.textContent ?? null);
   const node = h.eval('calTimeBlock')({ event: e, top: 600, bottom: 660, col: 0, cols: 1 }, day);
-  assert.deepEqual(texts(node), ['오전 10:00–오전 11:00', '오전 10:00', '10:00']);
+  assert.deepEqual(texts(node), ['오전 10:00\u2009–\u2009오전 11:00', '오전 10:00', '10:00']);
   // the day a block only ends on: 「까지」 while it fits, then a dash — 「11:00까지」 and 「until 1:30」 were cut in a 48px column (recheck)
   const late = { ...e, id: 'e2', start: '2026-11-01T22:00:00', end: `${day}T11:00:00` };
   assert.deepEqual(texts(h.eval('calTimeBlock')({ event: late, top: 0, bottom: 660, col: 0, cols: 1 }, day)), ['오전 11:00까지', '11:00까지', '–11:00']);
@@ -273,5 +309,23 @@ test('one Sunday red, 4.5:1 on the weekend shade in both themes; the small calen
   assert.equal(lastValue('.day-dots i', 'height'), '4px');
   assert.equal(lastValue('.day-dots', 'height'), '5px');
   assert.equal(lastValue('.large .day-number', 'flex-shrink'), '0');
+  // 2026-11-08 owner: today's circle stood close to the first line. 24px with 8px under it is the 32px that 27 + 5 was: no line moves and calMonthLimit counts the same.
+  assert.equal(lastValue('.large .day-number', 'width'), '24px');
+  assert.equal(lastValue('.large .day-number', 'height'), '24px');
+  assert.equal(lastValue('.large .day-items', 'margin-top'), '8px');
   assert.match(css, /\.time-event-title\{[^}]*-webkit-line-clamp:var\(--title-rows,2\)/);
+});
+
+test('a day\'s dots stand clear of its circle, and a small calendar answers the mouse with the circle alone (2026-11-07 owner: 「빨간색 원 아래 … 겹칠 듯 붙어」)', () => {
+  assert.equal(lastValue('.day-dots', 'margin-top'), '3px');
+  assert.equal(lastValue('.calendar-day', 'min-height'), '33px', 'the 25px circle, 3px, 5px of dots');
+  // the widget since 2026-11-09 (사용자 결정 V72): a 22px circle with 3px of the cell above it, 1px to 4px of dots — 3 + 22 + 1 + 4 (+ 4) in the same 34px cell
+  assert.equal(lastValue('.widget-calendar-content .calendar-day', 'padding-top'), '3px');
+  assert.equal(lastValue('.widget-calendar-content .day-dots', 'margin-top'), '1px');
+  assert.equal(lastValue('.widget-calendar-content .day-number', 'width'), '22px');
+  assert.equal(lastValue('.widget-calendar-content .calendar-day', 'min-height'), '34px', '3px, the 22px circle, 1px, 4px of dots: no taller than before, so the agenda keeps its rows');
+  assert.equal(lastValue('.calendar-grid:not(.large) .calendar-day:hover', 'background'), 'none', 'no square around a circle');
+  assert.equal(lastValue('.calendar-grid:not(.large) .calendar-day:not(.is-today):hover .day-number', 'background'), 'var(--hover)');
+  assert.equal(css.includes('.widget-calendar-content .calendar-day:hover'), false, 'nor in the widget');
+  assert.equal(lastValue('.widget-calendar-content .calendar-day:not(.is-today):hover .day-number', 'background'), 'var(--w-hover)');
 });

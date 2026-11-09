@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample, shotsLanguage, morningClock, morningMain } = require('./readme-sample.cjs');
+const { seedSample, prepareProfile, shotsLanguage, morningClock, morningMain, DEMO_DAY, EXAM_DAY } = require('./readme-sample.cjs');
 
 const LANG = shotsLanguage();
 const APP_DIR = path.resolve(__dirname, '..');
@@ -21,12 +21,13 @@ for (const old of fs.readdirSync(os.tmpdir()).filter(n => n.startsWith('dayboard
 }
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'dayboard-shots-profile-'));
 process.env.DAYBOARD_USER_DATA = profile;
+prepareProfile(profile, LANG);
 process.chdir(APP_DIR);
 
 const { app, BrowserWindow } = require('electron');
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
 app.commandLine.appendSwitch('lang', LANG === 'en' ? 'en-US' : 'ko-KR'); // the built-in list and calendar get names in that language
-morningMain();
+morningMain(DEMO_DAY); // the film's day: the pictures show its month and the week it saves in
 require(path.join(APP_DIR, 'main.cjs'));
 
 const log = (...a) => console.log('[shots]', ...a);
@@ -55,24 +56,25 @@ app.whenReady().then(async () => {
 
     // autoUpdate off, as in readme-demo.cjs: the throwaway profile never asks GitHub for a new version (first check 90 s after start).
     await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', tourDone: true, autoUpdate: false });
-    const { work, focusNote, planned } = await seedSample(invoke, new Date(), LANG);
+    const { work, focusNote } = await seedSample(invoke, LANG);
 
-    await morningClock(main); // 9:41 on the page, so today's events are not drawn as past
+    await morningClock(main, DEMO_DAY); // 9:41 on the page, so today's events are not drawn as past
     main.setBounds({ x: 0, y: 0, width: 1240, height: 820 });
     await wait(600);
     await run(`goto('today');`);
     await shot(main, 'tasks-today');
-    // A task's subtasks opened under it (1.1.3), as one would after clicking its arrow.
-    await run(`openSteps.add(${JSON.stringify(planned.id)});goto(${JSON.stringify(work.id)});`);
+    await shot(main, 'board'); // the board, large at the top of the pages: today's tasks, events and note on one screen
+    // A task's subtasks under it: listed open since 2026-11-06 (no arrow to click first).
+    await run(`goto(${JSON.stringify(work.id)});`);
     await shot(main, 'tasks-list');
     await run(`document.querySelector('.main-nav .nav-item:nth-child(2)').click();`);
     await shot(main, 'calendar');
     // The morning in view: the week opens at the current time, which at night shows only the small hours.
     // The week without the side panel: wider columns, so a long event reads as one (2026-10-27 user: the week looked like one-hour blocks).
-    await run(`setCalMode('week');if (document.querySelector('.panel-toggle.active')) calTogglePanel();await new Promise(r => requestAnimationFrame(r));const s = document.querySelector('.time-scroll');if (s) { s.scrollTop = 6.6 * calHour; s.dispatchEvent(new Event('scroll')); }`);
+    await run(`setCalMode('week', ${JSON.stringify(EXAM_DAY)});if (document.querySelector('.panel-toggle.active')) calTogglePanel();await new Promise(r => requestAnimationFrame(r));const s = document.querySelector('.time-scroll');if (s) { s.scrollTop = 6.6 * calHour; s.dispatchEvent(new Event('scroll')); }`);
     await shot(main, 'calendar-week');
     await run(`if (!document.querySelector('.panel-toggle.active')) calTogglePanel();`);
-    await run(`setCalMode('month');`);
+    await run(`setCalMode('month', D.dateKey());`);
     await invoke('note:pin', { id: focusNote.id, pinned: true });
     await run(`document.querySelector('.main-nav .nav-item:nth-child(3)').click();`);
     await shot(main, 'notes');

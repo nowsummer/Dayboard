@@ -42,7 +42,26 @@ async function github(token, method, url, body, headers = {}) {
   return data;
 }
 
-(async () => {
+// The draft → upload → publish steps, with GitHub passed in so a test can run them against a fake (2026-11-09 review F34).
+async function publishRelease({ call, api, tag, version, notes, branch, assets, read = file => fs.readFileSync(file), log = console.log }) {
+  const existing = await call('GET', `${api}/releases/tags/${encodeURIComponent(tag)}`).catch(error => { if (error.status === 404) return null; throw error; });
+  if (existing && !existing.draft) throw new Error(`${tag} is already published. Bump the version before releasing again.`);
+  // A draft first, so nobody downloads a release whose files are still uploading.
+  const release = existing || await call('POST', `${api}/releases`, JSON.stringify({ tag_name: tag, target_commitish: branch, name: `Dayboard ${version}`, body: notes, draft: true, prerelease: false }), { 'Content-Type': 'application/json' });
+  const uploaded = new Map((release.assets || []).map(asset => [asset.name, asset]));
+  for (const file of assets) {
+    const name = path.basename(file);
+    if (uploaded.has(name)) await call('DELETE', `${api}/releases/assets/${uploaded.get(name).id}`);
+    const uploadUrl = release.upload_url.replace(/\{.*\}$/, `?name=${encodeURIComponent(name)}`);
+    await call('POST', uploadUrl, read(file), { 'Content-Type': name.endsWith('.yml') ? 'text/yaml' : 'application/octet-stream' });
+    log(`uploaded ${name}`);
+  }
+  // The name and notes again: a reused draft still carries the ones of the run that made it.
+  return call('PATCH', `${api}/releases/${release.id}`, JSON.stringify({ name: `Dayboard ${version}`, body: notes, draft: false, make_latest: 'true' }), { 'Content-Type': 'application/json' });
+}
+module.exports = { publishRelease };
+
+if (require.main === module) (async () => {
   if (args.has('--login')) {
     const login = getToken(true);
     if (!login) throw new Error('GitHub sign-in was cancelled.');
@@ -87,19 +106,7 @@ async function github(token, method, url, body, headers = {}) {
   const repository = await github(token, 'GET', API).catch(error => { throw error.status === 404 ? new Error(`Repository ${owner}/${repo} was not found.`) : error; });
   if (repository.private) throw new Error(`${owner}/${repo} is private; installed copies could not download updates.`);
   credential('approve', login.raw, false);
-  const existing = await github(token, 'GET', `${API}/releases/tags/${encodeURIComponent(tag)}`).catch(error => { if (error.status === 404) return null; throw error; });
-  if (existing && !existing.draft) throw new Error(`${tag} is already published. Bump the version before releasing again.`);
-  // A draft first, so nobody downloads a release whose files are still uploading.
-  const release = existing || await github(token, 'POST', `${API}/releases`, JSON.stringify({ tag_name: tag, target_commitish: repository.default_branch, name: `Dayboard ${version}`, body: notes, draft: true, prerelease: false }), { 'Content-Type': 'application/json' });
-  const uploaded = new Map((release.assets || []).map(asset => [asset.name, asset]));
-  for (const file of assets) {
-    const name = path.basename(file);
-    if (uploaded.has(name)) await github(token, 'DELETE', `${API}/releases/assets/${uploaded.get(name).id}`);
-    const uploadUrl = release.upload_url.replace(/\{.*\}$/, `?name=${encodeURIComponent(name)}`);
-    await github(token, 'POST', uploadUrl, fs.readFileSync(file), { 'Content-Type': name.endsWith('.yml') ? 'text/yaml' : 'application/octet-stream' });
-    console.log(`uploaded ${name}`);
-  }
-  const published = await github(token, 'PATCH', `${API}/releases/${release.id}`, JSON.stringify({ draft: false, make_latest: 'true' }), { 'Content-Type': 'application/json' });
+  const published = await publishRelease({ call: (...a) => github(token, ...a), api: API, tag, version, notes, branch: repository.default_branch, assets });
   const record = { version, tag, url: published.html_url, assets: assets.map(file => path.basename(file)), publishedAt: published.published_at };
   fs.mkdirSync(at('artifacts'), { recursive: true });
   fs.writeFileSync(at('artifacts', `release-${version}.json`), JSON.stringify(record, null, 2) + '\n');

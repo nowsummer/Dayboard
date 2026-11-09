@@ -148,9 +148,9 @@ test('the ? card lists the three keys under 어디서나, in Korean and English'
   h.load(read('renderer/help.js'), 'renderer/help.js');
   const groups = h.eval('shortcutGroups')();
   const anywhere = groups.find(([title]) => title === '어디서나')[1];
-  const rows = anywhere.slice(-3).map(([label, combos]) => `${label}=${combos.map(c => c.join('+')).join('/')}`);
-  assert.equal(rows.join(' | '), '글자 크게=Ctrl++ | 글자 작게=Ctrl+- | 글자 기본 크기=Ctrl+0');
-  for (const [label] of anywhere.slice(-3)) assert.ok(I.EN[label], `${label} has English`);
+  const rows = anywhere.slice(-1).map(([label, combos]) => `${label}=${combos.map(c => c.join('+')).join('/')}`);
+  assert.equal(rows.join(' | '), '글자 크기=Ctrl++/Ctrl+-/Ctrl+0');
+  for (const [label] of anywhere.slice(-1)) assert.ok(I.EN[label], `${label} has English`);
 });
 
 test('the two selects: 글자 크기 in the sheet\'s first group and as the 위젯 tab card\'s third row, 기본 · 크게 · 더 크게', () => {

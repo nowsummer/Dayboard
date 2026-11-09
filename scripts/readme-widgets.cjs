@@ -11,7 +11,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { seedSample, shotsLanguage } = require('./readme-sample.cjs');
+const { seedSample, prepareProfile, shotsLanguage, morningClock, morningMain, DEMO_DAY } = require('./readme-sample.cjs');
 
 const LANG = shotsLanguage();
 const APP_DIR = path.resolve(__dirname, '..');
@@ -24,13 +24,15 @@ for (const old of fs.readdirSync(os.tmpdir()).filter(n => n.startsWith('dayboard
   try { fs.rmSync(path.join(os.tmpdir(), old), { recursive: true, force: true }); } catch { /* still in use */ }
 }
 process.env.DAYBOARD_USER_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'dayboard-widgets-profile-'));
+prepareProfile(process.env.DAYBOARD_USER_DATA, LANG);
 process.chdir(APP_DIR);
 
 const { app, BrowserWindow, screen, nativeImage } = require('electron');
 const { desktopSwitches, physicalRect, wallpaperLayer, compose } = require('./readme-desktop.cjs');
-const SCALE = Number(process.env.DAYBOARD_SCENE_SCALE) > 0 ? Number(process.env.DAYBOARD_SCENE_SCALE) : 2; // as the scene
+const SCALE = Number(process.env.DAYBOARD_SCENE_SCALE) > 0 ? Number(process.env.DAYBOARD_SCENE_SCALE) : 1.25; // as the scene: at 2x a 1920 px screen is too short for the calendar widget
 desktopSwitches(app, SCALE);
 app.commandLine.appendSwitch('lang', LANG === 'en' ? 'en-US' : 'ko-KR'); // the built-in list and calendar get names in that language
+morningMain(DEMO_DAY);
 require(path.join(APP_DIR, 'main.cjs'));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -46,7 +48,7 @@ app.whenReady().then(async () => {
     const invoke = (name, payload = {}) => main.webContents.executeJavaScript(`window.dayboard.invoke(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
     // autoUpdate off, as in readme-demo.cjs: the throwaway profile never asks GitHub for a new version.
     await invoke('settings:update', { language: LANG, timeFormat: '12h', theme: 'light', widgetMode: 'desktop', glassLevel: 0.5, autoUpdate: false });
-    const { focusNote } = await seedSample(invoke, new Date(), LANG);
+    const { focusNote } = await seedSample(invoke, LANG);
     main.hide();
     // One row, top-aligned, from the right: note, tasks, calendar (the calendar tall enough for today's events in full). The widgets
     // are not moved there (an attached widget did not always follow): each is sized, then sent the wallpaper behind its place in
@@ -76,6 +78,8 @@ app.whenReady().then(async () => {
     const goal = {}; let right = area.x + area.width - 16;
     for (const type of ['calendar', 'tasks', 'note']) { goal[type] = { x: right - 360, y: area.y + 16, width: 360, height: ROW[type] }; right -= 360 + 24; }
     for (const type of Object.keys(goal)) await (await widgetWin(type)).webContents.executeJavaScript(`window.dayboard.invoke('widget:resize', ${JSON.stringify({ id: opened[type].id, width: 360, height: ROW[type] })})`);
+    // 9:41 on each widget too, like the app's pictures: taken in the afternoon, today's events on the calendar widget were drawn as past.
+    for (const type of Object.keys(goal)) await morningClock(await widgetWin(type), DEMO_DAY);
     await wait(1500); // the backdrop main.cjs sends after a resize comes first, so it does not replace the one sent below
     // The photo: the three widgets with 16 px of desktop around them.
     const left = Math.min(...Object.values(goal).map(g => g.x)) - 16, top = area.y;

@@ -6,8 +6,8 @@
 // Loaded before app.js like calendar.js: app.js's globals are read only when these functions run.
 
 // ---- Shortcuts ----
-// A shortcut lists key combinations shown as alternatives: [['Ctrl','F'],['Ctrl','K']] reads Ctrl F / Ctrl K.
-function helpKeys(combos){return h('span',{class:'keys'},combos.map((combo,i)=>[i?h('span',{class:'keys-or'},'/'):null,combo.map(k=>h('kbd',{},k))]));}
+// A shortcut lists key combinations shown as alternatives: [['Ctrl','F'],['Ctrl','K']] reads Ctrl F / Ctrl K. A mouse action ({mouse:…}) is words, not a key cap (2026-11-09 V56).
+function helpKeys(combos){return h('span',{class:'keys'},combos.map((combo,i)=>[i?h('span',{class:'keys-or'},'/'):null,combo.map(k=>k&&k.mouse?h('span',{class:'keys-mouse'},k.mouse):h('kbd',{},k))]));}
 function shortcutGroups(){
   return [
     [tr('어디서나'),[
@@ -17,55 +17,62 @@ function shortcutGroups(){
       [tr('다시 실행'),[['Ctrl','Shift','Z'],['Ctrl','Y']]],
       [tr('닫기·취소'),[['Esc']]],
       [tr('키보드 단축키 보기'),[['?']]],
+      // the four screens and the settings (2026-11-05 owner request; app.js takes the keys)
+      [tr('할 일·달력·메모·위젯 화면'),[['Ctrl','1–4']]],
+      [tr('설정 열기'),[['Ctrl',',']]],
+      // the left panel folds and comes back, on every screen (2026-11-09 owner: 「우측패널 /에 대응되는 z」; app.js takes the key)
+      [tr('왼쪽 패널'),[['Z']]],
+      // the lists of 나의 목록 as the sidebar draws them (2026-11-06 owner request; app.js takes the keys)
+      [tr('나의 목록 1~9번째로 이동'),[['Alt','1–9']]],
       // 글자 크기 of the main window (2026-11-02 owner: text size; app.js takes the keys, the settings sheet has the same choice)
-      [tr('글자 크게'),[['Ctrl','+']]],
-      [tr('글자 작게'),[['Ctrl','-']]],
-      [tr('글자 기본 크기'),[['Ctrl','0']]]]],
+      // one row: three kept the double click's row from fitting the smallest window
+      [tr('글자 크기'),[['Ctrl','+'],['Ctrl','-'],['Ctrl','0']]]]],
     [tr('할 일'),[
-      [tr('입력한 할 일 추가'),[['Enter']]],
-      [tr('고른 할 일 위·아래로 옮기기'),[['Alt','↑'],['Alt','↓']]],
-      [tr('고른 할 일 삭제'),[['Delete']]],
-      // the row's menu at the row (2026-11-04: the keyboard way to 「목록으로 옮기기」, then ↑ ↓ and Enter in the menu)
-      [tr('고른 할 일 메뉴 열기'),[['Shift','F10']]],
-      [tr('오른쪽 패널'),[['\\']]]]],
+      // every task's subtasks on the screen at once (2026-11-07 owner: down opens, up folds; app.js stepFoldKey). One row: a second one made
+      // the sheet scroll in the default 1180×780 window (smoke shortcuts-sheet-list-keys). Moving a task by key is gone (owner: 「굳이 필요 할까」),
+      // and Shift+F10 is Windows' own key for a right click, not listed here.
+      [tr('하위 할 일 모두 펼치기·접기'),[['Alt','↓'],['Alt','↑']]],
+      // not a key, but nothing else tells of it, and the row's arrow is small (2026-11-08 owner)
+      [tr('하위 할 일 펼치기·접기'),[[{mouse:tr('더블클릭')}]]],
+      [tr('오른쪽 패널'),[['/']]]]],
     [tr('달력'),[
-      [tr('오늘로 이동'),[['T'],['Ctrl','T']]],
-      [tr('날짜로 이동'),[['Ctrl','Shift','T']]],
+      // Ctrl+2 again on the calendar is today too, as the sidebar's 달력 pressed again (2026-11-09 owner request; app.js takes the key)
+      [tr('오늘로 이동'),[['T'],['Ctrl','T'],['Ctrl','2']]],
+      [tr('날짜로 이동'),[['G'],['Ctrl','G']]],
       [tr('일·주·월 보기'),[['D'],['W'],['M']]],
-      [tr('다음 기간'),[['J'],['→']]],
-      [tr('이전 기간'),[['K'],['←']]],
+      [tr('이전 기간'),[['J'],['←']]],
+      [tr('다음 기간'),[['K'],['→']]],
       [tr('월간에서 한 주씩'),[['↑'],['↓']]],
-      [tr('새 일정'),[['C']]],
-      [tr('오른쪽 패널'),[['\\']]],
-      [tr('고른 일정 삭제'),[['Delete']]]]],
+      [tr('주간·일간에서 시간 이동'),[['↑'],['↓']]],
+      [tr('새 일정'),[['C'],['Ctrl','N']]],
+      [tr('오른쪽 패널'),[['/']]]]],
     [tr('메모'),[
       [tr('메모 안에서 찾기'),[['Ctrl','F']]],
       [tr('다음·이전 찾기'),[['Enter'],['Shift','Enter']]],
       [tr('메모 목록 검색'),[['Ctrl','K']]],
-      [tr('실행 취소'),[['Ctrl','Z']]],
-      [tr('다시 실행'),[['Ctrl','Shift','Z'],['Ctrl','Y']]],
-      [tr('고른 메모 삭제'),[['Delete']]]]],
+      [tr('폴더 보기'),[['/']]]]],
   ];
 }
 // The few that matter on the screen in view (Notion Calendar's 「유용한 단축키」).
 function usefulShortcuts(){
-  if(view==='calendar')return [[tr('오늘로 이동'),[['T']]],[tr('날짜로 이동'),[['Ctrl','Shift','T']]],[tr('일·주·월 보기'),[['D'],['W'],['M']]],[tr('다음·이전 기간'),[['J'],['K']]],[tr('새 일정'),[['C']]],[tr('일정 검색'),[['Ctrl','F']]]];
-  if(view==='notes')return [[tr('새 메모'),[['Ctrl','N']]],[tr('메모 안에서 찾기'),[['Ctrl','F']]],[tr('메모 목록 검색'),[['Ctrl','K']]],[tr('실행 취소'),[['Ctrl','Z']]]];
-  return [[tr('새 할 일'),[['Ctrl','N']]],[tr('할 일 검색'),[['Ctrl','F']]],[tr('고른 할 일 삭제'),[['Delete']]],[tr('방금 한 일 되돌리기'),[['Ctrl','Z']]]];
+  if(view==='calendar')return [[tr('오늘로 이동'),[['T']]],[tr('날짜로 이동'),[['G']]],[tr('일·주·월 보기'),[['D'],['W'],['M']]],[tr('이전·다음 기간'),[['J'],['K']]],[tr('새 일정'),[['C']]],[tr('일정 검색'),[['Ctrl','F']]]];
+  if(view==='notes')return [[tr('새 메모'),[['Ctrl','N']]],[tr('메모 안에서 찾기'),[['Ctrl','F']]],[tr('메모 목록 검색'),[['Ctrl','K']]],[tr('방금 한 일 되돌리기'),[['Ctrl','Z']]]];
+  return [[tr('새 할 일'),[['Ctrl','N']]],[tr('할 일 검색'),[['Ctrl','F']]],[tr('방금 한 일 되돌리기'),[['Ctrl','Z']]]];
 }
 function openShortcuts(){
   helpClose();
-  const groups=shortcutGroups().map(([title,rows])=>h('section',{class:'shortcut-group'},h('h3',{},title),h('dl',{},rows.map(([label,combos])=>h('div',{class:'shortcut-row'},h('dt',{},label),h('dd',{},helpKeys(combos)))))));
+  const marks=['keyboard','tasks','calendar','note'];
+  const groups=shortcutGroups().map(([title,rows],at)=>h('section',{class:'shortcut-group'},h('h3',{},marks[at]?icon(marks[at],16):null,title),h('dl',{},rows.map(([label,combos])=>h('div',{class:'shortcut-row'},h('dt',{},label),h('dd',{},helpKeys(combos)))))));
   // Two stacked columns, 어디서나 + 할 일 | 달력 + 메모: rows of the 2×2 grid left 180px empty under 할 일 once 어디서나 had nine rows, and the
   // sheet scrolled 105px in the 900×650 window (2026-11-02 r60 integration rr-app-ui-4). The order stays the reading order; ≤720px stacks them.
   modal(tr('키보드 단축키'),h('div',{class:'dialog-body shortcuts-body'},h('div',{class:'shortcut-col'},groups.slice(0,2)),h('div',{class:'shortcut-col'},groups.slice(2))),true);
 }
 
 // ---- The ? button and its card ----
-let helpPop=null,helpTimer=null,helpPointer=false; // the ? pressed with the mouse: no focus ring comes back to it afterwards (2026-10-26 review)
+let helpPop=null,helpTimer=null;
 function helpButton(){
   return h('button',{type:'button',class:'icon-button help-button'+(helpPop?' active':''),'aria-label':tr('단축키와 도움말'),'aria-haspopup':'dialog','aria-expanded':String(Boolean(helpPop)),'data-focus-key':'help',
-    onpointerenter:()=>helpHover(true),onpointerleave:()=>helpHover(false),onpointerdown:()=>{helpPointer=true;},onclick:()=>{const kb=!helpPointer;helpPointer=false;if(helpPop?.pinned)helpClose();else helpOpen(true,kb);}},icon('help',18));
+    onpointerenter:()=>helpHover(true),onpointerleave:()=>helpHover(false),onclick:e=>{/* the ? pressed with the mouse: no focus ring comes back to it afterwards (2026-10-26 review); a press let go elsewhere has no click to clear a flag, so the click itself says: 0 from the keyboard */const kb=e.detail===0;if(helpPop?.pinned)helpClose();else helpOpen(true,kb);}},icon('help',18));
 }
 function helpHover(inside){clearTimeout(helpTimer);if(inside){if(!helpPop)helpTimer=setTimeout(()=>helpOpen(false),150);}else if(helpPop&&!helpPop.pinned)helpTimer=setTimeout(helpClose,250);}
 function helpOpen(pinned,kb=false){
@@ -112,10 +119,10 @@ function helpMark(){const button=document.querySelector('#app .help-button');if(
 let tour=null;
 function tourSteps(){
   return [
-    {target:null,title:tr('Dayboard에 오신 걸 환영해요'),text:tr('할 일·달력·메모를 한 창에서 보고, 바탕화면에도 놓을 수 있어요.')},
+    {target:null,title:tr('Dayboard에 오신 걸 환영해요'),text:tr('오늘의 할 일과 일정을 현황판처럼 한눈에 봐요. 바탕화면에도 놓을 수 있어요.')},
     {target:'.smart-grid',title:tr('스마트 목록'),text:tr('오늘·예정·전체·중요 할 일을 한곳에 모아 봐요.')},
-    {target:'.quick-add',view:'today',title:tr('빠른 추가'),text:tr('「내일 오후 3시 회의」처럼 쓰면 날짜와 알림이 함께 들어가요.')},
-    {target:'.main-nav .nav-item:nth-child(2)',title:tr('달력'),text:tr('일·주·월로 보고, 일정을 끌어서 옮기거나 늘려요.')},
+    {target:'.quick-add',view:'today',title:tr('줄글로 쓰면 돼요'),text:tr('「내일 3시 치과」처럼 편하게 쓰면 날짜와 시간을 알아서 넣어 줘요.')},
+    {target:'.main-nav .nav-item:nth-child(2)',title:tr('달력'),text:tr('「금요일 2시~4시 세미나, 3층 회의실」처럼 한 줄로 일정을 적어요. 끌어서 옮길 수도 있어요.')},
     {target:'.main-nav .nav-item:nth-child(3)',title:tr('메모'),text:tr('생각을 적고 Ctrl+F로 찾아요. 고정과 이전 버전도 있어요.')},
     {target:'.main-nav .nav-item:nth-child(4)',title:tr('바탕화면 위젯'),text:tr('할 일·달력·메모를 바탕화면에 놓아 늘 볼 수 있어요.')},
     {target:'.account-button',title:tr('계정 연결'),text:tr('Outlook·Google의 할 일과 달력, iCloud 달력을 함께 봐요.')}, // iCloud gives the calendar only: no 미리 알림 claim (CLAUDE.md; 2026-11-02 r60 integration)

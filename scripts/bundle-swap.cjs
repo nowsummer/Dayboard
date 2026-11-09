@@ -48,7 +48,7 @@ function renameWithRetry(from, to, rename, tries = 5) {
 // Moves the tried bundle to `target`. The old bundle is first renamed beside it — a folder whose Dayboard.exe is running
 // cannot be renamed, so a running Dayboard stops this before anything changed — and comes back if the new one cannot be put
 // in place. A temporary folder on another drive is copied instead of renamed.
-function replaceBundle(staged, target, { rename = fs.renameSync, copy = (from, to) => fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false }) } = {}) {
+function replaceBundle(staged, target, { rename = fs.renameSync, copy = (from, to) => fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false }), remove = dir => fs.rmSync(dir, { recursive: true, force: true }) } = {}) {
   const old = `${target}.old-${Date.now()}`;
   const had = fs.existsSync(target);
   if (had) {
@@ -60,15 +60,22 @@ function replaceBundle(staged, target, { rename = fs.renameSync, copy = (from, t
     try { renameWithRetry(staged, target, rename); } catch (error) {
       if (error.code !== 'EXDEV') throw error;
       copy(staged, target);
-      fs.rmSync(staged, { recursive: true, force: true });
+      remove(staged);
     }
   } catch (error) {
-    fs.rmSync(target, { recursive: true, force: true });
-    if (had) fs.renameSync(old, target);
+    try { remove(target); } catch { /* the rename below says what is left */ }
+    if (had) {
+      // OneDrive may hold the just-renamed folder too: the same tries as the way out, then a message that says what to do — a
+      // half-placed new bundle still there is named first (the old folder cannot take its name while it is), and both reasons stay.
+      try { renameWithRetry(old, target, rename); } catch (back) {
+        const first = fs.existsSync(target) ? `먼저 ${target} 폴더를 지우고 ` : '';
+        throw new Error(`새 앱 번들을 놓지 못했고 기존 번들도 되돌리지 못했습니다. ${first}${old} 폴더 이름을 ${path.basename(target)}(으)로 직접 바꾸세요 (놓지 못한 이유: ${firstLine(error)} / 되돌리지 못한 이유: ${firstLine(back)}).`);
+      }
+    }
     throw new Error(`새 앱 번들을 제자리에 놓지 못해 기존 번들을 되돌렸습니다 (${firstLine(error)}).`);
   }
   if (had) {
-    try { fs.rmSync(old, { recursive: true, force: true }); } catch (error) {
+    try { remove(old); } catch (error) {
       console.warn(`경고: 이전 앱 번들을 지우지 못했습니다. 나중에 직접 지워 주세요: ${old} (${firstLine(error)})`);
     }
   }

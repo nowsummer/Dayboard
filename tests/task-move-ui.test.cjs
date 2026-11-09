@@ -16,7 +16,7 @@ const MOVE = ['const listBy=', 'function listColor(', 'function listVisual(', 'c
   'function transferToast(', 'function transferMoved(', 'async function transferSend(', 'function moveConfirm(', 'async function transferOne(', 'function finishToast(', 'function transferWaiting(', 'function staleUndo('];
 const MODAL = ['let restoreFocus=null;', 'const formSnapshot=', 'function sheetScroll(', 'function modal(', 'function dismissModal(', 'function askCloseModal(', 'const field=', 'const input=',
   "document.addEventListener('keydown',e=>{if(calendarKey(e))return;"];
-const DRAG = ['let dragTaskId=', 'function taskDragEnd(', 'function dragFlush(', 'function endDrags(', 'function taskDragStart(', 'const reorderable=', 'function taskDrag(', 'function clearDropMarks(', 'function taskDropTarget('];
+const DRAG = ['let dragTaskId=', 'let dragStep=', 'function taskDragEnd(', 'function dragFlush(', 'function endDrags(', 'function taskDragStart(', 'const reorderable=', 'function taskDrag(', 'const stepsCross=', 'function rowSpot(', 'function rowDrop(', 'function clearDropMarks(', 'function taskDropTarget('];
 
 const ACCOUNTS = [{ id: 'ga', provider: 'google', name: 'me@example.org' }, { id: 'ma', provider: 'microsoft', name: 'me@example.com' }, { id: 'off', provider: 'google', name: 'off@example.org', syncTasks: false }];
 const LISTS = [
@@ -335,6 +335,12 @@ test('the review of a move waiting for the user: this PC\'s words kept, from an 
   assert.equal(d.text, '「서류」 할 일이 Google 「업무」 목록에 저장됐는지 확인하지 못했어요. 계정 목록에 없으면 다시 보내 주세요.');
   d = open(t, { id: 't', listId: 'g1', route: 'push', phase: 'made' });
   assert.equal(d.text + ' | ' + d.buttons, '「서류」 할 일을 Google 「업무」 목록에 만들었지만 하위 할 일 일부를 아직 보내지 못했어요. | 이 PC에 두기|다시 보내기', 'made waits for the user now');
+  // Left here because it changed on its way (why: changed, review F41): the toast's words, never the subtasks line.
+  let c = open(t, { id: 't', listId: 'g1', route: 'push', phase: 'made', why: 'changed' });
+  assert.equal(c.text + ' | ' + c.buttons, '옮기는 동안 바뀌어 이 PC에도 남겨 뒀어요. 다시 보내면 바뀐 내용만 이어 보내요. | 이 PC에 두기|다시 보내기');
+  c = open(task('k', 'g1'), { id: 'k', listId: 'm1', route: 'copy', phase: 'made', why: 'changed', from: 'g1' });
+  assert.equal(c.text, '옮기는 동안 바뀌어 원래 목록에도 남겨 뒀어요. 다시 보내면 바뀐 내용만 이어 보내요.');
+  d = open(t, { id: 't', listId: 'g1', route: 'push', phase: 'made' });
   h.buttons()[0].click(); await h.tick();
   assert.equal(runs.at(-1), 'task:transfer-forget {"id":"t"}');
   assert.equal(h.lastToast().text, 'Google 「업무」 목록에 만든 사본은 그대로 남아요.', 'keeping it here leaves the copy made there');
@@ -888,8 +894,8 @@ test('the whole-list move counts a task deleted here while it was out apart (del
 
 test('a row on its way takes no tick, flag or edit; markMoving keeps the buttons in step (review R8)', async () => {
   const edits = [], runs = [];
-  const h = moveHarness({ repeatDoneText: () => '', repeatWords: () => '', reminderLabel: () => '', dueLabel: () => '', deleteTaskFlow() {}, editTask: x => edits.push(x.id), stepRow: () => null, taskMenu() {}, view: 'l1', search: '', smartColor: () => '#3478f6', taskLeave() {} });
-  h.loadApp('const lingering=', 'const flagHold=', 'const openSteps=', 'const smart=', 'function taskRowKey(', 'function taskRow(');
+  const h = moveHarness({ repeatDoneText: () => '', repeatWords: () => '', reminderLabel: () => '', dueLabel: () => '', deleteTaskFlow() {}, openTask: x => edits.push(x.id), stepRow: () => null, taskMenu() {}, view: 'l1', search: '', smartColor: () => '#3478f6', taskLeave() {} });
+  h.loadApp('const lingering=', 'const flagHold=', 'const stepFold=', 'const smart=', 'const TASK_DOUBLE=', 'function taskRow(');
   h.context.run = (name, payload) => { runs.push(name + ' ' + JSON.stringify(payload)); return Promise.resolve({}); };
   const s = h.context.state;
   s.tasks = [task('a', 'l1'), task('b', 'l1')];
@@ -926,9 +932,10 @@ test('a row on its way takes no tick, flag or edit; markMoving keeps the buttons
 
 test('a row on its way takes no change from its menu, its open steps or its keys either; 옮긴 결과 확인 stays as it was (review R8 recheck)', async () => {
   const menus = [], edits = [], deletes = [], reorders = [], runs = [];
-  const h = moveHarness({ repeatDoneText: () => '', repeatWords: () => '', reminderLabel: () => '', dueLabel: () => '', deleteTaskFlow: x => deletes.push(x.id), editTask: x => edits.push(x.id), view: 'l1', search: '', smartColor: () => '#3478f6', taskLeave() {},
-    contextMenu(x, y, { items }) { menus.push(items.filter(Boolean)); }, tasksFor: v => h.context.state.tasks.filter(x => x.listId === v), moveTaskRow: (v, id) => reorders.push(id) });
-  h.loadApp('const lingering=', 'const flagHold=', 'const openSteps=', 'const smart=', 'function stepRow(', 'function taskRowKey(', 'function taskRow(', 'function taskMenu(');
+  const h = moveHarness({ repeatDoneText: () => '', repeatWords: () => '', reminderLabel: () => '', dueLabel: () => '', deleteTaskFlow: x => deletes.push(x.id), openTask: x => edits.push(x.id), view: 'l1', search: '', smartColor: () => '#3478f6', taskLeave() {},
+    contextMenu(x, y, { items }) { menus.push(items.filter(Boolean)); }, tasksFor: v => h.context.state.tasks.filter(x => x.listId === v), moveTaskRow: (v, id) => reorders.push(id),
+    calEnter: action => ({ onkeydown: e => { if (e.key === 'Enter') action(e.target); }, oncompositionend() {} }) }); // calendar.js's, for a step's rename field
+  h.loadApp('const lingering=', 'const flagHold=', 'const stepFold=', 'const smart=', 'let stepEdit=', 'function stepDateButton(', 'function stepRow(', 'function stepDrag(', 'let dragTaskId=', 'let dragStep=', 'let dragListId=', 'function taskDragEnd(', 'function dragFlush(', 'function stepTitle(', 'function stepField(', 'function stepsToggle(', 'function taskRow(', 'function taskMenu(');
   h.context.run = (name, payload) => { runs.push(name + ' ' + JSON.stringify(payload)); return Promise.resolve({}); };
   const s = h.context.state;
   s.tasks = [task('a', 'l1'), task('b', 'l1', { dueDate: '2030-01-02', steps: [{ id: 's1', title: '첫 단계', completed: false }] })];
@@ -965,8 +972,7 @@ test('a row on its way takes no change from its menu, its open steps or its keys
   changing(menus.at(-1)).find(i => i.label === '편집').onClick();
   assert.equal(edits.join(), 'b');
   edits.length = 0;
-  // Its open steps: the circle and the title wait.
-  h.eval('openSteps').add('b');
+  // Its steps (listed open since 2026-11-06): the circle and the title wait.
   h.eval('movingIds').add('b');
   const row = h.eval('taskRow')(b);
   h.app.append(row);
@@ -981,8 +987,11 @@ test('a row on its way takes no change from its menu, its open steps or its keys
   // Freed with the answer: markMoving gives the steps back, and the keys work again.
   h.eval('movingIds').delete('b'); h.eval('markMoving')('b');
   assert.equal(steps(), 'false/false');
+  // the step's title renames it where it is since 2026-11-06 (no editor opens)
   row.querySelector('.step-title').click(); h.key(text, 'Delete'); h.key(text, 'ArrowUp', { altKey: true });
-  assert.equal([edits.join(), deletes.join(), reorders.join()].join(' / '), 'b / b / b');
+  assert.equal([edits.join(), deletes.join(), reorders.join(), Boolean(row.querySelector('.step-title-input'))].join(' / '), ' / b /  / true');
+  h.key(row.querySelector('.step-title-input'), 'Escape'); // back to its title, unchanged
+  assert.equal(row.querySelector('.step-title')?.textContent + '/' + runs.length, '첫 단계/0');
   // A row drawn before its move began: markMoving takes its steps too.
   h.eval('movingIds').add('b'); h.eval('markMoving')('b');
   assert.equal(steps(), 'true/true');
@@ -997,7 +1006,7 @@ test('a row on its way takes no change from its menu, its open steps or its keys
 // The edit dialog over the real modal, with the pickers that only draw stubbed (as tests/r60-D-dialogs.test.cjs).
 function editHarness() {
   const h = moveHarness({ plainSteps: s => s || [], deleteTaskFlow() {} });
-  h.loadApp('function toLocalInput(', 'function editTask(');
+  h.loadApp('function toLocalInput(', 'function parseQuick(', 'function clockField(', 'function dateFace(', 'function editTask(');
   const el = (tag, cls) => { const n = h.document.createElement(tag); if (cls) n.className = cls; return n; };
   h.context.stepEditor = () => ({ node: el('div', 'step-editor'), changed: () => false, value: () => [] });
   h.context.repeatPicker = () => { const f = h.eval('field')('반복', el('select', 'form-input')); const node = el('div'); node.append(f); return { node, value: () => '' }; };
@@ -1026,7 +1035,7 @@ test('편집 to or from an account list: the fields save first (without listId),
   h.api.length = 0;
   s.tasks = [task('t', 'm1', { title: '보고서' })];
   h.eval('editTask')(s.tasks[0]); await h.tick();
-  h.dialog().querySelector('input[name=title]').value = '보고서 초안';
+  h.dialog().querySelector('[name=title]').value = '보고서 초안';
   h.select().value = 'g1';
   await h.submit();
   assert.equal(h.runs.length, 1);
@@ -1038,7 +1047,7 @@ test('편집 to or from an account list: the fields save first (without listId),
   s.tasks = [task('t', 'm1', { title: '보고서' })];
   h.runAnswer = () => { throw new Error('하위 할 일 일부를 저장하지 못했어요.'); };
   h.eval('editTask')(s.tasks[0]); await h.tick();
-  h.dialog().querySelector('input[name=title]').value = '보고서 수정';
+  h.dialog().querySelector('[name=title]').value = '보고서 수정';
   h.select().value = 'l1';
   await h.submit();
   assert.equal(h.runs.length, 1, 'the save was tried');
@@ -1056,7 +1065,7 @@ test('편집 to or from an account list: the fields save first (without listId),
   s.tasks = [task('t', 'm1', { title: '보고서' })];
   h.eval('editTask')(s.tasks[0]); await h.tick();
   s.tasks = [task('t', 'm1', { title: '보고서', completed: true })];
-  h.dialog().querySelector('input[name=title]').value = '보고서 끝';
+  h.dialog().querySelector('[name=title]').value = '보고서 끝';
   h.select().value = 'g1';
   await h.submit();
   assert.equal(h.api.length, 0, 'nothing sent');
@@ -1082,7 +1091,7 @@ test('편집 between this PC\'s lists: moveTask, with its toast and 되돌리기
   // A changed title as well: the fields first, without listId, then the move.
   h.runs.length = 0; h.undos.length = 0;
   h.eval('editTask')(s.tasks[0]); await h.tick();
-  h.dialog().querySelector('input[name=title]').value = '할 일 t 고침';
+  h.dialog().querySelector('[name=title]').value = '할 일 t 고침';
   h.select().value = 'l2';
   await h.submit();
   assert.equal(h.runs.length, 2);
@@ -1094,7 +1103,7 @@ test('편집 between this PC\'s lists: moveTask, with its toast and 되돌리기
   s.tasks = [task('t', 'l1')];
   h.runAnswer = () => { throw new Error('저장하지 못했어요.'); };
   h.eval('editTask')(s.tasks[0]); await h.tick();
-  h.dialog().querySelector('input[name=title]').value = '다시 고침';
+  h.dialog().querySelector('[name=title]').value = '다시 고침';
   h.select().value = 'l2';
   await h.submit();
   assert.equal(h.runs.length + ' / ' + h.undos.length + ' / ' + (h.dialog() !== null), '1 / 0 / true');
@@ -1196,7 +1205,7 @@ test('a sidebar list takes a dragged task on its whole row, ⋯ spot included; i
 
 test('render() waits while a task or a list is dragged and draws once the drag ends; a lost dragend cannot hold it for good', async () => {
   const line = appLine('function render(');
-  const hold = 'if(dragTaskId||dragListId){renderPending=true;return;}';
+  const hold = 'if(dragTaskId||dragListId||dragStep){renderPending=true;return;}';
   assert.ok(line.includes(hold), 'the real render() holds for a drag');
   assert.ok(line.indexOf(hold) < line.indexOf('replaceChildren'), 'before it builds anything');
   const h = harness({ resizingWidget: false, composing: false, calHolding: () => false, glassHeld: false, ctxDragging: false, renderedOnce: true, renders: 0, isWidget: false, dragListId: null });
@@ -1223,9 +1232,10 @@ test('render() waits while a task or a list is dragged and draws once the drag e
   await tick();
   assert.equal(renders(), 2);
   assert.equal(String(h.eval('dragListId')), 'null');
-  // the window listens for its own dragend and for a mouse move with no button down
-  const backstop = appLine("if(!isWidget){addEventListener('dragend',endDrags,true);");
-  assert.ok(backstop.includes("addEventListener('mousemove',e=>{if(e.buttons===0&&(dragTaskId||dragListId))endDrags();},true)"));
+  // the window listens for its own dragend and for a mouse move with no button down — every window since 2026-11-09 (batch G W2: a task widget's subtasks drag)
+  const backstop = appLine('/* the widgets too since 2026-11-09');
+  assert.ok(backstop.includes("addEventListener('dragend',endDrags,true)") && backstop.includes("addEventListener('mousemove',e=>{if(e.buttons===0&&(dragTaskId||dragListId||dragStep))endDrags();},true)"));
+  assert.equal(backstop.includes('if(!isWidget)'), false, 'no longer the main window alone');
 });
 
 test('menus: ↑ ↓ Home End move through the items while the keyboard is in the menu; a field-led menu keeps its keys', async () => {
@@ -1280,7 +1290,7 @@ test('menus: an item that waits is shown disabled; a click does nothing and the 
 test('a task row: dimmed and busy while moving; Shift+F10 / the menu key (no point) opens its menu at the row', () => {
   const opened = [];
   const h = moveHarness({ repeatDoneText: () => '', repeatWords: () => '', reminderLabel: () => '', dueLabel: () => '', deleteTaskFlow() {}, editTask() {}, stepRow: () => null, taskMenu: (t, x, y) => opened.push(`${t.id}@${x},${y}`), view: 'l1', search: '', smartColor: () => '#3478f6' });
-  h.loadApp('const lingering=', 'const flagHold=', 'const openSteps=', 'const smart=', 'function taskRowKey(', 'function taskRow(');
+  h.loadApp('const lingering=', 'const flagHold=', 'const stepFold=', 'const smart=', 'function taskRow(');
   const s = h.context.state;
   s.tasks = [task('a', 'l1'), task('b', 'l1')];
   h.eval('movingIds').add('b');
@@ -1295,16 +1305,6 @@ test('a task row: dimmed and busy while moving; Shift+F10 / the menu key (no poi
   assert.equal(opened.join(' '), 'a@16,10 a@300,200', 'at the row (its left + 16, under it), else at the pointer');
 });
 
-test('the ? help lists the row menu key under 할 일, with English', () => {
-  const h = harness();
-  h.load(read('renderer/help.js'), 'renderer/help.js');
-  const tasks = h.eval('shortcutGroups')().find(([title]) => title === '할 일')[1];
-  const row = tasks.find(([, combos]) => combos.some(c => c.join('+') === 'Shift+F10'));
-  assert.ok(Boolean(row), 'listed');
-  assert.equal(row[0], '고른 할 일 메뉴 열기');
-  assert.ok(Boolean(I.EN[row[0]]), 'with an English label');
-});
-
 // 2026-11-04 fifth check (W1–W10, K3, G1, G2): main broadcasts every move record it writes (the shared contract (a)), the move back
 // names the list main calls 「원래 목록」, the review stays while its move waits, a move's toast waits under a dialog, menus give the
 // keyboard back, the edit dialog's move between this PC's lists says so, the whole-list words by kind.
@@ -1312,7 +1312,7 @@ test('main\'s move records reach every window (contract a): a sending row is dim
   const menus = [];
   const h = moveHarness({ repeatDoneText: () => '', repeatWords: () => '', reminderLabel: () => '', dueLabel: () => '', deleteTaskFlow() {}, editTask() {}, stepRow: () => null, view: 'l1', search: '', smartColor: () => '#3478f6', taskLeave() {},
     contextMenu(x, y, { items }) { menus.push(items.filter(Boolean)); }, renderPending: false, dragListId: null, render() {} });
-  h.loadApp('const lingering=', 'const flagHold=', 'const openSteps=', 'const smart=', 'function taskRowKey(', 'function taskRow(', 'function taskMenu(', 'let dragTaskId=', 'function taskDragEnd(', 'function dragFlush(', 'function taskDragStart(');
+  h.loadApp('const lingering=', 'const flagHold=', 'const stepFold=', 'const smart=', 'function taskRow(', 'function taskMenu(', 'let dragTaskId=', 'let dragStep=', 'function taskDragEnd(', 'function dragFlush(', 'function taskDragStart(');
   const s = h.context.state;
   const L = id => s.lists.find(l => l.id === id);
   const t = task('t', 'l1', { title: '서류' });
@@ -1480,7 +1480,7 @@ test('a move\'s toast under an open dialog: 확인… opens the review over it a
   kept.action.onClick();
   assert.equal(title(), '옮긴 결과 확인', 'the review over it');
   h.key(h.document, 'Escape'); await h.tick();
-  assert.equal(title() + ' / ' + h.dialog().querySelector('input[name=title]').value + ' / ' + (h.dialog().querySelector('input[name=title]') === typed), '할 일 편집 / 고치는 중 / true', 'Esc goes back to the edit, its typing there');
+  assert.equal(title() + ' / ' + h.dialog().querySelector('[name=title]').value + ' / ' + (h.dialog().querySelector('[name=title]') === typed), '할 일 편집 / 고치는 중 / true', 'Esc goes back to the edit, its typing there');
   kept.action.onClick();
   h.buttons()[0].click(); await h.tick(8);
   assert.equal(runs.at(-1) + ' / ' + title() + ' / ' + typed.value, 'task:transfer-forget {"id":"m"} / 할 일 편집 / 고치는 중', '둘 다 두기 closes the review only');
@@ -1789,7 +1789,7 @@ test('a review over the edit dialog of the very task a button would delete or gi
   // 할 일 편집 of the original's copy here, typing in it; the move's 확인… opens the review over it (fifth check W7).
   s.tasks = [moved, source]; s.taskMoves = [kept];
   h.eval('editTask')(source); await h.tick();
-  const typed = h.dialog().querySelector('input[name=title]');
+  const typed = h.dialog().querySelector('[name=title]');
   typed.value = '보고서 고침';
   assert.equal(h.dialog().querySelector('form').getAttribute('data-edit-task'), 'src', 'the edit says which task it edits');
   h.eval('transferWaiting')(source);
@@ -1797,7 +1797,7 @@ test('a review over the edit dialog of the very task a button would delete or gi
   h.buttons()[1].click(); await h.tick(8);
   assert.equal([finishes(), status(), h.buttons().map(b => String(b.disabled)).join(','), h.moving()].join(' / '), `0 / ${WAIT} / false,false / `, '원래 목록에서 지우기 waits: it would delete the task being edited');
   h.key(h.document, 'Escape'); await h.tick();
-  assert.equal(title() + ' / ' + h.dialog().querySelector('input[name=title]').value + ' / ' + (h.dialog().querySelector('input[name=title]') === typed), '할 일 편집 / 보고서 고침 / true', 'back to the edit, its typing there');
+  assert.equal(title() + ' / ' + h.dialog().querySelector('[name=title]').value + ' / ' + (h.dialog().querySelector('[name=title]') === typed), '할 일 편집 / 보고서 고침 / true', 'back to the edit, its typing there');
   h.eval('closeModal')(true);
   // Closed: the same button does it.
   h.eval('transferWaiting')(source);

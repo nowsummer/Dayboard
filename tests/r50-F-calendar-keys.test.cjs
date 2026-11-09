@@ -152,3 +152,31 @@ test('the month board: the chips and 「+n개」 of other days are out of the Ta
   const tabbable = grid.querySelectorAll('[tabindex]').filter(n => n.tabIndex === 0);
   assert.deepEqual(tabbable.map(n => n.dataset.day || n.dataset.eventKey), [first, 'e0', 'e1'], 'three stops in the whole month, not 42 days and every chip');
 });
+
+// 2026-11-09 사용자 결정 F24 「줄 유지」: on the big month board an arrow to a day already on the board (a grey day of the next or
+// the last month) only moves the selection, as a click on it does; the rows and the month title stay. Off the board it rolls as before.
+test('the month board: → from 11/30 onto the grey 12/1 keeps the rows; ↓ off the board still rolls', () => {
+  const { h } = calendarHarness('month');
+  h.loadApp("document.addEventListener('keydown',e=>{if(calendarKey(e))return;");
+  Object.assign(h.context, { askCloseModal() {}, taskPane: null, ctxDrawer: false, notesTrash: false, activeNote: null, toastAction: null, toastRedo: null });
+  const board = h.document.createElement('div'); h.app.append(board);
+  h.context.render = () => board.replaceChildren(h.eval('monthBoard')());
+  h.context.month = new Date(2026, 10, 1); h.context.selectedDate = '2026-11-30';
+  h.context.render();
+  const first = () => board.querySelector('.calendar-day').dataset.day;
+  const before = first();
+  const cell = board.querySelector('[data-day="2026-11-30"]'); cell.focus();
+  h.key(cell, 'ArrowRight');
+  assert.equal(h.context.selectedDate, '2026-12-01');
+  assert.equal(first(), before, 'the rows did not move');
+  assert.equal(h.context.month.getMonth(), 10, 'the title stays on November');
+  assert.equal(h.document.activeElement?.dataset.day, '2026-12-01', 'the keyboard is on 12/1');
+  // The six rows end on 12/12: ↓ to 12/8 stays, ↓ again to 12/15 leaves the board and it rolls to December as before.
+  h.key(h.document.activeElement, 'ArrowDown');
+  assert.equal(h.context.selectedDate, '2026-12-08');
+  assert.equal(first(), before);
+  h.key(h.document.activeElement, 'ArrowDown');
+  assert.equal(h.context.selectedDate, '2026-12-15');
+  assert.equal(h.context.month.getMonth(), 11);
+  assert.notEqual(first(), before, 'off the board the rows roll');
+});

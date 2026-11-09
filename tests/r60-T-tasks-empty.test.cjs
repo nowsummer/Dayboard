@@ -84,7 +84,7 @@ test('the empty notes screen is a title and one short line, no button; the trash
   const trashLink = h('button', { class: 'trash-link' }, '최근 삭제한 메모');
   const context = { h, tr, icon: name => h('i', { class: 'icon-' + name }), trashLink };
   vm.createContext(context);
-  vm.runInContext(appLine('function empty(') + '\nthis.out=(function(pool){\n' + appLine('  if(!pool.length)return') + '\n})([]);', context);
+  vm.runInContext(appLine('function empty(') + '\nthis.out=(function(pool,inFolder,side){\n' + appLine('  if(!pool.length){const none') + '\n})([]);', context);
   const box = byClass(context.out, 'empty-state')[0];
   assert.equal(all(box, c => c.tag === 'h2')[0].textContent, '아직 메모가 없어요');
   const ps = all(box, c => c.tag === 'p');

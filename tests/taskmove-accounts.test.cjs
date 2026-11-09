@@ -92,6 +92,20 @@ test('3 copy To Do → Google: the checklist as subtasks in order with their tic
   same([h.svc.in(ML).length, h.svc.checklist.size, moved.important, moved.steps.map(step => step.id)], [0, 0, true, task.steps.map(step => step.id)]);
 });
 
+test('a step\'s date goes with its task on every way out (Dayboard alone holds it; 2026-11-08 Codex full review F1)', async t => {
+  const h = setup(t);
+  const { task } = await atTodo(h, ML, { title: '이사' }, { steps: [{ displayName: '박스' }, { displayName: '테이프' }] });
+  h.store.mutate(state => { state.tasks.find(item => item.id === task.id).steps[0].dueDate = '2026-11-20'; });
+  const dates = id => h.get(id).steps.map(step => step.dueDate || '');
+  const copied = await h.sync.moveTask(task.id, GL.id);
+  same([copied.outcome, dates(copied.id)], ['moved', ['2026-11-20', '']], 'To Do → Google');
+  const asked = await h.sync.moveTask(copied.id, HERE);
+  const pulled = await h.sync.moveTask(copied.id, HERE, { accept: asked.warns });
+  same([pulled.outcome, dates(pulled.id)], ['moved', ['2026-11-20', '']], 'Google → this PC');
+  const step = date => ({ listId: 'l', steps: [{ id: 'a', title: '박스', completed: false, ...(date ? { dueDate: date } : {}) }] });
+  same(M.moveFingerprint(step('2026-11-20')) === M.moveFingerprint(step('')), false, 'a date changed during a move is a change');
+});
+
 test('3 copy Google → another Google account: made there with its subtasks (never Google\'s own move), then the original\'s subtasks and the original deleted', async t => {
   const h = setup(t);
   const { remote, task } = await atGoogle(h, GL, { title: '여행' }, [{ title: '여권' }, { title: '충전기', status: 'completed' }]);
@@ -646,6 +660,20 @@ test('M9 a second move of a task whose move is still under way or waiting never 
   same(M.moveSummary([h.get(three.task.id)], GX, h.store.get().taskMoves).waiting, [three.task.id]);
 });
 
+// 2026-11-09 사용자 결정 (review F41): a copy made there while the task changed here is on record, so moving it again never makes a second one.
+test('M9b a copy whose task changed here while on its way stays on record: moving it again carries on with the copy made there', async t => {
+  const h = setup(t);
+  const { task } = await atTodo(h, ML, { title: '원래 제목' });
+  h.svc.during(() => h.store.mutate(state => { state.tasks.find(item => item.id === task.id).title = '고친 제목'; }));
+  const first = await h.sync.moveTask(task.id, GL.id);
+  same([first.outcome, first.message], ['changed', '옮기는 동안 바뀌어 원래 목록에도 남겨 뒀어요. 다시 옮기면 바뀐 내용만 이어 보내요.']);
+  const parents = () => h.svc.in(GL).filter(item => !item.parent);
+  same([parents().length, recordOf(h, task.id)?.phase, recordOf(h, task.id)?.route, recordOf(h, task.id)?.remoteId === parents()[0]?.id, h.get(task.id)?.listId], [1, 'made', 'copy', true, ML.id]);
+  const again = await h.sync.moveTask(task.id, GL.id);
+  same([again.outcome, parents().length, h.svc.in(ML).length, h.store.get().taskMoves.length], ['moved', 1, 0, 0], 'one copy there, the original gone');
+  assert.ok(unique(h));
+});
+
 test('M10 To Do\'s links to mail that cannot be read count as there: the move asks, even within one account, and sends none', async t => {
   const h = setup(t);
   const { task } = await atTodo(h, ML, { title: '링크 못 읽음' }, { links: [{ applicationName: 'Outlook', webUrl: 'https://outlook.live.com/mail/4' }] });
@@ -1043,7 +1071,7 @@ test('C5 a task of this PC deleted from another window while it is pushed: main 
   h.add({ id: 'w-edit', title: '위젯에서 고칠 것' });
   h.svc.during(() => { h.store.mutate(state => { state.tasks.find(item => item.id === 'w-edit').title = '고친 제목'; }); });
   const edited = await h.sync.moveTask('w-edit', GL.id);
-  same([edited.outcome, edited.deleted, edited.message, h.get('w-edit').listId, h.get('w-edit').title], ['changed', undefined, '옮기는 동안 바뀌어 이 PC에도 남겨 뒀어요.', 'local-inbox', '고친 제목']);
+  same([edited.outcome, edited.deleted, edited.message, h.get('w-edit').listId, h.get('w-edit').title], ['changed', undefined, '옮기는 동안 바뀌어 이 PC에도 남겨 뒀어요. 다시 옮기면 바뀐 내용만 이어 보내요.', 'local-inbox', '고친 제목'], 'on record since 2026-11-09 (F41)');
 });
 
 // ---- The fourth review (2026-11-04, E1–E4) ----
@@ -1780,4 +1808,27 @@ test('Codex review F1–F3: a pull reads the original again before deleting it; 
   const at = h.svc.calls.length;
   const asked = await h.sync.moveTask(plain.task.id, ML2.id);
   same([asked.outcome, asked.warns, h.svc.writes(at), h.store.get().lists.find(item => item.id === ML.id).shared], ['confirm', ['shared'], [], undefined], 'asked although this PC has not seen the sharing yet');
+});
+
+test('2026-11-05 owner reports: a move from To Do reads the sharing from the list of lists (no single-list $select, which To Do refused with HTTP 400), falling back to the last sync\'s flag when that is refused; a list made in a Microsoft or Google account comes back once from the next sync', async t => {
+  const h = setup(t);
+  const { task, remote } = await atTodo(h, ML, { title: '쇼핑으로' });
+  let at = h.svc.calls.length;
+  const moved = await h.sync.moveTask(task.id, ML2.id);
+  same([moved.outcome, h.svc.calls.slice(at).some(c => /^GET \/v1\.0\/me\/todo\/lists\/[^/]+$/.test(c.line)), h.svc.calls.slice(at).some(c => c.line === 'GET /v1.0/me/todo/lists')], ['moved', false, true], 'moved; the list of lists, not one list');
+  same(h.svc.tasks.has(remote.id), false);
+  // The list of lists refused: the last sync's flag (not shared here) — the move still goes.
+  const second = await atTodo(h, ML, { title: '목록 읽기 거절' });
+  h.svc.fail(/^GET \/v1\.0\/me\/todo\/lists$/, 'refuse');
+  same((await h.sync.moveTask(second.task.id, ML2.id)).outcome, 'moved');
+  // New lists in the accounts: made at the service under the id a sync gives them, once.
+  const ms = await h.sync.mutateList('add', { name: '쇼핑 리스트 2', accountId: 'acc-m', provider: 'microsoft' });
+  const gg = await h.sync.mutateList('add', { name: '여행', accountId: 'acc-g', provider: 'google' });
+  same([ms.provider, ms.accountId, ms.name, gg.provider, gg.accountId, gg.name], ['microsoft', 'acc-m', '쇼핑 리스트 2', 'google', 'acc-g', '여행']);
+  h.store.mutate(state => { state.lists.push({ ...ms, color: '#ff9500' }, { ...gg, color: '#34c759' }); }); // as main list:add keeps them
+  await h.seeded();
+  const lists = h.store.get().lists;
+  same([lists.filter(item => item.id === ms.id).length, lists.filter(item => item.id === gg.id).length, lists.find(item => item.id === ms.id).color], [1, 1, '#ff9500'], 'the sync finds them here: no second list, the colour kept');
+  const lanes = require('../lib/lanes.cjs');
+  same([lanes.COMMAND_LANES['list:add']({ name: 'x' }), lanes.COMMAND_LANES['list:add']({ name: 'x', accountId: 'acc-m' }), lanes.COMMAND_LANES['list:add']({ name: 'x', accountId: 3 })], ['local', 'remote', 'exclusive']);
 });

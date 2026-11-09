@@ -35,11 +35,12 @@ Outside that folder:
 
 - **Wallpaper** — to paint the backdrop behind widgets, the app **only reads** the current wallpaper image and `%APPDATA%\Microsoft\Windows\Themes\TranscodedWallpaper`.
 - **Back up data** — writes one JSON file where you choose. It holds tasks, events, notes and account names, but no sign-in data.
+- **Automatic backup** — once a day, writes what no account holds (this PC's lists and calendars, notes that are not synced or whose sync has stopped) as unencrypted JSON to `Documents\Dayboard Backups` or a folder you choose. It holds no sign-in data. If that folder syncs to a cloud such as OneDrive, the files go with it. You can turn it off in Settings.
 
 ### Network
 
 - **Microsoft** — `login.microsoftonline.com` (sign-in), `graph.microsoft.com` (To Do, Outlook calendar).
-  - Scopes: `User.Read`, `Tasks.ReadWrite`, `Calendars.ReadWrite`, `offline_access`.
+  - Scopes: `User.Read`, `Tasks.ReadWrite`, `Calendars.ReadWrite`, `offline_access`. `Files.ReadWrite.AppFolder` is requested only when you turn on Notes for that account.
 - **Google** — `accounts.google.com`, `oauth2.googleapis.com`, `openidconnect.googleapis.com` (sign-in), `tasks.googleapis.com`, `www.googleapis.com` (Tasks, Calendar, Drive).
   - Scopes: `openid`, `email`, `profile`, `tasks`, `calendar.readonly`, `calendar.events`, `drive.appdata`.
 - **Apple** — `caldav.icloud.com` and the `icloud.com` servers Apple points to (HTTPS only; iCloud calendars over CalDAV).
@@ -57,6 +58,20 @@ Outside that folder:
 - A deleted note leaves a content-free deletion mark for 90 days.
 - The folder is hidden from the Drive interface and from other apps. The `drive.appdata` scope can't reach any Drive file outside it.
 - Only Dayboard on your other PCs, signed in to the same Google account, reads it.
+
+### Notes sync (OneDrive)
+
+- Runs only when you turn on a Microsoft account's **Notes** switch and allow the permission. One account holds the notes at a time.
+- Notes are stored as JSON files starting with `dayboard-note` in that account's OneDrive **app folder** (`Apps\Microsoft Graph Command Line Tools`). They hold the same content as in Google Drive.
+- Unlike Google's folder, this one shows up in OneDrive. If you delete the files, a PC with Notes on uploads them again.
+- The `Files.ReadWrite.AppFolder` scope can't reach any OneDrive file outside this app folder. Other tools using the same sign-in app can see the folder.
+- Files are downloaded from the short-lived address Microsoft gives, and no sign-in data is sent to it.
+
+### Settings matched between PCs
+
+- Between your PCs that use the same accounts, Dayboard matches list and calendar view settings (colour, icon, order, group, hidden state, sort), Quick events, To Do task times and subtask dates.
+- They hold no task, event or note titles or text. A task is referred to only by a short hash of its service id.
+- They are kept in the Google Drive app data folder and as Dayboard's own data on the default Microsoft To Do list, and stop when you disconnect the account.
 
 ### Windows
 
@@ -87,7 +102,7 @@ Outside that folder:
 - The sign-in screen and your account's app permissions list show that name instead of Dayboard.
 - Other tools using the same client (such as Microsoft Graph PowerShell) share this consent.
 - Work or school admins can block this client, and a Microsoft policy change could stop it working.
-- If that happens, enter your own app registration's client ID under **Use your own app registration** on the connect screen.
+- If that happens, enter your own app registration's client ID under **Sign in another way (advanced)** on the connect screen.
 
 ### Google sign-in
 
@@ -116,6 +131,7 @@ Outside that folder:
   1. On every PC, turn off **Notes** for that account in Dayboard, or disconnect it. (A PC with it on uploads the notes again.)
   2. In Google Drive on the web, go to Settings → Manage apps → Dayboard → Options → **Delete hidden app data**.
 - **Microsoft personal account** — remove "Microsoft Graph Command Line Tools" at `account.live.com/consent/Manage`. This also removes the consent for other tools using the same client.
+- **Notes in OneDrive** — disconnecting doesn't delete them. On every PC, turn off **Notes** for that account, then delete the files starting with `dayboard-note` from the app folder above.
 - **Microsoft work or school account** — use your organization's My Apps or ask your admin.
 - **iCloud** — revoke Dayboard's password under Apple Account → Sign-In and Security → App-Specific Passwords.
 

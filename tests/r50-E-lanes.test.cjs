@@ -80,15 +80,15 @@ test('lanes: an exclusive command waits for both lanes and holds both until it e
 // from the source and compares them with the same table).
 const DIRECT = ['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus',
   'widget:glass-preview', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit'];
-const LANED = ['state:get', 'task:add', 'task:update', 'task:delete', 'list:add', 'list:update', 'group:add', 'group:update', 'group:delete', 'list:delete', 'note:trash', 'note:restore',
-  'note:pin', 'note:duplicate', 'note:history', 'note:revert', 'note:delete', 'event:add', 'event:update', 'event:color', 'calendar:update', 'calendar:delete', 'calendar:move', 'event:delete',
-  'settings:update', 'account:update', 'account:disconnect', 'widget:update', 'external:open', 'backup:export', 'demo:load',
+const LANED = ['state:get', 'task:add', 'task:update', 'task:holds', 'task:delete', 'list:add', 'list:update', 'group:add', 'group:update', 'group:delete', 'list:delete', 'note:trash', 'note:restore',
+  'note:pin', 'note:folder', 'note:folder-add', 'note:folder-rename', 'note:folder-delete', 'note:duplicate', 'note:history', 'note:revert', 'note:delete', 'event:add', 'event:update', 'event:color', 'calendar:update', 'calendar:delete', 'calendar:move', 'event:delete',
+  'settings:update', 'account:update', 'account:disconnect', 'widget:update', 'external:open', 'backup:export', 'backup:restore', 'backup:undo', 'backup:folder', 'demo:load',
   'task:transfer', 'task:transfer-check', 'task:transfer-forget', // 2026-10-30: this PC's tasks to a connected list (lib/taskmove.cjs)
   'calendar:history', 'calendar:history-search', // 2026-10-30: the older calendar tier (lib/calhistory.cjs), read-only
   'task:transfer-finish']; // 2026-11-04: an original a move kept at its service deleted (lib/sync.cjs finishMove)
 
-test('laneOf: a rule for each of the 37 commands that take a lane, none for the 20 direct ones; an unknown name is exclusive', () => {
-  assert.equal(DIRECT.length + LANED.length, 57);
+test('laneOf: a rule for each of the 45 commands that take a lane, none for the 20 direct ones; an unknown name is exclusive', () => {
+  assert.equal(DIRECT.length + LANED.length, 65);
   assert.deepEqual(Object.keys(COMMAND_LANES).sort(), [...LANED].sort());
   const store = fakeStore();
   for (const name of DIRECT) assert.equal(laneOf(name, {}, store), EXCLUSIVE, `${name} never comes to the lanes; conservative if it did`);

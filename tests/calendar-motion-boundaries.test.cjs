@@ -86,3 +86,21 @@ test('reduced motion still settles a month jump without retaining a frame or off
   assert.equal(s.value().month, '2026-11'); assert.equal(s.value().moving, false);
   assert.equal(s.value().off, 0); assert.equal(s.frames.size, 0);
 });
+
+// 2026-11-09 사용자 결정 F75 「무시」: with a new event's card open, the wheel or a two-finger swipe neither rolls the month nor steps the
+// week or the day — the card was closed and saved with a half-typed title (or dropped untitled) by one stray scroll.
+test('a new event card open: the month wheel and the week/day swipe are ignored, the card stays and nothing is saved', () => {
+  for (const mode of ['month', 'week', 'day']) {
+    const s = screen();
+    s.run(`state.settings.calendarView=${JSON.stringify(mode)};var closes=0,adds=0;closeCard=()=>{closes++;return true;};run=name=>{if(name==='event:add')adds++;return Promise.resolve();};calCard={mode:'create',key:'draft',v:{title:'회'},pending:{}};`);
+    const before = s.value();
+    if (mode === 'month') s.run('calMonthWheel({ctrlKey:false,deltaX:0,deltaY:150,deltaMode:0,preventDefault(){}})');
+    else s.run('calTimeWheel({ctrlKey:false,deltaX:150,deltaY:0,deltaMode:0,preventDefault(){}})');
+    s.settle();
+    assert.equal(s.run('calCard?.mode'), 'create', mode + ': the card stays');
+    assert.equal(s.run('closes'), 0, mode);
+    assert.equal(s.run('adds'), 0, mode + ': no event:add');
+    assert.equal(s.value().start, before.start, mode + ': the rows did not roll');
+    assert.equal(s.value().selectedDate, before.selectedDate, mode + ': the day did not step');
+  }
+});

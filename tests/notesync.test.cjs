@@ -322,7 +322,7 @@ test('the notes account is the one chosen in settings, used once its sign-in has
   state.accounts[2].notesAccess = true;
   assert.equal(notesAccountId(state), 'g2');
   state.settings.notesAccountId = 'ms';
-  assert.equal(notesAccountId(state), null, 'only Google holds notes');
+  assert.equal(notesAccountId(state), 'ms', 'Google or Microsoft (2026-11-07), once it has the grant');
   assert.equal(notesAccountId({ settings: { notesAccountId: null }, accounts: state.accounts }), null);
 });
 

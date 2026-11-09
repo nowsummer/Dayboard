@@ -74,7 +74,7 @@ test('widget:open, the reopen after an Explorer restart, retryAttach and the rev
   const retry = mainFunction('retryAttach');
   assert.ok(retry.includes('perWidget(widgetId, async () => {') && !retry.includes('queued('), 'retryAttach is per widget');
   const refresh = mainFunction('refreshBackdrops');
-  assert.ok(refresh.includes('perWidget(id, () => revealOnDesktop(win, { hide: true })') && !refresh.includes('queued('), 'a card-fallback retry after a wallpaper change is per widget');
+  assert.ok(refresh.includes('perWidget(id, async () => {') && refresh.includes('return revealOnDesktop(win, { hide: true })') && !refresh.includes('queued('), 'a card-fallback retry after a wallpaper change is per widget');
   assert.equal((source.match(/queued\(\(\) => command\('widget:open'/g) || []).length, 0, 'the tray and the smoke hold open widgets directly');
   assert.ok(source.includes('perWidget(widget.id, () => openWidget(widget)).catch(() => {});'), 'a restored note\'s widgets reopen per widget');
   const uses = source.match(/\bqueued\(\(\) =>/g) || [];
@@ -142,7 +142,7 @@ test('the task moves of 2026-11-04 in command(): accept and undo passed on, tran
   assert.ok(source.includes('const warnKeys = value => Array.isArray(value) ? [...new Set(value.filter(key => WARNS.includes(key)))] : [];'));
   assert.equal(COMMAND_LANES['task:transfer-finish']({}, null), 'remote');
   const check = between("    case 'task:transfer-check': {", "    case 'task:transfer': ");
-  for (const part of ['dateOnly(fields.dueDate)', 'reminderAt(fields.reminderAt)', "rawText(fields.notes, tr('메모'), 20000)", 'rruleText(fields.rrule)', 'ids.size !== 1', 'item.listId !== list.id', 'moveSummary(tasks, list, state.taskMoves || [], id => state.lists.find(item => item.id === id))', "if (from && (from.provider !== 'local' || !isAccountList(list)))"]) assert.ok(check.includes(part), part);
+  for (const part of ['dateOnly(fields.dueDate)', 'reminderAt(fields.reminderAt)', "noteText(fields.notes, tr('메모'), 20000)", 'rruleText(fields.rrule)', 'ids.size !== 1', 'item.listId !== list.id', 'moveSummary(tasks, list, state.taskMoves || [], id => state.lists.find(item => item.id === id))', "if (from && (from.provider !== 'local' || !isAccountList(list)))"]) assert.ok(check.includes(part), part);
   const update = between("    case 'task:update': {", "    case 'calendar:history':");
   assert.ok(update.includes("if (list.provider !== 'local' || target.provider !== 'local') throw new Error(tr('계정 목록 간 이동은 지원하지 않습니다. 새 목록에 추가해 주세요.'));"), 'only lib/sync.cjs moveTask moves a task in or out of an account list');
   assert.equal(update.includes('pruneOrder('), false, 'the moves in and out of an account list prune the order (lib/sync.cjs), not task:update');
@@ -171,8 +171,8 @@ test('task:update between this PC\'s lists keeps the order of the list it left: 
   });
   const context = {
     store, tr, publicRecord, todayKey: () => localKey(new Date().toISOString()),
-    text: V.text, rawText: V.rawText, dateOnly: V.dateOnly, reminderAt: V.reminderAt, boolean: V.boolean, taskSteps: V.taskSteps, identifier: V.identifier,
-    setRepeat: T.setRepeat, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries,
+    text: V.text, rawText: V.rawText, noteText: V.noteText, dateOnly: V.dateOnly, reminderAt: V.reminderAt, boolean: V.boolean, taskSteps: V.taskSteps, identifier: V.identifier,
+    setRepeat: T.setRepeat, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
     lookup(collection, id) { const item = store.peek(collection, V.identifier(id)); if (!item) throw new Error('항목이 없거나 이미 삭제되었습니다.'); return item; },
     commit: fn => store.mutate(fn),
     sync: { async mutateTask() { throw new Error('no account list in this test'); } },

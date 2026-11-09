@@ -598,7 +598,10 @@ test('after 되돌리기, Ctrl+Z / Ctrl+Y inside the restored note', async t => 
   const afterRestore = a.note('n1').body;
   call(`key('n1','z')`); await new Promise(r => setTimeout(r, 800)); const afterUndo = a.note('n1').body;
   call(`key('n1','y')`); await new Promise(r => setTimeout(r, 800)); const afterRedo = a.note('n1').body;
-  console.log(JSON.stringify({ afterRestore, afterUndo, afterRedo }));
+  assert.equal(afterRestore, 'first line\nsecond line typed just now', 'the restore brings back the typing');
+  // the undo step may change; what counts is that Ctrl+Z works in the restored note and Ctrl+Y gives the typing back
+  assert.equal(afterUndo !== afterRestore && afterRestore.startsWith(afterUndo), true, `Ctrl+Z takes typing off the end: ${JSON.stringify(afterUndo)}`);
+  assert.equal(afterRedo, afterRestore, 'Ctrl+Y puts it back');
 });
 }
 

@@ -120,7 +120,7 @@ test('hidden calendars wait behind one 「숨긴 달력 N개」 row: closed they
   assert.equal(toggle.getAttribute('aria-expanded'), 'false');
   const open = render(CALENDARS, { hiddenCalendars: ['m1', 'i1'] }, true).list;
   const kids = open.children.filter(c => typeof c !== 'string').map(c => c.className.split(' ')[0]);
-  assert.deepEqual(kids, ['agenda-sub', 'calendar-row', 'calendar-row', 'calendar-row', 'calendar-row', 'calendar-row', 'cal-hidden-toggle'], 'shown rows, the hidden rows, then the toggle: it stays last, so it stays under the pointer (2026-11-03 review U3)');
+  assert.deepEqual(kids, ['calendar-list-head', 'calendar-row', 'calendar-row', 'calendar-row', 'calendar-row', 'calendar-row'], 'the heading row (달력 + the toggle at its right — 2026-11-05 owner 「제일 하단에 두니깐 뭔가 비례적으로 이상해」), then shown and hidden rows');
   assert.deepEqual(rowsOf(open).filter(r => byClass('hidden')(r.row)).map(r => r.name), ['생일', '가족']);
   assert.equal(render(CALENDARS).list.find(byClass('cal-hidden-toggle')) === null, true, 'no toggle when nothing is hidden'); // primitives only in asserts (CLAUDE.md 1.2.7 ⑨)
   const css = fs.readFileSync(path.join(project, 'renderer', 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

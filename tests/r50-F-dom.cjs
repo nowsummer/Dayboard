@@ -20,7 +20,7 @@ class EventImpl {
   constructor(type, init = {}) {
     this.type = type; this.bubbles = Boolean(init.bubbles); this.cancelable = init.cancelable !== false;
     this.defaultPrevented = false; this.stopped = false; this.target = null; this.currentTarget = null;
-    for (const k of ['key', 'code', 'ctrlKey', 'altKey', 'shiftKey', 'metaKey', 'isComposing', 'detail', 'clientX', 'clientY', 'relatedTarget', 'button', 'submitter']) if (k in init) this[k] = init[k];
+    for (const k of ['key', 'code', 'ctrlKey', 'altKey', 'shiftKey', 'metaKey', 'isComposing', 'repeat', 'detail', 'clientX', 'clientY', 'relatedTarget', 'button', 'submitter']) if (k in init) this[k] = init[k];
   }
   preventDefault() { this.defaultPrevented = true; }
   stopPropagation() { this.stopped = true; }
@@ -75,6 +75,8 @@ class Element extends Node {
   appendChild(k) { this.append(k); return k; }
   prepend(...kids) { this.childNodes.unshift(...kids.map(k => this.adopt(k))); }
   insertBefore(node, ref) { const n = this.adopt(node); const i = ref ? this.childNodes.indexOf(ref) : -1; if (i < 0) this.childNodes.push(n); else this.childNodes.splice(i, 0, n); return n; }
+  // the right panel puts its day or its calendar back in place of a closed card or task (2026-11-05)
+  replaceWith(...nodes) { const p = this.parentNode; if (!p) return; const marker = new Text(this.ownerDocument, ''); p.insertBefore(marker, this); this.remove(); for (const n of nodes) p.insertBefore(n, marker); marker.remove(); }
   replaceChildren(...kids) { for (const c of [...this.childNodes]) c.remove(); this.append(...kids.flat(Infinity).filter(k => k != null)); }
   setAttribute(k, v) { this.attrs.set(String(k).toLowerCase(), String(v)); }
   getAttribute(k) { const v = this.attrs.get(String(k).toLowerCase()); return v === undefined ? null : v; }
@@ -113,6 +115,23 @@ function dispatch(target, event) {
   const call = (node, capture) => { const list = node.listeners?.get(event.type); if (!list) return; for (const l of [...list]) { if (l.capture !== capture) continue; if (l.once) list.splice(list.indexOf(l), 1); event.currentTarget = node; l.fn.call(node, event); if (event.immediate) return; } };
   for (let i = path.length - 1; i >= 0 && !event.stopped; i--) call(path[i], true);
   for (let i = 0; i < path.length && !event.stopped; i++) { call(path[i], false); if (!event.bubbles) break; }
+  return !event.defaultPrevented;
+}
+// Dispatch as Chromium delivers a real input event: a microtask checkpoint after every listener (the stack is empty between them), so
+// what one listener started with a promise runs before the next listener — dispatchEvent above, like the browser's own dispatchEvent(),
+// runs the listeners back to back. For checks of listener order against a redraw started in capture (2026-11-09 review of the task
+// rows' claim of the right panel). Resolves to !defaultPrevented like dispatchEvent.
+// The checkpoint is microtasks only, as Chromium's: process.nextTick runs once V8 has drained the microtask queue (what a listener
+// started with promises, to the end of its chain) and before the loop's timers phase — twice, so a call from a macrotask drains too.
+// A setImmediate here (until 2026-11-09) let the timers phase in between, where a listener's setTimeout(…, 0) — the rows' claim —
+// could run before the next listener; the harness's run() and invoke() resolve synchronously, so nothing waits on a timer.
+async function dispatchNative(target, event) {
+  event.target = target;
+  const path = []; let n = target; while (n) { path.push(n); n = n.parentNode; }
+  const checkpoint = async () => { for (let i = 0; i < 2; i++) await new Promise(resolve => process.nextTick(resolve)); };
+  const call = async (node, capture) => { const list = node.listeners?.get(event.type); if (!list) return; for (const l of [...list]) { if (l.capture !== capture) continue; if (l.once) list.splice(list.indexOf(l), 1); event.currentTarget = node; l.fn.call(node, event); await checkpoint(); if (event.immediate) return; } };
+  for (let i = path.length - 1; i >= 0 && !event.stopped; i--) await call(path[i], true);
+  for (let i = 0; i < path.length && !event.stopped; i++) { await call(path[i], false); if (!event.bubbles) break; }
   return !event.defaultPrevented;
 }
 // ---- selectors ----
@@ -218,4 +237,4 @@ function createDom() {
   const flushFrames = () => { for (const fn of frames.splice(0)) fn(); };
   return { document, window, globals, flushFrames };
 }
-module.exports = { createDom, Node, Element, Text, Document, EventImpl };
+module.exports = { createDom, dispatchNative, Node, Element, Text, Document, EventImpl };

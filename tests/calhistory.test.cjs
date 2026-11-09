@@ -141,14 +141,18 @@ test('the providers read a calendar\'s range as their sync does, Google and Outl
   assert.deepEqual(got.map(e => [e.title, e.start, e.allDay]), [['여행', '2023-05-01', true]]);
   assert.equal(asked.searchParams.get('timeMin'), range.start); assert.equal(asked.searchParams.get('timeMax'), range.end);
   assert.equal(asked.searchParams.get('singleEvents'), 'true');
-  assert.match(asked.searchParams.get('fields'), /^items\(id,status,summary,location,start,end,recurringEventId,originalStartTime,reminders\),nextPageToken$/);
+  // The description too since 2026-11-05: an old event shows its notes (read-only).
+  assert.match(asked.searchParams.get('fields'), /^items\(id,status,summary,description,location,start,end,recurringEventId,originalStartTime,reminders\),nextPageToken$/);
   const MS = { id: 'm-cal', remoteId: 'AAA', accountId: 'acc-m', provider: 'microsoft', name: '일정' };
-  const m = microsoft.createMicrosoft({ request: async url => { asked = new URL(url); return { value: [{ id: 'x1', subject: '회의', isAllDay: false, start: { dateTime: '2023-05-01T01:00:00.0000000', timeZone: 'UTC' }, end: { dateTime: '2023-05-01T02:00:00.0000000', timeZone: 'UTC' }, type: 'singleInstance' }, { id: 'x2', isCancelled: true, subject: '취소', start: { dateTime: '2023-05-02T01:00:00', timeZone: 'UTC' }, end: { dateTime: '2023-05-02T02:00:00', timeZone: 'UTC' } }] }; } });
+  let prefer = '';
+  const m = microsoft.createMicrosoft({ request: async (url, options) => { asked = new URL(url); prefer = options?.headers?.Prefer || ''; return { value: [{ id: 'x1', subject: '회의', isAllDay: false, start: { dateTime: '2023-05-01T01:00:00.0000000', timeZone: 'UTC' }, end: { dateTime: '2023-05-01T02:00:00.0000000', timeZone: 'UTC' }, type: 'singleInstance' }, { id: 'x2', isCancelled: true, subject: '취소', start: { dateTime: '2023-05-02T01:00:00', timeZone: 'UTC' }, end: { dateTime: '2023-05-02T02:00:00', timeZone: 'UTC' } }] }; } });
   const outlook = await m.historyEvents(MS, range);
   assert.deepEqual(outlook.map(e => e.title), ['회의']);
   assert.match(asked.pathname, /\/me\/calendars\/AAA\/calendarView$/);
   assert.equal(asked.searchParams.get('startDateTime'), range.start);
-  assert.ok(!/body/.test(asked.searchParams.get('$select')), 'not the meetings\' bodies');
+  // The meetings' bodies since 2026-11-05 (an old event's notes), in Outlook's text form: a fraction of their HTML, and never written.
+  assert.ok(asked.searchParams.get('$select').split(',').includes('body'), 'the notes of old events');
+  assert.match(prefer, /outlook\.body-content-type="text"/, 'as text, not the HTML');
   const ICS = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//t//t//KO', 'BEGIN:VEVENT', 'UID:u1', 'DTSTAMP:20230101T000000Z', 'DTSTART:20230501T010000Z', 'DTEND:20230501T020000Z', 'SUMMARY:생일', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
   let davAsked = null;
   const client = { fetchCalendars: async () => [], fetchCalendarObjects: async options => { davAsked = options; return [{ url: 'https://caldav.icloud.com/1/calendars/home/u1.ics', etag: '"1"', data: ICS }]; } };

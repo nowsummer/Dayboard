@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu, dialog, shell, screen, safeStorage, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu, dialog, shell, screen, safeStorage, Notification, powerMonitor } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -15,6 +15,7 @@ const { createStartMenu } = require('./lib/startmenu.cjs');
 const { createSync, seriesKey, dropSeriesColors } = require('./lib/sync.cjs');
 const { createLanes, laneOf } = require('./lib/lanes.cjs');
 const { recordNoteDeletion, copyOf, sameContent, noteKey, noteRev, laterThan, cleanPast, archiveText, NOTE_ID, pastKey } = require('./lib/notesync.cjs');
+const { noteFolderName } = require('./lib/notekey.cjs');
 // A note as the renderer gets it from a note command: the shape publicState broadcasts (lib/store.cjs publicNote — the public
 // fields with rev and textId, no earlier versions; one definition since the 2026-10-27 review).
 const shownNote = publicNote;
@@ -22,18 +23,19 @@ const shownNote = publicNote;
 const textIdOf = value => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z~[0-9a-f]{16}$/.test(value) ? value : null);
 // Widgets of notes moved to the trash, so 되돌리기 brings them back where they were (2026-10-21 review round 4).
 const trashedWidgets = new Map();
-const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, panelWidth, scopeChoices, CONTACT_EMAIL, TEXT_SIZES, textScale, WIDGET_OPEN, widgetMinimum } = require('./renderer/domain.js');
+const { LIST_ICONS, seriesPosition, shiftRule, localKey, defaultCalendarId, sectionKey, visibleState, builtInList, taskList, keepOneVisible, hidingRefusal, panelWidth, scopeChoices, cleanShortcuts, CONTACT_EMAIL, TEXT_SIZES, textScale, WIDGET_OPEN, widgetMinimum } = require('./renderer/domain.js');
 const { createWallpaper, backdropPayload } = require('./lib/wallpaper.cjs');
 const { providerStatus } = require('./lib/providers/oauth.cjs');
 const i18n = require('./lib/i18n.cjs');
 const { tr } = i18n;
 // Input validators and the local-series helpers live in lib/ since the 2026-10-27 review (tests run them without Electron).
-const { text, rawText, identifier, boolean, color, dateOnly, dateTime, reminderAt, idList, eventColor, rruleText, scopeOf, taskSorts, taskSteps, eventAlert, taskOrders } = require('./lib/validate.cjs');
-const { dueAlerts, alertLine, pruneFired } = require('./lib/alerts.cjs');
-const { setRepeat, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries } = require('./lib/tasks.cjs');
+const { text, rawText, noteText, identifier, boolean, color, dateOnly, dateTime, dueTime, reminderAt, idList, eventColor, rruleText, scopeOf, taskSorts, taskSteps, eventAlert, taskOrders } = require('./lib/validate.cjs');
+const { dueAlerts, alertLine, pruneFired, taskDueLine } = require('./lib/alerts.cjs');
+const { setRepeat, setDueTime, followDue, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries, wantedSteps, stepsDone } = require('./lib/tasks.cjs');
 const { WARNS, isAccountList, moveSummary, settleMovesAtStart } = require('./lib/taskmove.cjs');
 const { createCalendarHistory } = require('./lib/calhistory.cjs');
-const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, seriesAlert, ring, alertOtherKind, seriesAllDay, toFirstShown, shiftedForMaster, truncatedRule } = require('./lib/series.cjs');
+const { BACKUP_LIMIT, backupRunner, parseBackup, restorePlan, applyRestore, undoRestore } = require('./lib/backup.cjs');
+const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, seriesAlert, ring, alertOtherKind, seriesAllDay, toFirstShown, shiftedForMaster, truncatedRule, keepsNothing, moveKey } = require('./lib/series.cjs');
 
 app.setName('Dayboard');
 app.setAppUserModelId('com.dayboard.desktop');
@@ -162,9 +164,16 @@ function perWidget(id, fn) {
   settled.then(() => { if (widgetQueues.get(id) === settled) widgetQueues.delete(id); });
   return result;
 }
+// Where the automatic backups go: the folder chosen, else Documents, where someone on a new PC looks, and which OneDrive often keeps too.
+// A run with its own data folder (the smoke test, DAYBOARD_USER_DATA) stays inside it.
+function backupFolder() {
+  const chosen = store?.read(state => state.settings.backupFolder);
+  if (chosen) return chosen;
+  return smoke || process.env.DAYBOARD_USER_DATA ? path.join(app.getPath('userData'), 'backups') : path.join(app.getPath('documents'), 'Dayboard Backups');
+}
 // What the windows see: the stored state plus the app version and the update state (lib/updater.cjs).
 function publicState() {
-  return { ...store.publicState(), app: { version: app.getVersion(), update: updater ? updater.state() : null } };
+  return { ...store.publicState(), app: { version: app.getVersion(), update: updater ? updater.state() : null, backupFolder: backupFolder() } };
 }
 function broadcast() {
   if (!store) return;
@@ -186,18 +195,18 @@ function checkReminders() {
   const now = Date.now();
   // Hidden account sections and hidden lists (settings.hiddenSections / hiddenLists) are left out everywhere, reminders included.
   // Read without a copy of the whole state (store.read; 2026-10-27 review: two full copies every 30 s stalled the main process).
-  const due = store.read(current => {
+  const { due, timeFormat } = store.read(current => {
     const shown = new Set(visibleState(current).lists.map(list => list.id));
     const hiddenLists = new Set(current.lists.filter(list => !shown.has(list.id)).map(list => list.id));
-    return current.tasks.filter(task => task.reminderAt && !task.completed && !task.reminderFiredAt && !hiddenLists.has(task.listId) && Date.parse(task.reminderAt) <= now && Date.parse(task.reminderAt) > now - 12 * 3600 * 1000)
-      .map(task => ({ id: task.id, title: task.title, dueDate: task.dueDate, listName: current.lists.find(item => item.id === task.listId)?.name || '' }));
+    return { timeFormat: current.settings.timeFormat, due: current.tasks.filter(task => task.reminderAt && !task.completed && !task.reminderFiredAt && !hiddenLists.has(task.listId) && Date.parse(task.reminderAt) <= now && Date.parse(task.reminderAt) > now - 12 * 3600 * 1000)
+      .map(task => ({ id: task.id, title: task.title, dueDate: task.dueDate, dueTime: task.dueDate && task.dueTime || '', listName: current.lists.find(item => item.id === task.listId)?.name || '' })) };
   });
   if (!due.length) return;
   commit(state => { for (const task of state.tasks) if (due.some(item => item.id === task.id)) task.reminderFiredAt = new Date().toISOString(); });
   if (!Notification.isSupported()) return;
   for (const task of due) {
     try {
-      const notification = new Notification({ title: task.title, body: [task.listName, task.dueDate ? tr("마감 {0}", [task.dueDate]) : tr('할 일 알림')].filter(Boolean).join(' · '), icon: path.join(__dirname, 'assets', 'toast.png') });
+      const notification = new Notification({ title: task.title, body: [task.listName, task.dueDate ? tr("마감 {0}", [taskDueLine(task, { now, timeFormat }) /* with its time (2026-11-05), as the task row writes it (2026-11-09 review F9) */]) : tr('할 일 알림')].filter(Boolean).join(' · '), icon: path.join(__dirname, 'assets', 'toast.png') });
       notification.on('click', showMain);
       notification.show();
     } catch (error) { console.error('reminder notification failed:', error.message); }
@@ -210,7 +219,7 @@ function checkEventAlerts() {
   if (!store || quitting) return;
   // Read without copying the state; nothing is looked at while 일정 알림 is off (2026-10-27 review).
   const { due, timeFormat } = store.read(current => current.settings.eventAlerts === false ? { due: [] } : {
-    due: dueAlerts(current).map(item => ({ key: item.key, event: { id: item.event.id, title: item.event.title, start: item.event.start, allDay: Boolean(item.event.allDay), location: item.event.location || '' } })),
+    due: dueAlerts(current).map(item => ({ key: item.key, event: { id: item.event.id, title: item.event.title, start: item.event.start, end: item.event.end || '', allDay: Boolean(item.event.allDay), location: item.event.location || '' } })),
     timeFormat: current.settings.timeFormat,
   });
   if (!due.length) return;
@@ -313,15 +322,27 @@ function commonWindow(extra = {}) {
 // to it where it is, kept on its screen — its content zooms and the smallest card shows what it showed at 기본. A card is never made
 // smaller here. Desktop cards (attached to the wallpaper) are moved by the desktop manager and get their wallpaper slice again. The
 // window itself keeps no minimum to change (it is not resizable): widget:resize and the grip clamp with the same rule.
+// Where Dayboard itself moved or sized a widget, and why (2026-11-08 owner: 「위젯 크기와 위치가 내가 설정해 놓은 크기랑 위치에서 자꾸 변경」): a short
+// local log beside the data with the screens of that moment, so the next time it happens there is a record to read. Rectangles only.
+function logWidgetMove(widget, reason, from, to) {
+  try {
+    const file = path.join(userData, 'widget-moves.log');
+    const displays = screen.getAllDisplays().map(d => `${d.bounds.x},${d.bounds.y} ${d.bounds.width}x${d.bounds.height}@${d.scaleFactor}`).join(' | ');
+    const line = JSON.stringify({ at: new Date().toISOString(), type: widget.type, reason, from, to, displays });
+    let old = ''; try { old = fs.readFileSync(file, 'utf8'); } catch { /* none yet */ }
+    fs.writeFileSync(file, [...old.split('\n').filter(Boolean), line].slice(-300).join('\n') + '\n');
+  } catch { /* a log is never worth a failure */ }
+}
 function applyWidgetMinimums() {
   if (!store) return;
-  for (const widget of store.get().widgets) {
+  // Read without copying the whole state (2026-11-09 review F32; the store's own note on frequent checks).
+  for (const widget of store.read(s => s.widgets.map(w => ({ id: w.id, type: w.type })))) {
     const win = widgetWindows.get(widget.id);
     if (!win || win.isDestroyed()) continue;
-    const minimum = widgetMinimum(widget.type, store.get().settings.widgetTextSize);
+    const minimum = widgetMinimum(widget.type, store.read(s => s.settings.widgetTextSize));
     try {
       const current = desktop.getBounds(win, screen);
-      if (current.width < minimum.minWidth || current.height < minimum.minHeight) { desktop.setBounds(win, clampBounds(current, screen.getAllDisplays(), current, minimum), screen); queueBackdrop(win); }
+      if (current.width < minimum.minWidth || current.height < minimum.minHeight) { const next = clampBounds(current, screen.getAllDisplays(), current, minimum); logWidgetMove(widget, 'minimum', current, next); desktop.setBounds(win, next, screen); queueBackdrop(win); }
     } catch (error) { console.error('widget minimum not applied:', error.message); }
   }
 }
@@ -397,7 +418,7 @@ async function openWidget(widget) {
   if (quitting) { const cancelled = new Error(tr('위젯을 여는 중에 닫혔어요.')); cancelled.cancelled = true; throw cancelled; } // no new window once the quit began
   const area = screen.getPrimaryDisplay().workArea;
   const size = { ...(WIDGET_OPEN[widget.type] || WIDGET_OPEN.note) };
-  const minimum = widgetMinimum(widget.type, store.get().settings.widgetTextSize); // WIDGET_MIN at the widgets' text size (r60-X)
+  const minimum = widgetMinimum(widget.type, store.read(s => s.settings.widgetTextSize)); // WIDGET_MIN at the widgets' text size (r60-X)
   const displays = screen.getAllDisplays();
   // A widget whose screen is not connected (second monitor off or undocked) waits in a free spot on the main screen,
   // never piled on another widget, and keeps its own place (homeBounds) for when that screen returns (rehomeWidgets),
@@ -408,8 +429,10 @@ async function openWidget(widget) {
     const away = { width: Math.max(minimum.minWidth, Math.round(home.width) || size.width), height: Math.max(minimum.minHeight, Math.round(home.height) || size.height) };
     bounds = clampBounds({ ...freeSlot(away, area), ...away }, displays, { ...freeSlot(size, area), ...size }, minimum);
     if (!widget.homeBounds) commit(state => { const current = state.widgets.find(item => item.id === widget.id); if (current) current.homeBounds = { ...home }; });
+    logWidgetMove(widget, 'opened-screen-gone', home, bounds);
   } else {
     bounds = clampBounds(home, displays, { ...freeSlot(size, area), ...size }, minimum);
+    if (home && ['x', 'y', 'width', 'height'].some(key => Math.round(home[key]) !== bounds[key])) logWidgetMove(widget, 'opened-corrected', home, bounds);
     if (widget.homeBounds) commit(state => { const current = state.widgets.find(item => item.id === widget.id); if (current) delete current.homeBounds; });
   }
   const win = new BrowserWindow({ ...commonWindow(), ...bounds, ...minimum,
@@ -460,6 +483,8 @@ async function openWidget(widget) {
     const wasAttached = desktop.isAttached(win);
     desktop.release(win);
     backdropKeys.delete(win.id);
+    revealTokens.delete(win.id);
+    resizeAnchors.delete(widget.id);
     widgetWindows.delete(widget.id);
     // An Explorer restart destroys child windows of the desktop host. If the
     // widget is still wanted (its record survived), reopen it once the shell is back.
@@ -609,8 +634,13 @@ function refreshBackdrops() {
   wallpaper.invalidate();
   for (const [id, win] of widgetWindows) {
     if (win.isDestroyed() || !desktop.isAttached(win)) continue;
-    // A widget that fell back to the opaque card (wallpaper unreadable for a moment) tries again.
-    if (desktop.shapeOf(win) === 'card') perWidget(id, () => revealOnDesktop(win, { hide: true }).then(backdrop => setWidgetBackdrop(id, backdrop))).catch(() => {});
+    // A widget that fell back to the opaque card (wallpaper unreadable for a moment) tries again — hidden only once its monitor has a
+    // picture now; while it has none the card stays, without hiding and coming back each time (2026-11-09 review F26, tests/backdrop-card-1109).
+    if (desktop.shapeOf(win) === 'card') perWidget(id, async () => {
+      const scene = await wallpaper.scene(), rect = !win.isDestroyed() && desktop.screenRect(win), monitor = rect && wallpaper.forRect(rect, scene);
+      if (!monitor || monitor.image === undefined || win.isDestroyed() || !desktop.isAttached(win)) return;
+      return revealOnDesktop(win, { hide: true }).then(backdrop => setWidgetBackdrop(id, backdrop));
+    }).catch(() => {});
     else queueBackdrop(win);
   }
 }
@@ -628,6 +658,8 @@ function watchWallpaper() {
   // and the event can arrive inside a native call (no koffi from there).
   let rehomeTimer = null;
   for (const name of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(name, () => { clearTimeout(rehomeTimer); rehomeTimer = setTimeout(rehomeWidgets, 1500); });
+  // Waking or unlocking the PC can bring a screen back without a display event reaching here: a widget waiting for it goes home then too (2026-11-08).
+  for (const name of ['resume', 'unlock-screen']) powerMonitor.on(name, () => { clearTimeout(rehomeTimer); rehomeTimer = setTimeout(rehomeWidgets, 3000); });
   setInterval(scheduleBackdropRefresh, 5 * 60 * 1000).unref?.();
 }
 function rehomeWidgets() {
@@ -637,10 +669,12 @@ function rehomeWidgets() {
   for (const widget of store.get().widgets) {
     const win = widgetWindows.get(widget.id);
     if (!win || win.isDestroyed()) continue;
-    const minimum = widgetMinimum(widget.type, store.get().settings.widgetTextSize);
+    const minimum = widgetMinimum(widget.type, store.read(s => s.settings.widgetTextSize));
     try {
       if (widget.homeBounds && onScreen(widget.homeBounds, displays)) {
-        desktop.setBounds(win, clampBounds(widget.homeBounds, displays, widget.homeBounds, minimum), screen);
+        const back = clampBounds(widget.homeBounds, displays, widget.homeBounds, minimum);
+        logWidgetMove(widget, 'screen-back', desktop.getBounds(win, screen), back);
+        desktop.setBounds(win, back, screen);
         commit(state => { const current = state.widgets.find(item => item.id === widget.id); if (current) delete current.homeBounds; });
         queueBackdrop(win);
         continue;
@@ -650,6 +684,7 @@ function rehomeWidgets() {
       const away = { width: Math.max(minimum.minWidth, current.width), height: Math.max(minimum.minHeight, current.height) };
       const target = clampBounds({ ...freeSlot(away, area), ...away }, displays, { ...freeSlot(away, area), ...away }, minimum);
       commit(state => { const stored = state.widgets.find(item => item.id === widget.id); if (stored && !stored.homeBounds) stored.homeBounds = { ...(stored.bounds || current) }; });
+      logWidgetMove(widget, 'screen-gone', current, target);
       desktop.setBounds(win, target, screen);
       queueBackdrop(win);
     } catch (error) { console.error('widget not moved after a display change:', error.message); }
@@ -664,6 +699,9 @@ function liveNote(id) {
 // Notes in 「최근 삭제한 메모」 for 30 days are deleted for good; the deletion reaches the other PCs like any other. The 30
 // days run on this PC's clock from when this PC first saw the note there (trashSeenAt), never against another PC's clock
 // (2026-10-21 review).
+// lib/backup.cjs. Off the start and off any click: a minute after start, then looked at hourly, and it writes at most once a day.
+let lastRestore = null;
+const runBackup = backupRunner({ live: () => Boolean(store) && !quitting, folder: backupFolder, read: fn => store.read(fn), save: status => commit(state => { state.backup = status; }) });
 function purgeTrash() {
   const cutoff = Date.now() - TRASH_DAYS * 86400000;
   const old = store.get().notes.filter(note => note.trashedAt && Date.parse(note.trashSeenAt || note.trashedAt) < cutoff);
@@ -701,6 +739,19 @@ function resolveEvent(rawId) {
     if (master && master.rrule) return { event: master, recurrenceId: id.slice(at + 1) };
   }
   throw new Error(tr('항목이 없거나 이미 삭제되었습니다. 화면을 새로 열어 주세요.'));
+}
+// An event's notes as the card or the widget's dialog sends them (2026-11-05 owner 「달력 메모 이거도 구현해줘」). A connected calendar's
+// note this PC has not read yet (an event stored before notes came) is never written over, and one the service keeps with formatting
+// (`notesRich`: links, bold, a list — lib/providers/common.cjs) only when the user chose 「텍스트로 고치기」 in the card (`notesPlain`):
+// an edit otherwise flattened it for every device. One shown cut at 20,000 characters (`notesCut`) is never changed from here, even as
+// text: a save kept only what this PC shows and deleted the rest everywhere (2026-11-05 check). History events never get here
+// (resolveEvent does not know them). This PC's events carry neither mark (lib/store.cjs drops them, an archive's included).
+function notesEditable(previous, payload, calendar) {
+  if (!('notes' in payload) || calendar.provider === 'local') return;
+  if (typeof previous.notes !== 'string') throw new Error(tr('이 일정의 메모를 아직 받지 못했어요. 동기화한 뒤 다시 시도해 주세요.'));
+  const changed = String(payload.notes ?? '').trim() !== previous.notes;
+  if (previous.notesCut && changed) throw new Error(tr('메모가 길어 앞부분만 보여요. 원래 달력 앱에서 고쳐 주세요.'));
+  if (previous.notesRich && payload.notesPlain !== true && changed) throw new Error(tr('서식이 있는 메모는 원래 달력 앱에서 고쳐 주세요.'));
 }
 // What an edit changes about a repeating event, for renderer/domain.js scopeChoices: 하루 종일 flipped, the start moved to another
 // local day than `from` has (the series' start, or the occurrence's), the rule itself. Values are validated first, as the edit's are.
@@ -752,6 +803,9 @@ async function writeRemoteEvent(kind, event, calendar, { scope = 'one', previous
 //    queued one could open after the user had moved on).
 // Every name is a case of command() (tests/commands.test.cjs).
 const DIRECT_COMMANDS = new Set(['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'widget:glass-preview', 'emoji:panel', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit']);
+// A folder's name from a window: what is kept (lib/notekey.cjs) or a refusal. Taken: by this PC's list or by a live note, case aside.
+function folderName(value) { const name = noteFolderName(value); if (!name) throw new Error(tr('폴더 이름을 확인해 주세요.')); return name; }
+function folderTaken(name, except) { const low = name.toLocaleLowerCase(); const state = store.get(); return [...(state.settings.noteFolders || []), ...state.notes.filter(note => !note.trashedAt && note.folder).map(note => note.folder)].some(item => item !== except && item.toLocaleLowerCase() === low); }
 async function command(commandName, payload, sourceWindow) {
   const now = () => new Date().toISOString();
   switch (commandName) {
@@ -759,10 +813,12 @@ async function command(commandName, payload, sourceWindow) {
     case 'task:add': {
       const list = lookup('lists', payload.listId || 'local-inbox');
       let task = { id: randomUUID(), listId: list.id, title: text(payload.title, tr('할 일 제목'), 500),
-        notes: rawText(payload.notes ?? '', tr('메모'), 20000), dueDate: dateOnly(payload.dueDate), reminderAt: reminderAt(payload.reminderAt),
+        notes: noteText(payload.notes ?? '', tr('메모'), 20000), dueDate: dateOnly(payload.dueDate), reminderAt: reminderAt(payload.reminderAt),
         important: payload.important === undefined ? false : boolean(payload.important, tr('중요')), completed: false, createdAt: now(), updatedAt: now() };
       // A repeat and steps come with a task given back by 되돌리기 (app.js deleteLocalTask), as task:update takes them (lib/tasks.cjs).
       if (payload.rrule !== undefined) setRepeat(task, payload.rrule, list.provider, todayKey());
+      // A time on its date (2026-11-05): from the editor, a title's words or 되돌리기 of a deletion (lib/tasks.cjs setDueTime).
+      if (payload.dueTime !== undefined) setDueTime(task, payload.dueTime, list.provider);
       if (payload.steps !== undefined) { const steps = taskSteps(payload.steps); if (steps.length) task.steps = steps; }
       if (list.provider !== 'local') task = { ...task, ...await cloudTask('add', task, list), id: task.id, listId: list.id };
       commit(state => state.tasks.push(task)); return publicRecord('tasks', task);
@@ -771,30 +827,46 @@ async function command(commandName, payload, sourceWindow) {
       const previous = lookup('tasks', payload.id);
       const list = lookup('lists', previous.listId);
       // Unticking the completed copy To Do made when it moved a series on is 되돌리기 of that series (lib/tasks.cjs rolledSeries).
-      if (list.provider === 'microsoft' && payload.completed === false && Object.keys(payload).every(key => key === 'id' || key === 'completed')) {
+      // (되돌리기 brings the subtasks' ticks along since 2026-11-09, lib/tasks.cjs stepsDone: steps + stepsBase are part of that same undo.)
+      if (list.provider === 'microsoft' && payload.completed === false && Object.keys(payload).every(key => ['id', 'completed', 'steps', 'stepsBase'].includes(key))) {
         const series = store.read(state => rolledSeries(previous, state.tasks, Date.now())?.id);
         if (series) return command('task:update', { id: series, completed: false });
       }
       let task = { ...previous, updatedAt: now() };
       if ('title' in payload) task.title = text(payload.title, tr('할 일 제목'), 500);
-      if ('notes' in payload) task.notes = rawText(payload.notes, tr('메모'), 20000);
+      if ('notes' in payload) task.notes = noteText(payload.notes, tr('메모'), 20000); // white space alone is no note (2026-11-06)
       if ('dueDate' in payload) task.dueDate = dateOnly(payload.dueDate);
       if ('reminderAt' in payload) { task.reminderAt = reminderAt(payload.reminderAt); if (task.reminderAt !== (previous.reminderAt || '')) delete task.reminderFiredAt; }
       if ('important' in payload) task.important = boolean(payload.important, tr('중요'));
       if ('completed' in payload) task.completed = boolean(payload.completed, tr('완료'));
-      // Steps (To Do's 단계, Google's subtasks): the dialog sends them all; a row's circle sends one step, applied to the steps as they
-      // are now, so two quick ticks both stay (2026-10-27 review: the whole list sent from the screen undid the first tick).
-      if ('steps' in payload) { const steps = taskSteps(payload.steps, previous.steps); if (steps.length) task.steps = steps; else delete task.steps; }
-      if ('step' in payload) {
-        const id = identifier(payload.step?.id); const done = boolean(payload.step?.completed, tr('하위 할 일'));
-        if (!(task.steps || []).some(step => step.id === id)) throw new Error(tr('항목이 없거나 이미 삭제되었습니다. 화면을 새로 열어 주세요.'));
-        task.steps = task.steps.map(step => step.id === id ? { ...step, completed: done } : step);
-      }
+      // Steps (To Do's 단계, Google's subtasks): the dialog and the right panel send them all, with the steps they opened on; a row sends
+      // one step — ticked, renamed, removed or put back —, applied to the steps as they are now, so two quick changes both stay (2026-10-27
+      // review: the whole list sent from the screen undid the first tick; 2026-11-06: the list shows them under their task). lib/tasks.cjs
+      // wantedSteps.
+      // 되돌리기 of a repeating To Do task's completion: what To Do made is looked up in the stored tasks (lib/tasks.cjs cloudUndo). Known
+      // before the steps are laid: where To Do moved the series on, the row's 되돌리기 sends the ticks they had over the all-ticked steps it
+      // assumes (stepsBase), but the series' stored steps are the next occurrence's, open — laid over those as they stand instead, so a
+      // step ticked before the completion comes back ticked (2026-11-09 review).
+      const hints = list.provider === 'microsoft' ? cloudUndo(previous, payload.completed === false, store.read(state => state.tasks.filter(item => item.listId === list.id)), Date.now()) : null;
+      const asked = hints?.undoRepeat === 'roll' && 'steps' in payload ? { ...payload, stepsBase: previous.steps || [] } : payload;
+      const steps = wantedSteps(asked, previous.steps);
+      if (steps) { if (steps.length) task.steps = steps; else delete task.steps; }
+      // Completing the task completes its subtasks in the same write (2026-11-09 owner, as Reminders; lib/tasks.cjs stepsDone) — on the steps
+      // as they stand now, so a step a sync brought meanwhile is ticked too; reopening leaves them, 되돌리기 sends their old ticks back.
+      const ticked = stepsDone(task, previous); if (ticked !== task.steps) task.steps = ticked;
       // Repeat (lib/tasks.cjs setRepeat). Clearing the date takes the repeat away too: Reminders and To Do repeat dated tasks only.
       // A repeat To Do holds that Dayboard cannot read keeps its date in To Do (its range would have to be sent with the date).
       if ('rrule' in payload) setRepeat(task, payload.rrule, list.provider, todayKey());
       else if ('dueDate' in payload && !task.dueDate && task.rrule) delete task.rrule;
-      if (previous.repeatsElsewhere && task.dueDate !== (previous.dueDate || '') && !(task.rrule && 'rrule' in payload)) throw new Error(tr('To Do에서 정한 반복이라 날짜는 To Do 앱에서 바꿔 주세요.'));
+      // The time on its date (2026-11-05, lib/tasks.cjs setDueTime): a date moved alone keeps it (Reminders' 「내일」 keeps the time), a
+      // date cleared takes it away; a repeat that came with today's date gets none. A To Do repeat Dayboard cannot read keeps it in To Do
+      // as it keeps its date: a new time is a patched dueDateTime, which moves that series one occurrence on.
+      if ('dueTime' in payload) setDueTime(task, payload.dueTime, list.provider);
+      else if (task.dueTime && !task.dueDate) delete task.dueTime;
+      if (previous.repeatsElsewhere && (task.dueDate !== (previous.dueDate || '') || (task.dueTime || '') !== (previous.dueTime || '')) && !(task.rrule && 'rrule' in payload)) throw new Error(tr('To Do에서 정한 반복이라 날짜는 To Do 앱에서 바꿔 주세요.'));
+      // A reminder read from the time (「30분 전」) moves with it when the date or the time came alone — a row's 오늘·내일·다음 주 and its
+      // 되돌리기 (2026-11-05 review: it stayed on the old day) —, as the editor moves it; kept as a reminder the user set (lib/tasks.cjs followDue).
+      const followed = !('reminderAt' in payload) && ('dueDate' in payload || 'dueTime' in payload) && followDue(task, previous);
       if ('listId' in payload && payload.listId !== previous.listId) {
         const target = lookup('lists', payload.listId);
         if (list.provider !== 'local' || target.provider !== 'local') throw new Error(tr('계정 목록 간 이동은 지원하지 않습니다. 새 목록에 추가해 주세요.'));
@@ -803,20 +875,31 @@ async function command(commandName, payload, sourceWindow) {
       const completing = task.completed && !previous.completed, reopening = !task.completed && previous.completed;
       let added = null; const dropped = new Set();
       if (list.provider !== 'local') {
-        // 되돌리기 of a repeating To Do task's completion: what To Do made is looked up in the stored tasks (lib/tasks.cjs cloudUndo).
-        const hints = list.provider === 'microsoft' ? cloudUndo(previous, payload.completed === false, store.read(state => state.tasks.filter(item => item.listId === list.id)), Date.now()) : null;
-        if (hints) Object.assign(task, hints);
+        if (hints) Object.assign(task, hints); // the 되돌리기 hints (cloudUndo, above)
         // What the service answered, or after a failure part-way (steps) what it has now: the same bookkeeping (lib/tasks.cjs
         // settleAnswer) — hints taken off, a moved reminder rings, a completion can be undone.
-        const settle = answer => settleAnswer(task, previous, answer, { keepsReminder: 'reminderAt' in payload, undone: Boolean(hints) || reopening, completing });
+        const settle = answer => settleAnswer(task, previous, answer, { keepsReminder: 'reminderAt' in payload || followed, undone: Boolean(hints) || reopening, completing });
         let settled;
         try { settled = settle(await sync.mutateTask('update', task, list)); }
         catch (error) {
-          if (error.partial) {
-            const kept = settle(error.partial);
-            commit(state => { state.tasks = state.tasks.map(item => item.id === kept.task.id ? kept.task : item).filter(item => item.id === kept.task.id || !(item.listId === list.id && kept.dropped.includes(item.remoteId))); });
+          if (!error.partial) throw error;
+          const kept = settle(error.partial);
+          const keep = found => commit(state => { state.tasks = state.tasks.map(item => item.id === found.task.id ? found.task : item).filter(item => item.id === found.task.id || !(item.listId === list.id && found.dropped.includes(item.remoteId))); });
+          keep(kept);
+          // The task is done at the service but a step's tick did not go (a 5xx on its PATCH): one more try for the open ones now — the task
+          // being completed already, nothing else would send them (2026-11-09 review: a done task kept two open subtasks) — and failing
+          // that, the message says how many stayed open.
+          const open = () => (store.peek('tasks', kept.task.id)?.steps || []).filter(step => !step.completed);
+          if (!(completing && kept.task.completed && open().length)) throw error;
+          try {
+            const stored = store.peek('tasks', kept.task.id);
+            settled = settle(await sync.mutateTask('update', { ...stored, updatedAt: now(), steps: stored.steps.map(step => (step.completed ? step : { ...step, completed: true })) }, list));
+          } catch (second) {
+            if (second.partial) keep(settle(second.partial));
+            const left = open().length;
+            if (!left) throw error;
+            throw Object.assign(new Error(error.message + ' ' + tr('하위 할 일 {0}개는 완료로 표시하지 못했어요.', [left])), { partial: error.partial });
           }
-          throw error;
         }
         task = settled.task; for (const remoteId of settled.dropped) dropped.add(remoteId);
       } else {
@@ -855,6 +938,7 @@ async function command(commandName, payload, sourceWindow) {
     // fields (`draft`), so the dialog says why before it saves —, transfer with the warnings the user accepted (`accept`, lib/taskmove.cjs
     // WARNS) and `undo` (the move back of a move just made), transfer-finish to delete an original a move kept at its service. A whole
     // list (listId) still goes from this PC to an account only.
+    case 'task:holds': return sync.taskHolds(identifier(payload.id)); // what a subtask would not keep (lib/sync.cjs taskHolds)
     case 'task:transfer-check': {
       const list = lookup('lists', payload.to);
       if (!isAccountList(list) && list.provider !== 'local') throw new Error(tr('옮길 계정 목록을 찾지 못했어요. 동기화한 뒤 다시 시도해 주세요.'));
@@ -866,8 +950,9 @@ async function command(commandName, payload, sourceWindow) {
         if (!ids || ids.size !== 1 || !payload.draft || typeof payload.draft !== 'object' || Array.isArray(payload.draft)) throw new Error(tr('할 일 옮기기 요청이 올바르지 않습니다.'));
         const fields = payload.draft; draft = {};
         if ('dueDate' in fields) draft.dueDate = dateOnly(fields.dueDate);
+        if ('dueTime' in fields) draft.dueTime = dueTime(fields.dueTime);
         if ('reminderAt' in fields) draft.reminderAt = reminderAt(fields.reminderAt);
-        if ('notes' in fields) draft.notes = rawText(fields.notes, tr('메모'), 20000);
+        if ('notes' in fields) draft.notes = noteText(fields.notes, tr('메모'), 20000);
         if ('rrule' in fields) draft.rrule = rruleText(fields.rrule);
       }
       return store.read(state => {
@@ -877,6 +962,7 @@ async function command(commandName, payload, sourceWindow) {
           // The dialog's fields over the task as it is (a repeat goes with a cleared date, as task:update does).
           const task = { ...item, ...draft };
           if (!task.rrule || ('dueDate' in draft && !task.dueDate)) delete task.rrule;
+          if (!task.dueDate || !task.dueTime) delete task.dueTime;
           return task;
         });
         return moveSummary(tasks, list, state.taskMoves || [], id => state.lists.find(item => item.id === id));
@@ -891,9 +977,26 @@ async function command(commandName, payload, sourceWindow) {
       commit(state => { state.tasks = state.tasks.filter(item => item.id !== task.id); }); return store.publicState();
     }
     case 'list:add': {
-      const list = { id: randomUUID(), name: text(payload.name, tr('목록 이름'), 100), color: color(payload.color), provider: 'local' };
-      const icon = listIcon(payload.icon); if (icon) list.icon = icon;
-      const group = groupRef(payload.groupId); if (group) list.groupId = group;
+      const name = text(payload.name, tr('목록 이름'), 100);
+      const look = { color: color(payload.color) };
+      const icon = listIcon(payload.icon); if (icon) look.icon = icon;
+      const group = groupRef(payload.groupId); if (group) look.groupId = group;
+      // In a connected account (2026-11-05 owner: 「Microsoft 계정에 할 일 목록을 추가 하고 싶은데 … 이PC에만 할 일 목록이 생성되는 데
+      // 왜이래?」): made at the service first, then kept here under the id a sync gives it — a sync that ran meanwhile and brought it
+      // already is not doubled.
+      if (payload.accountId) {
+        const account = typeof payload.accountId === 'string' ? store.peek('accounts', payload.accountId) : undefined;
+        if (!account || !['microsoft', 'google'].includes(account.provider)) throw new Error(tr('목록을 만들 계정을 찾지 못했어요.'));
+        if (account.syncTasks === false) throw new Error(tr('이 계정의 「할 일」이 꺼져 있어요. 계정에서 켜 주세요.'));
+        const made = await sync.mutateList('add', { name, accountId: account.id, provider: account.provider });
+        let list;
+        commit(state => {
+          const there = state.lists.find(item => item.id === made.id);
+          if (there) { Object.assign(there, look); list = there; } else { list = { ...made, ...look }; state.lists.push(list); }
+        });
+        return list;
+      }
+      const list = { id: randomUUID(), name, ...look, provider: 'local' };
       commit(state => state.lists.push(list)); return list;
     }
     case 'list:update': {
@@ -947,11 +1050,49 @@ async function command(commandName, payload, sourceWindow) {
         for (const widget of state.widgets) if (widget.listId === list.id) widget.listId = 'today';
         if (state.settings.defaultListId === list.id) state.settings.defaultListId = null;
         state.settings.hiddenLists = (state.settings.hiddenLists || []).filter(id => id !== list.id);
+        state.settings.notInAll = (state.settings.notInAll || []).filter(id => id !== list.id);
         state.settings.listOrder = (state.settings.listOrder || []).filter(id => id !== list.id);
         // Deleting the last visible list must not leave every remaining list hidden.
         keepOneVisible(state);
       });
       return store.publicState();
+    }
+    // Folders (2026-11-07 owner). A note names its folder and carries it to the other PCs, where the newest change wins (lib/notesync.cjs);
+    // settings.noteFolders is this PC's list, empty folders too, and a name only a note brings shows after it. Names are unique, case aside.
+    case 'note:folder': {
+      const previous = lookup('notes', payload.id);
+      const folder = payload.folder === null ? '' : folderName(payload.folder);
+      if ((previous.folder || '') === folder) return shownNote(previous);
+      const note = { ...previous, updatedAt: laterThan(now(), previous.updatedAt), folderAt: laterThan(now(), previous.folderAt), textKey: previous.textKey || noteKey(previous) };
+      if (folder) note.folder = folder; else delete note.folder;
+      commit(state => { state.notes = state.notes.map(item => item.id === note.id ? note : item); });
+      sync?.scheduleNotes();
+      return shownNote(note);
+    }
+    case 'note:folder-add': {
+      const name = folderName(payload.name);
+      if (folderTaken(name)) throw new Error(tr('같은 이름의 폴더가 있어요.'));
+      commit(state => { state.settings.noteFolders = [...(state.settings.noteFolders || []), name]; });
+      return { name };
+    }
+    case 'note:folder-rename': {
+      const from = folderName(payload.from), to = folderName(payload.to);
+      if (from === to) return { name: to };
+      if (folderTaken(to, from)) throw new Error(tr('같은 이름의 폴더가 있어요.'));
+      const at = now();
+      commit(state => {
+        state.settings.noteFolders = (state.settings.noteFolders || []).map(name => name === from ? to : name);
+        state.notes = state.notes.map(note => note.folder !== from ? note : { ...note, folder: to, updatedAt: laterThan(at, note.updatedAt), folderAt: laterThan(at, note.folderAt), textKey: note.textKey || noteKey(note) });
+      });
+      sync?.scheduleNotes();
+      return { name: to };
+    }
+    // Deleting a folder sends its notes to 「최근 삭제한 메모」 for 30 days, as Apple Notes does; a note restored brings its folder's name back.
+    case 'note:folder-delete': {
+      const name = folderName(payload.name);
+      for (const note of store.get().notes.filter(item => item.folder === name && !item.trashedAt)) await command('note:trash', { id: note.id }, sourceWindow);
+      commit(state => { state.settings.noteFolders = (state.settings.noteFolders || []).filter(item => item !== name); });
+      return { name };
     }
     case 'note:save': {
       // revive: a draft whose note was deleted (on another PC) while it was typed in comes back under its own id —
@@ -983,6 +1124,13 @@ async function command(commandName, payload, sourceWindow) {
       // A pin stays through typing (2026-10-21 review round 4: the first autosave unpinned the note on every PC).
       if (previous?.pinned) note.pinned = true;
       if (previous?.pinnedAt) note.pinnedAt = previous.pinnedAt; // when the pin last changed (lib/notesync.cjs merges by it)
+      // Its folder stays through typing too; a new note starts in the folder in view.
+      if (previous?.folder) note.folder = previous.folder;
+      if (previous?.folderAt) note.folderAt = previous.folderAt;
+      // A note revived under its own id comes back in the folder and with the pin its draft had on screen (2026-11-09 review F79); one
+      // folder rule with the folder commands (lib/notekey.cjs noteFolderName: tidied, over 40 characters no folder — F86).
+      if (!previous && typeof payload.folder === 'string' && payload.folder.trim()) { const folder = noteFolderName(payload.folder); if (folder) { note.folder = folder; note.folderAt = note.updatedAt; } }
+      if (revive && payload.pinned === true) { note.pinned = true; note.pinnedAt = note.updatedAt; }
       // The version that brought this text (lib/notesync.cjs textKey): kept while the text stays, new text is its own.
       if (previous && sameContent(previous, note)) note.textKey = previous.textKey || noteKey(previous);
       // When this PC stored the text (local only): earlier versions count "settled" from it, never from a forced time.
@@ -991,14 +1139,15 @@ async function command(commandName, payload, sourceWindow) {
         if (previous) state.notes = state.notes.map(item => item.id === note.id ? note : item); else state.notes.push(note);
         if (copy && !state.notes.some(item => item.id === copy.id)) state.notes.push(copy);
       });
-      sync?.scheduleNotes(); // other PCs get it a few seconds later (notes sync through Google, when on)
+      sync?.scheduleNotes(); // other PCs get it a few seconds later (notes sync through Google or OneDrive, when on)
       return shownNote(note);
     }
     // 「최근 삭제한 메모」: deleting moves a note there for 30 days (purgeTrash); every PC sees it there and can restore it.
     case 'note:trash': {
-      // Typing still waiting in the note's widget windows is saved first: the trash keeps what was on screen.
+      // Typing still waiting in the note's widget windows is saved first: the trash keeps what was on screen, and a save that fails
+      // stops the delete, whose window would take that typing with it (2026-11-08 Codex full review F2).
       const open = store.get().widgets.filter(w => w.noteId === payload.id).map(w => w.id);
-      await Promise.all(open.map(id => flushWindow(widgetWindows.get(id), 'notes').catch(() => {})));
+      await Promise.all(open.map(id => flushWindow(widgetWindows.get(id), 'notes')));
       const previous = lookup('notes', payload.id);
       if (previous.trashedAt) return shownNote(previous);
       const at = now();
@@ -1042,6 +1191,7 @@ async function command(commandName, payload, sourceWindow) {
       const room = 200 - tr('{0} 사본', ['']).length;
       const head = String(source.title || tr('메모'));
       const note = { id: randomUUID(), title: rawText(tr('{0} 사본', [head.length > room ? head.slice(0, room).replace(/[\uD800-\uDBFF]$/, '') : head]), tr('메모 제목'), 200), body: source.body, color: source.color, updatedAt: at, editedAt: at, storedAt: at, past: [] };
+      if (source.folder) { note.folder = source.folder; note.folderAt = note.updatedAt; }
       commit(state => {
         state.notes.push(note);
         const order = state.settings.noteOrder || [];
@@ -1103,7 +1253,7 @@ async function command(commandName, payload, sourceWindow) {
       const key = typeof payload.key === 'string' && /^[0-9a-f]{32}$/.test(payload.key) ? payload.key : '';
       // The same fields, checks and messages as an edit (lib/series.cjs eventFields; 2026-10-27 review: event:add repeated them).
       const id = key ? `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}` : randomUUID();
-      const event = eventFields({ title: payload.title, start: payload.start, end: payload.end, location: payload.location ?? '', color: payload.color, rrule: payload.rrule, ...('alert' in payload ? { alert: payload.alert } : {}) }, { id, calendarId: calendar.id, provider: calendar.provider }, allDay);
+      const event = eventFields({ title: payload.title, start: payload.start, end: payload.end, location: payload.location ?? '', notes: payload.notes ?? '', color: payload.color, rrule: payload.rrule, ...('alert' in payload ? { alert: payload.alert } : {}) }, { id, calendarId: calendar.id, provider: calendar.provider }, allDay);
       // A resend of the same key returns the first event; only a card sent again with other values (revise) updates it
       // (2026-10-26 recheck: an edit made before 「다시 시도」 was dropped; a kept add resent later overwrote edits made since).
       const revise = payload.revise === true;
@@ -1134,12 +1284,15 @@ async function command(commandName, payload, sourceWindow) {
         // scopes a change may take are one rule for main, the card and the widget's dialog (renderer/domain.js scopeChoices).
         if (previous.recurring && scope !== 'one' && !scopeChoices(previous, { provider: true, ...scopeFacts(payload, previous, allDay) })[scope]) throw new Error(tr('연결된 달력의 반복 일정을 다른 날로 옮기거나 하루 종일을 바꿀 때는 「이 일정만」으로 저장해 주세요.'));
         if (previous.recurring && scope !== 'one' && alertOtherKind(payload, previous, store.read(state => seriesAllDay(previous, state.events)))) throw new Error(tr('하루 종일로 바꾼 회차의 알림은 「이 일정만」으로 바꿔 주세요.'));
+        notesEditable(previous, payload, calendar);
         const desired = eventFields(payload, previous, allDay);
         const updated = await writeRemoteEvent('update', desired, calendar, { scope, previous, color: 'color' in payload ? (desired.color || null) : undefined });
         return updated.find(item => item.id === previous.id) || updated[0] || store.publicState();
       }
       // A plain event, an exception, or a master edited as a whole: update in place.
       if (!recurrenceId || !previous.rrule) {
+        // An occurrence edited on its own keeps no rule: it would be a series still tied to the old one and go with it (2026-11-09 review F46)
+        if (previous.masterId && !previous.rrule && 'rrule' in payload && rruleText(payload.rrule)) throw new Error(tr('따로 고친 반복 회차에는 반복을 넣을 수 없어요.'));
         const event = eventFields(payload, previous, allDay);
         // The series itself (a card holds it right after 반복 was chosen): another day or time moves its weekdays, skipped
         // days and edited occurrences along, as 「모든 일정」 does, and no repeat any more leaves the edited occurrences as
@@ -1167,7 +1320,7 @@ async function command(commandName, payload, sourceWindow) {
         if (alertOtherKind(payload, occurrence, previous.allDay)) throw new Error(tr('하루 종일로 바꾼 회차의 알림은 「이 일정만」으로 바꿔 주세요.'));
         if (!scopeChoices(previous, { provider: false, ...facts })[scope]) throw new Error(facts.flip ? tr('하루 종일로 바꾸거나 되돌리는 변경은 이 일정에만 적용할 수 있어요.') : tr('매월·매년 반복 일정을 다른 날로 옮길 때는 「이 일정만」이나 「이후 모든 일정」을 골라 주세요.'));
       }
-      const inherited = { calendarId: previous.calendarId, title: previous.title, start: occurrence.start, end: occurrence.end, allDay: previous.allDay, location: previous.location || '', provider: previous.provider, ...(previous.color ? { color: previous.color } : {}), ...(Number.isInteger(previous.alert) ? { alert: previous.alert } : {}) };
+      const inherited = { calendarId: previous.calendarId, title: previous.title, start: occurrence.start, end: occurrence.end, allDay: previous.allDay, location: previous.location || '', ...(previous.notes ? { notes: previous.notes } : {}), provider: previous.provider, ...(previous.color ? { color: previous.color } : {}), ...(Number.isInteger(previous.alert) ? { alert: previous.alert } : {}) };
       if (scope === 'one') {
         // This occurrence only: exclude it from the series and store the edited copy as an exception that still belongs to the master.
         const { rrule, ...rest } = payload;
@@ -1196,12 +1349,14 @@ async function command(commandName, payload, sourceWindow) {
           // Edited occurrences from here on go with the new series, or become events of their own when it does not repeat
           // (2026-10-21 review: they hung on a plain event and went with it when it was deleted).
           for (const item of exceptionsOf(state, previous.id)) {
+            if (!item.recurrenceId) { detach(item); continue; }
             if (!onOrAfter(item.recurrenceId, recurrenceId)) continue;
             if (colour !== undefined) paint(item, colour);
             if (alert !== undefined) ring(item, alert, next.allDay);
             const id = map ? map(item.recurrenceId) : null;
             if (id) { item.masterId = next.id; item.recurrenceId = id; } else detach(item);
           }
+          if (master && keepsNothing(master, state.events)) state.events = state.events.filter(item => item.id !== master.id);
           state.events.push(next);
         });
         return next;
@@ -1283,6 +1438,8 @@ async function command(commandName, payload, sourceWindow) {
         // account cannot keep (「당일 오전 9시」 on Google or Outlook) takes the account's default instead of stopping the move (2026-10-27 review).
         if (!Number.isInteger(source.alert)) outgoing.alert = null;
         else if (source.alert < 0 && ['google', 'microsoft'].includes(to.provider)) delete outgoing.alert;
+        // An answer lost on the way back leaves the original here: moving it again reaches the event already made (Codex full review F3).
+        { const { id: _fresh, ...body } = outgoing; outgoing.key = moveKey(['calendar:move', from.id, source.id, to.id, body]); }
         try {
           const created = await sync.mutateEvent('add', outgoing, to);
           commit(state => {
@@ -1313,6 +1470,7 @@ async function command(commandName, payload, sourceWindow) {
         return store.publicState();
       }
       if (event.rrule && recurrenceId && scope === 'one') {
+        occurrenceOf(event, recurrenceId);
         commit(state => { const master = state.events.find(item => item.id === event.id); if (master) master.exdates = [...new Set([...(master.exdates || []), recurrenceId])]; });
         return store.publicState();
       }
@@ -1320,11 +1478,14 @@ async function command(commandName, payload, sourceWindow) {
       const master = event.rrule ? event : (event.masterId ? store.get().events.find(item => item.id === event.masterId) : null);
       if (scope === 'future' && master && from) {
         const split = truncatedRule(master, from);
+        // null is the first occurrence only: an id that is none of the series' (a card opened before the series moved) deletes nothing (2026-11-09 review F8).
+        if (!split) occurrenceOf(master, from);
         commit(state => {
           const kept = state.events.find(item => item.id === master.id);
           if (split && kept) { kept.rrule = split.kept; kept.exdates = (kept.exdates || []).filter(item => !onOrAfter(item, from)); }
           else state.events = state.events.filter(item => item.id !== master.id);
           state.events = state.events.filter(item => !(item.masterId === master.id && onOrAfter(item.recurrenceId, from)));
+          if (split && kept && keepsNothing(kept, state.events)) state.events = state.events.filter(item => item.id !== master.id);
         });
         return store.publicState();
       }
@@ -1402,6 +1563,7 @@ async function command(commandName, payload, sourceWindow) {
       if ('taskSort' in payload) settings.taskSort = taskSorts(payload.taskSort);
       if ('taskOrder' in payload) settings.taskOrder = taskOrders(payload.taskOrder, settings.taskOrder);
       if ('eventAlerts' in payload) settings.eventAlerts = boolean(payload.eventAlerts, tr('일정 알림'));
+      if ('autoBackup' in payload) settings.autoBackup = boolean(payload.autoBackup, tr('자동 백업'));
       // Calendar view (month, week, day) and the right panel (auto: open when the window is wide enough).
       if ('calendarView' in payload) {
         if (!['month', 'week', 'day'].includes(payload.calendarView)) throw new Error(tr('지원하지 않는 달력 보기입니다.'));
@@ -1427,10 +1589,23 @@ async function command(commandName, payload, sourceWindow) {
         if (width === undefined) throw new Error(tr('패널 너비가 올바르지 않습니다.'));
         settings.taskPanelWidth = width;
       }
+      // The left panel (2026-11-09, app.js sidebarToggle): folded or not; this PC's choice, never synced (lib/viewsync.cjs).
+      if ('sidebar' in payload) {
+        if (!['open', 'closed'].includes(payload.sidebar)) throw new Error(tr('지원하지 않는 패널 설정입니다.'));
+        settings.sidebar = payload.sidebar;
+      }
       if ('listOrder' in payload) settings.listOrder = idList(payload.listOrder, 500, tr('목록 순서가 올바르지 않습니다.'));
       if ('hiddenCalendars' in payload) settings.hiddenCalendars = idList(payload.hiddenCalendars, 500, tr('달력 표시 설정이 올바르지 않습니다.'));
       if ('hiddenSections' in payload) settings.hiddenSections = idList(payload.hiddenSections, 100, tr('계정 표시 설정이 올바르지 않습니다.'));
       if ('hiddenLists' in payload) settings.hiddenLists = idList(payload.hiddenLists, 500, tr('목록 표시 설정이 올바르지 않습니다.'));
+      if ('notInAll' in payload) settings.notInAll = idList(payload.notInAll, 500, tr('목록 표시 설정이 올바르지 않습니다.'));
+      if ('noteFolderPanel' in payload) settings.noteFolderPanel = boolean(payload.noteFolderPanel, tr('메모 폴더'));
+      // 자주 쓰는 일정 (2026-11-08): every item whole, or none of it; the sheet already says what is wrong beside the field.
+      if ('eventShortcuts' in payload) {
+        const items = cleanShortcuts(payload.eventShortcuts);
+        if (!Array.isArray(payload.eventShortcuts) || items.length !== payload.eventShortcuts.length) throw new Error(tr('자주 쓰는 일정을 저장하지 못했어요.'));
+        settings.eventShortcuts = items;
+      }
       if ('hiddenSections' in payload || 'hiddenLists' in payload) {
         // At least one list stays visible. Only a save that hides something new is refused: a delete or a sync can
         // leave every remaining list hidden (visibleState then shows them all), and unrelated saves must still work.
@@ -1438,6 +1613,8 @@ async function command(commandName, payload, sourceWindow) {
         if (why) throw new Error(why === 'lists' ? tr('모든 목록을 숨길 수는 없어요. 하나는 보이게 두세요.') : tr('모든 계정의 목록을 숨길 수는 없어요. 하나는 보이게 두세요.'));
       }
       if ('collapsedSections' in payload) settings.collapsedSections = idList(payload.collapsedSections, 100, tr('사이드바 접기 상태가 올바르지 않습니다.'));
+      // The tasks whose subtasks are folded in the list (2026-11-06, app.js foldSteps): this PC's choice, never synced (lib/viewsync.cjs).
+      if ('foldedSteps' in payload) settings.foldedSteps = idList(payload.foldedSteps, 2000, tr('하위 할 일 접기 상태가 올바르지 않습니다.'));
       if ('autoUpdate' in payload) settings.autoUpdate = boolean(payload.autoUpdate, tr('새 버전 자동 확인'));
       if ('launchAtLogin' in payload) {
         settings.launchAtLogin = boolean(payload.launchAtLogin, tr('자동 시작'));
@@ -1466,11 +1643,11 @@ async function command(commandName, payload, sourceWindow) {
       if ('syncTasks' in payload) flags.syncTasks = boolean(payload.syncTasks, tr('할 일 동기화'));
       if ('syncCalendar' in payload) flags.syncCalendar = boolean(payload.syncCalendar, tr('달력 동기화'));
       if (account.provider === 'icloud') flags.syncTasks = false;
-      // 「메모」: one Google account holds the notes (settings.notesAccountId). Turning it on chooses this account (it takes
+      // 「메모」: one Google or Microsoft account holds the notes (settings.notesAccountId). Turning it on chooses this account (it takes
       // effect once this sign-in has the notes grant); turning it off stops notes sync — it never moves to another account.
       let notesChoice;
       if ('syncNotes' in payload) {
-        if (account.provider !== 'google') throw new Error(tr('메모 동기화는 Google 계정으로만 할 수 있어요.'));
+        if (!['google', 'microsoft'].includes(account.provider)) throw new Error(tr('메모 동기화는 Google이나 Microsoft 계정으로 할 수 있어요.'));
         notesChoice = boolean(payload.syncNotes, tr('메모 동기화'));
       }
       commit(state => {
@@ -1513,6 +1690,8 @@ async function command(commandName, payload, sourceWindow) {
       const widget = lookup('widgets', payload.id);
       if ('listId' in payload) widget.listId = widgetList(payload.listId);
       if ('noteId' in payload) widget.noteId = liveNote(payload.noteId).id;
+      // 위치와 크기 고정 (2026-11-08 owner): the widget no longer drags or sizes from itself (renderer), nor through widget:resize.
+      if ('locked' in payload) { if (boolean(payload.locked, tr('위치와 크기 고정'))) widget.locked = true; else delete widget.locked; }
       if ('mode' in payload) {
         if (!['desktop', 'top'].includes(payload.mode)) throw new Error(tr('지원하지 않는 위젯 모드입니다.'));
         widget.mode = payload.mode;
@@ -1523,6 +1702,7 @@ async function command(commandName, payload, sourceWindow) {
     }
     case 'widget:resize': {
       const widget = lookup('widgets', payload.id);
+      if (widget.locked) return widget; // held in place: a size from the page changes nothing (2026-11-08)
       const win = widgetWindows.get(widget.id);
       if (!win || win !== sourceWindow) throw new Error(tr('이 위젯의 크기만 변경할 수 있습니다.'));
       if (!Number.isFinite(payload.width) || !Number.isFinite(payload.height)) throw new Error(tr('위젯 크기가 올바르지 않습니다.'));
@@ -1536,7 +1716,7 @@ async function command(commandName, payload, sourceWindow) {
       const held = key ? resizeAnchors.get(widget.id) : null;
       const current = held && held.key === key ? held.bounds : desktop.getBounds(win, screen);
       if (key && !(held && held.key === key)) resizeAnchors.set(widget.id, { key, bounds: current });
-      const bounds = resizedBounds(current, { width: payload.width, height: payload.height, edge }, screen.getAllDisplays(), widgetMinimum(widget.type, store.get().settings.widgetTextSize));
+      const bounds = resizedBounds(current, { width: payload.width, height: payload.height, edge }, screen.getAllDisplays(), widgetMinimum(widget.type, store.read(s => s.settings.widgetTextSize)));
       desktop.setBounds(win, bounds, screen);
       return bounds;
     }
@@ -1609,6 +1789,38 @@ async function command(commandName, payload, sourceWindow) {
       fs.writeFileSync(result.filePath, JSON.stringify(store.publicState(), null, 2), { encoding: 'utf8', mode: 0o600 });
       return { path: result.filePath };
     }
+    // Adds what the chosen file has and this PC lacks; the toast's 되돌리기 is backup:undo (lib/backup.cjs).
+    case 'backup:restore': {
+      const folder = backupFolder();
+      const result = await dialog.showOpenDialog(mainWindow, { title: tr('백업에서 되살리기'), ...(fs.existsSync(folder) ? { defaultPath: folder } : {}), properties: ['openFile'], filters: [{ name: tr('JSON 백업'), extensions: ['json'] }] });
+      if (result.canceled || !result.filePaths?.[0]) return { canceled: true };
+      const file = result.filePaths[0];
+      if ((await fs.promises.stat(file)).size > BACKUP_LIMIT) throw new Error(tr('Dayboard 백업 파일이 아니에요.'));
+      const raw = parseBackup(await fs.promises.readFile(file, 'utf8'));
+      let done;
+      commit(state => { done = applyRestore(state, restorePlan(state, raw)); });
+      const added = Object.fromEntries(['tasks', 'events', 'notes', 'lists', 'calendars', 'groups', 'folders', 'shortcuts'].map(key => [key, done[key].length]));
+      if (!Object.values(added).some(Boolean)) return { added };
+      // The toast's 되돌리기 names this restore: an older toast must not take back a newer one (Opus 2026-11-07 O5).
+      const token = randomUUID(); lastRestore = { token, done };
+      if (done.notes.length) sync?.scheduleNotes();
+      return { token, added };
+    }
+    case 'backup:undo': {
+      if (!lastRestore || lastRestore.token !== payload?.token) throw new Error(tr('되돌릴 수 있는 시간이 지났어요.'));
+      const { done } = lastRestore; lastRestore = null; const at = new Date().toISOString();
+      commit(state => { for (const note of undoRestore(state, done)) recordNoteDeletion(state, note, at); });
+      if (done.notes.length) sync?.scheduleNotes();
+      return store.publicState();
+    }
+    case 'backup:folder': {
+      const result = await dialog.showOpenDialog(mainWindow, { title: tr('백업 폴더'), defaultPath: backupFolder(), properties: ['openDirectory', 'createDirectory'] });
+      if (result.canceled || !result.filePaths?.[0]) return { canceled: true };
+      const folder = result.filePaths[0];
+      commit(state => { state.settings = { ...state.settings, backupFolder: folder }; });
+      runBackup(true); // what is kept moves with the choice, not a day later
+      return { folder };
+    }
     case 'demo:load': {
       if (store.get().tasks.some(t => t.demo)) return store.publicState();
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -1660,7 +1872,8 @@ function createUpdater() {
   // The installer closes every Dayboard.exe: save note drafts and widget positions first, then start it, and quit only
   // once it runs (a new unsigned installer refused by Smart App Control leaves Dayboard running and the button in place).
   const launchInstaller = async (file, args) => {
-    await Promise.all(BrowserWindow.getAllWindows().map(flushWindow));
+    // A window that could not save first stops the install as it stops quitting (lib/updater.cjs 'unsaved' keeps the button, review F27).
+    try { await Promise.all(BrowserWindow.getAllWindows().map(flushWindow)); } catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { code: 'unsaved' }); }
     try { persistWidgetBounds(); } catch (error) { console.error('widget bounds not saved before update:', error.message); }
     await new Promise((resolve, reject) => {
       let child;
@@ -1771,7 +1984,7 @@ async function runSmokeTest() {
     }
     await mainWindow.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     fs.writeFileSync(path.join(output, 'main.png'), (await mainWindow.webContents.capturePage()).toPNG());
-    const extra = await require('./tests/ui-smoke.cjs')({ mainWindow, widgetWindows, invoke, output });
+    const extra = await require('./tests/ui-smoke.cjs')({ mainWindow, widgetWindows, invoke, output, runBackup });
     report.checks.push(...extra);
     // A reminder that is already due must be recorded as fired exactly once.
     const reminded = await invoke('task:add', { title: tr('Dayboard 알림 시험'), reminderAt: new Date(Date.now() - 60000).toISOString() });
@@ -1912,6 +2125,8 @@ else if (process.argv.includes(QUIT_FOR_INSTALL)) {
       // A moment later, so a redraw never lands under the click that brought the window to the front.
       app.on('browser-window-focus', () => { if (Date.now() - notesFocusAt < 60000) return; notesFocusAt = Date.now(); setTimeout(() => sync?.syncNotes().catch(() => {}), 1500).unref?.(); });
       // 「최근 삭제한 메모」 past 30 days: at start and every hour.
+      setTimeout(() => runBackup(), 60 * 1000).unref();
+      setInterval(() => runBackup(), 60 * 60 * 1000).unref();
       const purge = () => { try { purgeTrash(); } catch (error) { console.error('trash purge failed:', error.message); } };
       setInterval(purge, 60 * 60 * 1000).unref();
       purge();

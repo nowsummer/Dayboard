@@ -20,7 +20,8 @@ function dialogHarness() {
     'const providerName=', 'const listBy=', 'function listColor(', 'function listVisual(', 'function toLocalInput(', 'const moveTargets=', 'function groupSelect(', 'function submitGuard(', 'function composeName(',
     // where a task can go and the list select by account (2026-11-04: moving a task between any two lists)
     'const movableList=', 'const moveDestinations=', 'const canOffer=', 'const movingIds=', 'const taskMoving=', 'const transferWaitingOf=', 'const accountKey=', 'const accountLabel=', 'function byAccount(',
-    'function addList(', 'function editList(', 'function addGroup(', 'function editTask(');
+    'function defaultList(', 'function addList(', 'function editList(', 'function addGroup(', 'function clockField(', 'function dateFace(', 'function editTask(');
+  if (h.context.view === undefined) h.context.view = ''; // addList picks the account of the list shown (2026-11-05)
   const c = h.context, el = (tag, cls) => { const n = h.document.createElement(tag); if (cls) n.className = cls; return n; };
   // Pickers that only draw: a node and a value, as the real ones return.
   c.swatchPicker = v => ({ node: el('div', 'swatches'), value: v });
@@ -98,8 +99,10 @@ test('the emoji caption names To Do·아이폰 only for a Microsoft list', async
   s.accounts = [{ id: 'a1', provider: 'microsoft' }];
   s.lists = [{ id: 'l1', name: '장보기', provider: 'local' }, { id: 'g1', name: '여행', provider: 'google' }, { id: 'm1', name: '업무', provider: 'microsoft' }];
   h.eval('addList')(); await h.tick();
-  assert.equal(labels(), '아이콘|이모지', '새 목록 (always this PC)');
-  assert.deepEqual(h.helps(), ['이 PC에 저장돼요.'], 'and its one line no longer contradicts the caption');
+  assert.equal(labels(), '아이콘|이모지', '새 목록');
+  // With a Microsoft account whose 할 일 is on, where the list is made is chosen instead of the line (2026-11-05).
+  assert.deepEqual(h.helps(), [], 'no line: the 저장 위치 field says it');
+  assert.equal([...h.dialog().querySelectorAll('select[name=account] option')].map(o => o.textContent).join('|'), '이 PC|Microsoft');
   for (const [l, want] of [[s.lists[0], '아이콘|이모지'], [s.lists[1], '아이콘|이모지'], [s.lists[2], '아이콘|이모지 · 이름 앞에 붙어 To Do·아이폰에도 함께 표시']]) {
     h.eval('closeModal')(true); await h.tick();
     h.eval('editList')(l); await h.tick();
@@ -135,9 +138,9 @@ test('새 목록 and 새 그룹 carry at most one short line', async () => {
   h.eval('addList')(); await h.tick();
   assert.deepEqual(h.helps(), [], 'with no account there is nothing to tell this PC\'s lists apart from');
   h.eval('closeModal')(true); await h.tick();
-  h.context.state.accounts = [{ id: 'a1', provider: 'microsoft' }];
+  h.context.state.accounts = [{ id: 'a1', provider: 'microsoft', syncTasks: false }];
   h.eval('addList')(); await h.tick();
-  assert.deepEqual(h.helps(), ['이 PC에 저장돼요.']);
+  assert.deepEqual(h.helps(), ['이 PC에 저장돼요.'], 'an account whose 할 일 is off: still made on this PC, said in one line');
   h.eval('closeModal')(true); await h.tick();
   h.eval('addGroup')(); await h.tick();
   assert.deepEqual(h.helps(), ['목록을 끌어 넣거나 목록 편집에서 고르세요.'], 'the only hint about dragging stays, as one sentence');

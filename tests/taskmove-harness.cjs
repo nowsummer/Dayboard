@@ -65,12 +65,15 @@ function service() {
     if (u.hostname === 'www.googleapis.com' && /\/calendar\/v3\/users\/me\/calendarList$/.test(u.pathname)) return { items: [] };
     const p = u.pathname.replace(/^\/tasks\/v1/, '');
     if (p === '/users/@me/lists/@default') throw httpError(404, 'Not found');
+    if (p === '/users/@me/lists' && method === 'POST') { const remoteId = id('gl-new'); lists.set(remoteId, { provider: 'google', account, name: body.title, kind: 'none' }); return { id: remoteId, title: body.title }; }
     if (p === '/users/@me/lists') return { items: [...lists].filter(([, item]) => item.provider === 'google' && (!account || item.account === account)).map(([remoteId, item]) => ({ id: remoteId, title: item.name })) };
     let m = p.match(/^\/lists\/([^/]+)\/tasks\/([^/]+)\/move$/);
     if (m && method === 'POST') {
       const [from, taskId, to] = [decode(m[1]), decode(m[2]), u.searchParams.get('destinationTasklist')];
       const item = tasks.get(taskId);
       if (!item || item.list !== from || item.deleted) throw httpError(404, 'Not found');
+      // Within a list (no destinationTasklist): under parent, after previous, first when previous is left out (tasks.move).
+      if (!to) { if (u.searchParams.get('parent')) item.parent = u.searchParams.get('parent'); else delete item.parent; amongSiblings(item, from, u.searchParams.get('previous')); item.updated = now(); return gView(item); }
       if (item.recurring) throw httpError(400, 'Recurrent tasks cannot currently be moved between lists');
       if (options.moveStays) return gView(item);
       const children = [...tasks.values()].filter(child => child.parent === taskId && child.list === from);
@@ -89,16 +92,25 @@ function service() {
     if (method === 'GET') { if (!here && !(options.getIgnoresList && item)) throw httpError(404, 'Not found'); return gView(item); }
     if (method === 'POST') {
       const made = { id: id('gt'), list: listId, title: body.title, notes: body.notes, due: body.due, status: body.status, updated: now(), position: String(++position).padStart(20, '0'), ...(q.get('parent') ? { parent: q.get('parent') } : {}) };
-      tasks.set(made.id, made); return gView(made);
+      tasks.set(made.id, made);
+      if (made.parent) amongSiblings(made, listId, q.get('previous')); // tasks.insert: after previous, first when it is left out
+      return gView(made);
     }
     if (method === 'PATCH') { if (!here) throw httpError(404, 'Not found'); Object.assign(item, body, { updated: now() }); return gView(item); }
     if (method === 'DELETE') { if (!here || item.deleted) throw httpError(404, 'Not found'); tasks.delete(taskId); return {}; }
     throw httpError(405, 'Method not allowed');
   }
 
+  function amongSiblings(item, listId, previous) {
+    const others = [...tasks.values()].filter(task => task.list === listId && (task.parent || '') === (item.parent || '') && task.id !== item.id).sort((a, b) => String(a.position).localeCompare(String(b.position)));
+    others.splice(previous ? others.findIndex(task => task.id === previous) + 1 : 0, 0, item);
+    for (const task of others) task.position = String(++position).padStart(20, '0');
+  }
+
   function todoApi(u, method, body, account) {
     const p = u.pathname.replace(/^\/v1\.0/, '');
     if (p === '/me/calendars') return { value: [] };
+    if (p === '/me/todo/lists' && method === 'POST') { const remoteId = id('ml-new'); lists.set(remoteId, { provider: 'microsoft', account, name: body.displayName, kind: 'none' }); return { id: remoteId, displayName: body.displayName, wellknownListName: 'none', isShared: false }; }
     if (p === '/me/todo/lists') return { value: [...lists].filter(([, item]) => item.provider === 'microsoft' && (!account || item.account === account)).map(([remoteId, item]) => ({ id: remoteId, displayName: item.name, wellknownListName: item.kind === 'none' ? 'none' : item.kind, isShared: Boolean(item.shared) })) };
     const one = p.match(/^\/me\/todo\/lists\/([^/]+)$/);
     if (one && method === 'GET') { const list = lists.get(decode(one[1])); if (!list || list.provider !== 'microsoft') throw httpError(404, 'Not found'); return { id: decode(one[1]), displayName: list.name, isShared: Boolean(list.shared) }; }

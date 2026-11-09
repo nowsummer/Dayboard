@@ -52,6 +52,18 @@ test('the list colour row ends in 「다른 색…」: one more radio, one Tab s
   assert.equal(picker.node.querySelector('input[type=hidden]').value, '#007aff');
 });
 
+const take = (h, _, colour) => { const input = h.document.querySelector('.color-pop input.color-chooser'); input.value = colour; input.dispatchEvent(new h.dom.globals.Event('input')); h.document.querySelector('.color-pop .date-pop-link').click(); };
+
+test('hue, saturation and brightness to a code and back, by hand', () => {
+  assert.equal(D.hexToHsv('#ff0000').join(), '0,1,1');
+  assert.equal(D.hexToHsv('#00ff00').join(), '120,1,1');
+  assert.equal(D.hexToHsv('#000000').join(), '0,0,0');
+  assert.equal(D.hsvToHex(210, 1, 1), '#0080ff');
+  assert.equal(D.hsvToHex(0, 0, 1), '#ffffff');
+  assert.equal(D.hsvToHex(0, 0, 0), '#000000');
+  for (const hex of ['#007aff', '#2d6a4f', '#1f4e79']) assert.equal(D.hsvToHex(...D.hexToHsv(hex)), hex);
+});
+
 test('「다른 색…」 opens the picker; the colour that comes back is kept readable, picked, and reachable again by the arrows', () => {
   const h = harness();
   h.loadApp('function swatchPicker(');
@@ -60,9 +72,9 @@ test('「다른 색…」 opens the picker; the colour that comes back is kept r
   const slot = () => picker.node.querySelector('.swatch.custom');
   slot().click();
   const input = h.document.querySelector('input.color-chooser');
-  assert.equal(Boolean(input), true, 'one hidden colour input in the page');
+  assert.equal(Boolean(input), true, 'the colour\'s code in the popover');
   assert.equal(input.value, '#ff9500', 'it starts from the colour now (not its own fallback, final review R8)');
-  input.value = '#ffffff'; input.dispatchEvent(new h.dom.globals.Event('change'));
+  take(h, input, '#ffffff');
   assert.equal(picker.value, D.clampColor('#ffffff'));
   assert.equal(slot().getAttribute('aria-checked'), 'true');
   assert.equal(slot().getAttribute('aria-label'), '사용자 지정 색');
@@ -73,7 +85,7 @@ test('「다른 색…」 opens the picker; the colour that comes back is kept r
   assert.equal(picker.value, D.clampColor('#ffffff'), 'back to the colour of one\'s own');
   // a second pick from the picker updates it; a closed picker without a change leaves it
   slot().click();
-  input.value = '#1f4e79'; input.dispatchEvent(new h.dom.globals.Event('change'));
+  take(h, input, '#1f4e79');
   assert.equal(picker.value, '#1f4e79');
   slot().click();
   assert.equal(picker.value, '#1f4e79', 'cancelled: nothing changes');
@@ -98,7 +110,7 @@ test('a colour of one\'s own opens as 「사용자 지정 색」, selected; the 
   assert.equal(chips.length, D.LIST_PALETTE.length + 2, '달력 색, the palette, 「다른 색…」');
   chips[chips.length - 1].click();
   const input = h.document.querySelector('input.color-chooser');
-  input.value = '#2d6a4f'; input.dispatchEvent(new h.dom.globals.Event('change'));
+  take(h, input, '#2d6a4f');
   assert.equal(picks.join(), '#2d6a4f', 'the event row saves the colour of one\'s own as it saves a palette colour');
 });
 
@@ -109,7 +121,7 @@ test('a palette colour from the picker is that palette swatch, not a second chec
   h.app.append(picker.node);
   picker.node.querySelector('.swatch.custom').click();
   const input = h.document.querySelector('input.color-chooser');
-  input.value = '#34c759'; input.dispatchEvent(new h.dom.globals.Event('change'));
+  take(h, input, '#34c759');
   const checked = [...picker.node.querySelectorAll('[aria-checked="true"]')];
   assert.equal(checked.length, 1);
   assert.equal(checked[0].getAttribute('aria-label'), '초록');

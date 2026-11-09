@@ -120,7 +120,7 @@ test('eventFields validates like event:add did, drops an empty colour or rule an
   assert.deepEqual([coloured.color, coloured.rrule, coloured.allDay], ['#aabbcc', 'FREQ=WEEKLY', true]);
   assert.throws(() => S.eventFields({ title: 'x', start: '2026-11-02', end: '2026-11-02', location: '' }, base, true), /하루 종일 일정의 종료 날짜는 마지막 날의 다음 날로/);
   assert.throws(() => S.eventFields({ title: 'x', start: '2026-11-02T04:00:00.000Z', end: '2026-11-02T04:00:00.000Z', location: '' }, base, false), /종료 시간은 시작 시간보다 늦어야/);
-  assert.throws(() => S.eventFields({ title: undefined, start: '2026-11-02', end: '2026-11-03' }, base, true), /일정 제목을\(를\) 입력해 주세요/);
+  assert.throws(() => S.eventFields({ title: undefined, start: '2026-11-02', end: '2026-11-03' }, base, true), /일정 제목 칸이 비어 있어요/);
   assert.throws(() => S.eventFields({ title: 'x', start: '2026-11-02', end: '2026-11-03', rrule: 'FREQ=HOURLY' }, base, true), /지원하지 않는 반복 규칙/);
   // An edit that drops the rule drops the EXDATEs with it; one that keeps the title alone keeps everything else.
   const was = { ...base, title: 'old', start: '2026-11-02', end: '2026-11-03', rrule: 'FREQ=DAILY', exdates: ['2026-11-05'] };
@@ -152,5 +152,5 @@ test('idList: one validator for the id lists of settings:update (six copies befo
   assert.throws(() => V.idList('a', 3, 'bad'), /bad/);
   const main = read('main.cjs');
   assert.equal((main.match(/value\.some\(item => typeof item !== 'string' \|\| !item \|\| item\.length > 400\)/g) || []).length, 0, 'the six inline copies are gone');
-  assert.equal((main.match(/= idList\(payload\./g) || []).length, 6, 'noteOrder, listOrder, hiddenCalendars, hiddenSections, hiddenLists, collapsedSections (taskOrder is per list: validate.taskOrders)');
+  assert.equal((main.match(/= idList\(payload\./g) || []).length, 8, 'noteOrder, listOrder, hiddenCalendars, hiddenSections, hiddenLists, notInAll, collapsedSections, foldedSteps (2026-11-06; taskOrder is per list: validate.taskOrders)');
 });

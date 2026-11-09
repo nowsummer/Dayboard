@@ -70,7 +70,8 @@ test('the focus ring is the keyboard\'s only; hover and the open menu use --hove
   const rules = block.replace(/\/\*[\s\S]*?\*\//g, '');
   for (const scope of ['.settings-body .settings-group select.form-input', '.appearance-row select.form-input', '.dialog-body.widget-settings>.field>select.form-input']) {
     const esc = scope.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    assert.match(rules, new RegExp(`${esc}:is\\(:hover,:open\\)[,{][^}]*background-color:var\\(--hover\\)`), `${scope} hover/open`);
+    // [data-under-pointer], not :hover — a label row passes :hover on to its select (2026-11-05, tests/label-hover.test.cjs)
+    assert.match(rules, new RegExp(`${esc}:is\\(\\[data-under-pointer\\],:open\\)[,{][^}]*background-color:var\\(--hover\\)`), `${scope} pointer/open`);
     assert.match(rules, new RegExp(`${esc}:is\\(:focus,:open\\)[,{][^}]*box-shadow:none`), `${scope} no ring after a click`);
     assert.match(rules, new RegExp(`${esc}:focus-visible[,{][^}]*box-shadow:0 0 0 3px color-mix\\(in srgb,var\\(--blue\\) 16%,transparent\\),inset 0 0 0 1px color-mix\\(in srgb,var\\(--blue\\) 55%,transparent\\)`), `${scope} keyboard ring`);
     assert.match(rules, new RegExp(`${esc}::picker\\(select\\)[,{][^}]*position-area:block-end span-inline-start;position-try-fallbacks:block-start span-inline-start`), `${scope} menu anchor`);
@@ -107,20 +108,14 @@ test('the custom-repeat panel and the connect guide are hairline outlines, their
   assert.equal(computed(client, 'background').value, 'var(--field)', 'the client-ID field has its edge again');
 });
 
-test('the event card: 하루 종일 · 반복 · 알림 are inline values on the values\' column, not pills', () => {
+test('the event card: 반복 · 알림 are inline values on the values\' column, not pills; no chips are left', () => {
   const { h, el } = sheetDom();
-  const card = el('div', 'event-card', h.app), chips = el('div', 'card-row card-chips', card);
-  const allDay = el('label', 'card-chip', chips), on = el('label', 'card-chip on', chips), repeat = el('select', 'card-repeat', chips);
-  assert.equal(computed(chips, 'padding-left').value, '26px', 'the row starts where the date starts');
-  for (const [node, name] of [[allDay, '하루 종일'], [on, '하루 종일 (on)']]) {
-    assert.equal(computed(node, 'background').value, 'transparent', name);
-    assert.equal(computed(node, 'border-radius').value, '6px', name);
-    assert.equal(computed(node, 'color').value, 'var(--text)', name);
-  }
+  const card = el('div', 'event-card', h.app), row = el('div', 'card-row', card), repeat = el('select', 'card-repeat', row);
+  assert.equal(/card-chip/.test(block), false, '하루 종일 is a row with a switch since 2026-11-07');
   // 반복 · 알림 (this little DOM cannot read :is(), so the rule itself): no fill until hover or the open menu, which is --hover
   const rules = block.replace(/\/\*[\s\S]*?\*\//g, '');
   assert.ok(rules.includes('.event-card select:is(.card-repeat,.card-select){padding-left:7px;border-radius:6px;background-color:transparent;font-size:13px;font-weight:450;color:var(--text)}'));
-  assert.ok(rules.includes('.event-card select:is(.card-repeat,.card-select):is(:hover,:open){background-color:var(--hover)}'));
+  assert.ok(rules.includes('.event-card select:is(.card-repeat,.card-select):is([data-under-pointer],:open){background-color:var(--hover)}'));
   assert.equal(repeat.localName, 'select');
 });
 
@@ -138,8 +133,9 @@ test('quick add: the send circle is hidden while the input is empty, shown once 
 
 test('the task editor\'s 날짜 | 알림 each carry their own quick choices, so a widget can stack them', () => {
   const src = appLine('function editTask(');
-  assert.ok(src.includes("h('div',{class:'form-columns task-date-row'},h('div',{class:'date-col'},field(tr('날짜'),date),presets),h('div',{class:'date-col'},reminderField,alertPresets))"));
-  assert.match(src, /const presets=h\('div',\{class:'date-presets'\},btn\(tr\('오늘'\)[^;]*;\},'text-button'\),btn\(tr\('내일'\)[^;]*;\},'text-button'\),btn\(tr\('날짜 없음'\),\(\)=>\{date\.value='';\},'text-button'\)\);/);
+  // The date face carries the time on its date since 2026-11-05 (its third argument: the 「시간」 row of this PC's and To Do's lists).
+  assert.match(src, /h\('div',\{class:'form-columns task-date-row'\},h\('div',\{class:'date-col'\},field\(tr\('날짜'\),dateFace\(date,tr\('날짜 없음'\),[^;]*?\)\),presets\),h\('div',\{class:'date-col'\},reminderField,alertPresets\)\)/);
+  assert.match(src, /const presets=h\('div',\{class:'date-presets'\},btn\(tr\('오늘'\)[^;]*;\},'text-button'\),btn\(tr\('내일'\)[^;]*;\},'text-button'\),btn\(tr\('날짜 없음'\),\(\)=>\{date\.value='';\},'text-button date-clear'\)\);/);
   assert.ok(src.includes("const alertPresets=h('div',{class:'date-presets'},btn(tr('알림 없음'),()=>{reminder.value='';},'text-button reminder-clear'));"));
   const { h, el } = sheetDom();
   h.document.body.className = 'widget-body';
@@ -149,7 +145,7 @@ test('the task editor\'s 날짜 | 알림 each carry their own quick choices, so 
   assert.equal(computed(row, 'align-items').value, 'stretch', 'the main window keeps two top-aligned columns');
 });
 
-test('the smaller surfaces: one grouped 계정 추가 list, a status-line trash banner, the find bar\'s sunken tint, text-style shortcut keys, a red-label confirm', () => {
+test('the smaller surfaces: one grouped 계정 추가 list, a status-line trash banner, the find bar\'s sunken tint, key-cap shortcut keys, a red-label confirm', () => {
   const { h, el } = sheetDom();
   const body = el('div', 'dialog-body accounts-body', el('div', 'dialog', h.modalRoot));
   const list = el('div', 'provider-options', body), option = el('button', 'provider-option', list), logo = el('span', 'provider-logo', option);
@@ -163,8 +159,9 @@ test('the smaller surfaces: one grouped 계정 추가 list, a status-line trash 
   const find = el('div', 'note-find', el('div', 'note-editor', h.app));
   assert.equal(computed(find, 'background').value, 'var(--hover)');
   const kbd = el('kbd', '', el('span', 'keys', h.app));
-  assert.equal(computed(kbd, 'background').value, 'none');
-  assert.equal(computed(kbd, 'display').value, 'inline');
+  // key caps again, one rounded cap per key (2026-11-06 owner: 「단축키는 적당한 곡률의 박스를 넣는 게 구별이 좋지 않을까?」 — over 1.2.7 C1)
+  assert.equal(computed(kbd, 'background').value, 'var(--field)');
+  assert.equal(computed(kbd, 'display').value, 'inline-grid');
   const confirm = el('button', 'button danger', el('div', 'dialog-footer', el('div', 'dialog', h.modalRoot)));
   assert.equal(computed(confirm, 'background').value, 'var(--field)');
   assert.equal(computed(confirm, 'color').value, 'var(--sunday)');
@@ -228,7 +225,7 @@ test('a widget event\'s 시작|종료 stack whether 하루 종일 is on or off',
   assert.equal(/form-columns:has\(input\[type=datetime-local\]\)/.test(rules), false, 'not by the type 하루 종일 changes');
   const src = appLine('function eventDialog(');
   assert.ok(src.includes("const start=input('start',startValue,allDay0?'date':'datetime-local');"), 'the field is named start');
-  assert.ok(src.includes("start.type=end.type=all.checked?'date':'datetime-local';"), '하루 종일 flips the type, not the name');
-  assert.ok(src.includes("h('div',{class:'form-columns'},field(tr('시작'),start),field(tr('종료'),end))"), 'the row holds the start field');
+  assert.ok(src.includes("start.type=end.type='date'") && src.includes("start.type=end.type='datetime-local'"), '하루 종일 flips the type, not the name');
+  assert.ok(src.includes("h('div',{class:'form-columns'},field(tr('시작'),dateFace(start,tr('시작 날짜'),{required:true})),field(tr('종료'),dateFace(end,tr('종료 날짜'),{required:true})))"), 'the row holds the start field, in the rounded month (2026-11-07)');
   assert.equal((read('renderer/app.js').match(/input\('start'/g) || []).length, 1, 'no other form names a field start');
 });

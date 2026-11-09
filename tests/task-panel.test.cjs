@@ -1,7 +1,7 @@
 'use strict';
 // The 할 일 screen's right panel, as the calendar's (2026-11-03 owner: 「할 일 탭에서도 우측탭 좁히는 기능 있는 게 좋지 않을까?」): the
-// toolbar's panel button and \ hide it and bring it back (settings.taskPanel), its edge takes a drag (settings.taskPanelWidth by the
-// calendar panel's domain.js panelWidth), a window too narrow for it opens it as a drawer. The drag, the button, \ and the drawer run in
+// toolbar's panel button and / (2026-11-05, was \) hide it and bring it back (settings.taskPanel), its edge takes a drag (settings.taskPanelWidth by the
+// calendar panel's domain.js panelWidth), a window too narrow for it opens it as a drawer. The drag, the button, / and the drawer run in
 // the smoke test (task-panel). Asserts take primitives only (CLAUDE.md 1.2.7 ⑨).
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -38,11 +38,11 @@ test('settings:update takes auto/closed and a width or null, refuses the rest; t
   assert.match(store, /taskPanelWidth: state\.settings\.taskPanelWidth \?\? null,/);
 });
 
-test('the 할 일 toolbar ends in the panel button with \\, the key and Esc work there, and the shortcut sheet lists it under 할 일', () => {
+test('the 할 일 toolbar ends in the panel button with /, the key and Esc work there, and the shortcut sheet lists it under 할 일', () => {
   const app = read('renderer/app.js');
   assert.match(app, /listMenu\(current,r\.left,r\.bottom\+4\);\}\):null,widgetButton,ctxToggleButton\(\)\];\}/, 'last in the 할 일 toolbar, next to the panel it moves');
-  assert.match(app, /keyed\(ib\('panel',open\?tr\('오른쪽 패널 숨기기'\):tr\('오른쪽 패널 보이기'\),ctxTogglePanel,'panel-toggle'\+\(open\?' active':''\)\),'panel-toggle','\\\\'\)/, 'the calendar button\'s icon, words and key');
-  assert.match(app, /e\.code==='Backslash'&&!\['calendar','notes','widgets'\]\.includes\(view\)&&!e\.ctrlKey&&!e\.altKey&&!e\.metaKey&&!e\.shiftKey&&!dialogOpen&&!typing&&!menuRoot&&!\(calCard&&calCard\.node\?\.contains\(document\.activeElement\)\)\)\{e\.preventDefault\(\);ctxTogglePanel\(\);return;\}/, 'inside an event card \\ stays the card\'s (review U4)');
+  assert.match(app, /keyed\(ib\('panel',open\?tr\('오른쪽 패널 숨기기'\):tr\('오른쪽 패널 보이기'\),ctxTogglePanel,'panel-toggle'\+\(open\?' active':''\)\),'panel-toggle','\/'\)/, 'the calendar button\'s icon, words and key');
+  assert.match(app, /e\.code==='Slash'&&e\.key!=='\?'&&!\['calendar','widgets'\]\.includes\(view\)&&!e\.repeat&&!e\.ctrlKey&&!e\.altKey&&!e\.metaKey&&!e\.shiftKey&&!dialogOpen&&!typing&&!menuRoot&&!datePopNode&&!\$\('\.color-pop'\)&&!document\.querySelector\('#tour-root \.tour-card'\)&&!\(calCard&&calCard\.node\?\.contains\(document\.activeElement\)\)\)\{e\.preventDefault\(\);if\(view==='notes'\)noteFoldersToggle\(\);else ctxTogglePanel\(\);return;\}/, 'inside an event card / stays the card\'s (review U4); Shift+/ (?) never toggles it (2026-11-05)');
   assert.match(app, /else if\(!isWidget&&ctxDrawer&&!menuRoot&&!\['INPUT','TEXTAREA','SELECT'\]\.includes\(document\.activeElement\?\.tagName\)\)\{ctxCloseDrawer\(\);\}/, 'Esc closes the drawer, but not while typing (review R3)');
   assert.match(app, /function ctxCloseDrawer\(\)\{const inside=Boolean\(document\.activeElement\?\.closest\?\.\('\.context-pane\.drawer'\)\);ctxDrawer=false;render\(\);if\(inside\)document\.querySelector\('\[data-focus-key="panel-toggle"\]'\)\?\.focus/, 'the keyboard goes back to the panel button (review U8)');
   // docked unless hidden; the drawer only when asked for in a narrow window; the grip only on the docked panel; the drag holds render
@@ -50,7 +50,7 @@ test('the 할 일 toolbar ends in the panel button with \\, the key and Esc work
   assert.match(app, /const ctxSettled=ctxDrawer&&Boolean\(document\.querySelector\('\.app-layout>\.context-pane\.drawer'\)\);/, 'an open drawer does not slide in again (review U2)');
   assert.match(app, /ctxDocked\?ctxPanelResizer\(\):null,ctxDocked\|\|ctxDrawer\?contextPane\(ctxDrawer,ctxSettled\):null,ctxDrawer\?h\('div',\{class:'drawer-scrim ctx-scrim',onpointerdown:e=>\{e\.preventDefault\(\);ctxCloseDrawer\(\);\}\}\):null/);
   assert.match(read('renderer/calendar.js'), /docked\|\|drawer\?dayPanel\(drawer,drawer&&Boolean\(document\.querySelector\('\.calendar-view>\.day-panel\.drawer'\)\)\):null/, 'the calendar drawer too');
-  assert.match(app, /function ctxTogglePanel\(\)\{closeCard\(true\);if\(ctxNarrowQuery\.matches\)\{if\(ctxDrawer\)ctxCloseDrawer\(\);else\{ctxDrawer=true;render\(\);\}return;\}/, 'an event card opened from the panel closes with it, as calTogglePanel (review U4)');
+  assert.match(app, /function ctxTogglePanel\(\)\{if\(!closeCard\(true\)\)return;if\(ctxNarrowQuery\.matches\)\{if\(ctxDrawer\)ctxCloseDrawer\(\);else\{ctxDrawer=true;render\(\);\}return;\}/, 'an event card opened from the panel closes with it, as calTogglePanel (review U4)');
   assert.match(app, /const CTX_PANEL_MIN_W=240;/);
   assert.match(app, /function ctxPanelSave\(width\)\{const w=width==null\?null:Math\.max\(CTX_PANEL_MIN_W,D\.panelWidth\(width\)\);/);
   assert.match(app, /if\(\(pending\|\|w!==startW\)&&ctxPanelWidth\(\)===before\)render\(\);/, 'a drag ending on the saved width drops its stretched value (review U7)');
@@ -60,7 +60,10 @@ test('the 할 일 toolbar ends in the panel button with \\, the key and Esc work
   assert.match(app, /glassHeld\|\|ctxDragging\)\{renderPending=true;return;\}/);
   const help = read('renderer/help.js');
   const tasks = help.slice(help.indexOf("[tr('할 일'),["), help.indexOf("[tr('달력'),["));
-  assert.equal(tasks.includes("[tr('오른쪽 패널'),[['\\\\']]]"), true);
+  assert.equal(tasks.includes("[tr('오른쪽 패널'),[['/']]]"), true);
+  const calendar = help.slice(help.indexOf("[tr('달력'),["), help.indexOf("[tr('메모'),["));
+  assert.equal(calendar.includes("[tr('오른쪽 패널'),[['/']]]"), true, 'the calendar\'s too (2026-11-05)');
+  assert.equal(/\[\['\\\\'\]\]/.test(help), false, 'no \\ key left in the sheet');
 });
 
 test('the panel keeps 240–480 and gives way to the list, its grip is the calendar\'s, and the drawer sits under the top bar', () => {

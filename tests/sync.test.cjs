@@ -370,7 +370,35 @@ test('iCloud connect only blames the app password for 401/403; other failures ke
   const { sync } = setup(t, () => ({ identity: async () => { throw Object.assign(new Error('서비스가 일시적으로 응답하지 않습니다. (HTTP 503)'), { status: 503 }); } }), 'icloud');
   await assert.rejects(sync.connect({ provider: 'icloud', email: 'user@example.com', appPassword: 'abcd-efgh' }), /일시적으로/);
   const { sync: denied } = setup(t, () => ({ identity: async () => { throw Object.assign(new Error('x'), { status: 401 }); } }), 'icloud');
-  await assert.rejects(denied.connect({ provider: 'icloud', email: 'user@example.com', appPassword: 'abcd-efgh' }), /앱 전용 암호를 확인/);
+  await assert.rejects(denied.connect({ provider: 'icloud', email: 'user@example.com', appPassword: 'abcd-efgh' }), /앱 암호를 확인/);
+});
+
+// Changing the Apple Account password revokes every app password (support.apple.com/102654): the account says what to do, a new password
+// clears it, and the email (never the password) is remembered for the next time (2026-11-06).
+test('a 401 on a connected iCloud account asks for a new app password; connecting again clears it; only the email is remembered', async t => {
+  let refused = false;
+  const provider = () => ({ identity: async () => ({ remoteUserId: 'me@example.com', name: 'me@example.com' }), snapshot: async () => { if (refused) throw Object.assign(new Error('로그인이 만료되었습니다. (HTTP 401)'), { status: 401 }); return { lists: [], tasks: [], calendars: [], events: [], warnings: [] }; } });
+  const { store, sync, credentials } = setup(t, provider, 'icloud');
+  await sync.connect({ provider: 'icloud', email: 'me@example.com', appPassword: 'ABCD-EFGH-IJKL-MNOP' });
+  assert.equal(store.publicState().settings.appleId, 'me@example.com');
+  refused = true;
+  await sync.sync().catch(() => {});
+  let account = store.publicState().accounts[0];
+  assert.equal([account.status, account.authFailed, account.error].join('|'), 'error|true|Apple 계정 암호를 바꾸면 앱 암호가 모두 무효가 돼요. 새로 만들어 붙여 넣어 주세요.');
+  assert.ok(store.publicState().sync.error.includes('무효가 돼요'));
+  refused = false;
+  await sync.connect({ provider: 'icloud', accountId: account.id, email: 'me@example.com', appPassword: 'QRST-UVWX-YZAB-CDEF' });
+  account = store.publicState().accounts[0];
+  assert.equal([account.status, account.authFailed ?? 'none', account.error ?? 'none'].join('|'), 'connected|none|none');
+  assert.equal(credentials[account.id].appPassword, 'QRST-UVWX-YZAB-CDEF', 'the new password, in the vault');
+  assert.equal(JSON.stringify(store.get()).includes('QRST'), false, 'never in the state');
+});
+
+test('a 401 on a Google account is not an app password', async t => {
+  const { store, sync } = setup(t, () => ({ identity: async () => ({ remoteUserId: 'g', name: 'g@example.com' }), snapshot: async () => { throw Object.assign(new Error('로그인이 만료되었습니다. (HTTP 401)'), { status: 401 }); } }), 'google');
+  await sync.connect({ provider: 'google' }).catch(() => {});
+  const account = store.publicState().accounts[0];
+  assert.equal([account?.authFailed ?? 'none', account?.error].join('|'), 'none|로그인이 만료되었습니다. (HTTP 401)');
 });
 
 test('iCloud snapshot skips one unreadable event and reports it as a warning instead of failing the account', async () => {

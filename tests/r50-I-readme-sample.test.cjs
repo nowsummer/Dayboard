@@ -3,10 +3,10 @@
 // (scripts/readme-sample.cjs). The trip list is not red or pink, and no list in the sidebar sits within two rows of one of the same
 // colour family — the owner found green 장보기 and teal 제주 여행 two rows apart 「너무 비슷」 (2026-10-27). The second pass (2026-10-28
 // review of r50 I) checks the whole sidebar, 업무 included: purple trip, blue 내 할 일 and indigo 업무 made a run of three blue-violet
-// icons. The event the demo drags in the month view (가족 저녁 식사) is not the eye-straining pink either.
+// icons. The event the film drags in the month view is not the eye-straining pink either, and no list or calendar is indigo.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { seedSample } = require('../scripts/readme-sample.cjs');
+const { seedSample, demoText, COLOURS, CALENDAR_IDS } = require('../scripts/readme-sample.cjs');
 const D = require('../renderer/domain.js');
 
 const PLANNED_TILE = '#ec5e67'; // renderer/app.js smart.planned.color
@@ -56,7 +56,7 @@ async function sample(lang) {
     if (name === 'event:add') events.push(payload);
     return { id: `item-${++id}`, ...payload };
   };
-  await seedSample(invoke, new Date(2026, 9, 28, 9, 41), lang);
+  await seedSample(invoke, lang);
   // The sidebar's order (artifacts/r50-I/sidebar-full.cjs prints it): the group's lists, then 내 할 일, then the other loose lists.
   // Names are read as the sidebar shows them: the emoji the sample's own lists start with (2026-10-29) is their symbol, not their name.
   for (const l of lists) l.name = D.splitEmoji(l.name).title || l.name;
@@ -64,8 +64,8 @@ async function sample(lang) {
   return { lists, events, sidebar };
 }
 
-const NAMES = { ko: { trip: '제주 여행 준비', family: '가족 저녁 식사', order: ['장보기', '읽을 책', '제주 여행 준비', '내 할 일', '업무'] },
-  en: { trip: 'Lisbon trip', family: 'Family dinner', order: ['Groceries', 'Reading list', 'Lisbon trip', 'My Tasks', 'Work'] } };
+const NAMES = { ko: { trip: '제주 여행 준비', order: ['장보기', '집안일', '제주 여행 준비', '운동', '내 할 일', '업무'], work: '업무' },
+  en: { trip: 'Lisbon trip', order: ['Groceries', 'Home', 'Lisbon trip', 'Fitness', 'My Tasks', 'Work'], work: 'Work' } };
 
 for (const lang of ['ko', 'en']) {
   const n = NAMES[lang];
@@ -83,16 +83,19 @@ for (const lang of ['ko', 'en']) {
       assert.ok(d >= FAMILY, `${a.name} ${a.color} and ${b.name} ${b.color}, ${j - i} row(s) apart: CIEDE2000 ${d.toFixed(1)}`);
     }
     // The colours chosen here keep a white glyph readable (WCAG non-text 3:1).
-    for (const list of sidebar.filter(l => [n.trip, n.order[4]].includes(l.name))) assert.ok(whiteContrast(list.color) >= 3, `${list.name} ${list.color}: white glyph ${whiteContrast(list.color).toFixed(2)}:1`);
+    for (const list of sidebar.filter(l => [n.trip, n.work].includes(l.name))) assert.ok(whiteContrast(list.color) >= 3, `${list.name} ${list.color}: white glyph ${whiteContrast(list.color).toFixed(2)}:1`);
   });
 
-  test(`the event the demo drags (${lang}) is calm and its own colour`, async () => {
-    const { events } = await sample(lang);
-    const family = events.find(e => e.title === n.family);
-    assert.ok(family, 'seeded');
-    const color = family.color.toLowerCase();
-    assert.ok(D.LIST_PALETTE.includes(color));
+  test(`the calendars (${lang}) are the app's colours, apart from each other, and the event the film drags is calm`, async () => {
+    const { events, lists } = await sample(lang);
+    const calendars = Object.values(COLOURS.calendars).map(c => c.toLowerCase());
+    for (const colour of calendars) assert.ok(D.LIST_PALETTE.includes(colour), `${colour} is one of the app's colours`);
+    for (const colour of [...calendars, ...lists.map(l => l.color.toLowerCase())]) assert.notEqual(colour, '#5856d6', 'no indigo (2026-11-02 owner)');
+    for (let i = 0; i < calendars.length; i++) for (let j = i + 1; j < calendars.length; j++) assert.ok(deltaE00(calendars[i], calendars[j]) >= FAMILY, `${calendars[i]} and ${calendars[j]}: CIEDE2000 ${deltaE00(calendars[i], calendars[j]).toFixed(1)}`);
+    assert.ok(events.every(e => Object.values(CALENDAR_IDS).includes(e.calendarId) && !e.color), 'every event takes the colour of its calendar, as in real use');
+    const dragged = events.find(e => e.title === demoText(lang).dragTitle);
+    assert.ok(dragged, 'seeded');
+    const key = Object.keys(CALENDAR_IDS).find(k => CALENDAR_IDS[k] === dragged.calendarId), color = COLOURS.calendars[key].toLowerCase();
     assert.ok(!redOrPink(color), `${color} (hue ${Math.round(hue(color))}) is not red or pink`);
-    for (const other of events.filter(e => e !== family)) assert.notEqual(other.color.toLowerCase(), color, `${other.title} has another colour`);
   });
 }

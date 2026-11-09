@@ -360,6 +360,16 @@ test('Google steps: a parent Google will not take says why; a failure part-way c
   assert.ok(retried.steps.every(step => step.remoteId));
 });
 
+// 2026-11-08 Codex full review F5: the read failing alone sent reminders without the e-mail ones, and they were gone from Google.
+test('Google alerts: a failed read of the reminders stops the save; an e-mail reminder is not dropped by it', async () => {
+  const calendar = { id: 'cal', remoteId: 'primary', accountId: 'acc', provider: 'google', accessRole: 'owner' };
+  const event = { id: 'x', calendarId: 'cal', provider: 'google', remoteId: 'r1', title: 'n', start: '2026-10-28T00:00:00.000Z', end: '2026-10-28T01:00:00.000Z', location: '', alert: 30 };
+  const writes = [];
+  const provider = google.createGoogle({ request: async (url, options = {}) => { const method = options.method || 'GET'; if (method === 'GET') throw Object.assign(new Error('HTTP 503'), { status: 503 }); writes.push(method); return {}; } });
+  await assert.rejects(provider.mutateEvent('update', { ...event, alert: 10 }, calendar, { previous: event }));
+  assert.equal(writes.length, 0);
+});
+
 test('Google alerts: an event on the calendar default keeps the calendar\'s e-mail reminders when it gets its own alert', async () => {
   const calendar = { id: 'C', remoteId: 'RC', accountId: 'A', provider: 'google', defaultAlert: 30, defaultEmails: [{ method: 'email', minutes: 1440 }] };
   const sent = [];
@@ -501,14 +511,15 @@ test('iCloud: an alert changed for 「모든 일정」 reaches the occurrences e
 });
 
 // ---------------- 2026-10-27 recheck, round 3 ----------------
-test('To Do: a completion whose step write fails carries To Do\'s answer (repeatAt, rolledFrom); hints left on a task never act on a completion', async () => {
+test('To Do: a repeating task\'s completion writes its steps first — a step write that fails leaves the task open at To Do and says so; hints left on a task never act on a completion', async () => {
+  // Until 2026-11-09 the completion went first and a failed step write carried To Do's answer (repeatAt, rolledFrom). The steps go before
+  // the status now (the done copy To Do makes carries the ticks; the series is reset): a failure there has sent nothing of the completion.
   const { provider, tasks } = fakeToDo({ mode: 'roll', fail: [{ method: 'POST', pattern: /checklistItems$/, status: 503 }] });
   const open = await provider.mutateTask('add', { title: '물', dueDate: '2026-10-27', rrule: 'FREQ=DAILY', completed: false }, list);
   const stored = { ...open, steps: [{ id: 's', title: '못 보낸 단계', completed: false }] };
   const error = await provider.mutateTask('update', { ...stored, completed: true }, list, stored).then(() => null, failure => failure);
   assert.equal(error?.status, 503);
-  assert.ok(error.partial.repeatAt, 'when To Do took the completion'); assert.equal(error.partial.rolledFrom, '2026-10-27', 'and that it moved the series on');
-  assert.equal(error.partial.dueDate, '2026-10-28');
+  assert.equal([error.partial.completed, error.partial.repeatAt, error.partial.rolledFrom, error.partial.dueDate, tasks.get(open.remoteId).status].join('|'), 'false|||2026-10-27|notStarted', 'nothing of the completion went: the task stays open here and at To Do, the next tick sends it all again');
   // Stale 되돌리기 hints on a completion (they used to survive a failure in main): nothing is looked up or deleted, no rule is patched.
   const spawn = fakeToDo({ mode: 'spawn', dropOnComplete: true });
   const a = await spawn.provider.mutateTask('add', { title: '운동', dueDate: '2026-10-27', rrule: 'FREQ=DAILY', completed: false }, list);
@@ -522,6 +533,22 @@ test('To Do: a completion whose step write fails carries To Do\'s answer (repeat
   const done = await roll.provider.mutateTask('update', { ...r, completed: true, undoRepeat: 'roll', rolledFrom: '2026-10-20' }, list, r);
   assert.equal(done.dueDate, '2026-10-28', 'a completion with an old roll hint completes; the series is not put back to the 20th');
   void tasks;
+});
+
+test('To Do: a repeating task\'s completion whose status PATCH fails after the ticks went keeps the ticked steps as To Do has them (open, checked, read again soon)', async () => {
+  // The ticks are written before the completion (above). A 5xx on the status PATCH then leaves To Do with an open task whose steps are
+  // checked: the answer keeps that here too instead of the old steps, and asks for a read soon (2026-11-09 recheck: the store kept the
+  // steps unticked, and the next read showed an open task with every step checked).
+  const { provider, tasks, log } = fakeToDo({ mode: 'roll', fail: [{ method: 'PATCH', pattern: /\/tasks\/[^/]+$/, status: 503 }] });
+  const open = await provider.mutateTask('add', { title: '약', dueDate: '2026-10-27', rrule: 'FREQ=DAILY', completed: false, steps: [{ id: 'a', title: '아침', completed: false }, { id: 'b', title: '저녁', completed: true }] }, list);
+  const from = log.length;
+  const error = await provider.mutateTask('update', { ...open, completed: true, steps: open.steps.map(step => ({ ...step, completed: true })) }, list, open).then(() => null, failure => failure);
+  assert.equal(error?.status, 503);
+  assert.deepEqual(log.slice(from).filter(entry => entry.method !== 'GET').map(entry => `${entry.method} ${entry.tail.split('/').at(-1)}`), [`PATCH ${open.steps[0].remoteId}`, `PATCH ${open.remoteId}`], 'the open step ticked, then the completion that failed');
+  assert.equal([error.partial.completed, error.partial.resync, error.partial.repeatAt, error.partial.rolledFrom, 'undoRepeat' in error.partial].join('|'), 'false|true|||false', 'kept open here, read again soon, nothing of a completion, no hints');
+  assert.deepEqual(error.partial.steps.map(step => [step.id, step.completed, Boolean(step.remoteId)]), [['a', true, true], ['b', true, true]], 'the ticks as To Do now has them');
+  const stored = tasks.get(open.remoteId);
+  assert.equal([stored.status, stored.checklistItems.map(item => item.isChecked).join()].join('|'), 'notStarted|true,true', 'To Do: open, every step checked — what the store shows now too');
 });
 
 test('Steps after a refusal: a refused delete or change keeps new steps unsent; only a refused add drops them; a Google rate limit is not a refusal', async () => {

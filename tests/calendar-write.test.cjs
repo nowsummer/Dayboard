@@ -447,8 +447,9 @@ test('a series colour is applied to instances that arrive from a sync, an instan
   validateState(state);
   dropSeriesColors(state, new Set(['cal-1']));
   assert.deepEqual(state.seriesColors, {});
-  state.seriesColors['cal-1:m'] = 'red';
-  assert.throws(() => validateState(state), /반복 일정 색/);
+  state.seriesColors['cal-1:m'] = 'red'; state.seriesColors['cal-1:n'] = '#AABBCC';
+  validateState(state);
+  assert.deepEqual(state.seriesColors, { 'cal-1:n': '#AABBCC' }, 'a colour in another form is dropped, not the file refused (2026-11-09 review F13)');
 });
 
 test('older save files gain seriesColors on load', () => {

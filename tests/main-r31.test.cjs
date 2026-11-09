@@ -14,6 +14,7 @@ const vm = require('node:vm');
 const D = require('../renderer/domain.js');
 const { createStore } = require('../lib/store.cjs');
 const { seriesKey } = require('../lib/sync.cjs');
+const { moveKey } = require('../lib/series.cjs');
 const i18n = require('../renderer/i18n.js');
 
 const project = path.resolve(__dirname, '..');
@@ -76,7 +77,7 @@ function moveHarness(t, instancesOf) {
   store.mutate(state => { state.calendars.push({ id: 'gcal', name: 'Google', provider: 'google', accountId: 'acc', remoteId: 'primary' }); });
   const sent = [];
   const context = {
-    store, tr, randomUUID: () => crypto.randomUUID(), seriesKey,
+    store, tr, randomUUID: () => crypto.randomUUID(), seriesKey, moveKey,
     lookup(collection, id) { const item = store.peek(collection, id); if (!item) throw new Error('항목이 없거나 이미 삭제되었습니다.'); return item; },
     commit: fn => store.mutate(fn),
     sync: { async mutateEvent(kind, event, calendar) { sent.push({ kind, event, calendar: calendar.id }); return { events: instancesOf(event), series: false }; } },
@@ -91,6 +92,18 @@ function moveHarness(t, instancesOf) {
 const instancesOf = event => (event.rrule
   ? [1, 2, 3].map(n => ({ id: `${event.id}-${n}`, remoteId: `${event.id}_${n}`, seriesId: `srv-${event.id}`, recurring: true, calendarId: event.calendarId, provider: 'google', accountId: 'acc', title: event.title, start: event.start, end: event.end, allDay: event.allDay, location: event.location || '' }))
   : [{ id: `${event.id}-r`, remoteId: `${event.id}_r`, calendarId: event.calendarId, provider: 'google', accountId: 'acc', title: event.title, start: event.start, end: event.end, allDay: event.allDay, location: event.location || '' }]);
+
+// 2026-11-08 Codex full review F3: an answer lost on the way back left the original here, and moving again made a second event there.
+test('a calendar move names each event: moving again after a lost answer reaches the same one', async t => {
+  const m = moveHarness(t, event => [{ ...event }]);
+  m.store.mutate(state => { state.events.push({ id: 'one', calendarId: 'local-calendar', provider: 'local', title: '치과', allDay: false, start: '2026-10-07T01:00:00.000Z', end: '2026-10-07T02:00:00.000Z' }); });
+  await m.move({ id: 'local-calendar', to: 'gcal' });
+  const first = m.sent[0].event.key;
+  assert.match(first, /^[0-9a-f]{32}$/);
+  const same = { id: 'x', title: '치과', start: '2026-10-07T01:00:00.000Z' };
+  assert.equal(moveKey(['calendar:move', 'a', 'b', 'c', same]), moveKey(['calendar:move', 'a', 'b', 'c', { ...same }]));
+  assert.notEqual(moveKey(['calendar:move', 'a', 'b', 'c', same]), moveKey(['calendar:move', 'a', 'b', 'c', { ...same, title: '안과' }]));
+});
 
 test('S5: 「계정 달력으로 옮기기」 keeps a coloured local series\' colour as the series colour on the account calendar, as event:add does', async t => {
   const m = moveHarness(t, instancesOf);
@@ -130,7 +143,7 @@ test('S9: the smallest widget sizes are one table in renderer/domain.js, read by
   assert.equal(/\nconst WIDGET_MIN\b/.test(source), false, 'main.cjs defines no table of its own');
   // r60-X (2026-11-02 owner: text size): main reads it through domain's widgetMinimum, WIDGET_MIN at the widgets' text size
   assert.match(source, /const \{[^}]*\bwidgetMinimum\b[^}]*\} = require\('\.\/renderer\/domain\.js'\);/, 'main.cjs takes it from domain.js');
-  assert.ok((source.match(/widgetMinimum\(widget\.type, store\.get\(\)\.settings\.widgetTextSize\)/g) || []).length >= 4, 'main still clamps with it (openWidget, rehomeWidgets, widget:resize, a text size change)');
+  assert.ok((source.match(/widgetMinimum\(widget\.type, store\.read\(s => s\.settings\.widgetTextSize\)\)/g) || []).length >= 4, 'main still clamps with it (openWidget, rehomeWidgets, widget:resize, a text size change)');
   assert.equal(/\nconst WIDGET_MIN=/.test(appSource), false, 'app.js defines no table of its own');
   assert.ok(appSource.includes('D.widgetMinimum(widgetType,state?.settings?.widgetTextSize)'), 'app.js reads domain\'s table through the same rule as main (note sizes as the fallback)');
   assert.equal(appSource.includes('must match'), false, 'no "must match" contract comment is left');

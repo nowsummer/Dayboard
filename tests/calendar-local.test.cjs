@@ -94,3 +94,14 @@ test('a disconnect tags archived calendars with the account so a reconnect can c
   assert.equal(cleaned.events.some(item => item.title === 'Standup'), false);
   assert.equal(cleaned.lists.some(item => item.name === 'Google list · 보관본'), true, 'archived task list stays');
 });
+
+// 2026-11-07 owner: 「캘린더 보관본 저건 뭐야?」: two archives with no event in them.
+test('a disconnect keeps no empty archive; one already there goes at the next start; one with events stays', () => {
+  const { dropEmptyArchives } = require('../lib/store.cjs');
+  const state = { calendars: [{ id: 'empty', archivedFrom: 'acc' }, { id: 'kept', archivedFrom: 'acc' }, { id: 'mine' }], events: [{ id: 'e', calendarId: 'kept' }], settings: { hiddenCalendars: ['empty', 'kept'], defaultCalendarId: 'empty' } };
+  assert.equal(dropEmptyArchives(state), 1);
+  assert.equal(state.calendars.map(item => item.id).join(), 'kept,mine');
+  assert.equal(state.settings.hiddenCalendars.join(), 'kept');
+  assert.equal(state.settings.defaultCalendarId, null);
+  assert.equal(dropEmptyArchives(state), 0);
+});

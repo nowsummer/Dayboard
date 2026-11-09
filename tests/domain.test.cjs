@@ -216,7 +216,7 @@ test('Korean quick add reads next-week weekdays, particles and month-day dates (
     ['다음 주에 보고', '2026-10-27', '보고'],
     ['화요일 회의', '2026-10-27', '회의'],
     ['모레 장보기', '2026-10-22', '장보기'],
-    ['10월 19일 정산', '2027-10-19', '정산'],
+    ['10월 19일 정산', '', '10월 19일 정산'], // just past: about that day, not next year's (2026-11-06, corpus)
     ['내일', '2026-10-21', '내일'],
   ]) assert.deepEqual(quickKo(text), { title, dueDate, reminderAt: '' }, text);
 });
@@ -501,7 +501,7 @@ test('English quick add reads "at N" like Korean N시 and noon/midnight; a bare 
   assert.deepEqual(quickEn('decide 5 things'), { title: 'decide 5 things', dueDate: '', reminderAt: '' });
 });
 
-test('a new event for today starts at the next whole hour; other days keep 09:00-10:00', () => {
+test('an event\'s suggested time is the next whole hour of the clock on any day, an hour long (2026-11-07 owner)', () => {
   const at = (h, m) => new Date(2026, 9, 20, h, m);
   assert.deepEqual(R.defaultEventTimes('2026-10-20', at(8, 59)), ['2026-10-20T09:00', '2026-10-20T10:00']);
   assert.deepEqual(R.defaultEventTimes('2026-10-20', at(9, 0)), ['2026-10-20T10:00', '2026-10-20T11:00']);
@@ -509,8 +509,9 @@ test('a new event for today starts at the next whole hour; other days keep 09:00
   // Late evening stays on the chosen day: the start is capped at 23:00 and the hour ends at midnight.
   assert.deepEqual(R.defaultEventTimes('2026-10-20', at(22, 10)), ['2026-10-20T23:00', '2026-10-21T00:00']);
   assert.deepEqual(R.defaultEventTimes('2026-10-20', at(23, 45)), ['2026-10-20T23:00', '2026-10-21T00:00']);
-  assert.deepEqual(R.defaultEventTimes('2026-10-21', at(15, 20)), ['2026-10-21T09:00', '2026-10-21T10:00']);
-  assert.deepEqual(R.defaultEventTimes('2026-10-19', at(15, 20)), ['2026-10-19T09:00', '2026-10-19T10:00']);
+  assert.deepEqual(R.defaultEventTimes('2026-10-21', at(15, 20)), ['2026-10-21T16:00', '2026-10-21T17:00']);
+  assert.deepEqual(R.defaultEventTimes('2026-10-19', at(15, 20)), ['2026-10-19T16:00', '2026-10-19T17:00']);
+  assert.deepEqual(R.defaultEventTimes('2026-10-20', at(6, 30)), ['2026-10-20T07:00', '2026-10-20T08:00'], 'early morning too: no 09:00 made up');
 });
 
 test('moving an event start keeps its length, and the old fallback covers an end before the start', () => {

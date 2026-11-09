@@ -7,8 +7,14 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SOURCE_FILES = ['renderer/app.js', 'renderer/calendar.js', 'renderer/notefind.js', 'renderer/help.js', 'main.cjs', 'preload.cjs', 'lib/store.cjs', 'lib/sync.cjs', 'lib/notesync.cjs', 'lib/viewsync.cjs', 'lib/desktop.cjs',
-  'lib/series.cjs', 'lib/taskmove.cjs', 'lib/validate.cjs', 'lib/alerts.cjs', 'lib/providers/common.cjs', 'lib/providers/google.cjs', 'lib/providers/icloud.cjs', 'lib/providers/microsoft.cjs', 'lib/providers/oauth.cjs'];
+// Every app script: main.cjs, preload.cjs, renderer/*.js and lib/**/*.cjs, so a new file is read without being listed (2026-11-09 F99:
+// lib/backup.cjs and lib/tasks.cjs were missing from the hand-written list). The dictionaries and the quick-entry parser's regexes stay out.
+const SKIP = new Set(['renderer/i18n.js', 'renderer/domain.js', 'lib/i18n.cjs']);
+const SOURCE_FILES = (() => {
+  const root = path.resolve(__dirname, '..');
+  const walk = (dir, ext) => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(d => d.isDirectory() ? walk(`${dir}/${d.name}`, ext) : ext.test(d.name) ? [`${dir}/${d.name}`] : []);
+  return ['main.cjs', 'preload.cjs', ...walk('renderer', /\.js$/), ...walk('lib', /\.cjs$/)].filter(f => !SKIP.has(f));
+})();
 const HANGUL = /[가-힣]/;
 
 // Minimal tokenizer: skips comments and regex literals, returns string literals with positions.

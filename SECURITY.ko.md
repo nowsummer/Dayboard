@@ -10,7 +10,7 @@ Dayboard는 한 사람이 만드는 개인 프로젝트입니다. 보안 문제�
 
 - 이 저장소의 **Security** 탭 → **Report a vulnerability**(GitHub 비공개 취약점 신고)를 이용해 주세요.
 - 앱 버전(설정 맨 위), 발견한 내용, 재현 방법, 예상되는 영향을 적어 주세요.
-- 비밀번호·토큰·앱 전용 암호·`cloud-credentials.bin`(과 그 `.corrupt-*` 사본)은 절대 보내지 마세요.
+- 비밀번호·토큰·앱 암호·`cloud-credentials.bin`(과 그 `.corrupt-*` 사본)은 절대 보내지 마세요.
 - 로그와 화면 캡처에서 계정 주소와 Windows 사용자 경로를 지워 주세요.
 
 응답 시간은 보장하지 않습니다. 수정은 새 릴리스로 나가며 최신 릴리스만 지원합니다.
@@ -24,22 +24,23 @@ Dayboard는 한 사람이 만드는 개인 프로젝트입니다. 보안 문제�
 - `dayboard.json`: 할 일·일정·메모·목록·달력, 연결한 계정의 이름(대개 메일 주소), 설정, 위젯 위치.
   - 사본: 직전 저장본 `dayboard.previous.json`, 깨진 파일을 발견하면 남기는 `dayboard.recovery-*.json`.
   - **암호화하지 않은 JSON**입니다. 같은 Windows 계정으로 실행되는 프로그램과 관리자가 읽을 수 있습니다.
-- `cloud-credentials.bin`: 연결한 계정의 로그인 토큰과 iCloud 앱 전용 암호.
+- `cloud-credentials.bin`: 연결한 계정의 로그인 토큰과 iCloud 앱 암호.
   - Electron `safeStorage`(Windows 데이터 보호 API)로 암호화합니다. 그 키는 같은 폴더의 `Local State`에 보호해 둡니다.
   - 이 암호화는 **다른 Windows 계정과 다른 PC로 복사한 파일**만 막습니다. 같은 Windows 계정으로 실행되는 프로그램은 풀 수 있습니다.
   - 암호화를 쓸 수 없는 환경에서는 저장하지도 읽지도 않습니다. 읽을 수 없는 파일은 `cloud-credentials.bin.corrupt-*`로 이름을 바꿔 둡니다.
 - 그 밖: `icons\`(시작 메뉴 바로 가기 아이콘), `update-alerts.json`(새 버전 알림 기록), Electron(Chromium)이 만드는 일반 프로필 파일.
-- 0.2.0 설치형에는 업데이트 엔진이 만든 설치별 임의 ID `.updaterId`가 있습니다. 1.0.0부터는 만들지 않고 지웁니다.
+- 0.2.0을 PC에 직접 설치한 사본에는 업데이트 엔진이 만든 설치별 임의 ID `.updaterId`가 있습니다. 1.0.0부터는 만들지 않고 지웁니다.
 
 폴더 밖:
 
 - **바탕화면 그림**: 위젯 뒤 배경을 직접 그리려고 현재 바탕화면 그림 파일과 `%APPDATA%\Microsoft\Windows\Themes\TranscodedWallpaper`를 **읽기만** 합니다.
 - **「데이터 백업」**: 사용자가 고른 위치에 JSON 파일 하나를 씁니다. 할 일·일정·메모·계정 이름이 들어가고 로그인 정보는 들어가지 않습니다.
+- **「자동 백업」**: 어느 계정에도 없는 자료(이 PC의 목록·달력, 동기화하지 않거나 동기화가 멈춘 메모)를 하루 한 번 `문서\Dayboard Backups`나 사용자가 고른 폴더에 암호화하지 않은 JSON으로 저장합니다. 로그인 정보는 들어가지 않습니다. 그 폴더가 OneDrive 같은 클라우드와 동기화되면 파일도 함께 올라갑니다. 설정에서 끌 수 있습니다.
 
 ### 네트워크
 
 - **Microsoft**: `login.microsoftonline.com`(로그인), `graph.microsoft.com`(To Do·Outlook 달력).
-  - 권한: `User.Read`, `Tasks.ReadWrite`, `Calendars.ReadWrite`, `offline_access`.
+  - 권한: `User.Read`, `Tasks.ReadWrite`, `Calendars.ReadWrite`, `offline_access`. 그 계정에서 「메모」를 켤 때만 `Files.ReadWrite.AppFolder`를 더 요청합니다.
 - **Google**: `accounts.google.com`, `oauth2.googleapis.com`, `openidconnect.googleapis.com`(로그인), `tasks.googleapis.com`, `www.googleapis.com`(Tasks·캘린더·드라이브).
   - 권한: `openid`, `email`, `profile`, `tasks`, `calendar.readonly`, `calendar.events`, `drive.appdata`.
 - **Apple**: `caldav.icloud.com`과 Apple이 알려 주는 `icloud.com` 하위 서버(HTTPS만, iCloud 달력, CalDAV).
@@ -57,6 +58,20 @@ Dayboard는 한 사람이 만드는 개인 프로젝트입니다. 보안 문제�
 - 지운 메모는 내용 없는 삭제 표시로 90일 남습니다.
 - 이 폴더는 드라이브 화면과 다른 앱에서 보이지 않습니다. `drive.appdata` 권한은 이 폴더 밖의 드라이브 파일에 닿지 않습니다.
 - 같은 Google 계정으로 로그인한 내 다른 PC의 Dayboard만 읽습니다.
+
+### 메모 동기화 (OneDrive)
+
+- Microsoft 계정의 「메모」 스위치를 켜고 권한을 허용했을 때만 동작합니다. 메모를 맡는 계정은 한 번에 하나입니다.
+- 메모를 그 계정 OneDrive의 **앱 폴더**(`앱\Microsoft Graph Command Line Tools`)에 `dayboard-note`로 시작하는 JSON 파일로 둡니다. 들어가는 내용은 Google 드라이브와 같습니다.
+- 이 폴더는 Google과 달리 OneDrive 화면에서 보입니다. 파일을 지우면 메모가 켜진 PC가 다시 올립니다.
+- `Files.ReadWrite.AppFolder` 권한은 이 앱 폴더 밖의 OneDrive 파일에 닿지 않습니다. 같은 로그인 앱을 쓰는 다른 도구도 이 폴더를 볼 수 있습니다.
+- 파일을 받을 때는 Microsoft가 주는 짧은 주소로 받고, 그 주소에는 로그인 정보를 보내지 않습니다.
+
+### PC끼리 맞추는 설정
+
+- 같은 계정을 쓰는 내 PC끼리 목록·달력의 보기 설정(색·아이콘·순서·그룹·숨김·정렬), 「자주 쓰는 일정」, To Do 할 일의 시각, 하위 할 일의 날짜를 맞춥니다.
+- 할 일·일정·메모의 제목과 본문은 들어가지 않습니다. 할 일은 서비스 쪽 id의 짧은 해시로만 가리킵니다.
+- Google 드라이브 앱 데이터 폴더와 Microsoft To Do 기본 목록의 Dayboard 전용 데이터에 둡니다. 계정 연결을 해제하면 멈춥니다.
 
 ### Windows
 
@@ -87,19 +102,19 @@ Dayboard는 한 사람이 만드는 개인 프로젝트입니다. 보안 문제�
 - 로그인 화면과 계정의 앱 권한 목록에는 Dayboard 대신 그 이름이 보입니다.
 - 같은 클라이언트를 쓰는 다른 도구(Microsoft Graph PowerShell 등)도 이 동의를 함께 씁니다.
 - 회사·학교 계정은 관리자가 이 클라이언트를 막을 수 있고, Microsoft 정책이 바뀌면 동작이 멈출 수 있습니다.
-- 그때는 연결 화면의 「직접 등록한 앱 사용」에 자기 앱 등록의 클라이언트 ID를 넣을 수 있습니다.
+- 그때는 연결 화면의 「다른 방법으로 로그인 (고급)」에 자기 앱 등록의 클라이언트 ID를 넣을 수 있습니다.
 
 ### Google 로그인
 
 - 배포되는 설치 파일에는 배포자의 Google OAuth 데스크톱 클라이언트(ID와 보안 비밀)가 들어 있습니다.
-- Google은 설치형 앱의 보안 비밀을 기밀로 보지 않지만, 이 저장소에는 넣지 않았습니다.
+- Google은 PC에 직접 설치하는 앱의 보안 비밀을 기밀로 보지 않지만, 이 저장소에는 넣지 않았습니다.
 - 소스로 직접 빌드하면 Google을 연결할 때 자기 클라이언트 ID를 입력해야 합니다([README](README.ko.md) 참고).
 - 앱이 Google 검증을 받지 않아 로그인 중 「확인되지 않은 앱」 화면이 나오고, Google이 새로 로그인하는 사용자 수를 100명까지로 제한합니다.
 
 ### iCloud
 
-- Apple 계정 암호가 아니라 앱 전용 암호를 받습니다.
-- 앱 전용 암호는 달력 외의 iCloud 데이터에도 쓰일 수 있습니다.
+- Apple 계정 암호가 아니라 앱 암호를 받습니다.
+- 앱 암호는 달력 외의 iCloud 데이터에도 쓰일 수 있습니다.
 
 ### 로컬 데이터
 
@@ -116,6 +131,7 @@ Dayboard는 한 사람이 만드는 개인 프로젝트입니다. 보안 문제�
   1. 먼저 모든 PC의 Dayboard에서 그 계정의 「메모」를 끄거나 연결을 해제합니다(켜 둔 PC는 메모를 다시 올림).
   2. Google 드라이브 웹 → 설정 → 앱 관리 → Dayboard의 「옵션」 → 「숨겨진 앱 데이터 삭제」를 누릅니다.
 - **Microsoft 개인 계정**: `account.live.com/consent/Manage`에서 「Microsoft Graph Command Line Tools」를 제거합니다. 같은 클라이언트를 쓰는 다른 도구의 동의도 함께 없어집니다.
+- **OneDrive의 메모 파일**: 연결 해제만으로는 지워지지 않습니다. 모든 PC에서 그 계정의 「메모」를 끈 뒤 OneDrive의 위 앱 폴더에서 `dayboard-note`로 시작하는 파일을 지웁니다.
 - **Microsoft 회사·학교 계정**: 조직의 My Apps에서 정리하거나 관리자에게 요청합니다.
 - **iCloud**: Apple 계정 → 로그인 및 보안 → 앱 암호에서 Dayboard용 암호를 폐기합니다.
 

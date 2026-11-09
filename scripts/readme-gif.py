@@ -9,7 +9,10 @@
 #   .png  — APNG, lossless (about twice the size of the lossless WebP).
 # Needs Python 3 with Pillow (WebP support built in).
 # usage: py -3 scripts/readme-gif.py <frames folder> <out.webp|.gif|.png> [width, default 1315] [--then <scene frames folder>]
-#        [--quality 0-100, default 90] [--lossless] [--old-scene]
+#        [--join <app frames folder>] [--gap ms between parts, default 900] [--last ms on the last frame, default 2200]
+#        [--photo: the first folder is a desktop scene too] [--quality 0-100, default 90] [--lossless] [--old-scene]
+#        [--thin ms: no frame shorter than that; the frames between are dropped, a part's last one kept, for a film over its size]
+# --then and --join may be repeated and given in any order, and are joined in that order (scripts/readme-clips.py makes the film so).
 # The frames are recorded at twice the window's size (readme-demo.cjs) and scaled down here: 1315 px is the desktop scene's own
 # width (recorded on a 125 % screen), and sharp on the README's 860 px picture up to a 150 % screen. Narrower frames (1x, 1120 px)
 # keep their own width unless one is given: blown up to 1315 px their text came out softer (2026-10-28 review of r50 I).
@@ -39,10 +42,20 @@ def option(name, default=None, flag=False):
     return value
 
 
-then = option('--then')
+# The parts after the first, in the order given: (folder, is it a desktop scene).
+following = []
+while '--then' in args or '--join' in args:
+    at = min(args.index(name) for name in ('--then', '--join') if name in args)
+    following.append((args[at + 1], args[at] == '--then'))
+    del args[at:at + 2]
+scenes = [folder for folder, photo in following if photo]
+gap = int(option('--gap', 900))
+last_frame = int(option('--last', 2200))
+first_is_photo = option('--photo', False, flag=True)
 quality = int(option('--quality', 90))
 lossless = option('--lossless', False, flag=True)
 old_scene = option('--old-scene', False, flag=True)
+thin = int(option('--thin', 0))
 src, out = args[0], args[1]
 kind = os.path.splitext(out)[1].lower()
 if kind not in ('.webp', '.gif', '.png'):
@@ -51,7 +64,7 @@ if kind not in ('.webp', '.gif', '.png'):
 
 def frame_files(folder):
     files = sorted(glob.glob(os.path.join(folder, 'f_*.png')))
-    if len(files) < 10:
+    if len(files) < 3:  # a scene that holds still paints only a few
         sys.exit(f'too few frames in {folder}')
     return files
 
@@ -64,7 +77,7 @@ def sample_mark(folder):
         return None
 
 
-if then and not old_scene:
+for then, _ in following if not old_scene else []:
     app_mark, scene_mark = sample_mark(src), sample_mark(then)
     if scene_mark is None:
         sys.exit(f'{then} has no sample.json: recorded before the sample colours were marked (older sample data). Record it again with '
@@ -84,7 +97,7 @@ def first_width(folder):
 
 
 # Scaled down, never up, unless a width is given (then a note says so).
-narrowest = min(first_width(folder) for folder in [src] + ([then] if then else []))
+narrowest = min(first_width(folder) for folder in [src] + [folder for folder, _ in following])
 target = int(args[2]) if len(args) > 2 else min(1315, narrowest)
 if target > narrowest:
     print(f'note: {narrowest}-px frames scaled up to {target} px (softer text)')
@@ -101,26 +114,35 @@ def load(folder, size=None):
         size = size or (target, round(frame.height * target / frame.width))
         frames.append(frame if frame.size == size else frame.resize(size, Image.Resampling.LANCZOS))
     # A frame lasts until the next; browsers show delays under 20 ms as 100 ms, so none is shorter than 40 ms.
-    durations = [max(40, stamps[i + 1] - stamps[i]) for i in range(len(stamps) - 1)] + [2200]
+    durations = [max(40, stamps[i + 1] - stamps[i]) for i in range(len(stamps) - 1)] + [last_frame]
+    if thin:
+        kept, kept_times = [frames[0]], [durations[0]]
+        for i in range(1, len(frames)):
+            if kept_times[-1] < thin and i < len(frames) - 1:
+                kept_times[-1] += durations[i]
+            else:
+                kept.append(frames[i])
+                kept_times.append(durations[i])
+        frames, durations = kept, kept_times
     return frames, durations
 
 
 size = None
-if then:
+if scenes:
     # The scene sets the proportions, so at its own width its frames keep their own pixels (the app's window is 1 px off).
-    with Image.open(frame_files(then)[0]) as first:
+    with Image.open(frame_files(scenes[0])[0]) as first:
         size = (target, round(first.height * target / first.width))
 frames, durations = load(src, size)
 width, height = frames[0].size
 parts = [frames]
-desktop = [False] * len(frames)  # the desktop scene: a photo-like wallpaper (dithered in a GIF, lossy in a WebP)
-if then:
-    durations[-1] = 900  # the notes, then the desktop
-    scene, scene_durations = load(then, (width, height))
-    parts.append(scene)
-    frames = frames + scene  # a new list: parts[0] stays the app's frames
-    durations += scene_durations
-    desktop += [True] * len(scene)
+desktop = [first_is_photo] * len(frames)  # the desktop scene: a photo-like wallpaper (dithered in a GIF, lossy in a WebP)
+for folder, photo in following:
+    durations[-1] = gap  # the week view, then the desktop
+    part, part_durations = load(folder, (width, height))
+    parts.append(part)
+    frames = frames + part  # a new list: parts[0] stays the app's frames
+    durations += part_durations
+    desktop += [photo] * len(part)
 
 
 def merged(images, times, flags):

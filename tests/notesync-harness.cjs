@@ -93,17 +93,17 @@ function fakeDrive({ pageSize = 1000, clock = () => Date.now() } = {}) {
 
 // One PC. save/create/remove do what main.cjs note:save / note:delete do to the store (a save is always later than the
 // version it replaces). `offset` puts this PC's clock ahead (+) or behind (-) of the others, in ms.
-function pc(t, drive, { name = 'PC', access = true, now, onNotesRemoved, offset = 0 } = {}) {
+function pc(t, drive, { name = 'PC', access = true, now, onNotesRemoved, offset = 0, provider = 'google' } = {}) {
   const time = () => new Date(Date.parse(tick()) + offset).toISOString();
   const store = createStore(temporary(t));
   store.mutate(state => {
-    state.accounts.push({ id: ACCOUNT, provider: 'google', name: 'me@example.com', status: 'connected', notesAccess: access });
+    state.accounts.push({ id: ACCOUNT, provider, name: 'me@example.com', status: 'connected', notesAccess: access });
     state.settings.notesAccountId = ACCOUNT; state.settings.notesAutoDone = true;
   });
   const removed = [];
   const self = { name, store, removed, beforeApply: null };
   self.notes = createNotesSync({
-    store, change: fn => store.mutate(fn), requestFor: () => (url, options) => drive.request(url, options, self), hasAccess: () => access, delay: 0,
+    store, change: fn => store.mutate(fn), requestFor: () => (url, options) => drive.request(url, options, self), download: url => drive.download(url), hasAccess: () => access, delay: 0,
     onNotesRemoved: onNotesRemoved || (info => removed.push(info)),
     beforeApply: async () => { if (self.beforeApply) await self.beforeApply(); },
     // The sync engine reads the same clock as this PC's saves (as main.cjs and lib/notesync.cjs both read the real clock).

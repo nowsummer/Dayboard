@@ -58,8 +58,12 @@ function fakeToDo({ mode = 'roll', dropOnComplete = false, fail = [], singleExpa
         if (wasOpen && task.status === 'completed' && task.recurrence) {
           const date = task.dueDateTime.dateTime.slice(0, 10); const next = nextDate(task.recurrence.pattern, date);
           if (mode === 'roll') {
-            make({ title: task.title, status: 'completed', dueDateTime: due(date), body: task.body, importance: task.importance }, task.lastModifiedDateTime);
+            // The done occurrence is a copy of the task as it stands at the status change, its checklist too (items of its own); the
+            // series' steps come back unchecked, as To Do's app resets steps when a task repeats (modelled 2026-11-09 — not checked
+            // against a live account; lib/providers/microsoft.cjs writes the ticks before the completion for this reason).
+            make({ title: task.title, status: 'completed', dueDateTime: due(date), body: task.body, importance: task.importance, checklistItems: task.checklistItems.map(item => ({ ...item, id: `C${++n}` })) }, task.lastModifiedDateTime);
             task.status = 'notStarted'; task.dueDateTime = due(next); task.recurrence = { ...task.recurrence, range: { ...task.recurrence.range, startDate: next } };
+            task.checklistItems = task.checklistItems.map(item => ({ ...item, isChecked: false }));
             if (task.recurrence.range.type === 'numbered') task.recurrence.range.numberOfOccurrences -= 1;
           } else {
             make({ title: task.title, recurrence: { ...task.recurrence, range: { ...task.recurrence.range, startDate: next } }, body: task.body, importance: task.importance, ...(copySteps ? { checklistItems: task.checklistItems.map(item => ({ ...item, id: `C${++n}`, isChecked: false })) } : {}) }, task.lastModifiedDateTime);

@@ -97,12 +97,18 @@ test('styles: 44px rows with 28px borderless selects and 13px labels in the grou
   assert.equal(computed(label, 'color').value, 'var(--text)');
   assert.equal(computed(group, 'background').value, 'var(--field)');
   assert.equal(computed(footer, 'padding').value, '0');
-  // the task editor's 「중요한 할 일」 and the event dialog's 「하루 종일」: the settings' size, not 12px on a 20px row
-  const form = el('div', 'dialog-body', el('div', 'dialog', h.app)), important = el('label', 'checkbox-field', form);
-  assert.equal(computed(important, 'font-size').value, '13px');
+  // an option sentence in a dialog (the transfer dialog's rows) keeps the settings' size on a 32px row; the task editor's 「중요한 할 일」
+  // and the event dialog's 「하루 종일」 are labelled as the fields around them since 2026-11-05 (owner: 「중요한 할 일과 하위 할 일 이거
+  // 글자 크기가 서로 다를 이유가 있어?」) — .field-switch, the labels' 12px/600 --secondary, the same 32px row
+  const form = el('div', 'dialog-body', el('div', 'dialog', h.app)), option = el('label', 'checkbox-field', form), important = el('label', 'checkbox-field field-switch', form);
+  assert.equal(computed(option, 'font-size').value, '13px');
+  assert.equal(computed(option, 'min-height').value, '32px');
+  const fieldLabel = el('span', '', el('label', 'field', form));
+  for (const prop of ['font-size', 'font-weight', 'color']) assert.equal(computed(important, prop).value, computed(fieldLabel, prop).value, `「중요한 할 일」 ${prop} as a field label`);
   assert.equal(computed(important, 'min-height').value, '32px');
   h.document.body.className = 'widget-body';
-  assert.equal(computed(important, 'font-size').value, '12px', 'widget windows keep their 12px forms');
+  assert.equal(computed(option, 'font-size').value, '12px', 'widget windows keep their 12px forms');
+  assert.equal(computed(important, 'font-size').value, '12px');
 });
 
 // ---- after the independent review of r60-C (2026-11-02): long values, the keyboard on 업데이트 확인, the account blocks ----

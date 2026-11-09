@@ -1,18 +1,18 @@
 @font-face{font-family:'Pretendard';font-style:normal;font-weight:100 900;font-display:swap;src:url('./fonts/PretendardVariable.woff2') format('woff2')}
 :root{font-family:'Pretendard','Segoe UI Variable Text','Segoe UI','Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#242731;font-size:14px;line-height:1.5;font-synthesis:none;font-optical-sizing:auto;--bg:#fff;--side:rgba(239,241,246,.88);--text:#242731;--muted:#8a8d97;--secondary:#686d78;--line:rgba(30,36,50,.07);--blue:#3478f6;--hover:rgba(45,65,110,.055);--field:#f2f3f7;--glass:rgba(255,255,255,.94);--note:#fff9e7;color-scheme:light}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}body{background:var(--bg);color:var(--text);word-break:keep-all}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}button:disabled{cursor:wait;opacity:.55}button{border:0;background:none;padding:0;text-align:left;-webkit-app-region:no-drag}input,textarea,select{-webkit-app-region:no-drag}button:active{transform:scale(.98)}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #77a7ff;outline-offset:3px}button,textarea,input{-webkit-tap-highlight-color:transparent}button svg{flex-shrink:0}h1,h2,h3,h4,p{margin:0}h1{font-size:30px;letter-spacing:-1px;line-height:1.25;font-weight:730}h2{font-size:20px;letter-spacing:-.5px}h3{font-size:14px;font-weight:650}small{font-size:12px}svg{vertical-align:middle;flex-shrink:0}#app{height:100%}.loading{display:grid;place-items:center;height:100%;font-size:30px;color:var(--blue)}
-:root{--topbar:52px;--gutter:32px;--content-top:16px;--content-bottom:24px}.topbar{height:var(--topbar);display:flex;align-items:stretch;-webkit-app-region:drag;background:linear-gradient(90deg,var(--side) 0 244px,var(--bg) 244px);user-select:none;flex-shrink:0}.topbar-brand{width:244px;flex-shrink:0;display:flex;align-items:center;gap:9px;padding:0 22px 0 26px;box-shadow:inset -1px 0 var(--line);font-size:17px;font-weight:650;letter-spacing:-.5px;color:var(--text)}.topbar-brand img{border-radius:7px}.topbar-main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 12px 0 var(--gutter)}.topbar-main h1{font-size:19px;letter-spacing:-.5px;line-height:1.2;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:2px}.topbar-spacer{flex:1}.topbar .button{min-height:32px;padding:6px 13px;font-size:13px}.topbar-main .icon-button{width:32px;height:32px}.month-nav{gap:0}.window-actions{height:100%;display:flex;align-items:center;flex-shrink:0}.window-actions .icon-button{height:var(--topbar);width:46px;border-radius:0}.window-actions svg{width:16px;height:16px;stroke-width:1.5}.window-actions .window-close:hover{background:#e5484d;color:white}
-.app-layout{display:flex;height:calc(100% - var(--topbar));overflow:hidden}.sidebar{width:244px;flex-shrink:0;background:var(--side);backdrop-filter:blur(40px) saturate(140%);padding:var(--content-top) 16px 12px;display:flex;flex-direction:column;user-select:none;border-right:1px solid var(--line)}.brand{display:flex;gap:10px;align-items:center;margin:0 8px 25px;font-size:23px;letter-spacing:-1px;font-weight:650}.brand img{border-radius:10px}.search{display:flex;align-items:center;gap:7px;background:rgba(130,140,160,.09);border:1px solid rgba(100,110,130,.05);border-radius:9px;padding:7px 9px;color:var(--muted)}.search input{background:none;border:0;width:100%;min-width:0;font-size:13px}.search input:focus-visible{outline:none}.search:focus-within{background:var(--bg);border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 18%,transparent)}.smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:22px 0}.smart-tile{background:rgba(255,255,255,.84);padding:12px 13px 11px;border-radius:13px;box-shadow:0 1px 2px rgba(20,30,60,.025);color:var(--secondary);font-size:12px;font-weight:600;transition:background .12s}.smart-tile:hover{background:#fff}.smart-tile.selected{background:var(--accent);color:#fff;box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 20%,transparent)}.tile-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.tile-top strong{font-size:26px;font-weight:700;line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums;color:var(--text)}.selected .tile-top strong{color:#fff}.tile-icon{display:grid;place-items:center;width:28px;height:28px;background:var(--accent);color:#fff;border-radius:50%}.smart-tile.selected .tile-icon{background:rgba(255,255,255,.22)}.main-nav{display:flex;flex-direction:column;gap:3px}.nav-item{display:flex;gap:11px;align-items:center;padding:10px 12px;border-radius:8px;color:var(--secondary);font-size:13px}.nav-item:hover,.list-nav:hover{background:var(--hover)}.nav-item.selected,.list-nav.selected{background:rgba(115,130,155,.12);color:var(--text)}.sidebar-section-head{display:flex;align-items:center;justify-content:space-between;margin:23px 10px 5px;font-size:12px;font-weight:600;color:var(--muted)}.lists-nav{flex:1;overflow:auto;min-height:30px;display:flex;flex-direction:column;gap:3px}.list-nav{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;min-height:44px}.list-dot{width:27px;height:27px;color:#fff;display:grid;place-items:center;border-radius:50%;flex-shrink:0}.list-name{font-size:12px;flex:1;min-width:0;overflow-wrap:anywhere}.list-name small{display:block;font-size:12px;color:var(--muted);margin-top:1px}.list-count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}.sidebar-footer{padding-top:10px}.account-button{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;padding:7px 9px;border-radius:9px;border:0;color:var(--secondary);font-size:12px;font-weight:500;background:transparent;text-align:left}.account-button .status-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.account-button small{color:var(--muted);font-size:12px;white-space:nowrap}.status-dot{width:8px;height:8px;border-radius:50%;background:#b8bfca;flex-shrink:0;box-shadow:0 0 0 2px rgba(184,191,202,.28)}.account-button.ok .status-dot{background:#34c759;box-shadow:0 0 0 2px rgba(52,199,89,.22)}.account-button.busy .status-dot{background:#007aff;box-shadow:0 0 0 2px rgba(0,122,255,.22);animation:pulse 1.1s ease-in-out infinite}.account-button.error .status-dot{background:#ff3b30;box-shadow:0 0 0 2px rgba(255,59,48,.22)}.account-button.error{color:#de5960}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}.account-button:hover{background:var(--hover);color:var(--text)}.sidebar-bottom{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0}.sidebar-bottom .icon-button{color:var(--muted)}
-.main-content{flex:1;min-width:0;overflow:hidden;position:relative}.tasks-view{height:100%;display:flex;flex-direction:column}.content-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}.eyebrow{font-size:12px;color:var(--muted);margin-bottom:4px}.heading-count{font-size:38px;line-height:1;font-weight:300;letter-spacing:-2px;font-variant-numeric:tabular-nums}.task-toolbar{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}.inline-actions{display:flex;align-items:center;gap:5px}.icon-button{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;color:var(--secondary);flex-shrink:0}.icon-button:hover{background:var(--hover)}.button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:600;line-height:1.5;min-height:36px;background:var(--field);white-space:nowrap}.button.primary{background:var(--blue);color:white;box-shadow:0 2px 4px rgba(52,120,246,.1)}.button.primary:hover{background:#2469e7}.button.subtle{background:var(--field);color:var(--secondary)}.button.danger{background:#e64d52;color:#fff}.button.danger-quiet{color:#df4d53;background:transparent}.text-button{color:var(--blue);font-size:12px;display:inline-flex;gap:5px;align-items:center;padding:5px 6px;border-radius:5px}.text-button:hover{background:var(--hover)}.task-scroll{overflow:auto;flex:1;min-height:0;margin:0 -9px;padding:0 9px}.task-list{padding-top:4px}.task-row{position:relative;display:flex;align-items:flex-start;gap:12px;min-height:74px;padding:19px 1px 14px;border-bottom:1px solid var(--line)}.task-check{margin-top:3px;width:21px;height:21px;border:1.5px solid #c8ccd3;border-radius:50%;flex-shrink:0;display:grid;place-items:center;transition:background .12s,border-color .12s}.task-check:hover{border-color:var(--task-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--task-color) 10%,transparent)}.completed .task-check{border-color:var(--task-color);background:var(--task-color);color:#fff}.task-text{min-width:0;flex:1;line-height:1.5;padding:0 0 3px}.task-title{font-size:14px;display:block;overflow-wrap:anywhere}.task-meta{display:flex;align-items:center;gap:9px;margin-top:4px;font-size:12px;color:var(--muted);min-height:14px}.task-meta .overdue{color:#de5c62}.list-label{display:flex;align-items:center;gap:4px}.list-label i{width:4px;height:4px;border-radius:50%}.task-flag{color:#efa325;padding-top:3px}.row-more{opacity:0;width:23px;height:24px}.task-row:hover .row-more,.task-row:focus-within .row-more{opacity:1}.completed .task-title{text-decoration:line-through;color:var(--muted)}.completed-section{padding:24px 0 15px}.completed-section h3{font-size:12px;color:var(--muted)}.quick-add{margin-top:22px;border:1px solid var(--line);border-radius:13px;background:linear-gradient(125deg,var(--bg),var(--field));flex-shrink:0;box-shadow:0 3px 8px rgba(30,40,70,.015);overflow:hidden}.quick-main{display:flex;align-items:center;gap:9px;padding:12px 13px}.quick-plus{color:var(--blue)}.quick-input{flex:1;min-width:0;border:0;background:none;font-size:14px;padding:3px 0}.quick-submit{width:27px;height:27px;background:var(--blue);color:#fff;border-radius:50%;display:grid;place-items:center;opacity:.9}.quick-bottom{display:flex;justify-content:space-between;align-items:center;padding:0 14px 11px 41px;font-size:12px;color:var(--muted)}.quick-bottom[hidden]{display:none}.quick-list{max-width:60%;font-size:12px;border:0;background:transparent;color:var(--secondary)}.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;min-height:280px;padding:38px 20px;height:100%}.empty-symbol{color:#a9bad4;background:linear-gradient(140deg,#f0f5fd,#fafcff);border:1px solid #eaf0fa;width:76px;height:76px;border-radius:24px;display:grid;place-items:center;margin-bottom:8px}.empty-state h2{font-size:19px;letter-spacing:-.6px;font-weight:600}.empty-state p{font-size:12px;color:var(--muted);max-width:280px;line-height:1.8}.empty-state .button{margin-top:8px}
-.context-pane{width:272px;flex-shrink:0;padding:var(--content-top) 22px 18px;border-left:1px solid var(--line);background:linear-gradient(170deg,#fafbfe,#fff);display:flex;flex-direction:column;overflow:auto}.month-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;gap:10px}.month-heading h3{font-size:13px;letter-spacing:-.3px}.month-heading .icon-button{width:22px;height:22px}.month-heading svg{width:14px;height:14px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.weekday{text-align:center;font-size:12px;color:var(--muted);padding-bottom:8px;font-weight:500}.sunday{color:#ce767f}.calendar-day{display:flex;flex-direction:column;align-items:center;border-radius:8px;min-height:29px;font-variant-numeric:tabular-nums;position:relative}.day-number{width:25px;height:25px;display:grid;place-items:center;font-size:12px;border-radius:50%}.outside .day-number{opacity:.28}.calendar-day:hover{background:var(--hover)}.is-today .day-number{background:var(--blue);color:white;font-weight:600}.is-selected:not(.is-today) .day-number{background:var(--hover);outline:1px solid var(--line)}.day-dots{display:flex;gap:2px;height:4px;align-items:center}.day-dots i{width:3px;height:3px;border-radius:50%}.event-dot{background:#efa62f}.task-dot{background:var(--blue)}.context-heading{display:flex;align-items:center;justify-content:space-between;margin-top:25px;margin-bottom:7px}.context-heading h3{font-size:12px;display:flex;gap:6px;align-items:center}.agenda{display:flex;flex-direction:column;gap:13px;padding:7px 0}.event-row{display:flex;gap:10px;width:100%;padding:1px 0}.event-line{width:3px;border-radius:4px;flex-shrink:0}.event-row div{min-width:0}.event-row strong{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}.event-row span:not(.event-line,.event-title){display:block;color:var(--secondary);font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums}.event-row small{display:block;font-size:12px;margin-top:3px;color:var(--muted)}.no-events{font-size:12px;color:var(--muted);padding:7px 0}.context-note{margin-top:26px;padding:16px 17px 14px;border-radius:14px;background:#fffaf0;border:1px solid rgba(217,183,100,.13)}.context-note .context-heading{margin:0 0 10px;color:#9b803f}.context-note p{white-space:pre-wrap;font-size:12px;line-height:1.9;color:#797462;max-height:130px;overflow:hidden}.context-note>span{display:block;font-size:12px;color:#b6aa8b;margin-top:17px}.context-foot{margin-top:auto;padding-top:30px;display:flex;gap:6px;justify-content:center;align-items:center;font-size:12px;color:#b3b5bb}
-.calendar-view,.notes-view,.widgets-view{height:100%;overflow:auto}.calendar-view>.month-heading{padding:4px 0 12px;margin-bottom:0}.calendar-view>.month-heading h3{font-size:20px}.calendar-view>.month-heading .icon-button{width:30px;height:30px}.calendar-grid.large{gap:0;border-bottom:1px solid var(--line)}.large .weekday{padding:10px 0}.large .calendar-day{align-items:stretch;min-height:80px;border-top:1px solid var(--line);border-radius:0;padding:7px 5px}.large .day-number{align-self:center;width:27px;height:27px;font-size:12px}.large .is-selected{background:rgba(52,120,246,.035)}.large .day-items{display:flex;flex-direction:column;gap:2px;margin-top:5px}.day-event{background:#fff3d8;color:#a57728;font-size:12px;border-radius:3px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.day-tasks{font-size:12px;color:var(--blue);text-align:center}.calendar-bottom{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding-top:25px}.calendar-bottom h3{font-size:12px;margin-bottom:8px}.calendar-bottom .task-row{padding:10px 0;min-height:50px}.calendar-bottom .task-title{font-size:13px}.calendar-bottom .task-check{width:17px;height:17px}.calendar-bottom .task-meta{font-size:12px}.notes-view{display:flex;flex-direction:column;overflow:hidden}.notes-layout{display:flex;gap:24px;min-height:0;flex:1}.note-cards{width:210px;flex-shrink:0;overflow:auto;display:flex;flex-direction:column;gap:10px}.note-card{padding:16px 17px;background:var(--field);border:1px solid transparent;border-radius:12px;min-height:126px;flex-shrink:0}.note-card.selected{background:#fff8e1;border-color:#f1dda3}.note-card strong{font-size:13px;display:block}.note-card p{font-size:12px;color:var(--secondary);line-height:1.8;margin-top:7px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.note-card>span{font-size:12px;color:var(--muted);display:block;margin-top:10px}.note-editor{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;padding:23px;background:var(--note);border-radius:15px;border:1px solid rgba(200,164,60,.12)}.note-title-input{font-size:22px;font-weight:650;letter-spacing:-.6px;background:none;border:0;padding:4px 0 18px;min-width:0;width:100%}.note-body{background:none;border:0;resize:none;flex:1;width:100%;min-height:100px;font-size:14px;line-height:1.9;padding:0;white-space:pre-wrap;color:var(--secondary);word-break:normal}.note-footer{display:flex;justify-content:space-between;align-items:center;padding-top:12px;font-size:12px;color:var(--muted)}.view-description{font-size:13px;color:var(--secondary);line-height:1.8}.widget-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:30px}.widget-stage{height:230px;border-radius:20px;background:linear-gradient(155deg,#e0eaf5,#d1dde9 40%,#ebdee2);padding:22px 17px;display:flex;align-items:center;justify-content:center}.widget-gallery-item:nth-child(2) .widget-stage{background:linear-gradient(150deg,#dfe9e4,#cddedd,#e2e4e9)}.widget-gallery-item:nth-child(3) .widget-stage{background:linear-gradient(160deg,#efe7de,#e6d8cf,#e5dfe6)}.widget-preview{width:100%;background:rgba(255,255,255,.77);box-shadow:0 8px 20px rgba(60,75,110,.1),inset 0 1px 0 white;border:1px solid rgba(255,255,255,.8);border-radius:18px;padding:18px 15px;min-height:166px;backdrop-filter:blur(15px);color:#343944}.preview-widget-title{font-size:14px;font-weight:650;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;color:#3478f6}.preview-widget-title strong{font-size:24px;font-weight:400}.preview-task{display:flex;gap:7px;align-items:center;margin-top:12px;font-size:12px}.preview-task i{width:13px;height:13px;border:1px solid #b3bdca;border-radius:50%;flex-shrink:0}.preview-task span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.preview-calendar .preview-widget-title{color:#df6657;margin-bottom:13px}.mini-preview-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px 3px;text-align:center;font-size:12px}.mini-preview-calendar span{border-radius:50%;line-height:18px}.mini-preview-calendar .active{background:#e96b5a;color:#fff}.preview-note{background:rgba(255,250,227,.85)}.preview-note .preview-widget-title{color:#967b37}.preview-note p{font-size:12px;white-space:pre-wrap;line-height:1.9;max-height:88px;overflow:hidden}.preview-note-rule{height:1px;background:#dacfaa;display:block;margin-top:16px;opacity:.35}.widget-gallery h2{font-size:16px;margin-top:20px}.widget-gallery p{font-size:12px;color:var(--secondary);margin:7px 0 15px;line-height:1.8}.widget-gallery .button{font-size:12px;padding:8px 11px;min-height:32px}.widget-gallery .button svg{width:15px}.active-widgets{margin-top:24px}.active-widgets h3{margin-bottom:8px}.active-widget-row{display:flex;align-items:center;gap:12px;padding:9px 3px;border-bottom:1px solid var(--line);font-size:12px}.active-widget-row>small{margin-left:auto;color:var(--muted)}
+:root{--topbar:56px;--gutter:32px;--content-top:16px;--content-bottom:24px}.topbar{height:var(--topbar);display:flex;align-items:stretch;-webkit-app-region:drag;background:linear-gradient(90deg,var(--side) 0 244px,var(--bg) 244px);user-select:none;flex-shrink:0}.topbar-brand{width:244px;flex-shrink:0;display:flex;align-items:center;gap:9px;padding:0 22px 0 26px;box-shadow:inset -1px 0 var(--line);font-size:17px;font-weight:650;letter-spacing:-.5px;color:var(--text)}.topbar-brand img{border-radius:7px}.topbar-main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 12px 0 var(--gutter)}.topbar-main h1{font-size:19px;letter-spacing:-.5px;line-height:1.2;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:2px}.topbar-spacer{flex:1}.topbar .button{min-height:32px;padding:6px 13px;font-size:13px}.topbar-main .icon-button{width:32px;height:32px}.month-nav{gap:0}.window-actions{height:100%;display:flex;align-items:center;flex-shrink:0}.window-actions .icon-button{height:var(--topbar);width:46px;border-radius:0}.window-actions svg{width:16px;height:16px;stroke-width:1.5}.window-actions .window-close:hover{background:#e5484d;color:white}
+.app-layout{display:flex;height:calc(100% - var(--topbar));overflow:hidden}.sidebar{width:244px;flex-shrink:0;background:var(--side);padding:var(--content-top) 16px 12px;display:flex;flex-direction:column;user-select:none;border-right:1px solid var(--line)}.brand{display:flex;gap:10px;align-items:center;margin:0 8px 25px;font-size:23px;letter-spacing:-1px;font-weight:650}.brand img{border-radius:10px}.search{display:flex;align-items:center;gap:7px;background:rgba(130,140,160,.09);border:1px solid rgba(100,110,130,.05);border-radius:9px;padding:7px 9px;color:var(--muted)}.search input{background:none;border:0;width:100%;min-width:0;font-size:13px}.search input:focus-visible{outline:none}.search:focus-within{background:var(--bg);border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 18%,transparent)}.smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:22px 0}.smart-tile{background:rgba(255,255,255,.84);padding:12px 13px 11px;border-radius:13px;box-shadow:0 1px 2px rgba(20,30,60,.025);color:var(--secondary);font-size:12px;font-weight:600;transition:background .12s}.smart-tile:hover{background:#fff}.smart-tile.selected{background:var(--accent);color:#fff;box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 20%,transparent)}.tile-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.tile-top strong{font-size:26px;font-weight:700;line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums;color:var(--text)}.selected .tile-top strong{color:#fff}.tile-icon{display:grid;place-items:center;width:28px;height:28px;background:var(--accent);color:#fff;border-radius:50%}.smart-tile.selected .tile-icon{background:rgba(255,255,255,.22)}.main-nav{display:flex;flex-direction:column;gap:3px}.nav-item{display:flex;gap:11px;align-items:center;padding:10px 12px;border-radius:8px;color:var(--secondary);font-size:13px}.nav-item:hover,.list-nav:hover{background:var(--hover)}.nav-item.selected,.list-nav.selected{background:rgba(115,130,155,.12);color:var(--text)}.sidebar-section-head{display:flex;align-items:center;justify-content:space-between;margin:23px 10px 5px;font-size:12px;font-weight:600;color:var(--muted)}.lists-nav{flex:1;overflow:auto;min-height:30px;display:flex;flex-direction:column;gap:3px}.list-nav{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;min-height:44px}.list-dot{width:27px;height:27px;color:#fff;display:grid;place-items:center;border-radius:50%;flex-shrink:0}.list-name{font-size:12px;flex:1;min-width:0;overflow-wrap:anywhere}.list-name small{display:block;font-size:12px;color:var(--muted);margin-top:1px}.list-count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}.sidebar-footer{padding-top:10px}.account-button{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;padding:7px 9px;border-radius:9px;border:0;color:var(--secondary);font-size:12px;font-weight:500;background:transparent;text-align:left}.account-button .status-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.account-button small{color:var(--muted);font-size:12px;white-space:nowrap}.status-dot{width:8px;height:8px;border-radius:50%;background:#b8bfca;flex-shrink:0;box-shadow:0 0 0 2px rgba(184,191,202,.28)}.account-button.ok .status-dot{background:#34c759;box-shadow:0 0 0 2px rgba(52,199,89,.22)}.account-button.busy .status-dot{background:#007aff;box-shadow:0 0 0 2px rgba(0,122,255,.22);animation:pulse 1.1s ease-in-out infinite}.account-button.error .status-dot{background:#ff3b30;box-shadow:0 0 0 2px rgba(255,59,48,.22)}.account-button.error{color:#de5960}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}.account-button:hover{background:var(--hover);color:var(--text)}.sidebar-bottom{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0}.sidebar-bottom .icon-button{color:var(--muted)}
+.main-content{flex:1;min-width:0;overflow:hidden;position:relative}.tasks-view{height:100%;display:flex;flex-direction:column}.content-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}.task-toolbar{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}.inline-actions{display:flex;align-items:center;gap:5px}.icon-button{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;color:var(--secondary);flex-shrink:0}.icon-button:hover{background:var(--hover)}.button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:600;line-height:1.5;min-height:36px;background:var(--field);white-space:nowrap}.button.primary{background:var(--blue);color:white;box-shadow:0 2px 4px rgba(52,120,246,.1)}.button.primary:hover{background:#2469e7}.button.subtle{background:var(--field);color:var(--secondary)}.button.danger{background:#e64d52;color:#fff}.button.danger-quiet{color:#df4d53;background:transparent}.text-button{color:var(--blue);font-size:12px;display:inline-flex;gap:5px;align-items:center;padding:5px 6px;border-radius:5px}.text-button:hover{background:var(--hover)}.task-scroll{overflow:auto;flex:1;min-height:0;margin:0 -9px;padding:0 9px}.task-list{padding-top:4px}.task-row{position:relative;display:flex;align-items:flex-start;gap:12px;min-height:74px;padding:19px 1px 14px;border-bottom:1px solid var(--line)}.task-check{margin-top:3px;width:21px;height:21px;border:1.5px solid #c8ccd3;border-radius:50%;flex-shrink:0;display:grid;place-items:center;transition:background .12s,border-color .12s}.task-check:hover{border-color:var(--task-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--task-color) 10%,transparent)}.completed .task-check{border-color:var(--task-color);background:var(--task-color);color:#fff}.task-text{min-width:0;flex:1;line-height:1.5;padding:0 0 3px}.task-title{font-size:14px;display:block;overflow-wrap:anywhere}.task-meta{display:flex;align-items:center;gap:9px;margin-top:4px;font-size:12px;color:var(--muted);min-height:14px}.task-meta .overdue{color:#de5c62}.list-label{display:flex;align-items:center;gap:4px}.list-label i{width:4px;height:4px;border-radius:50%}.task-flag{color:#efa325;padding-top:3px}.row-more{opacity:0;width:23px;height:24px}.task-row:hover .row-more,.task-row:focus-within .row-more{opacity:1}.completed .task-title{text-decoration:line-through;color:var(--muted)}.completed-section{padding:24px 0 15px}.completed-section h3{font-size:12px;color:var(--muted)}.quick-add{margin-top:22px;border:1px solid var(--line);border-radius:13px;background:linear-gradient(125deg,var(--bg),var(--field));flex-shrink:0;box-shadow:0 3px 8px rgba(30,40,70,.015);overflow:hidden}.quick-main{display:flex;align-items:center;gap:9px;padding:12px 13px}.quick-plus{color:var(--blue)}.quick-input{flex:1;min-width:0;border:0;background:none;font-size:14px;padding:3px 0}.quick-submit{width:27px;height:27px;background:var(--blue);color:#fff;border-radius:50%;display:grid;place-items:center;opacity:.9}.quick-bottom{display:flex;justify-content:space-between;align-items:center;padding:0 14px 11px 41px;font-size:12px;color:var(--muted)}.quick-bottom[hidden]{display:none}.quick-list{max-width:60%;font-size:12px;border:0;background:transparent;color:var(--secondary)}.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;min-height:280px;padding:38px 20px;height:100%}.empty-symbol{color:#a9bad4;background:linear-gradient(140deg,#f0f5fd,#fafcff);border:1px solid #eaf0fa;width:76px;height:76px;border-radius:24px;display:grid;place-items:center;margin-bottom:8px}.empty-state h2{font-size:19px;letter-spacing:-.6px;font-weight:600}.empty-state p{font-size:12px;color:var(--muted);max-width:280px;line-height:1.8}.empty-state .button{margin-top:8px}
+.context-pane{width:272px;flex-shrink:0;padding:var(--content-top) 22px 18px;border-left:1px solid var(--line);background:linear-gradient(170deg,#fafbfe,#fff);display:flex;flex-direction:column;overflow:auto}.month-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;gap:10px}.month-heading h3{font-size:13px;letter-spacing:-.3px}.month-heading .icon-button{width:22px;height:22px}.month-heading svg{width:14px;height:14px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.weekday{text-align:center;font-size:12px;color:var(--muted);padding-bottom:8px;font-weight:500}.sunday{color:#ce767f}.calendar-day{display:flex;flex-direction:column;align-items:center;border-radius:8px;min-height:29px;font-variant-numeric:tabular-nums;position:relative}.day-number{width:25px;height:25px;display:grid;place-items:center;font-size:12px;border-radius:50%}.outside .day-number{opacity:.28}.calendar-day:hover{background:var(--hover)}.is-today .day-number{background:var(--today);color:white;font-weight:600}.is-selected:not(.is-today) .day-number{background:var(--hover);outline:1px solid var(--line)}.day-dots{display:flex;gap:2px;height:4px;align-items:center}.day-dots i{width:3px;height:3px;border-radius:50%}.event-dot{background:#efa62f}.task-dot{background:var(--blue)}.context-heading{display:flex;align-items:center;justify-content:space-between;margin-top:25px;margin-bottom:7px}.context-heading h3{font-size:12px;display:flex;gap:6px;align-items:center}.agenda{display:flex;flex-direction:column;gap:13px;padding:7px 0}.event-row{display:flex;gap:10px;width:100%;padding:1px 0}.event-line{width:3px;border-radius:4px;flex-shrink:0}.event-row div{min-width:0}.event-row strong{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}.event-row span:not(.event-line,.event-title){display:block;color:var(--secondary);font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums}.event-row small{display:block;font-size:12px;margin-top:3px;color:var(--muted)}.no-events{font-size:12px;color:var(--muted);padding:7px 0}.context-note{margin-top:26px;padding:16px 17px 14px;border-radius:14px;background:#fffaf0;border:1px solid rgba(217,183,100,.13)}.context-note .context-heading{margin:0 0 10px;color:#9b803f}.context-note p{white-space:pre-wrap;font-size:12px;line-height:1.9;color:#797462;max-height:130px;overflow:hidden}.context-note>span{display:block;font-size:12px;color:#b6aa8b;margin-top:17px}.context-foot{margin-top:auto;padding-top:30px;display:flex;gap:6px;justify-content:center;align-items:center;font-size:12px;color:#b3b5bb}
+.calendar-view,.notes-view,.widgets-view{height:100%;overflow:auto}.calendar-view>.month-heading{padding:4px 0 12px;margin-bottom:0}.calendar-view>.month-heading h3{font-size:20px}.calendar-view>.month-heading .icon-button{width:30px;height:30px}.calendar-grid.large{gap:0;border-bottom:1px solid var(--line)}.large .weekday{padding:10px 0}.large .calendar-day{align-items:stretch;min-height:80px;border-top:1px solid var(--line);border-radius:0;padding:7px 5px}.large .day-number{align-self:center;width:24px;height:24px;font-size:12px}.large .is-selected{background:rgba(52,120,246,.035)}.large .day-items{display:flex;flex-direction:column;gap:2px;margin-top:8px}.day-event{background:#fff3d8;color:#a57728;font-size:12px;border-radius:3px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.day-tasks{font-size:12px;color:var(--blue);text-align:center}.calendar-bottom{display:grid;grid-template-columns:1fr 1fr;gap:30px;padding-top:25px}.calendar-bottom h3{font-size:12px;margin-bottom:8px}.calendar-bottom .task-row{padding:10px 0;min-height:50px}.calendar-bottom .task-title{font-size:13px}.calendar-bottom .task-check{width:17px;height:17px}.calendar-bottom .task-meta{font-size:12px}.notes-view{display:flex;flex-direction:column;overflow:hidden}.notes-layout{display:flex;gap:24px;min-height:0;flex:1}.note-cards{width:210px;flex-shrink:0;overflow:auto;display:flex;flex-direction:column;gap:10px}.note-card{padding:16px 17px;background:var(--field);border:1px solid transparent;border-radius:12px;min-height:126px;flex-shrink:0}.note-card.selected{background:#fff8e1;border-color:#f1dda3}.note-card strong{font-size:13px;display:block}.note-card p{font-size:12px;color:var(--secondary);line-height:1.8;margin-top:7px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.note-card>span{font-size:12px;color:var(--muted);display:block;margin-top:10px}.note-editor{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;padding:23px;background:var(--note);border-radius:15px;border:1px solid rgba(200,164,60,.12)}.note-title-input{font-size:22px;font-weight:650;letter-spacing:-.6px;background:none;border:0;padding:4px 0 18px;min-width:0;width:100%}.note-body{background:none;border:0;resize:none;flex:1;width:100%;min-height:100px;font-size:14px;line-height:1.9;padding:0;white-space:pre-wrap;color:var(--secondary);word-break:normal}.note-footer{display:flex;justify-content:space-between;align-items:center;padding-top:12px;font-size:12px;color:var(--muted)}.view-description{font-size:13px;color:var(--secondary);line-height:1.8}.widget-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-top:30px}.widget-stage{height:230px;border-radius:20px;background:linear-gradient(155deg,#e0eaf5,#d1dde9 40%,#ebdee2);padding:22px 17px;display:flex;align-items:center;justify-content:center}.widget-gallery-item:nth-child(2) .widget-stage{background:linear-gradient(150deg,#dfe9e4,#cddedd,#e2e4e9)}.widget-gallery-item:nth-child(3) .widget-stage{background:linear-gradient(160deg,#efe7de,#e6d8cf,#e5dfe6)}.widget-preview{width:100%;background:rgba(255,255,255,.77);box-shadow:0 8px 20px rgba(60,75,110,.1),inset 0 1px 0 white;border:1px solid rgba(255,255,255,.8);border-radius:18px;padding:18px 15px;min-height:166px;backdrop-filter:blur(15px);color:#343944}.preview-widget-title strong{font-size:24px;font-weight:400}.preview-task{display:flex;gap:7px;align-items:center;margin-top:12px;font-size:12px}.preview-task i{width:13px;height:13px;border:1px solid #b3bdca;border-radius:50%;flex-shrink:0}.preview-task span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.mini-preview-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px 3px;text-align:center;font-size:12px}.mini-preview-calendar span{border-radius:50%;line-height:18px}.mini-preview-calendar .active{background:#e96b5a;color:#fff}.preview-note{background:rgba(255,250,227,.85)}.preview-note p{font-size:12px;white-space:pre-wrap;line-height:1.9;max-height:88px;overflow:hidden}.preview-note-rule{height:1px;background:#dacfaa;display:block;margin-top:16px;opacity:.35}.widget-gallery h2{font-size:16px;margin-top:20px}.widget-gallery p{font-size:12px;color:var(--secondary);margin:7px 0 15px;line-height:1.8}.widget-gallery .button{font-size:12px;padding:8px 11px;min-height:32px}.widget-gallery .button svg{width:15px}.active-widgets{margin-top:24px}.active-widgets h3{margin-bottom:8px}.active-widget-row{display:flex;align-items:center;gap:12px;padding:9px 3px;border-bottom:1px solid var(--line);font-size:12px}.active-widget-row>small{margin-left:auto;color:var(--muted)}
 .modal-overlay{position:fixed;inset:0;z-index:20;background:rgba(35,40,55,.17);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:24px;animation:reveal .16s ease-out}.dialog{width:440px;max-width:100%;max-height:calc(100vh - 48px);overflow:auto;background:var(--glass);border:1px solid rgba(255,255,255,.7);border-radius:19px;box-shadow:0 25px 80px rgba(25,35,60,.18);backdrop-filter:blur(35px) saturate(130%)}.dialog.wide{width:530px}.dialog-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--glass);z-index:1}.dialog-header h2{font-size:17px;letter-spacing:-.5px}.dialog-body{padding:23px 24px}.dialog-body>.view-description{margin-bottom:18px}.field{display:flex;flex-direction:column;gap:7px;margin-bottom:18px;min-width:0}.field>span{font-size:12px;color:var(--secondary);font-weight:600}.form-input{background:var(--field);border:1px solid transparent;border-radius:8px;padding:10px 12px;width:100%;min-width:0;font-size:13px}.form-input:focus{background:var(--bg)}textarea.form-input{resize:vertical;line-height:1.8;min-height:90px}.form-columns{display:flex;gap:16px;align-items:center}.form-columns>*{flex:1}.checkbox-field{display:flex;align-items:center;gap:9px;font-size:12px;margin:4px 0 18px}.checkbox-field input{accent-color:var(--blue);width:16px;height:16px}.field-help{font-size:12px;line-height:1.85;color:var(--muted);margin:10px 0 16px}.dialog-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}.dialog-footer.split{justify-content:space-between}.dialog{container:dialog / scroll-state;scroll-padding-top:72px;scroll-padding-bottom:88px}.dialog-body>.dialog-footer{position:sticky;bottom:0;z-index:1;background:var(--glass);background:rgb(from var(--glass) r g b / 1);margin:8px -24px -23px;padding:12px 24px 23px}@container dialog scroll-state(scrollable: bottom){.dialog-body>.dialog-footer{box-shadow:0 -1px 0 var(--line)}}.task-detail-source{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--secondary)}.task-detail-source span{color:var(--muted);margin-left:auto}.event-detail>p{margin-bottom:14px;display:flex;align-items:center;gap:9px;font-size:13px}.settings-brand{display:flex;align-items:center;gap:13px;margin-bottom:25px}.settings-brand strong{font-size:22px;letter-spacing:-.7px}.settings-brand small{display:block;color:var(--muted);font-size:12px;margin-top:3px}.settings-links{display:flex;gap:10px;border-top:1px solid var(--line);padding-top:20px}.provider-options{display:flex;flex-direction:column;gap:10px;margin:20px 0}.provider-option{display:flex;gap:14px;align-items:center;padding:15px 16px;background:var(--field);border:1px solid transparent;border-radius:12px}.provider-option:hover{border-color:#bdcffa;background:var(--bg)}.provider-option>span:nth-child(2){flex:1}.provider-option strong{display:block;font-size:13px}.provider-option small{display:block;font-size:12px;color:var(--muted);margin-top:4px}.provider-logo{display:grid;place-items:center;width:38px;height:38px;border-radius:9px;background:white;border:1px solid #e8e9ee;flex-shrink:0;color:#5782c5}.provider-logo.google{font-size:26px;font-weight:650;color:#4285f4}.ms-squares{display:grid;grid-template-columns:1fr 1fr;gap:2px;width:20px;height:20px}.ms-squares i:nth-child(1){background:#f25022}.ms-squares i:nth-child(2){background:#7fba00}.ms-squares i:nth-child(3){background:#00a4ef}.ms-squares i:nth-child(4){background:#ffb900}.connected-account{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.connected-account>div{flex:1;min-width:0}.connected-account strong{font-size:12px;overflow-wrap:anywhere}.connected-account small{display:block;margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.connect-intro{display:flex;align-items:center;gap:14px;margin-bottom:20px}.connect-intro p{font-size:12px;color:var(--muted);margin-top:4px}.setup-guide{padding:15px 17px;border-radius:11px;background:var(--field);margin-bottom:20px;font-size:12px;color:var(--secondary);line-height:1.85}.setup-guide summary{font-size:12px;font-weight:600;cursor:pointer}.setup-guide p{margin:10px 0}.setup-guide ol{padding-left:18px;margin:10px 0}.setup-guide li{margin-bottom:7px}.inline-error,.error-text{color:#de5960!important;font-size:12px;line-height:1.8;overflow-wrap:anywhere}.inline-error:empty{display:none}#toast{position:fixed;top:calc(var(--topbar) + 14px);left:50%;transform:translate(-50%,-12px);opacity:0;pointer-events:none;z-index:50;background:rgba(42,48,62,.94);color:#fff;box-shadow:0 6px 25px #0002;border:1px solid #ffffff22;border-radius:11px;padding:11px 18px;font-size:12px;max-width:calc(100% - 40px);text-align:center;transition:opacity .16s,transform .16s;backdrop-filter:blur(20px)}#toast.show{opacity:1;transform:translate(-50%,0)}#toast.error{background:rgba(137,47,55,.96)}
-.widget-body{background:transparent!important;padding:0}.widget-surface{height:100%;overflow:hidden;position:relative;display:flex;flex-direction:column}.widget-head{height:48px;padding:10px 15px 3px 19px;display:flex;align-items:center;justify-content:space-between;-webkit-app-region:drag;user-select:none;flex-shrink:0}.widget-drag-label{display:flex;align-items:center;gap:7px;min-width:0}.widget-drag-label strong{font-size:15px;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.widget-kind{color:var(--blue)}.widget-controls{display:flex;opacity:0;transition:opacity .15s}.widget-surface:hover .widget-controls,.widget-controls:focus-within{opacity:1}.widget-controls .icon-button{width:25px;height:25px}.widget-controls svg{width:15px}.widget-task-content{display:flex;flex-direction:column;flex:1;min-height:0;padding:3px 20px 17px}.widget-date{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}.widget-date strong{font-size:36px;line-height:1;font-weight:300;color:var(--blue);font-variant-numeric:tabular-nums}.widget-tasks{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto}.widget-tasks .task-row{min-height:59px;padding:12px 0 10px;gap:10px}.widget-tasks .task-check{width:19px;height:19px}.widget-tasks .task-title{font-size:13px}.widget-tasks .task-meta{font-size:12px;margin-top:2px;min-height:0}.widget-tasks .row-more{width:18px}.widget-tasks .row-more svg{width:18px;height:18px}.widget-task-content .quick-add{margin-top:12px;border-radius:10px;background:rgba(255,255,255,.45)}.widget-task-content .quick-main{padding:7px 9px;gap:6px}.widget-task-content .quick-input{font-size:12px}.widget-task-content .quick-submit{width:22px;height:22px}.widget-empty{height:100%;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);font-size:12px}.widget-empty svg{color:#95b7ca}.widget-calendar-content{padding:6px 21px 15px;overflow:auto}.widget-calendar-content .month-heading{margin-bottom:12px}.widget-calendar-content .calendar-day{min-height:34px}.widget-calendar-content .day-number{font-size:12px;width:29px;height:29px}.widget-calendar-content .weekday{font-size:12px}.widget-agenda-title{font-size:12px;color:var(--secondary);border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.widget-calendar-content .event-row strong{font-size:12px}.note-widget .widget-kind{color:#af8a33}.note-widget .note-editor{border:0;border-radius:0;background:transparent;padding:10px 21px 19px}.note-widget .note-title-input{font-size:19px;padding-bottom:13px}.note-widget .note-body{font-size:13px;color:#736a52;line-height:1.9}.widget-resize-hint{position:absolute;right:9px;bottom:8px;width:10px;height:10px;border-right:2px solid #a2a9b340;border-bottom:2px solid #a2a9b340;border-radius:1px;opacity:0;pointer-events:none}.widget-surface:hover .widget-resize-hint{opacity:1}.widget-body .dialog{border-radius:15px;max-height:100%}.widget-body .dialog-header{padding:13px 16px}.widget-body .dialog-header h2{font-size:14px}.widget-body .dialog-body{padding:15px 16px}.widget-body .field{margin-bottom:12px}.widget-body .form-input{font-size:12px;padding:8px 10px}.widget-body .dialog-footer{margin-top:14px}.widget-body .dialog-body>.dialog-footer{margin:4px -16px -15px;padding:10px 16px 15px}.widget-body .button{padding:7px 12px;font-size:12px}.widget-body .field-help{font-size:12px}.widget-body #toast{font-size:12px;top:calc(var(--w-margin) + 56px)}
+.widget-body{background:transparent!important;padding:0}.widget-surface{height:100%;overflow:hidden;position:relative;display:flex;flex-direction:column}.widget-head{height:48px;padding:10px 15px 3px 19px;display:flex;align-items:center;justify-content:space-between;-webkit-app-region:drag;user-select:none;flex-shrink:0}.widget-drag-label strong{font-size:15px;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.widget-kind{color:var(--blue)}.widget-controls{display:flex;opacity:0;transition:opacity .15s}.widget-surface:hover .widget-controls,.widget-controls:focus-within{opacity:1}.widget-controls .icon-button{width:25px;height:25px}.widget-controls svg{width:15px}.widget-task-content{display:flex;flex-direction:column;flex:1;min-height:0;padding:3px 20px 17px}.widget-date{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}.widget-date strong{font-size:36px;line-height:1;font-weight:300;color:var(--blue);font-variant-numeric:tabular-nums}.widget-tasks{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto}.widget-tasks .task-row{min-height:59px;padding:12px 0 10px;gap:10px}.widget-tasks .task-check{width:19px;height:19px}.widget-tasks .task-title{font-size:13px}.widget-tasks .task-meta{font-size:12px;margin-top:2px;min-height:0}.widget-tasks .row-more{width:18px}.widget-tasks .row-more svg{width:18px;height:18px}.widget-task-content .quick-add{margin-top:12px;border-radius:10px;background:rgba(255,255,255,.45)}.widget-task-content .quick-main{padding:7px 9px;gap:6px}.widget-task-content .quick-input{font-size:12px}.widget-task-content .quick-submit{width:22px;height:22px}.widget-empty{height:100%;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);font-size:12px}.widget-empty svg{color:#95b7ca}.widget-calendar-content{padding:6px 21px 15px;overflow:auto}.widget-calendar-content .month-heading{margin-bottom:12px}.widget-calendar-content .calendar-day{min-height:34px}.widget-calendar-content .day-number{font-size:12px;width:29px;height:29px}.widget-calendar-content .weekday{font-size:12px}.widget-agenda-title{font-size:12px;color:var(--secondary);border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.widget-calendar-content .event-row strong{font-size:12px}.note-widget .widget-kind{color:#af8a33}.note-widget .note-editor{border:0;border-radius:0;background:transparent;padding:10px 21px 19px}.note-widget .note-title-input{font-size:19px;padding-bottom:13px}.note-widget .note-body{font-size:13px;color:#736a52;line-height:1.9}.widget-resize-hint{position:absolute;right:9px;bottom:8px;width:10px;height:10px;border-right:2px solid #a2a9b340;border-bottom:2px solid #a2a9b340;border-radius:1px;opacity:0;pointer-events:none}.widget-surface:hover .widget-resize-hint{opacity:1}.widget-body .dialog{border-radius:15px;max-height:100%}.widget-body .dialog-header{padding:13px 16px}.widget-body .dialog-header h2{font-size:14px}.widget-body .dialog-body{padding:15px 16px}.widget-body .field{margin-bottom:12px}.widget-body .form-input{font-size:12px;padding:8px 10px}.widget-body .dialog-footer{margin-top:14px}.widget-body .dialog-body>.dialog-footer{margin:4px -16px -15px;padding:10px 16px 15px}.widget-body .button{padding:7px 12px;font-size:12px}.widget-body .field-help{font-size:12px}.widget-body #toast{font-size:12px;top:calc(var(--w-margin) + 56px)}
 [data-theme=dark]{--bg:#24262b;--side:rgba(34,36,42,.94);--text:#e9eaf0;--muted:#858a97;--secondary:#b2b7c1;--line:rgba(225,230,255,.08);--hover:rgba(200,215,255,.065);--field:#30333b;--glass:rgba(40,43,51,.97);--note:#353226;color-scheme:dark}[data-theme=dark] .smart-tile{background:#363a43}[data-theme=dark] .smart-tile.selected{background:var(--accent)}[data-theme=dark] .account-button{background:transparent}[data-theme=dark] .context-pane{background:linear-gradient(145deg,#272a30,#24262b)}[data-theme=dark] .context-note{background:#343023}[data-theme=dark] .context-note p{color:#bfb59a}[data-theme=dark] .empty-symbol{background:#2d3544;border-color:#3a4558;color:#91a5c4}[data-theme=dark] .note-card.selected{background:#45402c;border-color:#71633b}[data-theme=dark] .day-event{background:#54432b;color:#e1b36d}[data-theme=dark] .dialog{border-color:#ffffff12}[data-theme=dark] .widget-task-content .quick-add{background:#ffffff05}
 @keyframes reveal{from{opacity:0}to{opacity:1}}::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#9199ab33;border-radius:5px}::-webkit-scrollbar-track{background:transparent}
 @media(max-width:1080px){.context-pane{width:238px;padding-left:17px;padding-right:17px}.sidebar{width:225px}.topbar{background:linear-gradient(90deg,var(--side) 0 225px,var(--bg) 225px)}.topbar-brand{width:225px}.widget-gallery{gap:15px}.widget-stage{padding:20px 12px}}
 @media(max-width:930px){.context-pane{display:none}.main-content{min-width:0}.widget-gallery{gap:12px}.widget-preview{padding:15px 11px}.widget-stage{height:210px}}
-@media(max-width:650px){.sidebar{width:170px;padding:var(--content-top) 10px 10px}.topbar{background:var(--side)}.topbar-brand{width:170px;padding:0 12px;font-size:15px}.smart-grid{gap:6px}.smart-tile{padding:9px}.tile-top strong{font-size:21px}.tile-icon{width:23px;height:23px}.search kbd{display:none}.nav-item{font-size:12px;padding:9px 8px;gap:7px}.sidebar-section-head{margin-left:7px}.list-nav{padding:8px 6px;gap:7px}.list-dot{width:23px;height:23px}.list-name{font-size:12px}.content-heading{margin-bottom:12px}h1{font-size:26px}.eyebrow{font-size:12px}.heading-count{font-size:35px}.task-title{font-size:12px}.task-row{gap:8px}.task-check{width:18px;height:18px}.quick-bottom{padding-left:12px}.quick-input{font-size:12px}.widget-gallery{grid-template-columns:1fr}.widget-stage{height:220px}.widget-preview{max-width:210px}.notes-layout{flex-direction:column;gap:12px}.note-cards{flex-direction:row;width:auto;min-height:80px;max-height:90px}.note-card{min-height:78px;width:160px;padding:10px}.note-card p{-webkit-line-clamp:1}.note-card>span{display:none}.note-editor{padding:16px}.calendar-bottom{grid-template-columns:1fr}.large .calendar-day{min-height:53px;padding:3px}.large .day-items{display:none}.calendar-view>.content-heading{align-items:flex-start}.calendar-view>.content-heading>.inline-actions{flex-direction:column}.form-columns{gap:12px}}
+@media(max-width:650px){.sidebar{width:170px;padding:var(--content-top) 10px 10px}.topbar{background:var(--side)}.topbar-brand{width:170px;padding:0 12px;font-size:15px}.smart-grid{gap:6px}.smart-tile{padding:9px}.tile-top strong{font-size:21px}.tile-icon{width:23px;height:23px}.search kbd{display:none}.nav-item{font-size:12px;padding:9px 8px;gap:7px}.sidebar-section-head{margin-left:7px}.list-nav{padding:8px 6px;gap:7px}.list-dot{width:23px;height:23px}.list-name{font-size:12px}.content-heading{margin-bottom:12px}h1{font-size:26px}.task-title{font-size:12px}.task-row{gap:8px}.task-check{width:18px;height:18px}.quick-bottom{padding-left:12px}.quick-input{font-size:12px}.widget-gallery{grid-template-columns:1fr}.widget-stage{height:220px}.widget-preview{max-width:210px}.notes-layout{flex-direction:column;gap:12px}.note-cards{flex-direction:row;width:auto;min-height:80px;max-height:90px}.note-card{min-height:78px;width:160px;padding:10px}.note-card p{-webkit-line-clamp:1}.note-card>span{display:none}.note-editor{padding:16px}.calendar-bottom{grid-template-columns:1fr}.large .calendar-day{min-height:53px;padding:3px}.large .day-items{display:none}.calendar-view>.content-heading{align-items:flex-start}.calendar-view>.content-heading>.inline-actions{flex-direction:column}.form-columns{gap:12px}}
 @media(max-width:450px){body:not(.widget-body) .sidebar{width:70px;padding:var(--content-top) 8px 10px}body:not(.widget-body) .topbar-brand{width:70px;padding:0;justify-content:center}body:not(.widget-body) .brand-name,body:not(.widget-body) .search,body:not(.widget-body) .smart-tile>span,body:not(.widget-body) .tile-top strong{display:none}body:not(.widget-body) .smart-grid{grid-template-columns:1fr;margin:0 0 14px;gap:5px}body:not(.widget-body) .smart-tile{padding:9px}body:not(.widget-body) .tile-top{justify-content:center;margin:0}body:not(.widget-body) .main-nav .nav-item{font-size:0;justify-content:center;padding:10px;gap:0}body:not(.widget-body) .sidebar-section-head>span,body:not(.widget-body) .list-name,body:not(.widget-body) .list-count{display:none}body:not(.widget-body) .sidebar-section-head{justify-content:center;margin:15px 0 5px}body:not(.widget-body) .list-nav{justify-content:center;padding:9px 3px}body:not(.widget-body) .account-button{padding:8px}body:not(.widget-body) .account-button .status-text,body:not(.widget-body) .account-button small{display:none}body:not(.widget-body) .sidebar-bottom{justify-content:center}body:not(.widget-body) .content-heading{gap:8px}.task-meta{flex-wrap:wrap;gap:5px}.quick-bottom>span{display:none}.quick-list{max-width:100%}.row-more{display:none}.calendar-view>.content-heading .button{padding:5px 8px;font-size:12px;min-height:28px}.dialog-body{padding:18px}.dialog-header{padding:15px 18px}.modal-overlay{padding:14px}.form-columns{flex-direction:column;align-items:stretch}.form-columns .field{margin-bottom:12px}.connected-account{flex-wrap:wrap}.widget-body .form-columns{flex-direction:row}.widget-body .widget-head{padding-left:18px}.widget-body .note-editor{padding-left:19px}.widget-body .note-title-input{font-size:19px}.widget-body .task-row{gap:9px}.widget-body .task-title{font-size:12px}.widget-body .row-more{display:flex}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}button:active{transform:none}}@media(prefers-reduced-transparency:reduce){.widget-surface,.dialog{background:var(--bg)!important;backdrop-filter:none}}
 
@@ -46,7 +46,7 @@
 
 /* Typography: Apple-like weight and contrast; captions are secondary, never faint. */
 :root{font-weight:450;--muted:#6f7584;--secondary:#50566a}[data-theme=dark]{--muted:#9ba1ae;--secondary:#c9cdd6}
-.eyebrow{font-size:13px;color:var(--secondary);font-weight:500;margin-bottom:3px}.task-toolbar{font-size:13px;color:var(--secondary);font-weight:500}.text-button{font-size:13px;font-weight:600}.task-meta{font-size:13px;color:var(--secondary);gap:10px}.task-meta .list-label{color:var(--muted)}.no-events{font-size:13px;color:var(--secondary)}.view-description{font-size:14px;color:var(--secondary)}.context-heading h3{font-size:14px}.event-row span:not(.event-line,.event-title),.event-row small{font-size:12px;color:var(--secondary)}.sync-status{font-size:12px;color:var(--secondary)}.list-count{font-size:12px;font-weight:500}.sidebar-section-head{font-size:12px;color:var(--secondary)}.note-card>span,.note-footer{font-size:12px;color:var(--secondary)}.field-help{font-size:12px;color:var(--secondary)}.quick-bottom{font-size:12px;color:var(--secondary);padding:0 14px 10px 41px}.heading-count{font-weight:400}.task-title{font-weight:500}.nav-item{font-weight:500}.section-toggle{color:var(--secondary)}.context-note p{color:#6b6450}.context-note>span{display:none}.empty-state h2{font-size:20px}.empty-state p{font-size:13px;color:var(--secondary)}
+.task-toolbar{font-size:13px;color:var(--secondary);font-weight:500}.text-button{font-size:13px;font-weight:600}.task-meta{font-size:13px;color:var(--secondary);gap:10px}.task-meta .list-label{color:var(--muted)}.no-events{font-size:13px;color:var(--secondary)}.view-description{font-size:14px;color:var(--secondary)}.context-heading h3{font-size:14px}.event-row span:not(.event-line,.event-title),.event-row small{font-size:12px;color:var(--secondary)}.sync-status{font-size:12px;color:var(--secondary)}.list-count{font-size:12px;font-weight:500}.sidebar-section-head{font-size:12px;color:var(--secondary)}.note-card>span,.note-footer{font-size:12px;color:var(--secondary)}.field-help{font-size:12px;color:var(--secondary)}.quick-bottom{font-size:12px;color:var(--secondary);padding:0 14px 10px 41px}.task-title{font-weight:500}.nav-item{font-weight:500}.section-toggle{color:var(--secondary)}.context-note p{color:#6b6450}.context-note>span{display:none}.empty-state h2{font-size:20px}.empty-state p{font-size:13px;color:var(--secondary)}
 .notes-view .empty-state{flex:1}
 .sync-toggles{display:flex;flex-direction:column;gap:0;margin-top:8px;flex:1 0 100%}.sync-toggle{display:flex;align-items:center;min-height:32px;font-size:13px;color:var(--text);margin:0}.sync-toggle+.sync-toggle{box-shadow:0 -1px 0 var(--line)}
 .reminder-label{display:inline-flex;align-items:center;gap:3px;color:#b8721a}
@@ -199,13 +199,14 @@
 .widget-calendar-content .calendar-grid{gap:1px 0}
 .widget-calendar-content .weekday{font-size:12px;font-weight:600;color:var(--w-tertiary);padding-bottom:4px}
 .widget-calendar-content .weekday.sunday{color:color-mix(in srgb,var(--w-red) 75%,transparent)}
-.widget-calendar-content .calendar-day{min-height:33px;border-radius:10px;background:none}
-.widget-calendar-content .calendar-day:hover{background:var(--w-hover)}
-.widget-calendar-content .day-number{width:28px;height:28px;font-size:14px;font-weight:500;color:var(--w-text)}
+.widget-calendar-content .calendar-day{min-height:34px;border-radius:10px;background:none}
+.widget-calendar-content .calendar-day:not(.is-today):hover .day-number{background:var(--w-hover)}
+/* 26px, not 28: the dots' 3px comes out of the circle, or the taller grid leaves the agenda no whole row (2026-11-07 smoke) */
+.widget-calendar-content .day-number{width:26px;height:26px;font-size:14px;font-weight:500;color:var(--w-text)}
 .widget-calendar-content .outside .day-number{color:var(--w-tertiary)}
 .widget-calendar-content .is-today .day-number{background:var(--w-today);color:#fff;font-weight:700}
 .widget-calendar-content .is-selected:not(.is-today) .day-number{background:var(--w-button);outline:0;box-shadow:inset 0 0 0 1px var(--w-line)}
-.widget-calendar-content .day-dots{height:5px;gap:2px;margin-top:1px}
+.widget-calendar-content .day-dots{height:5px;gap:2px;margin-top:3px}
 .widget-calendar-content .day-dots i{width:4px;height:4px}
 .widget-calendar-content .event-dot{background:var(--w-tertiary)}
 .widget-calendar-content .task-dot{background:#3478f6}
@@ -334,10 +335,9 @@
 @media(max-width:450px){:root{--gutter:14px}}
 /* Task quick menu (right-click / ⋯): scrolls instead of being clipped in a small widget. */
 .context-menu{max-height:calc(100vh - 16px);overflow-y:auto}
-/* Task editor: 오늘 · 내일 · 날짜 없음 under the date, 알림 없음 under the alert (text sits on the field edge). */
-.date-presets{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;margin:-10px 0 12px -6px}
-.date-presets .reminder-clear{margin-left:auto;margin-right:-6px}
-.widget-body .date-presets{margin-top:-6px}
+/* Task editor: 오늘 · 내일 · 날짜 없음 under the date, 알림 없음 under the alert; their size and place (a field's sub-items: 12px, the first
+   letter on the field's text, just under it — 2026-11-05) are in the block before r60-apple. */
+.date-presets{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px}
 /* Settings: updates (version, status, one action, auto-check, history link). */
 .update-block{display:flex;flex-direction:column;gap:4px;padding:10px 14px;margin:-10px 0 22px;border-radius:12px;background:var(--field)}
 .update-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px}
@@ -427,9 +427,9 @@
 @media(max-width:930px){.calendar-view{grid-template-rows:none;overflow:hidden}.calendar-main{min-height:0}.day-panel.drawer{padding-left:20px;padding-top:var(--content-top);border-left:1px solid var(--line);overflow:auto}}
 /* Month view: the date number opens the day; the 1st of a month names its month; '+N개' and '할 일 N개' are buttons. */
 .calendar-grid.rolling .calendar-day{cursor:default}
-.calendar-grid.rolling .day-number{border-radius:14px;cursor:pointer}
+.calendar-grid.rolling .day-number{border-radius:12px;cursor:pointer}
 .calendar-grid.rolling .calendar-day:not(.is-today) .day-number:hover{background:var(--hover)}
-.calendar-grid.rolling .day-number.first{width:auto;min-width:27px;padding:0 8px;font-weight:600}
+.calendar-grid.rolling .day-number.first{width:auto;min-width:24px;padding:0 8px;font-weight:600}
 .calendar-grid.rolling .day-more{align-self:flex-start;font-size:12px;color:var(--secondary);padding:1px 5px;border-radius:4px;min-height:0;height:auto;width:auto}
 .calendar-grid.rolling .day-more:hover,.calendar-grid.rolling .day-tasks:hover{background:var(--hover)}
 .calendar-grid.rolling .day-tasks{align-self:flex-start;padding:1px 5px;border-radius:4px;min-height:0;height:auto;width:auto;text-align:left}
@@ -451,8 +451,8 @@ body.cal-denied,body.cal-denied *{cursor:not-allowed!important}
 .time-weekday{font-size:12px;font-weight:500}
 .time-date{font-size:18px;font-weight:600;color:var(--text);min-width:32px;height:32px;padding:0 4px;display:grid;place-items:center;border-radius:16px;font-variant-numeric:tabular-nums}
 .time-view.week .time-day:not(.is-today):hover .time-date{background:var(--hover)}
-.time-day.is-today .time-weekday{color:var(--blue);font-weight:600}
-.time-day.is-today .time-date{background:var(--blue);color:#fff}
+.time-day.is-today .time-weekday{color:var(--today);font-weight:600}
+.time-day.is-today .time-date{background:var(--today);color:#fff}
 .time-day.sunday:not(.is-today) .time-weekday{color:var(--sunday)}
 .time-day.weekend,.time-col.weekend,.allday-cell.weekend{background-color:var(--weekend)}
 .time-gutter-cell{min-width:0}
@@ -503,14 +503,14 @@ body.cal-denied,body.cal-denied *{cursor:not-allowed!important}
 .now-dim{position:absolute;left:0;right:0;top:calc(var(--now,0) * var(--hour));height:1px;background:rgba(255,59,48,.35);pointer-events:none;z-index:0}
 /* The event card: floats beside its event (Notion), translucent glass, saves as you go. Below dialogs (z 20), above the panel drawer. */
 #card-root{position:relative}
-.event-card{position:fixed;z-index:15;width:min(360px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;padding:0 16px 14px;border-radius:12px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(20px) saturate(140%);box-shadow:0 12px 32px rgba(0,0,0,.18);animation:reveal .12s ease-out;color:var(--text);outline:none}
+.event-card{position:fixed;z-index:15;width:min(320px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;padding:0 16px 14px;border-radius:12px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(20px) saturate(140%);box-shadow:0 12px 32px rgba(0,0,0,.18);animation:reveal .12s ease-out;color:var(--text);outline:none}
 [data-theme=dark] .event-card{box-shadow:0 12px 36px rgba(0,0,0,.5)}
 @media(prefers-reduced-transparency:reduce){.event-card{background:var(--bg);backdrop-filter:none}}
 .card-head{height:44px;display:flex;align-items:center;gap:4px;margin:0 -6px 0 0}
 .card-head .icon-button{width:28px;height:28px}
 .card-spacer{flex:1}
 .card-color{width:16px;height:16px;min-height:0;padding:0;border-radius:5px;background:var(--dot);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
-.card-color:hover{transform:scale(1.12)}
+.card-color:hover{box-shadow:0 0 0 3px var(--hover)}
 .card-title{display:block;width:100%;margin:0 0 6px;padding:2px 0;border:0;outline:none;resize:none;overflow:hidden;background:transparent;font:inherit;font-size:17px;font-weight:650;line-height:24px;color:var(--text)}
 .card-title::placeholder{color:var(--muted);font-weight:500}
 .card-title.static{overflow-wrap:anywhere}
@@ -518,16 +518,9 @@ body.cal-denied,body.cal-denied *{cursor:not-allowed!important}
 .card-row>svg{color:var(--muted);flex-shrink:0;margin-right:4px}
 .card-when{row-gap:2px}
 .card-date-wrap{position:relative;display:inline-flex}
-.card-date-wrap input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}
 .card-date,.card-time{min-height:0;height:28px;padding:0 7px;border:0;border-radius:6px;background:transparent;font:inherit;font-size:13px;color:var(--text);cursor:pointer}
 .card-time{width:88px;text-align:center}
 .card-date:hover,.card-time:hover,.card-time:focus{background:var(--hover);outline:none}
-.card-dash{color:var(--muted)}
-.card-chips{gap:6px}
-.card-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;background:var(--field);font-size:12px;font-weight:500;color:var(--secondary);cursor:pointer}
-.card-chip.on{color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,var(--bg))}
-.card-chip input{margin:0;accent-color:var(--blue)}
-.card-chip.static{cursor:default}
 .card-repeat,.card-select{height:28px;max-width:100%;padding:0 8px;border:0;border-radius:14px;background:var(--field);font:inherit;font-size:12px;font-weight:500;color:var(--secondary);cursor:pointer}
 .card-select{max-width:calc(100% - 30px)}
 .card-input{flex:1;min-width:0;height:28px;padding:0 7px;border:0;border-radius:6px;background:transparent;font:inherit;font-size:13px;color:var(--text)}
@@ -741,8 +734,6 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 .checkbox-field input[type=checkbox]:checked::after{left:16px}
 .checkbox-field input[type=checkbox]:disabled{opacity:.45;cursor:default}
 [data-theme=dark] .checkbox-field input[type=checkbox]{background:#4a4f5b}
-.card-chip input{position:absolute;width:0;height:0;margin:0;opacity:0;pointer-events:none}
-.card-chip{position:relative}
 /* Colour marks are circles everywhere. */
 .card-color{width:14px;height:14px;border-radius:50%;position:relative}
 .card-cal i{border-radius:50%}
@@ -786,11 +777,10 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 .task-row.dragging{opacity:.4}.task-row.drop-before{box-shadow:inset 0 2px 0 var(--blue)}.task-list.drop-end{box-shadow:inset 0 -2px 0 var(--blue)}.task-list.drag-active{padding-bottom:28px}
 /* 1.1.3: a task's repeat and steps in its row, its steps opened under it (Reminders' subtasks), and the steps in its dialog. */
 .repeat-label,.steps-label{display:inline-flex;align-items:center;gap:3px}.steps-label{font-variant-numeric:tabular-nums}
-.steps-toggle{width:26px;height:26px;margin-top:-1px;color:var(--muted)}.steps-toggle svg{width:16px;height:16px}
 .task-row.steps-open{flex-wrap:wrap;row-gap:6px}.task-steps{flex-basis:100%;display:flex;flex-direction:column;padding:0 0 0 33px}
 .task-step{display:flex;align-items:center;gap:10px;min-height:32px}.step-check{width:17px;height:17px;border:1.5px solid #c8ccd3;border-radius:50%;flex-shrink:0;display:grid;place-items:center;color:#fff;transition:background .12s,border-color .12s}.step-check:hover{border-color:var(--task-color,var(--blue))}.task-step.done .step-check,.step-edit-row.done .step-check{background:var(--task-color,var(--blue));border-color:var(--task-color,var(--blue))}
 .step-title{font-size:13px;color:var(--text);overflow-wrap:anywhere;padding:3px 0}.task-step.done .step-title{text-decoration:line-through;color:var(--muted)}
-.step-editor-list{display:flex;flex-direction:column}.step-edit-row{display:flex;align-items:center;gap:9px;min-height:36px}.step-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--line);background:none;font-size:13px;padding:7px 2px;color:var(--text)}.step-input:focus{outline:none;border-bottom-color:var(--blue)}.step-edit-row.done .step-input{color:var(--muted);text-decoration:line-through}.step-add-row{min-height:36px}.step-plus{width:17px;display:grid;place-items:center;color:var(--blue);flex-shrink:0}.step-remove{width:26px;height:26px;opacity:0}.step-edit-row:hover .step-remove,.step-edit-row:focus-within .step-remove{opacity:1}
+.step-editor-list{display:flex;flex-direction:column}.step-edit-row{position:relative;display:flex;align-items:center;gap:9px;min-height:36px}.step-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--line);background:none;font-size:13px;padding:7px 2px;color:var(--text)}.step-input:focus{outline:none;border-bottom-color:var(--blue)}.step-edit-row.done .step-input{color:var(--muted);text-decoration:line-through}.step-add-row{min-height:36px}.step-plus{width:17px;display:grid;place-items:center;color:var(--blue);flex-shrink:0}.step-remove{width:26px;height:26px;opacity:0}.step-edit-row:hover .step-remove,.step-edit-row:focus-within .step-remove{opacity:1}
 .repeat-elsewhere{display:flex;align-items:center;gap:6px;margin:0 0 14px}
 /* 2026-10-27 user choice B (「글 시작 위치는 B안이 좋아」): the captions under each stage start 9px in, where the 30px corner's 45°
    point is (r(1−1/√2) ≈ 9px), at every window width. The radii stay Apple's (stage 30, inner card 22, widget 26). */
@@ -829,7 +819,7 @@ mark{background:rgba(255,204,0,.45);color:inherit;border-radius:3px;padding:0 1p
 .card-color::before{content:"";position:absolute;inset:-7px;border-radius:50%}
 .event-card .card-title:focus-visible,.event-card .card-time:focus-visible,.event-card .card-input:focus-visible,.event-card .card-date:focus-visible{outline:none;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--blue) 45%,transparent)}
 .event-card .card-date:focus-visible{background:var(--hover)}
-.event-card .card-repeat:focus-visible,.event-card .card-select:focus-visible,.event-card .card-chip:has(input:focus-visible){outline:none;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--blue) 45%,transparent)}.event-card .card-chip input:focus-visible{outline:none}
+.event-card .card-repeat:focus-visible,.event-card .card-select:focus-visible{outline:none;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--blue) 45%,transparent)}
 .event-card .card-color:focus-visible{outline:none;box-shadow:0 0 0 2px var(--bg),0 0 0 3px color-mix(in srgb,var(--blue) 45%,transparent)}
 /* D10: the calendar title that opens 날짜로 이동 shows a small muted chevron inside the same button (Apple's title menus). The
    chevron gives way first: the button wraps, so a chevron with no room drops to a second line that the button's one-line height
@@ -936,7 +926,7 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 .settings-contact a{color:var(--secondary);text-decoration:none;user-select:text;-webkit-user-select:text}
 .settings-contact a:hover{color:var(--blue);text-decoration:underline}
 /* 2026-10-30 An event older than the recent window (lib/calhistory.cjs): its card's colour is a plain dot. */
-.card-color.static{cursor:default}.card-color.static:hover{transform:none}
+.card-color.static{cursor:default}.card-color.static:hover{box-shadow:none}
 /* 2026-10-30 A widget resizes from any edge or corner (app.js widgetEdges): invisible bands 10px wide on the card's border — 6px in the
    window's clear margin, 4px on the card, clear of rows and scroll bars — corners 22px. The window's region (lib/desktop.cjs 'frame')
    takes the margin, so the outer part is grabbable; the fallback card that fills its window keeps the inner part. */
@@ -999,9 +989,12 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 [data-theme=dark]{--sunday:#ff6a5c}
 .sunday{color:var(--sunday)}
 /* app-design-11: the mini calendar's colour dots at the widget's size (3px read as dust); .large .calendar-day keeps min-height 0. */
-.day-dots{height:5px}
+.day-dots{height:5px;margin-top:3px}
 .day-dots i{width:4px;height:4px}
-.calendar-day{min-height:30px}
+.calendar-day{min-height:33px}
+/* The dots touched today's circle, and the mouse put a square behind it: circle, square and dots in one cell read as crowded (2026-11-07 owner: 「거의 겹칠 듯 붙어 … 답답해 보이잖아」). 3px apart as under Apple Calendar's circle; the mouse lights the circle itself. */
+.calendar-grid:not(.large) .calendar-day:hover{background:none}
+.calendar-grid:not(.large) .calendar-day:not(.is-today):hover .day-number{background:var(--hover)}
 /* app-design-12: 「Nov 2026」 instead of 「November 2026」 cut to 「November 2…」 — calTitleFit sets .tight while the long title and its chevron do not fit (calTitleNode, data-short). */
 .title-text::after{content:attr(data-short);display:none}
 .topbar-main h1 .title-text.tight .title-long{display:none}.topbar-main h1 .title-text.tight::after{display:inline}
@@ -1019,7 +1012,8 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 .form-input::-webkit-datetime-edit-fields-wrapper{padding:0}
 /* Task editor 반복|목록 row (2026-11-02 review usability-7): the 중요 switch keeps its 18px gap under the row whether the custom-repeat panel between them is shown or hidden. A list that cannot be changed stays one line there — the name ellipsizes (full name and account in the tooltip), no account tag — and is exactly as tall as the 반복 select beside it in the window (41px) and in widgets (36px) because both columns stretch (fix-D review: it wrapped onto 2–3 lines, and a fixed 41px overshot the widget's select). */
 .task-repeat-row{align-items:stretch}.task-repeat-row .task-detail-source{flex:1;min-width:0}.task-repeat-row .task-detail-source .list-name{margin-left:0;color:inherit;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.task-repeat-row+.checkbox-field,.task-repeat-row+.repeat-panel+.checkbox-field{margin-top:0}
+/* … and since 2026-11-05 the switch row is spaced as a label (.checkbox-field.field-switch, before r60-apple): -6px here too, these weigh more */
+.task-repeat-row+.checkbox-field,.task-repeat-row+.repeat-panel+.checkbox-field{margin-top:-6px}
 /* r60-D2 */
 /* 2026-11-02 review app-design-14: the account card wraps — row 1 is logo · name/status · 연결 해제 (top-aligned so the button stays the header's trailing action while the status column grows), row 2 the full-width .sync-toggles switch rows (32px each, the app's .checkbox-field switch). `.connected-account>div{flex:1}` (line 9) would otherwise keep the toggles on the first line, so the full-width basis is restated with the child selector. row-gap 0: the 12px flex gap would add to the toggles' 8px margin and float the rows 30px under the status line, detached from their account. */
 .connected-account{flex-wrap:wrap;align-items:flex-start;row-gap:0}
@@ -1070,7 +1064,9 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 .dialog-body>.dialog-footer.bare{padding:0;margin:23px -24px -23px;min-height:0}
 /* app-design-8 ①: one switch row everywhere — settings, 「중요한 할 일」, 「하루 종일」 — 13px words on a 32px row (the switch centred
    in it, the next field 12px on: the same 18px from the words as before); widget windows keep their 12px form scale */
-.checkbox-field{font-size:13px;min-height:32px;margin:0 0 12px}
+.checkbox-field{font-size:13px;min-height:32px;margin:0 0 12px;cursor:default}
+/* no Windows up-and-down arrows in a number field (2026-11-07 owner: the old look, app-wide) */input[type=number]{appearance:textfield}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{appearance:none;margin:0}
+.date-field[hidden]{display:none}
 .widget-body .checkbox-field{font-size:12px}
 
 /* r60-X text size (2026-11-02 owner: text size) — every widget's 글자 크기 (settings.widgetTextSize, renderer/domain.js TEXT_SIZES 1 / 1.125 /
@@ -1201,7 +1197,6 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
    the system picker's hidden input sits over the swatch that opened it, since its popup opens there. The event sheet's row keeps one line. */
 .swatch.custom,.menu-swatch.custom{border:0;background:radial-gradient(circle closest-side,var(--fill,var(--field)) calc(100% - 3.5px),transparent calc(100% - 3px)),linear-gradient(color-mix(in srgb,var(--field) 35%,transparent),color-mix(in srgb,var(--field) 35%,transparent)),var(--ring)}
 .menu-swatch.custom{background:radial-gradient(circle closest-side,var(--fill,var(--field)) calc(100% - 2.5px),transparent calc(100% - 2px)),linear-gradient(color-mix(in srgb,var(--field) 35%,transparent),color-mix(in srgb,var(--field) 35%,transparent)),var(--ring)}
-.color-chooser{position:fixed;opacity:0;pointer-events:none;border:0;padding:0;margin:0}
 .dialog:not(.wide) .event-swatches{gap:8px}
 
 /* Hidden calendars (2026-11-03 owner): one quiet row at the end of the list; opened, the hidden rows are unchecked and muted, not struck through. */
@@ -1225,6 +1220,522 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 /* the review's word on an answer that leaves the move waiting (2026-11-04 fifth check W4): a quiet line under its words, gone while empty */
 .move-status{margin:-6px 0 14px;line-height:1.5}.move-status:empty{display:none}
 
+/* The unsaved-changes guard asks in words (2026-11-05 owner): the question at the left, the two answers at the right. */
+.dialog-guard .guard-text{margin-right:auto;align-self:center;color:var(--secondary);font-size:13px;line-height:20px}
+/* Date and reminder as words and Dayboard's own month popover (2026-11-05 owner: 「애플 처럼 곡률도 주고 좀 미려하면서 유려하게」): the field
+   is a button with the words, dim when empty; the popover is a rounded sheet — 32px round days, today in blue, the chosen day filled. */
+.date-field{display:block;min-width:0}.date-button{display:block;text-align:left;cursor:pointer;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px}.date-button.empty{color:var(--muted)}.date-button:disabled{opacity:.5;cursor:default}
+.date-pop-times{background:var(--bg);background:rgb(from var(--glass) r g b / 1)}/* the popover's own surface, solid (2026-11-06) */
+.date-pop{position:fixed;z-index:45;width:272px;padding:12px 12px 10px;background:var(--bg);background:rgb(from var(--glass) r g b / 1);/* --sheet lives on .dialog only; the popover sits on <body> (2026-11-05 owner: it showed through) */border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px rgba(25,35,60,.18),0 2px 8px rgba(25,35,60,.08);animation:pop-in .14s ease-out}.date-pop-head{display:flex;align-items:center;gap:2px;margin:0 0 6px 6px}.date-pop-title{flex:1;font-size:14px;font-weight:600;letter-spacing:-.2px}.date-pop-head .icon-button{width:28px;height:28px;border-radius:14px;color:var(--blue)}.date-pop-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px;justify-items:center}.date-pop-wd{width:32px;text-align:center;font-size:12px;color:var(--muted);height:24px;line-height:24px}.date-pop-day{display:inline-flex;align-items:center;justify-content:center;padding:0;margin:0;min-width:0;text-align:center;width:32px;height:32px;border-radius:50%;/* the number in the middle of its circle, under its weekday (2026-11-05 owner: 「요일에 일들이 정렬이 제대로 안 되어 있어」) */font-size:13px;font-variant-numeric:tabular-nums;color:var(--text);background:none}.date-pop-day:hover{background:var(--hover)}.date-pop-day.out{color:var(--muted)}.date-pop-day.today{color:var(--blue);font-weight:600}.date-pop-day.sel{background:var(--blue);color:#fff;font-weight:600}.date-pop-day:focus-visible{outline:2px solid var(--blue);outline-offset:1px}.date-pop-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.date-pop-link{font-size:13px;color:var(--blue);padding:4px 8px;border-radius:8px;background:none}.date-pop-link:hover{background:var(--hover)}.date-pop-time{width:auto;padding:5px 8px;font-size:13px}
+/* 「다른 색…」 (app.js chooseColor): the popover of the dates, a rounded field and hue bar. */
+.color-pop{position:fixed;z-index:46;display:flex;flex-direction:column;gap:12px;width:248px;padding:12px;background:var(--bg);background:rgb(from var(--glass) r g b / 1);border:1px solid var(--line);border-radius:var(--r-pop);box-shadow:0 10px 28px color-mix(in srgb,black 20%,transparent);animation:pop-in .14s cubic-bezier(.2,.9,.25,1)}
+.color-pop-area{position:relative;height:132px;border-radius:10px;background:linear-gradient(to top,black,transparent),linear-gradient(to right,white,transparent),hsl(var(--hue,210) 100% 50%);cursor:crosshair;touch-action:none}
+.color-pop-hue{position:relative;height:12px;margin:0 6px;border-radius:6px;background:linear-gradient(to right,red,yellow,lime,cyan,blue,magenta,red);cursor:pointer;touch-action:none}
+.color-pop-thumb{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;box-shadow:0 0 0 2px white,0 0 0 3px color-mix(in srgb,black 30%,transparent);pointer-events:none}
+.color-pop-hue .color-pop-thumb{top:50%;background:white}
+.color-pop-foot{display:flex;align-items:center;gap:8px}
+.color-pop-dot{flex:none;width:22px;height:22px;border-radius:50%}
+.color-pop .color-chooser{flex:1;min-width:0;height:30px;padding:0 8px;font-size:13px}
+/* A code it cannot read (적용 or Enter, app.js chooseColor aria-invalid): the system red edge, so a click is seen to do something. */
+.color-pop .color-chooser[aria-invalid=true]{border-color:var(--today);box-shadow:0 0 0 3px color-mix(in srgb,var(--today) 16%,transparent)}
+.color-pop-area:focus-visible,.color-pop-hue:focus-visible{outline:2px solid color-mix(in srgb,var(--blue) 55%,transparent);outline-offset:2px}
+/* Colour as Apple's apps use it (2026-11-07 owner: 「Apple에서 이 프로그램을 만든다면」, 「색깔은 무조건적으로 없애거나 그러지는 않잖아」): today is the system red in Calendar, as in the widgets (--w-today), beside the red line of the time now; Notes' folders are yellow, and the folder in view takes the note's yellow. */
+:root{--today:#ff3b30;--note-accent:#d9a400;--list-edge:rgb(from var(--glass) r g b / 1);--note-pick:color-mix(in srgb,#f5c242 30%,var(--field))}
+[data-theme=dark]{--today:#ff453a;--note-pick:color-mix(in srgb,#f5c242 14%,var(--field))}
+/* The event card's colour dot, smaller (2026-11-05 owner 「색깔을 나타내는 동그라미가 너무 큰 거 같지 않아?」): 10px like Apple Calendar's, the same 28px to press. */
+.card-color.card-color{width:10px;height:10px}.card-color.card-color::before{inset:-9px}
+/* The new event's typed line as understood, dim under the title; 「숨긴 달력 N개」 beside the 「달력」 heading (2026-11-05 owner). */
+.card-hint{font-size:12px;line-height:18px;color:var(--muted);margin:-2px 0 6px;min-height:0;overflow-wrap:anywhere}.card-hint:empty{display:none}.calendar-list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 6px}/* the heading's margins move here, so 숨긴 달력 N개 centres on 달력 itself (2026-11-06 owner) */
+.calendar-list-head>.agenda-sub{margin:0}
+.day-panel .task-title{font-size:13px}/* the day panel's tasks at the calendar's scale (2026-11-06 owner: larger than the month read odd) */
+.completed-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+/* A row's details never break inside one — 「오후 12:00」 stays whole and the line wraps between them in a narrow panel; the day panel's
+   check circle at its 13px titles' scale (2026-11-06 owner: 「우측패널을 좁혔더니 알림이랑 하위항목 표시가 깨져서」, 「동그라미가 글자 대비 좀 과하게 크지 않아?」) */
+.task-meta{flex-wrap:wrap;row-gap:2px}
+.task-meta>*{white-space:nowrap}
+.day-panel .task-check{width:18px;height:18px;margin-top:1px}
+/* Rounded tooltip (app.js tipHide): the menus' glass, 8px corners, 12px words, a soft shadow; fades in unless motion is reduced */
+.tip{position:fixed;z-index:200;max-width:280px;padding:5px 9px;border-radius:8px;font-size:12px;line-height:16px;font-weight:500;color:var(--text);background:rgb(from var(--glass) r g b / .97);box-shadow:0 4px 14px rgba(25,35,60,.16),0 0 0 .5px rgba(30,36,50,.12);pointer-events:none;white-space:pre-line;animation:tip-in .12s ease-out}
+[data-theme=dark] .tip{box-shadow:0 4px 14px rgba(0,0,0,.4),0 0 0 .5px #ffffff1f}
+@keyframes tip-in{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.tip{animation:none}}.calendar-list-head>.agenda-sub{flex:1;min-width:0}.calendar-list-head>.cal-hidden-toggle{width:auto;margin:0;padding:2px 4px;flex-direction:row-reverse;font-size:12px;color:var(--muted);white-space:nowrap}.calendar-list-head .group-chevron.open{transform:rotate(90deg)}
+/* A task's time on its date (2026-11-05 owner: 「색깔로 해당 일정의 날짜, 시간을 보여주고 그 옆에 종모양으로 좀 흐릿하게 30분 전 알림 이런식이 낫지 않을까」): in a row the date and time are one coloured piece, as the same-day reminder is (red once past, .task-meta .overdue), and a reminder that reads from that time a dim bell in the row's own colour. */
+.task-meta .due-time:not(.overdue){color:#b8721a}.task-meta .reminder-label.rel{color:inherit;opacity:.8}
+/* The date popover's 「시간」 row (Apple Reminders' switch: off is the date alone) and a timed task's 알림 choices — 알림 없음 | 제시간에 … 1일 전, each with the time it rings | 날짜와 시간 지정… */
+.date-pop-clock{display:flex;align-items:center;gap:8px;min-height:34px;margin-top:8px;padding:8px 2px 0 6px;border-top:1px solid var(--line);font-size:13px}.date-pop-clock-end{display:flex;align-items:center;gap:10px;margin-left:auto}.date-pop-clock .checkbox-field{margin:0;min-height:0}.date-pop-clock .date-pop-time[hidden]{display:none}
+.date-pop-choices{display:flex;flex-direction:column;margin:-4px -4px -2px}.date-pop-choices[hidden]{display:none}.date-pop-choices hr{border:0;border-top:1px solid var(--line);margin:4px 8px}.date-pop-choice{display:flex;align-items:center;gap:12px;width:100%;min-height:32px;padding:6px 10px;border-radius:8px;background:none;color:var(--text);font-size:13px;text-align:left}.date-pop-choice:hover{background:var(--hover)}.date-pop-choice:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}.date-pop-choice[aria-pressed=true]{color:var(--blue);font-weight:600}.date-pop-choice small{margin-left:auto;font-size:12px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}.date-pop-choice.more{color:var(--blue)}.date-pop>[hidden]{display:none}
+/* Event notes (2026-11-05 owner 「달력 메모 이거도 구현해줘」): under 장소 in the card, the card's own field — no box, the hover tint —
+   on as many lines as it holds, up to ten (then it scrolls), its icon on the first line; a read-only note keeps its line breaks. A
+   formatted note's helper line is the card's muted note with a blue text button. A search hit whose notes match shows that line, muted,
+   under its title. */
+.event-card .card-notes{align-items:flex-start;padding-top:3px}
+.event-card .card-notes>svg{margin-top:6px}
+.event-card .card-notes-input{display:block;height:28px;padding:4px 7px;line-height:20px;resize:none;overflow-y:auto}
+.event-card .card-notes-body{flex:1;min-width:0}
+.event-card .card-notes-text{flex:1;min-width:0;margin:0;padding:4px 7px;font-size:13px;line-height:20px;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere;max-height:208px;overflow-y:auto}
+.event-card .card-notes-body .card-note{margin:2px 0 4px;padding:0 7px}
+.event-card .card-notes-plain{padding:0;border:0;background:none;font:inherit;color:var(--blue);cursor:pointer}
+.event-card .card-notes-plain:hover{text-decoration:underline}
+.event-card .card-notes-plain:focus-visible{outline:none;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--blue) 45%,transparent)}
+.search-hit-note{grid-column:3/-1;margin-top:-8px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.event-detail .event-notes{white-space:pre-wrap;overflow-wrap:anywhere}
+/* Details in the right panel (2026-11-05 owner: 「할 일 목록에 있는 걸 클릭 했을 때 … 우측 탭에 뜨는 게 더 직관적이지 않을까?」), as Microsoft To Do's
+   detail pane and Notion Calendar's side panel. A task's: the panel's heading with 닫기, the edit dialog's fields one under another at the
+   panel's width, 메모 growing with its lines, 삭제 at the foot; its row keeps a quiet tint while it is open. An event's card in the day
+   panel is the floating card without its sheet — no glass, border, shadow or pop-in — at the panel's width. */
+.task-pane{display:flex;flex-direction:column;flex:1 0 auto}
+.task-pane-head{display:flex;align-items:center;gap:8px;min-height:32px;margin:0 -6px 12px 0}
+.task-pane-head h3{flex:1;min-width:0;font-size:14px;font-weight:650}
+.task-pane-head .icon-button{width:28px;height:28px}
+.task-pane-body{display:flex;flex-direction:column;flex:1 0 auto}
+.task-pane-body .form-columns{flex-direction:column;align-items:stretch;gap:0}
+.task-pane-body .field{margin-bottom:14px}
+.task-pane-body textarea.form-input[name=notes]{field-sizing:content;min-height:0;line-height:1.5;max-height:calc(12lh + 22px);resize:none}
+.task-pane-body .repeat-panel{margin:-6px 0 14px}
+.task-pane-foot{display:flex;margin-top:auto;padding-top:8px}
+.task-pane-foot .button{margin-left:-10px}
+.task-row.pane-open{isolation:isolate}
+/* left: past the arrow in the gutter, on every row so the edge stays put from row to row (2026-11-07 owner: the shade's edge all but touched the arrow) */
+.task-row.pane-open::after{content:"";position:absolute;inset:3px -8px 3px calc(0px - min(24px,var(--gutter)));z-index:-1;border-radius:10px;background:var(--hover);pointer-events:none}
+.event-card.docked{position:static;z-index:auto;width:auto;max-height:none;overflow:visible;padding:0 0 14px;border:0;border-radius:0;background:none;backdrop-filter:none;box-shadow:none;animation:none}
+/* at the panel's width its 닫기 stays inside the panel (the floating card's -6px reached past it into a sideways scroll), and a timed
+   event's day takes the first line with its start – end under it, both after the clock and as wide as their words, instead of the end
+   time alone on a line */
+.event-card.docked .card-head{margin-right:0;height:32px;margin-top:-4px}/* the title closer under the dot·⋯·X row in the day panel (2026-11-06 owner: 「간격이 너무 넓지 않아?」) */
+/* A failed save's question in the task panel's foot (2026-11-05 check), the edit dialog's: its words on their own line at the panel's
+   width, 변경 취소 · 계속 편집 under them at the right; 삭제 steps aside while it shows */
+.task-pane-guard{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;margin-top:auto;padding-top:8px}
+.task-pane-guard .guard-text{flex:1 0 100%;color:var(--secondary);font-size:13px;line-height:20px}
+.task-pane-body:has(>.task-pane-guard)>.task-pane-foot{display:none}
+/* One rule per kind (2026-11-05 owner, on the 할 일 편집 screenshot: 「오늘 내일 날짜 없음 폰트 크기가 다른 것과 어울리지 않게 너무 크지 않아? …
+   오늘이 시작하는 위치가 좀 더 안 쪽으로 … 위의 날짜 박스의 하위 항목에 속하는 거니깐 좀 더 위 박스와 간격이 좁아야」, 「중요한 할 일과 하위 할 일
+   이거 글자 크기가 서로 다를 이유가 있어? … 전반적으로 이런거 없는지도 다시 점검해서 디자인 정합성이 높도록」), over the task editor (dialog, right
+   panel, widget), the event dialog and card, the list dialogs and the date popover:
+   · a link under a field is that field's sub-item — 오늘·내일·날짜 없음·알림 없음, 새 그룹 만들기: the small-text size (12px/500, blue; it was
+     13px/600 like a toolbar's), its first letter or icon on the field's text (the field's 1px edge and 12px inner padding, a widget's
+     10px, less the link's own 6px), 2px under the field so its words sit 6px below it (they sat 13px below, 알림 없음 at the far right), and after it the
+     field's usual space less the 4px under its words (18px fields 14, the right panel's and a wide dialog's 14px fields 10, a widget's 8) */
+.date-presets .text-button,.text-button.field-link{font-size:12px;font-weight:500;line-height:18px;padding:4px 6px}
+.text-button.field-link{display:flex;width:fit-content}.text-button.field-link>svg{width:16px;height:16px}
+.date-col>.field:has(+.date-presets:not(:empty)),.field:has(+.field-link){margin-bottom:0}
+.date-presets,.text-button.field-link{margin:2px 0 14px 0}/* the first letter 6px in from the field's edge, between its edge and its text (2026-11-06 owner: 「조금 좌측으로 가는 게 안정적이지 않을까?」 — on the text, 11-05, read set in) */
+.task-pane-body .date-presets,.dialog.wide .text-button.field-link{margin-bottom:10px}
+.widget-body .date-presets{margin:2px 0 8px 0}
+@media(max-width:450px){.form-columns .date-presets{margin-bottom:8px}}
+/* · a line that explains a field (목록's 「옮길 수 없는 이유」) sits under it as its links do: 6px below, on the field's text */
+.field:has(+.move-why:not(:empty)){margin-bottom:0}
+.move-why:not(:empty){margin:6px 0 14px 13px}
+.task-pane-body .move-why:not(:empty){margin-bottom:10px}
+.widget-body .move-why:not(:empty){margin:6px 0 8px 11px}
+/* · a switch row among labelled fields (중요한 할 일; the event dialog's 하루 종일) is labelled as they are — 12px/600 --secondary, the
+     switch at the end (it was 13px text beside 12px labels) — and spaced as a label: its words the fields' gap under the field above
+     (they were 6px lower, the 32px row centring them) and the next label that gap under them; option sentences (the transfer dialog's,
+     the settings rows) keep their 13px text */
+.checkbox-field.field-switch{margin-top:-6px;font-size:12px;font-weight:600;color:var(--secondary)}
+.task-pane-body .checkbox-field.field-switch,.dialog.wide .checkbox-field.field-switch{margin-bottom:8px}
+.widget-body .checkbox-field.field-switch{margin-bottom:6px}
+/* · the steps are one list: the add line follows the last step with no gap (and 7px under 하위 할 일 when there is none — it was 14px),
+     and every row draws the same rule, from the words to the row's end like a list's separator in Apple's apps: on the input, the date button left the steps' rules 33px shorter than the add line's (2026-11-07 check) */
+.step-editor-list{margin-bottom:-7px}
+.step-edit-row::before{content:"";position:absolute;left:26px;right:0;bottom:0;height:1px;background:var(--line);pointer-events:none}
+.step-edit-row:has(.step-input:focus)::before{background:var(--blue)}
+.step-input,.step-input:focus{border-bottom-color:transparent}
+/* · 삭제 at the start of an editor's foot stands on the content edge as in the right panel (its icon sat 11px in) */
+.dialog-footer.split>.button.danger-quiet:first-child{margin-left:-10px}
+/* · the event card's 달력 row is a value like the others: its dot on their text, 7px in, and the text colour (it was --secondary on the
+     row's edge, unlike the same row's menu when there are several calendars) */
+.event-card .card-cal{padding-left:7px;color:var(--text)}
+/* · the date popover's 오늘 · 날짜 없음 start and end 18px in, where its title and 시간 start */
+.date-pop-link{padding:4px 6px}
+/* The sidebar's list and group names (2026-11-06 owner 「나의 목록에 적힌 할 일 리스트 글자 크기가 좀 작지 않아? 검토해봐줘. 꼭 내 말에 따를 필요는
+   없어.」): 14px, as the menu items right above them and the task rows a list opens — at 13px they read as a smaller kind of row (Apple's
+   sidebar rows are the size of the rows they open; Windows' body text is 14px). 20px lines keep the text on whole pixels in the 36px and
+   34px rows; the 24px dot, the 12px counts and the 38/59 grid stay. Only the sidebar's: the editor's fixed list name keeps .list-name's 13px. */
+.list-nav .list-name{font-size:14px;line-height:20px}
+.group-row{font-size:14px;line-height:20px}
+/* A row's second line is one line of words high also when it holds icons alone (2026-11-06 review of batch A): the note mark or the repeat
+   arrows by themselves made a 12px line, so a task with only a note stood 7px shorter than one with a date — two-line rows in two heights. */
+.task-meta{min-height:1lh}
+/* Where more is below and no bar fades it (2026-11-06 review of batch A), the soft fade of the settings sheet's 닫기 bar (scroll-state,
+   above) comes in at the foot, so the content dissolves instead of ending in a cut: the shortcuts sheet in the 900×650 window cut its last
+   key caps in half, and at 글자 크기 더 크게 the sidebar's lists were cut on the 계정·?·설정 row. Nothing shows while the end is in view. */
+.dialog:has(>.shortcuts-body)::after{content:"";display:block;position:sticky;bottom:0;height:28px;margin-top:-28px;background:linear-gradient(var(--sheet-clear),var(--sheet));pointer-events:none;opacity:0;transition:opacity .2s ease}
+@container dialog scroll-state(scrollable: bottom){.dialog:has(>.shortcuts-body)::after{opacity:1}}
+.sidebar-scroll{container:sidebar-scroll / scroll-state}
+.sidebar-scroll::after{content:"";display:block;position:sticky;bottom:-6px;height:20px;margin-top:-20px;background:linear-gradient(transparent,var(--side));pointer-events:none;opacity:0;transition:opacity .2s ease}
+@container sidebar-scroll scroll-state(scrollable: bottom){.sidebar-scroll::after{opacity:1}}
+/* · bottom −6px: a sticky box keeps clear of its scroller's padding, and .sidebar-scroll has 6px at its foot — at 0 the lists showed whole
+   under the fade, along the 계정·?·설정 row */
+/* Subtasks listed under their task (2026-11-06 owner: 「메인 할 일 화면에서 하위 항목은 해당 상위 항목보다 좀 더 들여써져 있게 보여서 바로바로
+   체크 하거나 삭제하거나 보거나 하는 게 더 직관적일꺼 같은데 … 하위항목을 접을 수도 있게」). The arrow that folds them sits in the gutter left of
+   the task's circle (Reminders), so every circle, title and meta line keeps its x: the scroller reaches over the gutter to show it, and in a
+   16px gutter the arrow narrows. A step's circle stands under its task's title (33px in, 26px where the circle is 18px); its title fills the
+   row up to its ×, which shows on hover or with the keyboard there, at the row's right end like the task's ⋯. The field that renames a step
+   keeps the title's box (13px, the same height) with the editor's blue underline in place of a focus ring. While the pointer is on the steps
+   the task's own hover buttons stay out: they act on the task, not on the step under the pointer. */
+.task-scroll{margin-left:calc(-1*var(--gutter));padding-left:var(--gutter)}
+.steps-toggle{--w:min(18px,calc(var(--gutter) - 2px));position:absolute;top:13px;left:calc(-2px - var(--w));width:var(--w);height:23px;display:grid;place-items:center;border-radius:6px;color:var(--muted)}
+.steps-toggle:hover{background:var(--hover);color:var(--secondary)}
+.steps-toggle:focus-visible{outline-offset:0}
+.steps-toggle .group-chevron{width:auto}
+.task-step .step-title{flex:1;min-width:0;cursor:text}
+.step-title-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--blue);border-radius:0;background:none;font-size:13px;line-height:1.5;padding:3px 0 2px;color:var(--text)}
+.step-title-input:focus-visible{outline:none}
+.task-step .step-remove{color:var(--muted)}
+.task-step .step-remove svg{width:16px;height:16px}
+.task-step:hover .step-remove,.task-step:focus-within .step-remove{opacity:1}
+.task-step.editing .step-remove{display:none}
+.task-row:has(>.task-steps:hover)>.row-more:not(:focus-visible),.task-row:has(>.task-steps:hover)>.task-flag:not(.on):not(:focus-visible){opacity:0}
+@media(max-width:650px){.task-steps{padding-left:26px}}
+/* The event card (2026-11-06 owner D2): a larger title and its rows in quiet groups on --field; a line between rows, from the words on */
+.card-title{font-size:17px;line-height:24px;margin-bottom:0}
+.card-hint{margin:2px 0 0}
+.card-group{margin-top:10px;padding:1px 10px;border-radius:var(--r-card);background:var(--field);container-type:inline-size}
+/* A row keeps to one line (2026-11-07 owner: 「이상하게 줄이 내려가고」): what is long ends in … or wraps inside itself, never under the icon. */
+.card-group>.card-row{position:relative;min-height:36px;flex-wrap:nowrap}
+.card-group>.card-row>span{min-width:0}
+.card-group>.card-row>select{flex:0 1 auto;min-width:0}
+/* 시작 · 종료: the values' 26px column for both rows (the clock sits in it), the label, the date, the time at the row's end. Tight enough for the
+   day panel's usual width (2026-11-07: at 242px the time fell under the date). */
+.card-group>.card-when:has(>.card-when-label){gap:2px;padding-left:26px}
+.card-group>.card-when>svg{position:absolute;left:0;top:10px;margin:0}
+.card-when-label{flex:none;width:34px;padding-left:7px;box-sizing:content-box;color:var(--secondary)}
+:root[lang=en] .card-when-label{width:40px}
+.card-group>.card-when>.card-date-wrap{flex:1 1 auto;min-width:0}
+.card-group>.card-when .card-date{max-width:100%;padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-group>.card-when>.card-time{flex:none;width:auto;min-width:0;padding:0 4px;field-sizing:content;text-align:right}
+.card-allday{justify-content:space-between;padding:0 2px 0 33px}
+.card-allday .checkbox-field{margin:0;min-height:0}
+.card-value{padding-left:7px}
+.card-cal{flex:1 1 auto}
+.card-cal-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The narrowest day panel has no room for the date and the time side by side: the time goes under the date, in the date's column. */
+@container (max-width:212px){.card-group>.card-when:has(>.card-time){flex-wrap:wrap;row-gap:0;padding-block:3px}.card-group>.card-when>.card-time{margin-left:43px;text-align:left}.card-group>.card-when>.card-date-wrap{flex-basis:calc(100% - 45px)}}
+.card-group>.card-row+.card-row::before{content:"";position:absolute;top:0;left:26px;right:-10px;height:1px;background:var(--line)}
+.event-card .card-swatches{margin-top:10px}
+.event-card>.card-note:first-of-type{margin-top:10px}
+/* A guide's steps start where its sentences start (2026-11-07 owner: the line under them began left of 「1.」), the number in its own column */
+.setup-guide ol{list-style:none;counter-reset:guide;padding-left:0}
+.setup-guide li{position:relative;padding-left:18px;counter-increment:guide}
+.setup-guide li::before{content:counter(guide) ".";position:absolute;left:0}
+.setup-guide .guide-lead{margin-top:0;color:var(--text)}
+.setup-guide>.text-button{margin-left:-6px}
+/* iPhone Reminders through Outlook, one line that opens (2026-11-06) */
+/* The time in the date popover (2026-11-06 owner T7): words in a field and a rounded list, not Chromium's square picker */
+.date-pop-time-wrap{position:relative;display:inline-flex}.date-pop-time-wrap[hidden]{display:none}
+.date-pop .date-pop-time{width:104px;height:30px;padding:0 8px;text-align:center;font-size:13px}
+.date-pop-times{position:absolute;z-index:3;top:calc(100% + 4px);right:0;width:148px;max-height:216px;overflow-y:auto;padding:4px;border-radius:var(--r-pop);border:1px solid var(--line);box-shadow:0 10px 28px color-mix(in srgb,black 20%,transparent)}
+.date-pop-times.up{top:auto;bottom:calc(100% + 4px)}
+.date-pop-times[hidden]{display:none}
+.date-pop-time-row{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:30px;padding:0 8px;border:0;border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--text);cursor:pointer}
+.date-pop-time-row:hover,.date-pop-time-row.current{background:var(--hover)}
+.date-pop-time-row svg{color:var(--blue);flex-shrink:0}
+/* Subtasks dragged (2026-11-06): a line for 「here」, the task lit for 「under this task」 */
+.task-step.dragging,.step-edit-row.dragging{opacity:.4}
+.task-step.drop-before,.step-edit-row.drop-before{box-shadow:inset 0 2px 0 var(--blue)}
+.task-step.drop-after,.step-edit-row.drop-after,.task-row.drop-after{box-shadow:inset 0 -2px 0 var(--blue)}
+.task-row.drop-under{background:color-mix(in srgb,var(--blue) 10%,transparent);border-radius:var(--r-card)}
+/* A tooltip's shortcut, dimmer than its words (app.js tipParts, 2026-11-07). */
+.tip-key{margin-left:8px;font:inherit;color:var(--muted)}
+/* The day's tasks in the task screen's right panel (app.js contextDayTasks, 2026-11-07) */
+.context-day-tasks{margin-top:10px}.context-day-tasks .agenda-sub{margin:0 0 2px}
+/* Note folders (app.js noteFoldersColumn, 2026-11-07): a column left of the list, as in Mac Notes; it opens and closes by its width, so the list and the text slide over. */
+.note-folders-toggle.active{background:var(--hover)}
+.note-folders{flex:none;width:188px;display:flex;flex-direction:column;gap:2px;min-height:0;overflow:hidden auto}
+.note-folder{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:0 10px;flex:none;border:0;border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--text);text-align:left;cursor:pointer}
+.note-folder>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note-folder>small{flex:none;font-size:12px;color:var(--muted)}
+.note-folder>svg{flex:none;color:var(--note-accent)}
+.note-folder:hover,.note-folder.selected{background:var(--hover)}
+.note-folder.selected{background:var(--note-pick);font-weight:600}
+.note-folder.drop-on{box-shadow:inset 0 0 0 1.5px var(--blue)}
+.note-folder.new{color:var(--secondary)}
+.note-folders-foot{display:flex;flex-direction:column;gap:2px;margin-top:auto;padding-top:8px}
+.note-folders.opening{animation:note-folders-in .18s ease-out}
+.note-folders.closing{animation:note-folders-out .15s ease-in forwards}
+@keyframes note-folders-in{from{width:0;margin-right:-24px;opacity:0}to{width:188px;margin-right:0;opacity:1}}
+@keyframes note-folders-out{from{width:188px;margin-right:0;opacity:1}to{width:0;margin-right:-24px;opacity:0}}
+@media(prefers-reduced-motion:reduce){.note-folders.opening,.note-folders.closing{animation:none}}
+@media(max-width:650px){.note-folders{width:auto;flex-direction:row;overflow:auto hidden}.note-folder{width:auto;white-space:nowrap}.note-folder>span{flex:none}.note-folders-foot{flex-direction:row;margin:0;padding:0}}
+/* A subtask's date (app.js stepDateButton, 2026-11-07): words beside the title, a small calendar on hover until it has one. */
+.step-date{flex:none;display:inline-grid;place-items:center;height:22px;padding:0 6px;border:0;border-radius:6px;background:none;font:inherit;font-size:12px;line-height:16px;color:var(--secondary);white-space:nowrap;cursor:pointer}
+.step-date:hover{background:var(--hover)}
+.step-date.late{color:var(--danger,var(--red))}
+.step-date.empty{width:24px;padding:0;color:var(--muted);opacity:0}
+.task-step:hover .step-date.empty,.task-step:focus-within .step-date.empty,.step-edit-row:hover .step-date.empty,.step-edit-row:focus-within .step-date.empty{opacity:1}
+.task-step.editing .step-date{display:none}
+.task-step.done .step-date,.step-edit-row.done .step-date{color:var(--muted)}
+.day-step .task-meta{display:block}
+/* Quiet until it is wanted (2026-11-07 owner: 「난잡하거나 복잡하거나」): where a new task will go shows while typing; a clear link shows when there is something to clear. */
+.quick-add:not(:focus-within) .quick-bottom{display:none}
+.date-col:has(.date-button.empty) :is(.date-clear,.reminder-clear){display:none}
+/* 자동 백업 rows (2026-11-07): the value stands where a select's does, one line however long the path */
+.settings-body .settings-group>.backup-row{grid-template-columns:auto minmax(0,1fr)}
+.settings-body .settings-group>.backup-row>.backup-value{justify-self:end;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px}
+.settings-body .backup-failed{color:var(--danger,var(--red))}
+/* The right panels and a day's list (2026-11-08 owner: 「메인인 스케줄 이름이 조금이라도 더 큰 게 맞지 않아?」, 「달력에 적은 스케줄과 할 일 글자 크기 차이가
+   너무 나지 않아?」): one row for an event and a task — its title 14px, its time and place 12px in the secondary colour under it, as Apple's
+   lists set a row's title over its details. The repeat mark stands on the title's middle (its 24-unit drawing is centred). */
+.context-pane .agenda .event-row strong,.day-panel .agenda .event-row strong,.event-card.day-list .agenda .event-row strong{font-size:14px;line-height:20px;font-weight:500}
+.day-panel .task-title{font-size:14px}
+/* Its box was the line's height with the drawing at the bottom, so the mark sat 2.5px under the title's middle (smoke panel-row-sizes). */
+.agenda .event-row .chip-repeat{align-self:center;line-height:0;margin-left:5px;position:relative;top:-1px}/* Hangul sits a little above its box's middle */
+.agenda .event-row .chip-repeat svg{display:block}
+/* A widget held in place (app.js widgetView, 2026-11-08): its top no longer drags it and its edges no longer size it. */
+.widget-body.locked .widget-head{-webkit-app-region:no-drag}
+/* The day panel's steps (2026-11-08 owner): its rows stand 20px from the panel's edge and the resizer takes the first 6px of that, so the arrow is 14px
+   and clear of it, level with the task's 18px circle. A step's circle stands under the task's words, a size down, at the panel's closer spacing. */
+.day-panel .steps-toggle{--w:14px;left:-15px;top:14px;height:18px}
+.day-panel .task-row.steps-open{row-gap:4px}
+.day-panel .task-steps{padding-left:30px}
+.day-panel .task-step{min-height:28px;gap:8px}
+.day-panel .step-check{width:15px;height:15px}
+/* the day the panel is about is not said again beside a step, as it is not beside its task; on hover it is there to change */
+.day-panel .step-date.quiet{opacity:0}
+.day-panel .task-step:hover .step-date.quiet,.day-panel .task-step:focus-within .step-date.quiet{opacity:1}
+/* A list of times shows whole rows and says what is above and below with a soft edge (2026-11-08 owner: 글자가 위아래로 조금씩 잘려 보임). Rows snap,
+   so a scroll stops on a row; the edges come with the content past them, as the shortcuts sheet's foot does. */
+.context-menu.time-menu{container:time-list / scroll-state;scroll-snap-type:y mandatory;scroll-padding-block:6px}
+.date-pop-times{max-height:220px;container:time-list / scroll-state;scroll-snap-type:y mandatory;scroll-padding-block:4px}
+.context-menu.time-menu .menu-item,.date-pop-time-row{scroll-snap-align:start}
+.context-menu.time-menu::before,.context-menu.time-menu::after,.date-pop-times::before,.date-pop-times::after{content:"";display:block;position:sticky;z-index:1;height:22px;pointer-events:none;opacity:0;transition:opacity .15s}
+.context-menu.time-menu::before,.date-pop-times::before{top:0;margin-bottom:-22px;background:linear-gradient(to bottom,var(--list-edge),transparent)}
+.context-menu.time-menu::after,.date-pop-times::after{bottom:0;margin-top:-22px;background:linear-gradient(to top,var(--list-edge),transparent)}
+@container time-list scroll-state(scrollable: top){.context-menu.time-menu::before,.date-pop-times::before{opacity:1}}
+@container time-list scroll-state(scrollable: bottom){.context-menu.time-menu::after,.date-pop-times::after{opacity:1}}
+/* A week block's lines: a line that would not fit whole wraps out to a second column, which the block clips, so the time and the place are there or not, never cut (2026-11-08 owner). */
+.time-event:not(.one-line){flex-wrap:wrap;align-content:flex-start;column-gap:24px}
+.time-event:not(.one-line)>.time-event-title,.time-event:not(.one-line)>.time-event-time,.time-event:not(.one-line)>.time-event-place{width:100%}
+/* 14px lines under the title: at 16 an hour's block was 1px short of two title lines and the time, which then left whole (2026-11-08 owner) */
+.time-event:not(.one-line)>.time-event-time,.time-event:not(.one-line)>.time-event-place{line-height:14px}
+/* the focus mark of a task's words is round, as every other mark (2026-11-08) */
+.task-text:focus-visible{border-radius:6px}
+/* An event over several days in the month is one bar over the cells (2026-11-08 owner, as Apple Calendar and Notion Calendar). It stands where the cell's lines start, the
+   head of calMonthLimit (39px) and its line (22.2px); the cell leaves it that room with .day-lanes. The ends take a drag (.chip-edge), a piece that goes on is flat there. */
+.large .day-event{position:relative}
+.large .calendar-day{user-select:none}
+.day-lanes{display:block;flex:none;height:calc(var(--lanes) * 22.2px - 2px)}
+.month-bar{position:relative;z-index:2;align-self:start;min-width:0;height:20.2px;margin:calc(39px + var(--lane) * 22.2px) 5px 0}
+.month-bar.cont-before{margin-left:0;border-top-left-radius:0;border-bottom-left-radius:0}
+.month-bar.cont-after{margin-right:0;border-top-right-radius:0;border-bottom-right-radius:0}
+.month-bar.draft{--cal-color:var(--blue)}
+.month-bar.ghost{z-index:3;pointer-events:none;box-shadow:0 0 0 1.5px color-mix(in srgb,var(--cal-color,var(--blue)) 55%,transparent)}
+.chip-edge{position:absolute;z-index:1;top:0;bottom:0;width:7px;cursor:ew-resize}
+.chip-edge.start{left:0}
+.chip-edge.end{right:0}
+.chip-edge::after{content:"";position:absolute;top:4px;bottom:4px;width:2px;border-radius:1px;background:currentColor;opacity:0;transition:opacity .12s}
+.chip-edge.start::after{left:2px}
+.chip-edge.end::after{right:2px}
+.day-event:hover>.chip-edge::after,.allday-bar:hover>.chip-edge::after{opacity:.4}
+body.cal-stretching,body.cal-stretching *{cursor:ew-resize!important}
+@media(max-width:650px){.month-bar{display:none}}
+/* Batch G (2026-11-09 owner requests). Subtasks in the editor take a drag by their grip (「우측 세부 정보에서 하위 할 일의 순서를 드레그로 조정하려고 하는데
+   불가능하네」): the row is an input and buttons, which a press selects or clicks, so the grip in the 26px left of the separator (app.js stepEditor) is where
+   the drag begins — there on hover and keyboard focus, as the × is. The check circle keeps its x: the grip stands over the circle's left margin. */
+.step-edit-row .step-grip{position:absolute;left:-18px;top:0;bottom:0;width:16px;display:grid;place-items:center;color:var(--muted);opacity:0;cursor:grab;transition:opacity .15s}
+.step-edit-row:hover .step-grip,.step-edit-row:focus-within .step-grip{opacity:1}
+.step-edit-row.dragging .step-grip{cursor:grabbing}
+.step-edit-row .step-grip svg{width:14px;height:14px}
+/* A connected series' repeat row (calendar.js calRepeatControl, 2026-11-09 owner: 「반복 일정을 누르려고 하는데 아무런 변화가 안 나와」): the rule's words
+   as the card's other values, a lock after them, a button so a press or Enter says where the rule is changed; no box of its own (1.2.7 ⑥). */
+.card-repeat-locked{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0 0 0 7px;font:inherit;color:var(--secondary);cursor:default;text-align:left}
+.card-repeat-locked svg{width:12px;height:12px;color:var(--muted);flex-shrink:0}
+.card-repeat-locked:focus-visible{outline:none;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--blue) 55%,transparent)}
+/* W5 · the task widget's head (2026-11-09 owner: 「할 일 숫자나타내는 것과 … 위젯 설정 부분을 나타내는 ...의 동그라미가 위치가 좀 어긋나서」): the count and the hover
+   controls share one 28px box at the head's padding edge, on the title row's centre line (the count sat 3px lower and 4px further in than the circle). The title
+   keeps clear of that box. */
+.widget-head.task-head .widget-controls{top:16px;right:16px}
+.widget-head.task-head .widget-count{position:absolute;top:16px;right:16px;height:28px;min-width:28px;margin:0;display:grid;place-items:center;line-height:1}
+.widget-head.task-head .widget-title-block{padding-right:34px}
+/* W2 · subtasks in the task widget (app.js taskRow compact 'widget', 2026-11-09 owner: 「위젯에서 하위항목 볼 수 있도록 … 더블클릭하면 펼치고 접을 수 있게 … 드레그로 순서도」):
+   the list's rows in the widget's inks, 13px, the step circle under the title; no arrow — the widget has no gutter, a double click folds (the folded row counts). */
+.widget-body .widget-tasks .steps-toggle{display:none}
+.widget-body .widget-tasks .task-row.steps-open{row-gap:4px}
+.widget-body .widget-tasks .task-steps{padding-left:29px}
+.widget-body .widget-tasks .task-step{min-height:28px;gap:8px}
+.widget-body .widget-tasks .step-check{width:15px;height:15px;border-width:1.5px;border-color:color-mix(in srgb,var(--task-color) var(--w-check-mix),var(--w-check-with));background:transparent}/* the task circle's inks (the widget body's --w-check tokens), a size down */
+.widget-body .widget-tasks .task-step.done .step-check{background:var(--task-color);border-color:var(--task-color)}
+.widget-body .widget-tasks .step-title,.widget-body .widget-tasks .step-title-input{font-size:13px;color:var(--w-text)}
+.widget-body .widget-tasks .task-step.done .step-title{color:var(--w-tertiary)}
+.widget-body .widget-tasks .step-date,.widget-body .widget-tasks .step-remove{color:var(--w-secondary)}
+.widget-body .widget-tasks .step-date:hover{background:var(--w-hover)}
+.widget-body .widget-tasks .task-step.drop-before,.widget-body .widget-tasks .task-step.drop-after{box-shadow:none;background:var(--w-hover)}
+/* W3 · the calendar widget's day (2026-11-09 owner: 「할 일도 나타내주는 게」, 「오늘을 나타내는 빨간 동그라미 크기가 좀 커서 위쪽 줄에 … 작은 동그라미와 거의 겹치려고」): the
+   today circle was 24px as the app's month got on 11-08 (22px since V72, below), with 2px of the cell above it and 3px between it and the dots (2 + 24 + 3 + 5 = 34, the cell as it was;
+   it was 26 + 3 + 5 with the circle on the row above's dots, then 24 + 4 + 5 with 1px spare above — the dots of the day above still touched the circle, 2026-11-09
+   review: the spare pixels go above the circle, 3px each way with the grid's 1px gap). The day's tasks follow its events in the same inks and sizes as the
+   event rows (title 14/600, the circle to complete). */
+/* 2026-11-09 사용자 결정 V72 「오늘 원 22px」: 3 + 22 + 1 + 4px of dots + 4 spare = 34 — a day's dots nearer its own number (about 7px) than the circle of the row
+   below (8px); 2 + 24 + 3 + 5 left the row above's dots 3px from today's circle and 10px from their own number. The larger text size zooms it all (--wz). */
+.widget-calendar-content .calendar-day{padding-top:3px}
+.widget-calendar-content .day-number{width:22px;height:22px}
+.widget-calendar-content .day-dots{margin-top:1px;height:4px}
+.widget-body .widget-agenda-tasks{display:flex;flex-direction:column;margin-top:2px}
+.widget-body .widget-agenda-tasks .task-row{min-height:0;padding:5px 4px;gap:9px;border-bottom:0;border-radius:9px}
+.widget-body .widget-agenda-tasks .task-row:hover{background:var(--w-hover)}
+.widget-body .widget-agenda-tasks .task-check{width:17px;height:17px;margin-top:1px;border-color:color-mix(in srgb,var(--task-color) var(--w-check-mix),var(--w-check-with));background:transparent}
+.widget-body .widget-agenda-tasks .task-row.completed .task-check{background:var(--task-color);border-color:var(--task-color)}
+.widget-body .widget-agenda-tasks .task-title{font-size:14px;font-weight:600;color:var(--w-text)}
+.widget-body .widget-agenda-tasks .task-row.completed .task-title{color:var(--w-tertiary)}
+.widget-body .widget-agenda-tasks .task-meta{font-size:12px;color:var(--w-secondary);margin-top:1px}
+.widget-body .widget-agenda-tasks .row-more,.widget-body .widget-agenda-tasks .task-flag:not(.on),.widget-body .widget-agenda-tasks .steps-label{color:var(--w-tertiary)}
+
+/* W4 · the glass slider in a widget's own settings sheet (app.js openWidgetSettings glass-field; 2026-11-09 owner request over 1.2.7 ③): its own row of the card, the
+   label over the slider, which takes the row's width — beside the label it had 100px in a 360px widget. */
+.dialog-body.widget-settings>.field.glass-field{grid-template-columns:1fr;row-gap:0;padding-top:8px;padding-bottom:8px}
+.dialog-body.widget-settings>.field.glass-field>.glass-slider{width:100%;min-width:0;flex:none}
+/* S1 · the rows a settings disclosure opens (app.js foldField; 2026-11-09 owner: 「하위 항목들이 그 윗단과 구분되는 게 없어서 좀 비직관적인 거 같아.
+   … 좀 더 오른쪽으로 약간 들여서 써서 시작하든지」): 16px in from the head's text, as a nested list in macOS System Settings, 32px rows under
+   the 44px head, the hairlines between them from the indented text; the row from the head keeps the card's full hairline (the .fold-head+ rule
+   after r60-E). Nothing filled inside the card: the indent and the rhythm alone tell the rows from the head. Test tests/settings-fold-1109.test.cjs. */
+.settings-body .settings-group>.section-visibility.folding>.checkbox-field{padding-left:16px;min-height:32px}
+.settings-body .settings-group>.section-visibility.folding>.checkbox-field+.checkbox-field::before{left:16px}
+/* K2 · the left panel folds (app.js sidebarToggle, settings.sidebar; 2026-11-09 owner: 「좌측 패널도 접을 수 있으면 접는 게 좋을까? … 단축키는 우측패널
+   /에 대응되는 z」): the brand keeps its place from before the fold (06cdcda: 26px in, 24px mark, 9px gap, 17px word; 2026-11-09 owner: 「Dayboard를 나타내는
+   아이콘과 글자는 이 프로그램을 대변하는거니깐 옮기면 안된다고 생각해.」) and the toggle takes the row's right end, 12px from the box edge as the bar's right
+   buttons keep 12px (.topbar-main); where the box is narrow (170px at 650px and under) the word alone ellipsises. Closed, the sidebar goes whole and the
+   content takes its width, the word leaves the DOM, the mark stays at its x, then the toggle, then the view's title 12px on; the bar loses the sidebar's
+   tint. #app carries the class, so these outrank the width steps of the media rules (lines 13–16, 1094) without repeating them. Open, the button is a
+   plain glyph — no fill lives in the brand box. Tests tests/brand-first-1109.test.cjs, tests/sidebar-toggle-1109.test.cjs. */
+.topbar-brand>img{flex-shrink:0}
+.topbar-brand>.brand-name{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar-brand>.sidebar-toggle{width:32px;height:32px;flex-shrink:0;margin-left:auto;margin-right:-10px}
+@media(max-width:650px){.topbar-brand>.sidebar-toggle{margin-right:0}}
+.icon-button.sidebar-toggle.active{color:var(--text)}
+#app.sidebar-closed .sidebar{display:none}
+#app.sidebar-closed .topbar{background:var(--bg)}
+#app.sidebar-closed .topbar-brand{width:auto;padding-right:0;box-shadow:none;justify-content:flex-start}
+#app.sidebar-closed .topbar-brand>.sidebar-toggle{margin-left:0;margin-right:0}
+#app.sidebar-closed .topbar-main{padding-left:12px}
+/* A1 · the connect dialogs (app.js connectAccount; 2026-11-09 owner: 「이거 너무 장황해. 그냥 간결하게만 적어도 될 것 같아 … 겉 테두리 너무 큰 거 아니야?」):
+   two short lines under the name; the own-client-ID way is a plain disclosure row (chevron + 13px text) with its line of why inside, no box — the big
+   hairline box stays only round iCloud's steps (.setup-guide, r60-apple S3); the one notice people need on the consent screen (the app's name) is a muted
+   line right above the sign-in button. Descriptions wrap by the letter: word-break normal + overflow-wrap anywhere on description paragraphs, while body
+   keeps keep-all for titles, labels and menu items (「가져옵니다」 fell to the next line whole). Test tests/connect-dialog-1109.test.cjs. */
+.view-description,.field-help,.dialog-body p,.setup-guide li{word-break:normal;overflow-wrap:anywhere}
+.connect-intro{margin-bottom:16px}
+.connect-intro p{font-size:13px;color:var(--secondary);line-height:1.6;margin-top:3px}
+.setup-more{margin:0 0 14px;font-size:13px;color:var(--secondary)}
+.setup-more>summary{display:flex;align-items:center;gap:6px;width:fit-content;min-height:32px;margin-left:-6px;padding:0 6px;border-radius:7px;list-style:none;color:var(--text);font-size:13px;font-weight:450;cursor:pointer}
+.setup-more>summary::-webkit-details-marker{display:none}
+.setup-more>summary:hover{background:var(--hover)}
+.setup-more>summary>svg{flex:none;color:var(--secondary);transform:rotate(-90deg);transition:transform .15s ease}
+.setup-more[open]>summary>svg{transform:none}
+.setup-more>p{margin:2px 0 10px;font-size:12px;line-height:1.7;color:var(--secondary)}
+.setup-more>.field{margin:0 0 12px}
+.setup-more>.text-button{margin-left:-6px}
+.field-help+.field-help.connect-note{margin-top:-10px}
+@media (prefers-reduced-motion:reduce){.setup-more>summary>svg{transition:none}}
+/* Push buttons answer the pointer like the blue one beside them (2026-11-09 F90): grey ones (plain, subtle, danger — grey with red text since
+   1.2.7 C2) darken their own --field toward --text, the borderless danger-quiet takes --hover. :where keeps the emoji text action's own hover. */
+@media(hover:hover){.button:where(:not(.primary,.primary-choice,.danger-quiet,.emoji-more,:disabled)):hover,.button.danger:not(:disabled):hover{background:color-mix(in srgb,var(--field),var(--text) 7%)}.button.danger-quiet:not(:disabled):hover{background:var(--hover)}}
+/* The window's visual review (2026-11-09 V cards, tests/visual-1109b). The open task row's shade ends at the row's right edge, as its line does,
+   and the lines above and below it give way to it (V2·V11·V17; its left edge past the arrow stays, 2026-11-07 owner). */
+.task-row.pane-open::after{right:0}
+.task-row.pane-open,.task-row:has(+.task-row.pane-open){border-bottom-color:transparent}
+/* the sidebar: hover a lighter step than selected (V5); with a list chosen, 할 일 above marks its section by its words only (V51) */
+.nav-item:not(.selected):hover,.list-nav-wrap:not(.task-drop)>.list-nav:not(.selected):hover{background:color-mix(in srgb,var(--hover) 50%,transparent)}
+@media(min-width:451px){.sidebar:has(.list-nav.selected) .main-nav .nav-item.selected:not(:hover){background:none}} /* at 450 px and below the row is an icon alone, with no text to mark the section: it keeps its fill (design review) */
+/* the alert menu's current value as the time list's: a quiet fill and a blue check; blue words stay with 날짜와 시간 지정… (V12) */
+.date-pop-choice[aria-pressed=true]{color:var(--text);font-weight:400;background:var(--hover)}
+.date-pop-choice>svg{flex:none;margin-left:auto;color:var(--blue)}
+.date-pop-choice>small+svg{margin-left:0}
+/* a subtask's ×, date and grip: for the pointer on the row or the keyboard in it, not for the circle a mouse pressed a moment ago (V19) */
+.task-step:not(:hover):not(:has(:focus-visible)) .step-remove,.task-step:not(:hover):not(:has(:focus-visible)) .step-date.empty,.step-edit-row:not(:hover):not(:has(:focus-visible)) .step-remove,.step-edit-row:not(:hover):not(:has(:focus-visible)) .step-date.empty,.step-edit-row:not(:hover):not(:has(:focus-visible)) .step-grip,.day-panel .task-step:not(:hover):not(:has(:focus-visible)) .step-date.quiet{opacity:0}
+/* the count stays apart from the title where the narrow window's gap shrinks (V21) */
+@media(max-width:860px){.topbar-main>h1+.topbar-count{margin-left:4px}}
+@media(max-width:760px){.topbar-main>h1+.topbar-count{margin-left:6px}}
+/* 다른 색…: the hue bar as wide as the square, 적용's words end on their edge (V23) */
+.color-pop-hue{margin:0}
+.color-pop-foot>.date-pop-link{margin-right:-6px}
+/* the line under the menu's swatches indented as its <hr> lines; the swatches keep their place (V30) */
+.menu-colors{margin:0 6px 4px;padding:7px 2px 9px}
+/* 하루 종일 is a row name like 시작 · 종료 (V37) */
+.card-allday>span{color:var(--secondary)}
+/* the read date under 날짜로 이동 starts with the typed words: the box's 1px border and 12px padding (V38) */
+.go-date-hint{margin-left:13px}
+/* settings words-buttons end on the switches' and the selects' line (V47) */
+.settings-body .settings-group>.backup-row>.backup-value,.settings-body .settings-group>.event-word-entry>.text-button{margin-right:-6px}
+/* 자주 쓰는 일정: the emoji button inside 앞에 붙일 말's box, so the boxes end together, and 더 보기 on the group's edge (V48) */
+.event-word-form .event-word-before-row{position:relative}
+.event-word-form .settings-group .event-word-before-row>input.form-input{padding-right:40px}
+/* inside the white field: not filled (no filled control in a filled box), and inside its edge, round corner and focus ring (design review) */
+.event-word-form .event-word-before-row>.emoji-choice{position:absolute;right:2px;top:50%;width:28px;height:28px;margin-top:-14px;background:none}
+.event-word-form .event-word-before-row>.emoji-choice:hover{background:var(--hover)}
+.event-word-form .event-word-more{margin-right:-6px}
+/* a mouse action in the shortcut sheet is words, not a key cap (V56) */
+.keys .keys-mouse{font-size:12px;color:var(--secondary)}
+/* the provider's logo by the dialog's 「… 연결」 title (V60) */
+.connect-intro{align-items:flex-start}
+/* VW · the 2026-11-09 visual review of the widgets (tests/widget-visual-1109b.test.cjs). The widget's 위젯 설정 sheet opens at the top of the card as the
+   note widget's (taller) one does, over the head rather than centred across its title (V62), and its title keeps 6 + 6px to its card, about the 14px under
+   the card (V64; 13 + 15 left 33px under the 30px close button) */
+.widget-body .modal-overlay:has(.widget-settings){align-items:stretch}
+.widget-body .dialog:has(>.widget-settings)>.dialog-header{padding-bottom:6px}
+.widget-body .dialog-body.widget-settings{padding-top:6px}
+/* a fixed toast at left 50% only had half the window, so a short message broke in two: its words' width, up to the card less 16px a side (V65, V76) */
+body.widget-body #toast{width:max-content;max-width:calc(100% - 2 * var(--w-margin) - 32px)}
+/* a list that scrolls fades at its foot while more is below, on the glass as well (a mask, not a colour): a scroll timeline on the list itself runs the
+   fade out over the last 24px (16 until the 2026-11-09 smoke left half a line hard at the edge; black is the mask's opaque stop, never drawn); while the list fits there is no timeline and no fade (V73, V74) */
+@property --w-edge{syntax:"<length>";inherits:false;initial-value:0px}
+@keyframes w-edge{from{--w-edge:24px}to{--w-edge:0px}}
+.widget-body .widget-tasks,.widget-body .widget-calendar-content{-webkit-mask-image:linear-gradient(black calc(100% - var(--w-edge)),transparent);mask-image:linear-gradient(black calc(100% - var(--w-edge)),transparent);animation:w-edge linear both;animation-timeline:scroll(self);animation-range:calc(100% - 24px) 100%}
+/* a widget's menu taller than the window scrolls (max-height, r60-int): soft edges say what is past them, as the time list's do (V77) */
+body.widget-body .context-menu:not(.time-menu){container:widget-menu / scroll-state;scroll-padding-block:16px}
+body.widget-body .context-menu:not(.time-menu)::before,body.widget-body .context-menu:not(.time-menu)::after{content:"";display:block;position:sticky;z-index:1;height:22px;pointer-events:none;opacity:0;transition:opacity .15s}
+body.widget-body .context-menu:not(.time-menu)::before{top:0;margin-bottom:-22px;background:linear-gradient(to bottom,var(--list-edge),transparent)}
+body.widget-body .context-menu:not(.time-menu)::after{bottom:0;margin-top:-22px;background:linear-gradient(to top,var(--list-edge),transparent)}
+@container widget-menu scroll-state(scrollable: top){body.widget-body .context-menu:not(.time-menu)::before{opacity:1}}
+@container widget-menu scroll-state(scrollable: bottom){body.widget-body .context-menu:not(.time-menu)::after{opacity:1}}
+/* 「+n개 더 보기」 starts on the line of the event bars and task circles: the rows' 4px inset, not the text button's 6px (V79) */
+.widget-body .widget-agenda .agenda>.text-button{padding-left:4px;padding-right:4px}
+/* the count's figure ends where the rows' lines end, not centred in its 28px box (V81) */
+.widget-head.task-head .widget-count{justify-items:end}
+/* titles wrap (2026-11-09, app.js titleField, tests/title-wrap-1109): one line as tall as the fields beside it, growing with its words to four, then it scrolls */
+textarea.form-input.title-field{field-sizing:content;min-height:0;line-height:1.5;max-height:calc(4lh + 22px);resize:none;white-space:pre-wrap;overflow-wrap:anywhere;overflow-y:auto}
+.widget-body textarea.form-input.title-field{max-height:calc(4lh + 18px)}
+/* SV · the 2026-11-09 smoke pictures judged again (tests/smoke-visual-1109b.test.cjs). The widget's 위젯 설정 sheet fills the card less the overlay's
+   12px on every side, its footer at the foot (V62: it ended 57px above the card's foot); with it open a toast sits on its title row, not on its first
+   setting (V62, V76; with no sheet it stays under the head, CLAUDE.md 1.1.2 ①) */
+.widget-body .dialog:has(>.widget-settings){display:flex;flex-direction:column}
+.widget-body .dialog:has(>.widget-settings)>.dialog-header{flex:none}
+.widget-body .dialog-body.widget-settings{flex:1 0 auto;display:flex;flex-direction:column}
+.widget-body .dialog-body.widget-settings>.button{align-self:flex-start}
+.widget-body .dialog-body.widget-settings>.dialog-footer{margin-top:auto}
+/* the fade over a sheet's footer is whole over its last 6px: a white slider knob still showed through the last rows of an even ramp, cut on the line (V63) */
+.widget-body .dialog-body>.dialog-footer::before{background:linear-gradient(var(--sheet-clear),var(--sheet) calc(100% - 6px))}
+body.widget-body:has(#modal-root .modal-overlay) #toast{top:calc(var(--w-margin) + 19px)}
+/* the line over 새로운 할 일 gives way while the list scrolls on past it (V74): the list's scroll timeline, named so the input row beside it reads it;
+   none while the list fits, so the line is there */
+.widget-body .widget-task-content{timeline-scope:--w-list}
+.widget-body .widget-tasks{scroll-timeline:--w-list y}
+@keyframes w-rule{from,to{opacity:0}}
+.widget-body .widget-tasks:not(:empty)+.quick-add::before{animation:w-rule linear none;animation-timeline:--w-list;animation-range:0% calc(100% - 2px)}
+/* a widget's task menu (7 items, 2 lines) fits a 240px window at the default text size: no scroll, no fade (V77) */
+body.widget-body .context-menu:not(.time-menu) .menu-item{padding-top:4px;padding-bottom:4px;line-height:18px}
+body.widget-body .context-menu:not(.time-menu) hr{margin:3px 6px}
+/* the chosen list stops clear of the sidebar's 20px fades (V20): app.js sidebarScrollTarget reckons them and moves .sidebar-scroll by the least,
+   with the screens' row (.main-nav) above it beside the search; the top fade shows once the lists are scrolled, as the foot's while more is below */
+.sidebar-scroll::before{content:"";display:block;position:sticky;top:0;z-index:1;height:20px;margin-bottom:-20px;background:linear-gradient(var(--side),transparent);pointer-events:none;opacity:0;transition:opacity .2s ease}
+@container sidebar-scroll scroll-state(scrollable: top){.sidebar-scroll::before{opacity:1}}
+/* the event card's colour dot on its title's first line, not alone at the head's left (V27) */
+.card-title-row{display:flex;align-items:flex-start;gap:10px}
+.card-title-row>.card-color{flex:none;margin-top:9px}
+.card-title-row>.card-title{flex:1;min-width:0}
+/* a row's ⋯ shows over the end of its title, left of the flag, and takes no width at rest, so the flag ends on the rows' line (V3, V66, V80); in the
+   narrow day panel an unset flag takes none either (V34). Over the words it lies on, the page's own ground */
+.task-row{anchor-scope:--flag}
+.task-row>.task-flag{anchor-name:--flag}
+.task-row>.row-more{position:absolute;position-anchor:--flag;right:anchor(left);top:anchor(center);translate:0 -50%;margin-right:4px}
+body:not(.widget-body) .task-row>.row-more{background-color:var(--bg)}
+body:not(.widget-body) .task-row>.row-more:hover,body:not(.widget-body) .task-row.pane-open>.row-more{background-image:linear-gradient(var(--hover),var(--hover))}
+.day-panel .task-row>.task-flag:not(.on){position:absolute;right:0;background-color:var(--bg)}
+.day-panel .task-row>.task-flag:not(.on):hover{background-image:linear-gradient(var(--hover),var(--hover))}
+/* V18 (2026-11-09 사용자 결정): a subtask's date on its own line, right after its title (12px: the row's 10px gap + 2), not at the far end where the
+   eye crossed the row; a date not set keeps its hover icon at the end. The title still shrinks and wraps, the date never does (tests/subtask-date-1109). */
+.tasks-view .task-step .step-title{flex:0 1 auto}
+.tasks-view .task-step .step-date:not(.empty){margin:0 auto 0 2px}
+.tasks-view .task-step .step-date.empty{margin-left:auto}
 /* r60-apple — one surface rule (2026-11-02 owner: Apple surfaces — 「음영있는 pill 안에 흰색을 넣는건 좀 애플 스타일이 아닌거 같아. 전반적으로 다시
    봐줘. 애플 스타일에 맞춰줘.」, after 「설정창 … 투톤 같아서 좀 촌스럽고 난잡해보이던데」), as macOS System Settings · Calendar · Reminders:
    no control stands on more than two layers. Layer 1 is a surface (window --bg, sheet --sheet, popover --glass, note paper). Layer 2 is
@@ -1243,7 +1754,7 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
    white (dark: darker) box. The chevron's right edge sits on the 16px inset of the switches (−6px margin, chevron 6px in); the 168px
    value column (line 1051) stays, so a long label wraps before a value is cut. */
 .settings-body .settings-group select.form-input,.appearance-row select.form-input{width:auto;min-width:0;max-width:100%;min-height:28px;margin-right:-6px;padding:4px 20px 4px 8px;--chevron-x:6px;border:0;border-radius:6px;background-color:transparent;color:var(--secondary);font-size:13px;font-weight:450;transition:background-color .12s ease-out}
-.settings-body .settings-group select.form-input:is(:hover,:open),.appearance-row select.form-input:is(:hover,:open){background-color:var(--hover)}
+.settings-body .settings-group select.form-input:is([data-under-pointer],:open),.appearance-row select.form-input:is([data-under-pointer],:open){background-color:var(--hover)}
 .settings-body .settings-group select.form-input:is(:focus,:open),.appearance-row select.form-input:is(:focus,:open){border-color:transparent;box-shadow:none}
 .settings-body .settings-group select.form-input:focus-visible,.appearance-row select.form-input:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--blue) 55%,transparent)}
 /* the menu opens under the value, trailing-aligned, so it stays inside the sheet; above it when there is no room below */
@@ -1261,7 +1772,7 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 .dialog-body.widget-settings>.field+.field::before{content:"";position:absolute;left:12px;right:0;top:0;height:1px;background:var(--line)}
 .dialog-body.widget-settings>.field>span{font-size:13px;line-height:1.3;font-weight:450;color:var(--text)}
 .dialog-body.widget-settings>.field>select.form-input{justify-self:end;width:auto;min-width:0;max-width:calc(100% + 6px);min-height:28px;margin-right:-6px;padding:4px 20px 4px 8px;--chevron-x:6px;border:0;border-radius:6px;background-color:transparent;color:var(--secondary);font-size:13px;font-weight:450;transition:background-color .12s ease-out}
-.dialog-body.widget-settings>.field>select.form-input:is(:hover,:open){background-color:var(--hover)}
+.dialog-body.widget-settings>.field>select.form-input:is([data-under-pointer],:open){background-color:var(--hover)}
 .dialog-body.widget-settings>.field>select.form-input:is(:focus,:open){border-color:transparent;box-shadow:none}
 .dialog-body.widget-settings>.field>select.form-input:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--blue) 55%,transparent)}
 .dialog-body.widget-settings selectedcontent{display:block;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -1270,18 +1781,9 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
    highlight there (the rings above stay box-shadows for everyone else) */
 @media(forced-colors:active){.settings-body .settings-group select.form-input:focus-visible,.appearance-row select.form-input:focus-visible,.dialog-body.widget-settings>.field>select.form-input:focus-visible{outline:2px solid Highlight;outline-offset:1px}}
 
-/* S2 · the event card: 하루 종일 · 반복 · 알림 are inline values like the date and time above them — no pills; 하루 종일 is a checkbox
-   (macOS Calendar's popover; the event dialog keeps its switch), the row starts on the values' 26px column. The read-only 반복 일정
-   (.static) gets neither a hover nor a box. The keyboard ring (line 831) and the chevron (line 852) are unchanged. */
-.event-card .card-chips{padding-left:26px;gap:2px}
-.event-card .card-chip{height:28px;padding:0 7px;gap:7px;border-radius:6px;background:transparent;font-size:13px;font-weight:450;color:var(--text)}
-.event-card .card-chip:not(.static):hover{background:var(--hover)}
-.event-card .card-chip:not(.static)::before{content:"";flex:none;width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--muted)}
-.event-card .card-chip.on{background:transparent;color:var(--text)}
-.event-card .card-chip.on:hover{background:var(--hover)}
-.event-card .card-chip.on::before{box-shadow:none;background:var(--blue) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.6 6.3 5 8.6l4.4-5' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px no-repeat}
+/* S2 · the event card: 반복 · 알림 are inline values like the date and time above them, no pills. The keyboard ring (line 831) and the chevron (line 852) are unchanged. */
 .event-card select:is(.card-repeat,.card-select){padding-left:7px;border-radius:6px;background-color:transparent;font-size:13px;font-weight:450;color:var(--text)}
-.event-card select:is(.card-repeat,.card-select):is(:hover,:open){background-color:var(--hover)}
+.event-card select:is(.card-repeat,.card-select):is([data-under-pointer],:open){background-color:var(--hover)}
 
 /* S3 · S6 · S7 · boxes that hold filled controls are hairline outlines: the custom-repeat panel (its fields and weekday circles take the
    editor's own --field, white while focused like every field), the connect guide (the client-ID field had no edge on a guide of its
@@ -1320,7 +1822,7 @@ body:not(.widget-body) .quick-add .quick-input:placeholder-shown+.quick-submit{v
    glass, its rim and lens, the red today disc and the 오늘 capsule are unchanged */
 :is(.widget-body.glass-solid,.widget-body:not(.has-backdrop)) .widget-controls .icon-button{background:color-mix(in srgb,var(--w-text) 6%,transparent);box-shadow:none;backdrop-filter:none}
 :is(.widget-body.glass-solid,.widget-body:not(.has-backdrop)) .widget-controls .icon-button:hover{background:color-mix(in srgb,var(--w-text) 10%,transparent)}
-.widget-body .widget-calendar-content .calendar-day:hover,.widget-body .widget-agenda .event-row:hover,.widget-body .widget-agenda-title .agenda-add:hover{background:color-mix(in srgb,var(--w-text) 7%,transparent)}
+.widget-body .widget-calendar-content .calendar-day:not(.is-today):hover .day-number,.widget-body .widget-agenda .event-row:hover,.widget-body .widget-agenda-title .agenda-add:hover{background:color-mix(in srgb,var(--w-text) 7%,transparent)}
 .widget-body .widget-calendar-content .is-selected:not(.is-today) .day-number{background:color-mix(in srgb,var(--w-text) 10%,transparent);box-shadow:none}
 
 /* S12 · C8 · dates and times readable: a widget's 시작|종료 stack (Calendar's Starts / Ends rows), and the task editor's 날짜 | 알림 each
@@ -1336,11 +1838,8 @@ body:not(.widget-body) .quick-add .quick-input:placeholder-shown+.quick-submit{v
 .task-date-row .date-presets:empty{display:none}
 
 /* C1–C7 · quieter extras */
-/* C1 shortcut keys as menu text 「Ctrl+Shift+Z」, no key caps (help.js helpKeys unchanged) */
-.keys{gap:0}
-.keys kbd{display:inline;min-width:0;height:auto;padding:0;border-radius:0;background:none;box-shadow:none;font-weight:500;color:var(--secondary);font-variant-numeric:tabular-nums}
-.keys kbd+kbd::before{content:"+";padding:0 1px;color:var(--muted);font-weight:400}
-.keys-or{padding:0 6px}
+/* Shortcut keys as key caps again, one rounded cap per key (2026-11-06 owner: 「단축키는 적당한 곡률의 박스를 넣는 게 구별이 좋지 않을까?」 — over 1.2.7 C1's menu text) */
+.keys-or{padding:0 2px}
 /* C2 a destructive confirm is a red label on the grey push button (light --sunday 4.58:1 on --field; dark #ff6b6b 4.55:1, where
    --sunday's #ff6a5c gives 4.49) — it replaces the solid #e64d52 fill, so no tone is added */
 .button.danger{background:var(--field);color:var(--sunday)}
@@ -1376,3 +1875,54 @@ body:not(.widget-body) .quick-add .quick-input:placeholder-shown+.quick-submit{v
 .section-toggle{padding-left:14px}.section-toggle .group-chevron{margin-right:7px}
 @media(max-width:450px){body:not(.widget-body) .main-nav .nav-item{line-height:0}body:not(.widget-body) .group-lists{margin-left:14px;padding-left:8px}}
 @media(prefers-contrast:more){:root{--muted:#505764;--secondary:#3f4556;--line:#7c8392}[data-theme=dark]{--muted:#c3c8d2;--secondary:#e2e5ec;--line:#8a91a0}.widget-surface{background:var(--w-opaque,var(--bg))!important;backdrop-filter:none!important}.widget-preview,.widget-preview.lg{background:var(--w-opaque,var(--bg))!important;backdrop-filter:none!important;box-shadow:none!important;border:1px solid color-mix(in srgb,currentColor 40%,transparent)!important}.widget-preview.lg::before,.widget-surface.lg::before{opacity:0!important}}
+
+.event-word-sheet .view-description{margin:0 0 14px}
+.event-word-sheet .event-word-lead{margin:0 0 8px}
+.event-word-sheet .settings-group{overflow:hidden;margin-bottom:12px}
+.event-word-row{display:flex;align-items:center;gap:16px;width:100%;min-height:44px;padding:0 16px;border:0;background:none;color:var(--text);font-size:13px;text-align:left;cursor:pointer}
+.event-word-row strong{flex:none;max-width:40%;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.event-word-row span{margin-left:auto;min-width:0;color:var(--secondary);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.event-word-row:hover{background:color-mix(in srgb,currentColor 6%,transparent)}
+.event-word-form .settings-group{margin-bottom:12px}
+.event-word-form .settings-group input.form-input{justify-self:end;width:100%;min-height:32px;padding:5px 12px;font-size:13px;border-radius:8px;background:var(--bg)}
+.event-word-form .settings-group>.field[hidden]{display:none}
+.event-word-clock{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.event-word-clock input.form-input{width:104px;text-align:center}
+.event-word-before-row{display:flex;align-items:center;gap:8px}
+.event-word-before-row .emoji-choice{flex:none;width:32px;height:32px}
+.event-word-form .event-word-emoji{padding:8px 16px 12px}
+.event-word-form .event-word-emoji[hidden]{display:none}
+.event-word-form .event-word-colors{min-height:52px}
+.event-word-form .event-word-colors .swatches{justify-self:end}
+.event-word-note{margin:-4px 0 10px}
+.event-word-note[hidden]{display:none}
+.event-word-preview{display:flex;flex-direction:column;gap:2px;margin:0 0 8px;padding:12px 16px;border-radius:var(--r-card);background:var(--field)}
+.event-word-preview[hidden]{display:none}
+.event-word-preview small{font-size:12px;color:var(--secondary)}
+.event-word-preview strong{font-size:13px;font-weight:600;color:var(--text);overflow-wrap:anywhere}
+.event-word-more{display:block;margin:0 0 10px auto;font-size:13px}
+.card-hint:has(.card-hint-keep){display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.card-hint-keep{flex:none;padding:0;font-size:12px;line-height:18px}
+.settings-body .settings-group>.event-word-entry{grid-template-columns:auto minmax(0,1fr)}
+.settings-body .settings-group>.event-word-entry>.text-button{justify-self:end;font-size:13px}
+.event-word-form .settings-group>.field:not(.section-visibility){grid-template-columns:84px minmax(0,1fr)}
+.event-word-form .settings-group>.field>select.form-input{justify-self:stretch;width:100%}
+.event-word-form .event-word-clock{justify-content:stretch}
+.event-word-form .event-word-clock .date-pop-time-wrap{flex:1;min-width:0}
+.event-word-form .event-word-clock input.form-input{width:100%}
+.settings-body .settings-group>.field.section-visibility.folding{padding:0 16px}
+.settings-body .settings-group>.section-visibility>.checkbox-field[hidden]{display:none}
+.settings-body .folding>.fold-head{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:0;border:0;background:none;color:var(--text);font:inherit;font-size:13px;font-weight:450;text-align:left;cursor:pointer}
+.settings-body .folding>.fold-head>span:first-child{flex:1}
+.settings-body .folding>.fold-head>.fold-count{color:var(--secondary)}
+.settings-body .folding>.fold-head>svg{color:var(--secondary);transform:rotate(-90deg);transition:transform .15s ease}
+.settings-body .folding>.fold-head[aria-expanded=true]>svg{transform:none}
+.settings-body .settings-group>.section-visibility.folding>.fold-head+.checkbox-field::before{content:"";position:absolute;left:0;right:-16px;top:0;height:1px;background:var(--line)}
+@media (prefers-reduced-motion:reduce){.settings-body .folding>.fold-head>svg{transition:none}}
+.shortcut-group h3{display:flex;align-items:center;gap:7px}
+.shortcut-group h3>svg{flex:none;color:var(--secondary)}
+.calendar-list .calendar-row{margin-left:-6px;width:calc(100% + 6px)}
+.card-delete-group{padding:0;overflow:hidden}
+.card-delete-group>.card-delete{display:block;width:100%;min-height:38px;padding:0 12px;border:0;background:none;color:var(--sunday);font:inherit;font-size:13px;font-weight:500;text-align:center;cursor:pointer}
+.card-delete-group>.card-delete:hover{background:color-mix(in srgb,currentColor 7%,transparent)}
+.card-delete-group>.card-delete:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;border-radius:var(--r-card)}

@@ -210,6 +210,9 @@ test('glass text stays readable on the filtered glass over flat and two-tone wal
         if (level >= 0.5) {
           const plain = inkAt(look.tone, 0), card = solidCard[look.tone];
           for (const [what, c] of Object.entries(colours.accents)) {
+            // The flag (2026-11-09 사용자 결정 V67 「깃발만 원색」): Apple's orange on every light glass, whatever its brightness (it
+            // read as dark brown at 75%); on dark glass the orange too, lifted toward a lighter orange only where it would fall under 3:1.
+            if (what === 'flag' && look.tone === 'light') { assert.equal(colours.accents.flag.rgb.map(v => Math.round(v * 255)).join(','), '255,149,0', `flag on ${where}`); continue; }
             const need = Math.min(3, wcag(plain.accents[what].rgb, card)) - 0.005;
             assert.ok(wcag(c.rgb, bg) >= need, `${what} on ${where}: ${wcag(c.rgb, bg).toFixed(2)} (needs ${need.toFixed(2)})`);
           }
@@ -546,4 +549,20 @@ test('the hiding guard refuses only a save that newly hides the last visible lis
   assert.equal(D.hidingRefusal({}, { hiddenLists: ['a'] }, lists), '');
   assert.equal(D.hidingRefusal({ hiddenLists: ['a', 'b'] }, { hiddenLists: ['b'] }, lists), '');
   assert.equal(D.hidingRefusal({}, { hiddenLists: ['a'] }, []), '', 'no lists at all: nothing to protect');
+});
+
+// 2026-11-09 사용자 결정 V67 「깃발만 원색」: the widget flag keeps Apple's orange (#ff9500) on light glass at every ink strength; on dark
+// glass it stays #ff9500 until the ink where plain orange would fall under 3:1 (from about 0.72, tests above), then lifts toward a lighter
+// orange step by step — still orange (its hue within a few degrees), never the pale cream it was.
+test('the widget flag: #ff9500 on light glass at every ink; on dark glass #ff9500 up to 0.70, then a lighter orange', () => {
+  const hue = hex => { const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255); const max = Math.max(r, g, b), min = Math.min(r, g, b); return max === min ? 0 : max === r ? 60 * (((g - b) / (max - min)) % 6) : max === g ? 60 * ((b - r) / (max - min) + 2) : 60 * ((r - g) / (max - min) + 4); };
+  for (let i = 0; i <= 100; i++) {
+    const k = i / 100;
+    assert.equal(D.glassInks('light', k)['--w-flag'], '#ff9500', `light ${k}`);
+    const dark = D.glassInks('dark', k)['--w-flag'];
+    if (k <= 0.7) assert.equal(dark, '#ff9500', `dark ${k}`);
+    assert.equal(Math.abs(hue(dark) - hue('#ff9500')) <= 4, true, `dark ${k}: ${dark} is still orange`);
+    assert.equal(dark.slice(0, 3), '#ff', `dark ${k}: ${dark}`);
+  }
+  assert.notEqual(D.glassInks('dark', 1)['--w-flag'], '#ff9500', 'lifted at the strong end');
 });

@@ -148,12 +148,24 @@ test('a request under way is on record before it goes, so a Dayboard that stops 
   assert.equal(M.settleMovesAtStart(seen).taskMoves[0].phase, 'unknown');
 });
 
-test('changed here while on its way: left as it is (the service keeps its copy); a sync that brought the copy first leaves one task', async t => {
+// 2026-11-09 사용자 결정 (review F41): the copy made there is on record, so moving it again sends only what changed — never a second copy.
+test('changed here while on its way: left here and on record; moving it again carries on with the copy made there; a sync that brought the copy first leaves one task', async t => {
   const { svc, sync, add, get, store } = setup(t);
   add({ id: 't9', title: '원래 제목' });
   svc.during(() => store.mutate(state => { state.tasks.find(item => item.id === 't9').title = '고친 제목'; }));
-  assert.equal((await sync.moveTask('t9', GL.id)).outcome, 'changed');
-  assert.equal(get('t9').title, '고친 제목'); assert.equal(get('t9').listId, 'local-inbox'); assert.deepEqual(store.get().taskMoves, []);
+  const first = await sync.moveTask('t9', GL.id);
+  assert.equal(first.outcome, 'changed');
+  assert.equal(first.message, '옮기는 동안 바뀌어 이 PC에도 남겨 뒀어요. 다시 옮기면 바뀐 내용만 이어 보내요.');
+  assert.equal(get('t9').title, '고친 제목'); assert.equal(get('t9').listId, 'local-inbox');
+  const parents = () => [...svc.tasks.values()].filter(item => !item.parent);
+  assert.equal(store.get().taskMoves.length, 1); assert.equal(store.get().taskMoves[0].phase, 'made');
+  assert.equal(store.get().taskMoves[0].remoteId, parents()[0].id); assert.equal(store.get().taskMoves[0].base.title, '원래 제목');
+  assert.equal(store.get().taskMoves[0].why, 'changed', 'the record says why it waits (review F41)');
+  assert.equal(store.publicState().taskMoves[0].why, 'changed', 'and the screen is told');
+  assert.equal((await sync.moveTask('t9', GL.id)).outcome, 'moved');
+  assert.equal(parents().length, 1, 'one task at the service');
+  assert.equal(parents()[0].title, '고친 제목', 'what changed here went over it');
+  assert.equal(get('t9').listId, GL.id); assert.equal(get('t9').remoteId, parents()[0].id); assert.equal(store.get().taskMoves.length, 0);
   add({ id: 't10', title: '먼저 온 사본' });
   svc.during(() => store.mutate(state => { state.tasks.push({ id: 'from-sync', listId: GL.id, accountId: 'acc-g', remoteId: 'gt' + (svc.tasks.size + 1), title: '먼저 온 사본' }); }));
   assert.equal((await sync.moveTask('t10', GL.id)).outcome, 'moved');

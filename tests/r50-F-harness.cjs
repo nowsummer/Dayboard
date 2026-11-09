@@ -24,7 +24,7 @@ function appLine(prefix, { optional = false, multi = false } = {}) {
   return appLines.slice(i, j + 1).join('\n');
 }
 // The builders every screen uses: $, h, icon (paths, fills), btn, ib, keyed.
-const UI_PREFIXES = ['const $=', 'const h=', 'const paths=', 'const fills=', 'function icon(', 'const btn=', 'const ib=', 'const keyed=',
+const UI_PREFIXES = ['const $=', 'const h=', 'const paths=', 'const fills=', 'function icon(', 'const btn=', 'const ib=', 'const keyTip=', 'const keyed=',
   { prefix: 'function radioKeys(', optional: true }, { prefix: 'const colorName=', optional: true }, { prefix: 'function gridTabStop(', optional: true },
   { prefix: 'const CUSTOM_RING=', optional: true }, { prefix: 'const chooseColor=', optional: true }, { prefix: 'function customSwatch(', optional: true }]; // the three area-F helpers: absent on the baseline
 
@@ -41,13 +41,15 @@ function harness(extra = {}) {
     api: { invoke(name, payload) { calls.push({ name, payload, direct: true }); return Promise.resolve({}); } },
     state: { settings: {}, lists: [], tasks: [], notes: [], events: [], calendars: [], accounts: [], widgets: [], groups: [] },
     isWidget: false, view: 'today', search: '', menuRoot: null, selectedDate: D.dateKey(), month: new Date(),
-    render() {}, renderMain() {}, closeMenu() {},
+    render() {}, renderMain() {}, closeMenu() {}, sidebarLists: () => [],
+    taskPane: null, taskPaneFits: () => false, taskPaneOpen() {}, datePopNode: null, // a row's claim of the right panel (2026-11-09) finds no panel unless a test gives one
     ...extra,
   };
   vm.createContext(context);
   const load = (code, filename = 'renderer/app.js') => vm.runInContext(code, context, { filename });
   const loadApp = (...prefixes) => { for (const p of prefixes) load(typeof p === 'string' ? appLine(p) : appLine(p.prefix, p)); };
   loadApp(...UI_PREFIXES);
+  load(calendarSource.split(/\r?\n/).find(line => line.startsWith('function calParseClock(')), 'renderer/calendar.js'); // the popover's time field reads words as the event card does
   // index.html's three roots
   const app = dom.document.createElement('div'); app.id = 'app';
   const modalRoot = dom.document.createElement('div'); modalRoot.id = 'modal-root';

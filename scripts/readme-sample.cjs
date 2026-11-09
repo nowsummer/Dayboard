@@ -1,81 +1,187 @@
 'use strict';
-// Sample data for the public screenshots and demo (scripts/readme-shots.cjs, readme-widgets.cjs, readme-demo.cjs), in
-// Korean or English (2026-10-27: the public pages show each language its own pictures). Everything here is invented; the
-// screenshots never show a real account, task, event or note. `invoke` runs a Dayboard command.
+// Sample data for the public screenshots and film (scripts/readme-shots.cjs, readme-widgets.cjs, readme-demo.cjs), in Korean or English
+// (2026-10-27: the public pages show each language its own pictures). Everything here is invented; the pictures never show a real
+// account, task, event or note. `invoke` runs a Dayboard command.
+//
+// One fixed month, October 2026, as someone who really uses the app would have it (2026-11-09 owner: 「영상이나 움짤 등 제작할 때 월간
+// 달력에 일정들이 일별로 1개만 있거나 색깔이 다 같거나 이런 단조롭게 말고 진짜 이걸 잘 쓰는 이용자 처럼 적당히 구분해서 색도 지정하고 진짜 스케줄 같이
+// 만들어줘. 월간으로 보기에서 모든 달력이 +3 이런식으로 나오면 보기 안 좋으니깐 적당히 달력 잘 보여주고.」): a calendar each for work, personal,
+// exercise and family with its own colour, 0–3 lines a day, timed and all-day events and bars over several days, everyday titles. The
+// pictures and the film all take today as DEMO_DAY, so they show the same month and the same week.
+const fs = require('node:fs');
+const path = require('node:path');
+
+// The film's day (scripts/readme-demo.cjs, readme-widget-scene.cjs): a few days before the 10/6 it types, so October is the month on
+// the screen and that day's cell is there to land in.
+const DEMO_DAY = '2026-10-01';
+// The days the film saves on. Their cells are empty in the film so the new event is seen whole (no 「+n개」), and the pictures, which
+// have both events already, show them there.
+const EXAM_DAY = '2026-10-06', LUNCH_DAY = '2026-10-08';
+// The event the film drags, from a day to another of its week: a family event, a colour few others have, so the eye follows it from
+// the month into the week. In the afternoon, in the hours the week view opens on.
+const DRAG = { key: 'mom', from: '2026-10-20', to: '2026-10-22', stretchHours: 1.5 };
 
 // The sample's colours. The recordings write them next to their frames (writeSampleMark → sample.json), and scripts/readme-gif.py
 // joins a desktop scene only to app frames recorded with the same colours and language: a scene recorded before a colour change
 // showed the old pink trip icon for the animation's last 14 s (2026-10-28 review of r50 I).
-// Lists, in the order the sidebar draws them: 생활 (장보기, 읽을 책, the trip list), then 내 할 일 and 업무. The trip list is purple:
-// not the pink that was 「너무 빨간색이라 눈아파」 (2026-10-28 user), not the teal that was too close to 장보기's green (2026-10-27
-// user). 업무 is brown, not indigo: indigo sat right under 내 할 일's blue (CIEDE2000 15.3, the closest pair in the sidebar) and
-// two rows under the purple (15.7), a run of three blue-violet icons; brown is 45.7 from the blue and 46.6 from the purple.
-// With indigo kept, no trip colour helps (blue/indigo stays 15.3); a gray list reads as disabled (artifacts/r50-I/sidebar-full.png).
-// The lists the user makes carry an emoji in their name, as people do in To Do and Reminders (2026-10-29 owner, of his own sidebar:
-// 「이모지 넣은 거로 된 게 더 이쁘지 않을까?」): it shows on a soft circle of the list's colour, and To Do and the iPhone show it too.
-// 내 할 일, the built-in list, keeps its icon.
-const EMOJI = { shop: '🛒', books: '📚', trip: '✈️', work: '💼' };
+// Lists, in the order the sidebar draws them: 생활 (장보기, 집안일, the trip list, 운동), then 내 할 일 and 업무 — all of them in the sidebar
+// at the film's height, 업무 not faded at its foot. No two within two
+// rows are of one colour family (tests/r50-I-readme-sample.test.cjs): the owner found green and teal two rows apart too alike
+// (2026-10-27), the trip list is not the pink that was 「너무 빨간색이라 눈아파」 (2026-10-28), and indigo #5856d6 is not used anywhere
+// (2026-11-02 owner: 「보라색도 아니고 파란색도 아닌 이 색깔은 별로」).
+// The lists the user makes carry an emoji in their name, as people do in To Do and Reminders (2026-10-29 owner, 2026-11-09 owner:
+// 「할 일도 목록을 이모지 넣고 색도 목록 별로 다르게 해서 이쁘게」): it shows on a soft circle of the list's colour. 내 할 일, the built-in
+// list, keeps its icon.
+const EMOJI = { shop: '🛒', home: '🧺', trip: '✈️', fitness: '🏃', work: '💼', lunch: '🍽️' };
 const COLOURS = {
-  lists: { shop: '#34c759', books: '#ff9500', trip: '#af52de', inbox: '#007aff', work: '#a2845e' },
-  // 가족 저녁 식사, which the demo drags in the month view only when the book club is not shown (r50 M), is brown, which no other
-  // event has, not the pink of the trip list. The book club the demo drags is purple, its own among the events. The weekly meeting
-  // and the workshop are blue, not indigo #5856d6 (2026-11-02 owner: 「보라색도 아니고 파란색도 아닌 이 색깔은 별로 … 그냥 파랑색이나
-  // 다른 색」); no sample event or list uses indigo.
-  events: {
-    weekly: '#007aff', swim: '#30b0c7', lunch: '#ff9500', review: '#ff3b30', dentist: '#34c759', club: '#af52de', trip: '#30b0c7',
-    family: '#a2845e', demo: '#ff3b30', report: '#ff9500', workshop: '#007aff', client: '#ff9500', away: '#34c759',
-  },
+  lists: { shop: '#34c759', home: '#ff9500', trip: '#af52de', fitness: '#30b0c7', inbox: '#007aff', work: '#a2845e' },
+  // The calendars. The built-in one (개인) takes what the film types, so its new events have the colour of the personal ones.
+  calendars: { work: '#007aff', personal: '#ff9500', fitness: '#34c759', family: '#af52de' },
 };
+const CALENDAR_IDS = { work: 'sample-work', personal: 'local-calendar', fitness: 'sample-fitness', family: 'sample-family' };
 
-function dateKey(d) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
-}
+// The month, the same in both languages (the words are in TEXT): [calendar, event, day, from, to, extra]. An all-day event has no
+// `from`, and `to` is the day after its last. At most three lines a day, the 할 일 line included: the month's cells hold three, and the
+// rest would fold into 「+n개」 (owner, above; tests/r50-M-sample-text.test.cjs counts them).
+const MONTH = [
+  ['fitness', 'swim', '2026-09-07', '07:00', '08:00', { rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' }],
+  ['work', 'weekly', '2026-09-07', '10:00', '11:00', { rrule: 'FREQ=WEEKLY;BYDAY=MO' }],
+  ['personal', 'dentist', '2026-09-29', '18:30', '19:30', { alert: 60 }],
+  ['work', 'close', '2026-09-30', '15:00', '16:00'],
+  ['work', 'review', '2026-10-01', '11:00', '12:00'],
+  ['personal', 'lunch', '2026-10-01', '12:00', '13:00', { alert: 30 }],
+  ['work', 'call', '2026-10-02', '10:00', '11:00'],
+  ['family', 'dad', '2026-10-02', '18:30', '20:30'],
+  ['fitness', 'hike', '2026-10-03', '09:00', '13:00'],
+  ['personal', 'reunion', '2026-10-03', '18:00', '20:00'],
+  ['family', 'brunch', '2026-10-04', '11:00', '13:00'],
+  ['work', 'workshop', '2026-10-07', '13:00', '17:00'],
+  ['family', 'trip', '2026-10-09', null, '2026-10-12'],
+  ['work', 'planning', '2026-10-13', '14:00', '16:00'],
+  ['fitness', 'pilates', '2026-10-13', '19:00', '20:00'],
+  ['personal', 'colleagues', '2026-10-14', '19:00', '21:00'],
+  ['work', 'away', '2026-10-15', null, '2026-10-17'],
+  ['work', 'client', '2026-10-16', '09:30', '12:30'],
+  ['fitness', 'run', '2026-10-17', '08:00', '09:00'],
+  ['personal', 'hair', '2026-10-17', '11:00', '12:00'],
+  ['family', 'parents', '2026-10-18', '12:00', '15:00'],
+  ['work', 'results', '2026-10-19', '15:00', '16:00'],
+  ['family', 'mom', '2026-10-20', '14:00', '15:00'],
+  ['work', 'training', '2026-10-21', '13:00', '14:30'],
+  ['personal', 'club', '2026-10-22', '19:00', '21:00'],
+  ['work', 'designReview', '2026-10-23', '16:00', '17:00'],
+  ['personal', 'friend', '2026-10-23', '19:00', '21:00'],
+  ['fitness', 'tennis', '2026-10-24', '10:00', '11:00'],
+  ['family', 'dol', '2026-10-24', '12:00', '14:00'],
+  ['work', 'report', '2026-10-27', null, '2026-10-28'],
+  ['personal', 'physical', '2026-10-28', '09:00', '11:00'],
+  ['work', 'townhall', '2026-10-29', '10:00', '11:30'],
+  ['personal', 'concert', '2026-10-30', '19:30', '21:00'],
+  ['fitness', 'marathon', '2026-10-31', null, '2026-11-01'],
+  ['work', 'kickoff', '2026-11-03', '14:00', '15:30'],
+  ['family', 'camping', '2026-11-06', null, '2026-11-09'],
+];
 
-// The words, read as what one person would really type in a week (2026-10-28 user: 「gif로 예시 화면 만들 때 들어가는 글들이 이상한
-// 말 없고 말이 되는 말 적어줘. 일상에서 적을법한 걸로 해줘.」). What that pass changed and why (tests/r50-M-sample-text.test.cjs keeps
-// it): the notes were slogans or repeated the lists (「이번 주 집중할 것」, 「회의 아이디어」, a 「읽고 싶은 책」 note listing the book
-// already being read); a plan review today with its draft due three days later; an expense claim done before the trip; a check-in
-// time asked that the trip note already gave; 「세제 리필」; an all-day 「프로젝트 중간 발표」; in English a 「3 pm meeting」 with no
-// meeting at 3. Today's tasks fit one line in the calendar's side panel. Its review (2026-10-28): a weekend plan with a Sunday lunch
-// at the parents' on the day of the lunch with 민지, a call to the parents the week of the birthday and the family dinner, two trips
-// to Portugal in a week for an English reader paying in dollars, 「I’m replying to the client」 in meeting notes.
+// The tasks, the same in both languages: [list, task, due, flagged, extra]. Done tasks and those with no date are in the lists only;
+// the others are on the month's 할 일 line of their day, so they keep to days with room and off EXAM_DAY and LUNCH_DAY.
+const TASKS = [
+  ['work', 'report', DEMO_DAY, true, { steps: 'reportSteps' }],
+  ['work', 'budget', DEMO_DAY, false],
+  ['work', 'reply', '2026-10-02', true],
+  ['work', 'plan', '2026-10-05', false, { steps: 'planSteps', planned: true }],
+  ['work', 'train', '2026-10-13', false],
+  ['work', 'feedback', '', false, { done: true }],
+  ['shop', 'milk', DEMO_DAY, false, { rrule: 'FREQ=WEEKLY' }],
+  ['shop', 'detergent', '2026-10-03', false],
+  ['home', 'shirts', DEMO_DAY, false],
+  ['home', 'recycling', '2026-10-02', false, { remind: '19:30' }],
+  ['home', 'fee', '2026-10-04', true],
+  ['home', 'clean', '2026-10-17', false, { steps: 'cleanSteps' }],
+  ['trip', 'car', '2026-10-07', true],
+  ['trip', 'checkin', '2026-10-07', false],
+  ['trip', 'pack', '2026-10-07', false, { steps: 'packSteps' }],
+  ['fitness', 'renew', '2026-10-04', false],
+  ['fitness', 'signup', '2026-10-12', true],
+  ['fitness', 'shoes', '', false],
+  ['inbox', 'demian', DEMO_DAY, false],
+  ['inbox', 'questions', '2026-10-21', false],
+  ['inbox', 'papers', '2026-10-02', false],
+  ['inbox', 'insurance', '2026-10-13', true],
+  ['inbox', 'return', '', false, { done: true }],
+];
+
+// The words, read as what one person would really type in a month (2026-10-28 user: 「gif로 예시 화면 만들 때 들어가는 글들이 이상한 말
+// 없고 말이 되는 말 적어줘. 일상에서 적을법한 걸로 해줘.」; tests/r50-M-sample-text.test.cjs keeps what code can check of it). Today's tasks
+// fit one line in the calendar's side panel.
 const TEXT = {
   ko: {
-    inbox: '내 할 일', work: '업무', life: '생활', shop: '장보기', books: '읽을 책', trip: '제주 여행 준비',
+    inbox: '내 할 일', work: '업무', life: '생활', shop: '장보기', home: '집안일', trip: '제주 여행 준비', fitness: '운동',
+    calendars: { work: '업무', personal: '개인', fitness: '운동', family: '가족' },
     tasks: {
-      work: ['주간 보고서 마무리하기', '예산 회의 자료 검토', '고객사 회신 메일 보내기', '분기 계획 초안 공유', '부산 출장 KTX 예매'],
-      shop: ['우유·달걀·사과 사기', '세탁 세제 사기'], books: ['데미안 3장까지 읽기', '독서 모임 발제 준비'],
-      trip: ['렌터카 예약 확인', '숙소 얼리 체크인 문의'], inbox: ['세탁소에서 셔츠 찾기', '관리비 납부', '반품 택배 보내기', '분리수거 하기'],
+      report: '주간 보고서 마무리하기', budget: '예산 회의 자료 검토', reply: '고객사 회신 메일 보내기', plan: '분기 계획 초안 공유', train: '부산 출장 KTX 예매', feedback: '디자인 시안 피드백 정리',
+      milk: '우유·달걀·사과 사기', detergent: '세탁 세제 사기',
+      shirts: '세탁소에서 셔츠 찾기', recycling: '분리수거 하기', fee: '관리비 납부', clean: '주말 대청소',
+      car: '렌터카 예약 확인', checkin: '숙소 얼리 체크인 문의', pack: '여행 짐 싸기',
+      renew: '수영 강습 재등록', signup: '하프 마라톤 참가 신청', shoes: '러닝화 바꾸기',
+      demian: '데미안 3장까지 읽기', questions: '독서 모임 발제 준비',
+      papers: '주민센터에서 서류 떼기', insurance: '자동차 보험 갱신', return: '반품 택배 보내기',
     },
-    steps: ['매출 실적 확인', '초안 쓰기', '팀장님께 검토 요청'],
+    steps: {
+      reportSteps: [['지표 정리', true], ['결론 쓰기', false]],
+      planSteps: [['매출 실적 확인', true], ['초안 쓰기', false], ['팀장님께 검토 요청', false]],
+      cleanSteps: [['창틀 닦기', false], ['베란다 정리', false], ['이불 빨래', false]],
+      packSteps: [['선크림', true], ['충전기', false], ['우산', false]],
+    },
     events: {
-      weekly: ['팀 주간 회의', '3층 회의실'], swim: '아침 수영', lunch: ['민지랑 점심', '광화문'], review: '예산 회의', dentist: '치과 정기 검진',
-      club: ['독서 모임', '동네 서점'], trip: '제주 여행', family: '가족 저녁 식사', demo: '엄마 생신', report: '월간 보고 마감',
-      workshop: '디자인 워크숍', client: ['고객사 미팅', '부산 지사'], away: '부산 출장',
+      swim: '아침 수영', weekly: ['팀 주간 회의', '3층 회의실'], dentist: '치과 정기 검진', close: '3분기 마감 회의', review: '예산 회의', lunch: ['대학 동기 점심', '광화문'],
+      call: '고객사 전화 회의', dad: '아빠 생신 저녁', hike: '북한산 등산', reunion: '동창 모임', brunch: '가족 브런치', workshop: '디자인 워크숍', trip: '제주 여행',
+      planning: '서비스 기획 회의', pilates: '필라테스', colleagues: '동료들과 저녁', away: '부산 출장', client: ['고객사 미팅', '부산 지사'], run: '러닝 10km', hair: '미용실',
+      parents: '부모님 댁 점심', results: '3분기 실적 공유', mom: '엄마 병원 동행', training: '신입 교육', club: ['독서 모임', '동네 서점'], designReview: '디자인 시안 리뷰',
+      friend: '친구 생일 저녁', tennis: '테니스 레슨', dol: '조카 돌잔치', report: '월간 보고 마감', physical: '건강검진', townhall: '전사 타운홀', concert: '콘서트',
+      marathon: '하프 마라톤', kickoff: '4분기 킥오프', camping: '가족 캠핑',
     },
     // Things one jots down to keep — a recipe, places, ideas, what a meeting decided — not a plan with days and times, which is the
     // calendar's (2026-10-29 owner: 「주말 계획을 넣었던데 이건 사실 달력에 들어갈 내용에 가깝잖아. 메모에 들어갈 적절한 다른 내용을 적어줘」).
     notes: [
       ['드립 커피 레시피', '원두 15g, 물 250ml\n물 온도는 92도\n뜸은 30초 정도'],
       ['제주 맛집 메모', '애월 고기국수, 줄 서도 먹을 만함\n협재 근처 흑돼지집, 주차장 넓음\n동문시장 귤 찹쌀떡'],
-      ['선물 아이디어', '민지: 향초, 핸드크림\n엄마: 따뜻한 스카프\n하나에 3만 원 안쪽'],
+      ['선물 아이디어', '민수: 향초, 핸드크림\n엄마: 따뜻한 스카프\n하나에 3만 원 안쪽'],
       ['주간 회의 메모', '- 예산안은 이번 주 안에 확정\n- 고객사 회신은 내가 맡기로\n- 디자인 시안은 B안으로'],
     ],
-    // Quick add in the demo: an errand for later today with its time, as one would type it (r50 M).
-    quick: '오후 6시 약국 들르기',
+    // What the film types and says: the lines and captions the owner agreed one by one (소개글 초안.md, 2026-11-09). The name and the
+    // password are invented.
+    quick: '내일 오후 3시 보고서', entry: '10/6, 오후 2시~3시, 경제학 원론 시험, 대강의실', entryTitle: '경제학 원론 시험', entryPlace: '대강의실', word: ['점심', '민수'],
+    wifi: { title: '와이파이 비밀번호', body: '우리 집: sunny1234', search: '와이파이' },
+    captions: {
+      board: '할 일과 일정을 현황판처럼 한눈에', tasks: '적어 두고, 끝나면 동그라미만 누르면 돼요', entry: '떠오르는 대로 쓰면, 달력에 일정으로 저장돼요',
+      quickSet: '점심 약속처럼 자주 잡는 일정은 틀을 만들어 두고', quickUse: '낱말만 쓰면 정해 둔 대로 저장돼요', drag: '일정은 끌어서 옮기고, 늘려서 시간을 바꿔요', notes: '가볍게 적어 두고, 바로 찾아요', widget: '앱을 열지 않아도 바탕화면에서 바로 확인해요',
+    },
   },
   en: {
-    inbox: 'My Tasks', work: 'Work', life: 'Personal', shop: 'Groceries', books: 'Reading list', trip: 'Lisbon trip',
+    inbox: 'My Tasks', work: 'Work', life: 'Personal', shop: 'Groceries', home: 'Home', trip: 'Lisbon trip', fitness: 'Fitness',
+    calendars: { work: 'Work', personal: 'Personal', fitness: 'Fitness', family: 'Family' },
     tasks: {
-      work: ['Finish the weekly report', 'Review budget slides', 'Reply to the client', 'Share the quarterly plan draft', 'Book flights to Chicago'],
-      shop: ['Milk, eggs and apples', 'Laundry detergent'], books: ['Finish Atomic Habits', 'Prepare questions for book club'],
-      trip: ['Confirm the rental car', 'Ask about early check-in'], inbox: ['Pick up dry cleaning', 'Pay the electricity bill', 'Drop off the return', 'Take out the recycling'],
+      report: 'Finish the weekly report', budget: 'Review budget slides', reply: 'Reply to the client', plan: 'Share the quarterly plan draft', train: 'Book flights to Chicago', feedback: 'Send the design feedback',
+      milk: 'Milk, eggs and apples', detergent: 'Laundry detergent',
+      shirts: 'Pick up dry cleaning', recycling: 'Take out the recycling', fee: 'Pay the electricity bill', clean: 'Deep clean the apartment',
+      car: 'Confirm the rental car', checkin: 'Ask about early check-in', pack: 'Pack for the trip',
+      renew: 'Renew swim classes', signup: 'Sign up for the half marathon', shoes: 'Replace running shoes',
+      demian: 'Finish Atomic Habits', questions: 'Prepare questions for book club',
+      papers: 'Get the notary form', insurance: 'Renew car insurance', return: 'Drop off the return',
     },
-    steps: ['Check the sales numbers', 'Write the draft', 'Ask for a review'],
+    steps: {
+      reportSteps: [['Pull the numbers', true], ['Write the summary', false]],
+      planSteps: [['Check the sales numbers', true], ['Write the draft', false], ['Ask for a review', false]],
+      cleanSteps: [['Wipe the windows', false], ['Tidy the balcony', false], ['Wash the bedding', false]],
+      packSteps: [['Sunscreen', true], ['Chargers', false], ['Umbrella', false]],
+    },
     events: {
-      weekly: ['Team sync', 'Room 3A'], swim: 'Morning swim', lunch: ['Lunch with Mia', 'Downtown'], review: 'Budget meeting', dentist: 'Dentist check-up',
-      club: ['Book club', 'Corner bookshop'], trip: 'Trip to Lisbon', family: 'Family dinner', demo: 'Mom’s birthday', report: 'Monthly report due',
-      workshop: 'Design workshop', client: ['Client meeting', 'Chicago office'], away: 'Trip to Chicago',
+      swim: 'Morning swim', weekly: ['Team sync', 'Room 3A'], dentist: 'Dentist check-up', close: 'Q3 close meeting', review: 'Budget meeting', lunch: ['Lunch with Mia', 'Downtown'],
+      call: 'Client call', dad: 'Dad’s birthday dinner', hike: 'Morning hike', reunion: 'Dinner with friends', brunch: 'Family brunch', workshop: 'Design workshop', trip: 'Trip to Lisbon',
+      planning: 'Product planning', pilates: 'Pilates', colleagues: 'Drinks with coworkers', away: 'Trip to Chicago', client: ['Client meeting', 'Chicago office'], run: '10K run', hair: 'Haircut',
+      parents: 'Lunch at my parents’', results: 'Q3 results', mom: 'Mom’s check-up', training: 'New-hire training', club: ['Book club', 'Corner bookshop'], designReview: 'Design review',
+      friend: 'Friend’s birthday', tennis: 'Tennis lesson', dol: 'Nephew’s party', report: 'Monthly report due', physical: 'Annual physical', townhall: 'All-hands', concert: 'Concert',
+      marathon: 'Half marathon', kickoff: 'Q4 kickoff', camping: 'Family camping',
     },
     notes: [
       ['Pour-over coffee', 'Beans 15 g, water 250 ml\nWater at 92 °C\nLet it bloom about 30 seconds'],
@@ -83,113 +189,77 @@ const TEXT = {
       ['Gift ideas', 'Mia: candle, hand cream\nMom: a warm scarf\nAround $30 each'],
       ['Team sync notes', '- Finalize the budget this week\n- I’ll handle the client reply\n- Going with design option B'],
     ],
-    quick: 'Pick up prescription at 6pm',
+    quick: 'tomorrow 3pm report', entry: 'Oct 6, 2–3pm, Economics exam, Main Hall', entryTitle: 'Economics exam', entryPlace: 'Main Hall', word: ['lunch', 'Alex'],
+    wifi: { title: 'Wi-Fi password', body: 'Home: sunny1234', search: 'wi-fi' },
+    captions: {
+      board: 'Your tasks and calendar on one board, at a glance', tasks: 'Write it down, tick it off', entry: "Type it the way you'd say it, and it lands on your calendar",
+      quickSet: 'Set up the plans you make all the time', quickUse: 'Then just type the word', drag: 'Drag to move an event, stretch to change its time', notes: 'Jot it down, find it fast', widget: 'Check it all right from your desktop',
+    },
   },
 };
 
-// What the demo animation (scripts/readme-demo.cjs) types into quick add, completes, drags in the month, stretches in the week
-// and opens: taken from the sample here, so the demo's targets are always in it. It drags the first of `move` it finds shown: the
-// book club, still to come (the 10-27 design); the dentist or the past family dinner only if the club is not in the month's six weeks.
-function demoText(lang) {
-  const t = TEXT[lang] || TEXT.ko, e = t.events;
-  return { quick: t.quick, done: t.tasks.shop[0], event: e.lunch[0], move: [e.club[0], e.dentist, e.family], stretch: e.workshop };
+// The hours of the Quick event's word, the same in the pictures and in the film, where they are set up on the screen.
+const LUNCH_HOURS = { start: '12:00', end: '13:00' };
+
+function dateKey(d) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 }
 
-async function seedSample(invoke, now = new Date(), lang = 'ko') {
+// What the film (scripts/readme-demo.cjs) types and says: taken from the sample here, so the words are checked with it (r50 M).
+function demoText(lang) {
   const t = TEXT[lang] || TEXT.ko;
-  const addDays = (base, n) => { const d = new Date(base); d.setDate(d.getDate() + n); return d; };
-  const today = dateKey(now);
-  const day = n => dateKey(addDays(now, n));
-  const at = (n, hh, mm = 0) => `${day(n)}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+  return { quick: t.quick, quickTitle: lang === 'en' ? 'report' : '보고서', entry: t.entry, entryTitle: t.entryTitle, entryDay: EXAM_DAY, word: t.word.join(' '), wordAlone: t.word[0], wordEmoji: EMOJI.lunch, wordStart: LUNCH_HOURS.start, wordTitle: `${EMOJI.lunch} ${t.word[1]}`, wordDay: LUNCH_DAY, wifi: t.wifi, captions: t.captions, planTitle: t.tasks.plan, dragTitle: t.events[DRAG.key], dragFrom: DRAG.from, dragTo: DRAG.to, stretchHours: DRAG.stretchHours };
+}
 
-  // ---- The week, as days from today ----
-  // Long and multi-day events too, so the week view is not only one-hour blocks (2026-10-27 user): a 4-hour workshop, a two-day
-  // work trip with a 3-hour client meeting on its second day (the first day's 7:00 swim comes before the train) and a three-day
-  // holiday. Whatever day the pictures are taken, weekends included, one person could live it (r50 M, 2026-10-28, and its review):
-  // nothing at the same time, nothing in town on a trip day, no work at the weekend. Taken on a Wednesday, the old sample put
-  // today's lunch and review inside the workshop (three cut-off lanes); on a Thursday the lunch in town fell on the work trip;
-  // the holiday ran into the Monday meeting or a swim on five days of seven; at the weekend the budget meeting was on Saturday.
-  // - The work trip is this Thursday–Friday, or Tuesday–Wednesday when today is one of those: never today.
-  // - The workshop is this Wednesday (today after lunch when today is a Wednesday), or the trip-free weekday that is not today.
-  // - The holiday is next week's Friday to Sunday, so no Monday meeting or Tuesday/Thursday swim falls in it.
-  // - At the weekend the budget meeting and its two tasks are on Monday; the lunch with 민지 stays today.
-  const dow = now.getDay(), sunday = -dow;
-  const weekend = n => [0, 6].includes(((dow + n) % 7 + 7) % 7);
-  const workday = n => { while (weekend(n)) n++; return n; };
-  const awayDay = sunday + (dow === 4 || dow === 5 ? 2 : 4);
-  const workshopDay = sunday + (dow === 4 ? 5 : dow === 5 ? 4 : 3);
-  const holiday = sunday + 12, reviewDay = workday(0);
-  const tripDays = [awayDay, awayDay + 1, holiday, holiday + 1, holiday + 2];
-  // The book club, which the demo drags in the month view, is next week's Wednesday: no repeat falls on it and no other event
-  // either, so the demo's small window does not hide it behind 「+1」, and that week's Sunday is free to drop it on.
-  // The other evenings in town move further from today, off the trip days, the workshop and each other — the dentist also off the
-  // weekend (clinics close early on Saturday). Work due later is due on a weekday (a plan's draft was due on a Saturday).
-  const clubDay = sunday + 10;
-  const taken = new Set([...tripDays, workshopDay, clubDay]);
-  const evening = (n, weekday = false) => { const step = n < 0 ? -1 : 1; while (taken.has(n) || (weekday && weekend(n))) n += step; taken.add(n); return n; };
-  const dentistDay = evening(2, true), familyDay = evening(-3);
-  // The monthly report is due on the 27th, or on the last weekday before it that is not a trip day or the book club's (in some
-  // months the 27th is a Saturday or a Sunday).
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const offsetOf = d => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
-  const monStart = offsetOf(firstOfMonth);
-  let reportDay = monStart + 26; while (weekend(reportDay) || tripDays.includes(reportDay) || reportDay === clubDay) reportDay--;
+// The calendars of the sample: the app makes only its built-in one, so the temporary profile starts with all four, before main.cjs
+// reads it. `folder` is DAYBOARD_USER_DATA; call before main.cjs is loaded.
+function prepareProfile(folder, lang = 'ko') {
+  const { initialState } = require('../lib/store.cjs');
+  const state = initialState(), names = (TEXT[lang] || TEXT.ko).calendars;
+  state.calendars = Object.keys(COLOURS.calendars).map(key => ({ id: CALENDAR_IDS[key], name: names[key], color: COLOURS.calendars[key], provider: 'local' }));
+  // Settings shows the folder's last two names: those of an installed app (main.cjs backupFolder), not the throwaway profile's random one.
+  state.settings.backupFolder = path.join(folder, 'Documents', 'Dayboard Backups');
+  fs.writeFileSync(path.join(folder, 'dayboard.json'), JSON.stringify(state));
+}
+
+// `demo`: for the film, which sets up and types the exam and the Quick event itself (the pictures have them on the calendar already).
+async function seedSample(invoke, lang = 'ko', { demo = false } = {}) {
+  const t = TEXT[lang] || TEXT.ko;
 
   // ---- Lists and groups ----
-  const c = COLOURS.lists, ec = COLOURS.events;
+  const c = COLOURS.lists;
   await invoke('list:update', { id: 'local-inbox', name: t.inbox, color: c.inbox, icon: 'list' });
   const work = await invoke('list:add', { name: `${EMOJI.work} ${t.work}`, color: c.work, icon: 'briefcase' });
   const personal = await invoke('group:add', { name: t.life });
-  const mk = (name, color, icon) => invoke('list:add', { name, color, icon, groupId: personal.id });
-  const shop = await mk(`${EMOJI.shop} ${t.shop}`, c.shop, 'cart');
-  const books = await mk(`${EMOJI.books} ${t.books}`, c.books, 'book');
-  const trip = await mk(`${EMOJI.trip} ${t.trip}`, c.trip, 'plane');
+  const mk = (key, icon) => invoke('list:add', { name: `${EMOJI[key]} ${t[key]}`, color: c[key], icon, groupId: personal.id });
+  const lists = { work: work.id, inbox: 'local-inbox' };
+  for (const [key, icon] of [['shop', 'cart'], ['home', 'home'], ['trip', 'plane'], ['fitness', 'heart']]) lists[key] = (await mk(key, icon)).id;
 
   // ---- Tasks ----
-  // `extra`: a repeat (rrule) or subtasks (steps), new in 1.1.3, so the pictures show them.
-  const task = async (title, listId, dueDate = '', important = false, completed = false, notes = '', extra = {}) => {
-    const item = await invoke('task:add', { title, listId, dueDate, important, notes, ...extra });
-    if (completed) await invoke('task:update', { id: item.id, completed: true });
-    return item;
-  };
-  const w = t.tasks.work, s = t.tasks.shop, b = t.tasks.books, r = t.tasks.trip, i = t.tasks.inbox;
-  await task(w[0], work.id, day(reviewDay), true);
-  await task(w[1], work.id, day(reviewDay));
-  await task(w[2], work.id, day(workday(1)), true);
-  const planned = await task(w[3], work.id, day(workday(3)), false, false, '', { steps: t.steps.map((title, n) => ({ title, completed: n === 0 })) });
-  await task(w[4], work.id, '', false, true);
-  await task(s[0], shop.id, today, false, false, '', { rrule: 'FREQ=WEEKLY' });
-  await task(s[1], shop.id, day(2));
-  await task(b[0], books.id, today);
-  await task(b[1], books.id, day(clubDay - 1));
-  await task(r[0], trip.id, day(holiday - 4), true);
-  await task(r[1], trip.id, day(holiday - 2));
-  await task(i[0], 'local-inbox', today);
-  await task(i[1], 'local-inbox', day(2), true);
-  await task(i[2], 'local-inbox', '', false, true);
-  const remind = await task(i[3], 'local-inbox', day(1));
-  await invoke('task:update', { id: remind.id, reminderAt: new Date(`${day(1)}T19:30:00+09:00`).toISOString() });
+  // Repeats and subtasks too, so the pictures show them.
+  let planned = null;
+  for (const [list, key, dueDate, important, extra = {}] of TASKS) {
+    const payload = { title: t.tasks[key], listId: lists[list], dueDate, important, notes: '' };
+    if (extra.rrule) payload.rrule = extra.rrule;
+    if (extra.steps) payload.steps = t.steps[extra.steps].map(([title, completed]) => ({ title, completed }));
+    const item = await invoke('task:add', payload);
+    if (extra.done) await invoke('task:update', { id: item.id, completed: true });
+    if (extra.remind) await invoke('task:update', { id: item.id, reminderAt: new Date(`${dueDate}T${extra.remind}:00+09:00`).toISOString() });
+    if (extra.planned) planned = item;
+  }
 
-  // ---- Events (local calendar) ----
-  const e = t.events;
-  const ev = p => invoke('event:add', { calendarId: 'local-calendar', location: '', allDay: false, ...p });
-  let firstMon = new Date(firstOfMonth); while (firstMon.getDay() !== 1) firstMon.setDate(firstMon.getDate() + 1);
-  await ev({ title: e.weekly[0], start: at(offsetOf(firstMon), 10), end: at(offsetOf(firstMon), 11), location: e.weekly[1], color: ec.weekly, rrule: 'FREQ=WEEKLY;BYDAY=MO' });
-  let firstTue = new Date(firstOfMonth); while (firstTue.getDay() !== 2) firstTue.setDate(firstTue.getDate() + 1);
-  await ev({ title: e.swim, start: at(offsetOf(firstTue), 7), end: at(offsetOf(firstTue), 8), color: ec.swim, rrule: 'FREQ=WEEKLY;BYDAY=TU,TH' });
-  // Today: the budget meeting (on Monday at the weekend), then lunch — both after 9:41 and before a workshop at 13:00 (r50 M;
-  // they were 12:30 and 16:00).
-  await ev({ title: e.review, start: at(reviewDay, 11), end: at(reviewDay, 12), color: ec.review });
-  await ev({ title: e.lunch[0], start: at(0, 12), end: at(0, 13), location: e.lunch[1], color: ec.lunch, alert: 30 });
-  await ev({ title: e.dentist, start: at(dentistDay, 18, 30), end: at(dentistDay, 19, 30), color: ec.dentist, alert: 60 });
-  await ev({ title: e.club[0], start: at(clubDay, 19), end: at(clubDay, 21), location: e.club[1], color: ec.club });
-  await ev({ title: e.trip, start: day(holiday), end: day(holiday + 3), allDay: true, color: ec.trip });
-  await ev({ title: e.family, start: at(familyDay, 18), end: at(familyDay, 20), color: ec.family });
-  await ev({ title: e.demo, start: day(-6), end: day(-5), allDay: true, color: ec.demo });
-  await ev({ title: e.report, start: day(reportDay), end: day(reportDay + 1), allDay: true, color: ec.report });
-  await ev({ title: e.workshop, start: at(workshopDay, 13), end: at(workshopDay, 17), color: ec.workshop });
-  await ev({ title: e.client[0], start: at(awayDay + 1, 9, 30), end: at(awayDay + 1, 12, 30), location: e.client[1], color: ec.client });
-  await ev({ title: e.away, start: day(awayDay), end: day(awayDay + 2), allDay: true, color: ec.away });
+  // ---- Events ----
+  const addEvent = (calendar, title, location, day, from, to, extra = {}) => invoke('event:add', { calendarId: CALENDAR_IDS[calendar], title, location, ...(from ? { allDay: false, start: `${day}T${from}:00`, end: `${day}T${to}:00` } : { allDay: true, start: day, end: to }), ...extra });
+  for (const [calendar, key, day, from, to, extra] of MONTH) {
+    const words = t.events[key], [title, location] = Array.isArray(words) ? words : [words, ''];
+    await addEvent(calendar, title, location, day, from, to, extra);
+  }
+  // 자주 쓰는 일정: the word and hours this person chose (Settings), the lunch it made, and the exam the film types.
+  if (!demo) {
+    await invoke('settings:update', { eventShortcuts: [{ id: 'sample-lunch', word: t.word[0], before: EMOJI.lunch, after: '', ...LUNCH_HOURS, allDay: false, calendarId: '', color: '', created: 1 }] });
+    await addEvent('personal', t.entryTitle, t.entryPlace, EXAM_DAY, '14:00', '15:00');
+    await addEvent('personal', `${EMOJI.lunch} ${t.word[1]}`, '', LUNCH_DAY, LUNCH_HOURS.start, LUNCH_HOURS.end);
+  }
 
   // ---- Notes ----
   const [focus, ...others] = t.notes;
@@ -205,30 +275,29 @@ async function seedSample(invoke, now = new Date(), lang = 'ko') {
 // before they changed shows the old tasks in the gallery's tasks card.
 function sampleMark(lang) { return { lang, colours: COLOURS, emoji: EMOJI, text: TEXT[lang] || TEXT.ko }; }
 function writeSampleMark(folder, lang) {
-  require('node:fs').writeFileSync(require('node:path').join(folder, 'sample.json'), JSON.stringify(sampleMark(lang), null, 1));
+  fs.writeFileSync(path.join(folder, 'sample.json'), JSON.stringify(sampleMark(lang), null, 1));
 }
 
 // The language of a screenshot run: DAYBOARD_SHOTS_LANG=en|ko (Korean when unset).
 function shotsLanguage() { return process.env.DAYBOARD_SHOTS_LANG === 'en' ? 'en' : 'ko'; }
 
-// The pictures are taken as if it were 9:41 in the morning: taken in the evening, every event of today was past and drawn faded
-// (2026-10-27 user). Only the window's page clock moves (a script the page runs before its own, through the DevTools protocol);
-// the data and the app's main process keep the real time, and the day stays today.
-const MORNING = `(() => { const Real = Date; const shift = new Real(Real.now()).setHours(9, 41, 0, 0) - Real.now();
+// The pictures are taken as if it were 9:41 in the morning of DEMO_DAY: taken in the evening, every event of today was past and drawn
+// faded (2026-10-27 user). Only the window's page clock moves (a script the page runs before its own, through the DevTools protocol).
+const MORNING = day => `(() => { const Real = Date; const shift = ${day ? `new Real('${day}T09:41:00').getTime()` : 'new Real(Real.now()).setHours(9, 41, 0, 0)'} - Real.now();
   class Morning extends Real { constructor(...args) { if (args.length) super(...args); else super(Real.now() + shift); } static now() { return Real.now() + shift; } }
   globalThis.Date = Morning; })();`;
 // The app's own clock goes to 9:41 of the same day as the page's, and seedSample sets it back further while it saves each note, so
 // the notes carry the times NOTE_TIMES gives them (2026-10-30: taken after midnight they read 「오전 12:20」 beside a page at 9:41;
 // taken in the afternoon, a time ahead of the page's clock read as now, so every note said 9:41 — 「메모에서 작성한 시간이 9:41로
 // 모두 같아서 좀 작위적여보여」). Call before main.cjs is loaded.
-function morningMain() {
-  const Real = Date; const clock = { Real, shift: new Real(Real.now()).setHours(9, 41, 0, 0) - Real.now(), extra: 0 };
+function morningMain(day) {
+  const Real = Date; const clock = { Real, shift: (day ? new Real(`${day}T09:41:00`).getTime() : new Real(Real.now()).setHours(9, 41, 0, 0)) - Real.now(), extra: 0 };
   class Morning extends Real { constructor(...args) { if (args.length) super(...args); else super(Real.now() + clock.shift + clock.extra); } static now() { return Real.now() + clock.shift + clock.extra; } }
   globalThis.Date = Morning; globalThis.__dayboardSampleClock = clock;
 }
 // When each note was last written, as [days from today, hour, minute]: the shown note this morning, the others over the past days —
-// as a real list looks (Today / Yesterday / earlier). In the order of t.notes; without morningMain (tests, the widget pictures, which
-// show no note times) the notes are saved at the real time.
+// as a real list looks (Today / Yesterday / earlier). In the order of t.notes; without morningMain (tests) the notes are saved at the
+// real time.
 const NOTE_TIMES = [[0, 9, 26], [-1, 16, 12], [-2, 21, 47], [-5, 11, 20]];
 async function writtenAt([days, hour, minute], save) {
   const clock = globalThis.__dayboardSampleClock;
@@ -238,12 +307,12 @@ async function writtenAt([days, hour, minute], save) {
   clock.extra = when.getTime() - base;
   try { return await save(); } finally { clock.extra = 0; }
 }
-async function morningClock(win) {
+async function morningClock(win, day) {
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const page = win.webContents;
   if (!page.debugger.isAttached()) page.debugger.attach('1.3');
   await page.debugger.sendCommand('Page.enable');
-  await page.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: MORNING });
+  await page.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: MORNING(day) });
   for (let attempt = 0; attempt < 3; attempt++) {
     page.reload();
     for (let i = 0; i < 200; i++) {
@@ -256,4 +325,4 @@ async function morningClock(win) {
   throw new Error('the morning clock did not take');
 }
 
-module.exports = { seedSample, dateKey, shotsLanguage, morningClock, morningMain, sampleMark, writeSampleMark, demoText, COLOURS, TEXT };
+module.exports = { seedSample, prepareProfile, dateKey, shotsLanguage, morningClock, morningMain, sampleMark, writeSampleMark, demoText, DEMO_DAY, EXAM_DAY, LUNCH_DAY, DRAG, COLOURS, CALENDAR_IDS, MONTH, TASKS, TEXT };

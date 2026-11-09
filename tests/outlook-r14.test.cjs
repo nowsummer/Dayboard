@@ -303,5 +303,6 @@ test('Outlook: a new repeating event stored but not read back is done with no ev
   const h = graph(null);
   h.fail.add('GET', /^\/me\/events\/N1\/instances$/, 'error');
   await assert.rejects(h.provider.mutateEvent('add', { ...repeating, exdates: ['2026-11-03T12:00:00.000Z'] }, msCalendar), /HTTP 503/);
+  // 2026-11-08 Codex full review F4 is run in tests/review-1108.test.cjs, with its own fake Graph.
   assert.equal(h.events.size, 1);
 });

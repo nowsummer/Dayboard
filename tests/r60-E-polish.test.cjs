@@ -88,8 +88,8 @@ test('type ladder: whole-pixel nav size, 17px card title, 19px empty title, 13px
   const p = box(value('.main-nav .nav-item', 'padding'));
   assert.equal(p.top + p.bottom + 22, 38, 'nav row stays 38px');
   assert.ok(!rules.some(r => r.decls.some(d => d.name === 'font-size' && /\b13\.5px/.test(d.value))), 'no half-pixel font size left');
-  assert.equal(value('.card-title', 'font-size'), '17px');
-  assert.equal(value('.card-title', 'line-height'), '24px', 'card height unchanged');
+  assert.equal(value('.card-title', 'font-size'), '17px', 'the 19px of 2026-11-06 read too large beside the rows (2026-11-07 owner)');
+  assert.equal(value('.card-title', 'line-height'), '24px');
   assert.equal(value('.empty-state h2', 'font-size'), '19px');
   assert.equal(value('.empty-state h2', 'line-height'), '28px', 'whole-pixel line (19 × 1.5 = 28.5)');
   assert.equal(value('#toast', 'font-size'), '13px');
@@ -119,4 +119,46 @@ test('prefers-contrast:more wins over the token rules in light and dark and make
   const tokenRules = rules.filter(r => r.selectors.some(s => s === ':root' || /^\[data-theme=dark\]$/.test(s)) && r.decls.some(d => d.name.startsWith('--')));
   const last = tokenRules[tokenRules.length - 1];
   assert.ok(last.media.some(m => /prefers-contrast:more/.test(m)), 'the prefers-contrast token rules are the last ones');
+});
+
+// 2026-11-06 owner 「나의 목록에 적힌 할 일 리스트 글자 크기가 좀 작지 않아? 검토해봐줘. 꼭 내 말에 따를 필요는 없어.」: a list's and a group's name
+// in the sidebar are 14px like the menu items above them and the task rows they open (13px read as a smaller kind of row), on 20px lines
+// (whole pixels in the 36px and 34px rows); the counts stay 12px, the dot and the 38/59 grid stay; the editor's fixed list name is not one.
+test('sidebar list and group names: 14px on 20px lines like the menu, counts 12px, before r60-apple; the editor\'s list name untouched', () => {
+  assert.equal(value('.main-nav .nav-item', 'font-size'), '14px');
+  assert.equal(value('.list-nav .list-name', 'font-size'), '14px');
+  assert.equal(value('.list-nav .list-name', 'line-height'), '20px');
+  assert.equal(value('.group-row', 'font-size'), '14px');
+  assert.equal(value('.group-row', 'line-height'), '20px');
+  assert.equal(value('.list-count', 'font-size'), '12px', 'counts as they were');
+  assert.equal(box(value('.list-nav', 'padding')).left, 10, 'names still at 59');
+  assert.equal(value('.list-dot', 'width'), '24px');
+  for (const [height, line] of [[px(value('.list-nav', 'min-height')), 20], [px(value('.group-row', 'min-height')), 20]]) assert.equal(Number.isInteger((height - line) / 2), true, `${height}px row, ${line}px line: whole pixels`);
+  assert.equal(value('.list-name', 'font-size'), '13px', 'the bare class (the editor\'s fixed list beside 반복) keeps its size');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'styles.css'), 'utf8');
+  const at = css.indexOf('\n.list-nav .list-name{font-size:14px;line-height:20px}');
+  assert.equal(at > 0 && at < css.indexOf('/* r60-apple'), true, 'in the block before r60-apple');
+});
+
+// 2026-11-06 review of batch A. A row's second line is one line of words high also with icons alone in it: the note mark (or the repeat
+// arrows) by itself made a 12px line, so a task with only a note stood 7px shorter than one with a date. And where more is below with no
+// bar to fade it — the shortcuts sheet in the 900×650 window, the sidebar's lists at 글자 크기 더 크게 — the content fades at the foot as
+// under the settings sheet's 닫기 bar, only while the sheet or the sidebar can still scroll down (scroll-state), not at its end.
+test('a row\'s second line is one line high with icons alone; the shortcuts sheet and the sidebar fade at the foot while more is below', () => {
+  assert.equal(value('.task-meta', 'min-height'), '1lh', 'the meta line, also with the note mark alone');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'styles.css'), 'utf8').replace(/\r\n/g, '\n');
+  const apple = css.indexOf('/* r60-apple');
+  // A sticky box keeps clear of its scroller's padding: the sidebar's fade sits that far down, on the edge the lists are cut at.
+  const sidePad = box(value('.sidebar-scroll', 'padding')).bottom;
+  for (const [selector, height, bottom] of [['.dialog:has(>.shortcuts-body)::after', '28px', '0'], ['.sidebar-scroll::after', '20px', `-${sidePad}px`]]) {
+    assert.equal([value(selector, 'position'), value(selector, 'bottom'), value(selector, 'height'), value(selector, 'margin-top'), value(selector, 'opacity'), value(selector, 'pointer-events')].join(' '),
+      `sticky ${bottom} ${height} -${height} 0 none`, `${selector}: a sticky fade over the last ${height}, taking no room, hidden until more is below`);
+  }
+  assert.equal(sidePad, 6);
+  assert.equal(value('.sidebar-scroll', 'container'), 'sidebar-scroll / scroll-state');
+  assert.equal(value('.dialog', 'container'), 'dialog / scroll-state', 'the sheet\'s own scroll state, as for the 닫기 bar');
+  for (const rule of ['@container dialog scroll-state(scrollable: bottom){.dialog:has(>.shortcuts-body)::after{opacity:1}}', '@container sidebar-scroll scroll-state(scrollable: bottom){.sidebar-scroll::after{opacity:1}}', '\n.task-meta{min-height:1lh}\n']) {
+    const at = css.indexOf(rule);
+    assert.equal(at > 0 && at < apple, true, `${rule.trim()} — in the block before r60-apple`);
+  }
 });

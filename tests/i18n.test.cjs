@@ -76,6 +76,26 @@ test('English counts use {n|singular|plural}: one task, three tasks; Korean keys
   assert.equal(shared.translate('en', '할 일 {0}개', [3]), '3 tasks');
   assert.equal(shared.translate('en', '「{0}」 일정 {1}개', ['one', 1]), '1 event for “one”');
   assert.equal(shared.translate('ko', '할 일 {0}개', [1]), '할 일 1개');
-  const plural = Object.values(shared.EN).filter(value => /{d} (accounts|tasks|events|days|characters|notes)/.test(value));
+  // \{\d+\}, not {d}: without the u flag {d} matched the three letters 「{d}」 and the check passed on anything (2026-11-09 F39).
+  const plural = Object.values(shared.EN).filter(value => /\{\d+\} (accounts|tasks|subtasks|events|days|characters|notes|lists|calendars)\b/.test(value));
   assert.deepEqual(plural, [], 'every English count noun has its singular form');
+  assert.equal(shared.translate('en', '되살렸어요: 할 일 {0}, 일정 {1}, 메모 {2}', [1, 0, 2]), 'Restored: 1 task, 0 events, 2 notes');
+});
+
+// Every file that calls tr() is read by the two checks above (2026-11-09 F99: lib/backup.cjs and lib/tasks.cjs were left out of a hand-written list).
+test('every source file that calls tr() is in the extractor list', () => {
+  const skip = new Set(['renderer/i18n.js', 'renderer/domain.js', 'lib/i18n.cjs']);
+  const walk = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(d => d.isDirectory() ? walk(`${dir}/${d.name}`) : [`${dir}/${d.name}`]);
+  const files = [...walk('lib'), ...walk('renderer'), ...fs.readdirSync(root)].filter(f => /\.c?js$/.test(f) && !skip.has(f));
+  const callers = files.filter(f => /\btr\(/.test(fs.readFileSync(path.join(root, f), 'utf8'))).sort();
+  assert.deepEqual(callers.filter(f => !extract.SOURCE_FILES.includes(f)), []);
+});
+
+// 2026-11-09 사용자 결정 F92 「해요체 통일」: the app speaks in 해요체 — a dialog's line or an empty screen in 합니다체 (「삭제합니다.」
+// 「표시됩니다.」) next to 「사라져요.」 changed voice sentence by sentence. Allowed: the account connection guidance and lib's check words,
+// should they come through these files as literals (none today).
+const POLITE_ALLOWED = new Set([]);
+const formalIn = source => [...extract.keysIn(source)].filter(key => /니다[.!?]?(\s|$)/.test(key) && !POLITE_ALLOWED.has(key));
+test('app.js and calendar.js: no tr() sentence ends in 합니다체', () => {
+  for (const file of ['renderer/app.js', 'renderer/calendar.js']) assert.equal(formalIn(fs.readFileSync(path.join(root, file), 'utf8')).join(' | '), '', file);
 });

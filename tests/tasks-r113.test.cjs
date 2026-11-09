@@ -154,7 +154,7 @@ test('store: new fields of the wrong shape heal; internal bookkeeping never reac
 });
 
 // ---------------- 일정 알림 ----------------
-test('dueAlerts: from the alert time to a quarter of an hour after the start, at most 12 hours late, once per key; hidden calendars and the setting', () => {
+test('dueAlerts: from the alert time until the event ends (a quarter of an hour after the start at least), at most 12 hours late, once per key; hidden calendars and the setting', () => {
   const now = Date.parse('2026-10-27T05:00:00.000Z');
   const event = (id, start, alert, fields = {}) => ({ id, calendarId: 'c', title: id, start, end: new Date(Date.parse(start) + 3600000).toISOString(), alert, ...fields });
   const state = { settings: {}, alertsFired: {}, events: [
@@ -162,9 +162,10 @@ test('dueAlerts: from the alert time to a quarter of an hour after the start, at
     event('gone', '2026-10-27T04:30:00.000Z', 5), event('none', '2026-10-27T05:05:00.000Z', null), event('hidden', '2026-10-27T05:05:00.000Z', 10, { calendarId: 'h' }),
     event('stale', '2026-10-28T05:00:00.000Z', 40320),
   ] };
-  assert.deepEqual(dueAlerts(state, now).map(x => x.event.id), ['started', 'due', 'hidden'], 'in the order they came due');
+  // 'gone' began half an hour ago and is still on: it rings until its end (2026-11-09 사용자 결정, review F82).
+  assert.deepEqual(dueAlerts(state, now).map(x => x.event.id), ['gone', 'started', 'due', 'hidden'], 'in the order they came due');
   state.settings.hiddenCalendars = ['h'];
-  assert.deepEqual(dueAlerts(state, now).map(x => x.event.id), ['started', 'due'], 'a hidden calendar rings nothing');
+  assert.deepEqual(dueAlerts(state, now).map(x => x.event.id), ['gone', 'started', 'due'], 'a hidden calendar rings nothing');
   const fired = Object.fromEntries(dueAlerts(state, now).map(x => [x.key, new Date(now).toISOString()]));
   assert.deepEqual(dueAlerts({ ...state, alertsFired: fired }, now), [], 'shown once');
   assert.equal(dueAlerts({ ...state, settings: { eventAlerts: false } }, now).length, 0);
@@ -172,6 +173,23 @@ test('dueAlerts: from the alert time to a quarter of an hour after the start, at
   const moved = { ...state, alertsFired: fired, events: [event('due', '2026-10-27T05:06:00.000Z', 10)] };
   assert.equal(dueAlerts(moved, now).length, 1);
   assert.deepEqual(Object.keys(pruneFired({ old: '2026-10-01T00:00:00Z', new: '2026-10-26T00:00:00Z' }, now)), ['new']);
+});
+// 2026-11-09 사용자 결정 (review F82): a PC that wakes during an event still hears of it, as task reminders are shown late.
+test('dueAlerts: an alert missed while the PC slept rings once it wakes during the event, never after it ends; 12 hours late at most; the line says 진행 중 (F82)', () => {
+  const start = new Date(2026, 9, 27, 14, 0).getTime(); const minute = 60000, hour = 3600000;
+  const ev = { id: 'meet', calendarId: 'c', title: '회의', start: new Date(start).toISOString(), end: new Date(start + hour).toISOString(), alert: 60 };
+  assert.equal(dueAlerts({ settings: {}, events: [ev] }, start + 20 * minute).length, 1, '시작 20분 뒤·종료 전');
+  assert.equal(dueAlerts({ settings: {}, events: [ev] }, start + hour + minute).length, 0, '종료 뒤');
+  const long = { ...ev, id: 'long', end: new Date(start + 24 * hour).toISOString() };
+  assert.equal(dueAlerts({ settings: {}, events: [long] }, start + 11 * hour + 2 * minute).length, 0, 'more than 12 hours after its alert');
+  const short = { ...ev, id: 'short', end: new Date(start + 5 * minute).toISOString(), alert: 0 };
+  assert.equal(dueAlerts({ settings: {}, events: [short] }, start + 10 * minute).length, 1, 'a short event keeps the quarter hour after its start');
+  const noEnd = { ...ev, id: 'no-end', end: '' };
+  assert.equal(dueAlerts({ settings: {}, events: [noEnd] }, start + 10 * minute).length, 1, 'no end: the quarter hour');
+  assert.equal(alertLine(ev, { now: start + 20 * minute }), '오후 2:00 · 진행 중');
+  assert.equal(alertLine({ ...ev, location: '3층' }, { now: start + 20 * minute }), '오후 2:00 · 진행 중 · 3층');
+  assert.equal(alertLine(ev, { now: start + 30 * 1000 }), '오후 2:00', 'on time: no word');
+  assert.equal(alertLine(ev, { now: start - 30 * minute }), '오후 2:00');
 });
 test('dueAlerts: an all-day event counts from its midnight; a series on this PC rings on its occurrence, not on its first day', () => {
   const at9 = new Date(2026, 9, 27, 9, 0).getTime();

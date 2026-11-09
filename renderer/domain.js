@@ -10,9 +10,16 @@
     const a=new Date(`${day}T00:00:00`),b=new Date(a);b.setDate(b.getDate()+1);
     return start<b && (end>start ? end>a : start>=a);
   }
+  // A subtask's date counts for its task (2026-11-07 owner: a task due the 30th with steps due the 15th, 19th and 29th): the earliest of its own date
+  // and its open steps' is when it next needs looking at, in 오늘, 예정 and the sort by date.
+  // A time range's dash (2026-11-08 owner: 「오후 8:00-오후 9:00 … 반칸씩이라도 띄우는 게」): an en dash between thin spaces, as Apple's date ranges set it.
+  const RANGE='\u2009–\u2009';
+  function nextDueOf(t){let next=t.dueDate||'';for(const x of Array.isArray(t.steps)?t.steps:[])if(x.dueDate&&!x.completed&&(!next||x.dueDate<next))next=x.dueDate;return next;}
+  // The open steps of open tasks due on a day, for the calendar.
+  function stepsDueOn(tasks,day){const out=[];for(const t of tasks||[]){if(t.completed||!Array.isArray(t.steps))continue;for(const x of t.steps)if(x.dueDate===day&&!x.completed)out.push({task:t,step:x});}return out;}
   function matches(t,view,today=dateKey()){
-    if(view==='today')return !!t.dueDate&&t.dueDate<=today;
-    if(view==='planned')return !!t.dueDate;
+    if(view==='today'){const next=nextDueOf(t);return !!next&&next<=today;}
+    if(view==='planned')return !!nextDueOf(t);
     if(view==='important')return t.important;
     if(view==='all')return true;
     return t.listId===view;
@@ -396,6 +403,9 @@
   const lumOfHex=c=>{const n=parseInt(c.slice(1),16),lin=v=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;};return 0.2126*lin(n>>16&255)+0.7152*lin(n>>8&255)+0.0722*lin(n&255);};
   const CUSTOM_LUM_MAX=lumOfHex('#ffcc00'),CUSTOM_LUM_MIN=1.5*(lumOfHex('#24262b')+0.05)-0.05;
   const isCustomColor=c=>/^#[0-9a-f]{6}$/i.test(c||'')&&!LIST_PALETTE.includes(String(c).toLowerCase());
+  // A colour as hue 0–360, saturation and brightness 0–1 and back, for the 「다른 색…」 popover (app.js chooseColor).
+  function hexToHsv(hex){const n=parseInt(hex.slice(1),16),r=(n>>16&255)/255,g=(n>>8&255)/255,b=(n&255)/255,max=Math.max(r,g,b),d=max-Math.min(r,g,b);let hue=0;if(d)hue=60*(max===r?((g-b)/d+6)%6:max===g?(b-r)/d+2:(r-g)/d+4);return [hue,max?d/max:0,max];}
+  function hsvToHex(hue,sat,val){const part=n=>{const k=(n+hue/60)%6;return Math.round(255*(val-val*sat*Math.max(0,Math.min(k,4-k,1)))).toString(16).padStart(2,'0');};return '#'+part(5)+part(3)+part(1);}
   function clampColor(color){
     if(!/^#[0-9a-f]{6}$/i.test(color||''))return null;
     const hex=color.toLowerCase(),inBand=x=>{const l=lumOfHex(x);return l>=CUSTOM_LUM_MIN-1e-9&&l<=CUSTOM_LUM_MAX+1e-9;};
@@ -510,16 +520,18 @@
   // app.js applyGlass sets on the widget body. tests/lists.test.cjs checks every step of the glass with these.
   const GLASS_INKS={
     light:{plain:{text:'#1c1d22',second:[44,48,60,0.82],third:[44,48,60,0.7],red:'#ff3b30',note:'#8a6604',dot:'#2a5fc4',flag:'#ff9500',check:[65,'#3a3f4a'],plus:[70,'#000000']},
-      strong:{text:'#000000',second:[0,0,0,0.9],third:[0,0,0,0.78],red:'#a8221a',note:'#372902',dot:'#11264e',flag:'#402500',check:[20,'#000000'],plus:[20,'#000000']}},
+      strong:{text:'#000000',second:[0,0,0,0.9],third:[0,0,0,0.78],red:'#a8221a',note:'#372902',dot:'#11264e',flag:'#ff9500',check:[20,'#000000'],plus:[20,'#000000']}},
     dark:{plain:{text:'#f3f4f7',second:[236,238,245,0.84],third:[236,238,245,0.72],red:'#ff453a',note:'#f6cf5c',dot:'#9dbdff',flag:'#ff9500',check:[45,'#ffffff'],plus:[45,'#ffffff']},
-      strong:{text:'#ffffff',second:[255,255,255,0.92],third:[255,255,255,0.8],red:'#ffe3e0',note:'#fbe7ae',dot:'#dde8ff',flag:'#ffe5bf',check:[35,'#ffffff'],plus:[35,'#ffffff']}}};
+      strong:{text:'#ffffff',second:[255,255,255,0.92],third:[255,255,255,0.8],red:'#ffe3e0',note:'#fbe7ae',dot:'#dde8ff',flag:'#ff9500',check:[35,'#ffffff'],plus:[35,'#ffffff']},
+      flagLift:{from:0.7,to:'#ffc46b',most:0.78}}};
   function glassInks(tone,ink){
     const set=GLASS_INKS[tone==='dark'?'dark':'light'],k=Math.min(1,Math.max(0,Number(ink)||0)),p=set.plain,q=set.strong;
     const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),lerp=(a,b)=>a+(b-a)*k;
     const hex=(a,b)=>{const x=rgb(a),y=rgb(b);return '#'+[0,1,2].map(i=>Math.round(lerp(x[i],y[i])).toString(16).padStart(2,'0')).join('');};
+    /* the flag stays Apple's orange whatever the glass (2026-11-09 V67); on dark glass, past the ink where it would fall under 3:1, a lighter orange step by step (tests/lists.test.cjs) */const flag=()=>{const f=set.flagLift;if(!f||k<=f.from)return p.flag;const m=(k-f.from)/(1-f.from)*f.most,x=rgb(p.flag),y=rgb(f.to);return '#'+[0,1,2].map(i=>Math.round(x[i]+(y[i]-x[i])*m).toString(16).padStart(2,'0')).join('');};
     const rgba=(a,b)=>`rgba(${[0,1,2].map(i=>Math.round(lerp(a[i],b[i]))).join(',')},${+lerp(a[3],b[3]).toFixed(3)})`;
     return {'--w-text':hex(p.text,q.text),'--w-secondary':rgba(p.second,q.second),'--w-tertiary':rgba(p.third,q.third),'--w-red':hex(p.red,q.red),
-      '--w-note':hex(p.note,q.note),'--w-dot':hex(p.dot,q.dot),'--w-flag':hex(p.flag,q.flag),
+      '--w-note':hex(p.note,q.note),'--w-dot':hex(p.dot,q.dot),'--w-flag':flag(),
       '--w-check-mix':Math.round(lerp(p.check[0],q.check[0]))+'%','--w-check-with':hex(p.check[1],q.check[1]),
       '--w-plus-mix':Math.round(lerp(p.plus[0],q.plus[0]))+'%','--w-plus-with':hex(p.plus[1],q.plus[1])};
   }
@@ -554,12 +566,13 @@
     if(!result.dueDate&&!(at(day)>now))day=dayOffset(day,1);
     const when=at(day);
     if(!(when>now))return result;
-    return {title:quickStrip(result.title,m)||result.title,dueDate:day,reminderAt:when.toISOString()};
+    return {title:quickStrip(result.title,m),dueDate:day,reminderAt:when.toISOString()}; // '' when the time was all that was left: the parsers keep the typed line (2026-11-09 F73)
   }
   // "3:30" with no 오전/오후 (am/pm) and no leading zero can be either time (2026-10-20 review: "3:30 회의" typed at
   // 14:00 became 03:30 tomorrow): today it is the next one still ahead; on a later day the daytime reading wins
   // (1–6 afternoon, 7–11 morning). "03:30" and 13–23 stay 24-hour.
   function quickClock(result,m,written,hour,minute,today,now){
+    if(hour>=7&&hour<=11&&!/^0/.test(written)&&EVENING.test(result.title))return quickTime(result,m,hour+12,minute,today,now); // 「7시 팀 회식」
     if(hour>=1&&hour<=11&&!/^0/.test(written)){
       const day=result.dueDate||today;const at=h=>new Date(`${today}T${pad(h)}:${pad(minute)}:00`);
       if(day===today&&at(hour)>now){/* the morning time is still ahead */}
@@ -582,29 +595,210 @@
   // year); 「이번 달 N일」 / "this month N" is this month's day only while it is still ahead — quickMonthDay would roll a past one to next year.
   const quickNextMonth=(today,da)=>quickMonthDay(today,Number(today.slice(5,7))%12+1,da);
   const quickThisMonth=(today,da)=>{const key=today.slice(0,8)+pad(da);return key>=today&&dateKey(fromDate(key))===key?key:'';};
-  function parseQuickKo(raw,today=dateKey(),now=new Date()){
-    const text=String(raw||'').trim();let result={title:text,dueDate:'',reminderAt:''};
+  // An app password as Apple shows it, four groups of four letters (2026-11-06). Spaces go, 16 letters pasted without hyphens get them, the case stays.
+  // ok false is only a warning: Apple's article gives no format, so the shape never stops a save.
+  function appPassword(raw){const text=String(raw||'').replace(/\s+/g,'');const value=/^[A-Za-z]{16}$/.test(text)?text.match(/.{4}/g).join('-'):text;return {value,ok:/^[A-Za-z]{4}(?:-[A-Za-z]{4}){3}$/.test(value)};}
+  // The many ways people write one day or hour (2026-11-06 owner: 「사람마다 또 상황마다 장소나 날짜나 스케줄 제목을 입력하는 방법이나 순서 등등이
+  // 다르니깐 제대로 잘 작동하도록 꼼꼼하게 규칙 등을 잘 설정해줘.」; rules, not a model: 「AI를 붙이면 구동도 느리고 무거워지니깐」), put in the plain
+  // words the rules below read. The corpus is tests/fixtures/nl-corpus.jsonl. A line nothing is read from keeps what was typed (parseQuickKo).
+  const KO_HOURS={한:1,두:2,세:3,네:4,다섯:5,여섯:6,일곱:7,여덟:8,아홉:9,열:10,열한:11,열두:12};
+  // A day word ends here, or at a particle that ends here: 「차주에게」 is a person (Codex fifth review F5).
+  const DAY_EDGE='(?:\\s|$|[,，]|\\d|새벽|아침|오전|낮|오후|저녁|밤|정오|자정)';
+  const WORD_END='(?='+DAY_EDGE+'|(?:까지|부터|에는|에|엔|중으로|중에|중|안으로|안에|안)'+DAY_EDGE+')';
+  const QUICK_SAME=[[new RegExp('(^|\\s)(?:낼|내일)\\s?모레'+WORD_END,'g'),'모레'],[new RegExp('(^|\\s)금일'+WORD_END,'g'),'오늘'],[new RegExp('(^|\\s)(?:명일|익일|낼)'+WORD_END,'g'),'내일'],[new RegExp('(^|\\s)차주'+WORD_END,'g'),'다음 주'],[new RegExp('(^|\\s)tomorrow'+WORD_END,'gi'),'내일'],[new RegExp('(^|\\s)today'+WORD_END,'gi'),'오늘']];
+  const QUICK_YOIL=new RegExp('(^|\\s)([월화수목금토일])욜'+WORD_END,'g');
+  // After a day, a figure is not a date or a time: 「3.5 버전」, 「1.5배」 are amounts, with their particles too; 「다음 주 일 정리」 is not Sunday.
+  const DOT_UNIT=/^\s*(?:버전|배|리터|킬로|km|kg|cm|mm|m|g|l|%|퍼센트|프로|점|평|인치|도|만|억|천|원|달러|시간|분|초)(?:으로|에서|부터|까지|보다|짜리|로|의|을|를|이|가|은|는|에|만|도)?(?=\s|$)/i;
+  const DOT_BEFORE=/(?:버전|ver\.?|v|평점|학점|GPA|iOS|안드로이드|윈도우)\s*$/i;
+  // Each change is kept in undo: what stays in the title goes back to what was typed (quickTyped; Codex fifth review F4, F5).
+  function quickPlain(raw,undo=[]){
+    const swap=(text,re,fn)=>text.replace(re,(...args)=>{const out=fn(...args);if(out!==args[0])undo.push([out.trim(),args[0].trim()]);return out;});
+    let text=String(raw);
+    for(const [from,word] of QUICK_SAME)text=swap(text,from,(all,lead)=>lead+word);
+    text=swap(text,QUICK_YOIL,(all,lead,day)=>lead+day+'요일');
+    text=swap(text,/(^|\s)(다다음|다음|이번|담)\s?주\s?([월화수목금토])(?=\s|$)/g,(all,lead,which,day)=>lead+which+' 주 '+day+'요일');
+    text=swap(text,/(\d일|요일|\d{1,2}\/\d{1,2}|\d{1,2}\.\d{1,2})\s?\([월화수목금토일](?:요일)?\)/g,(all,day)=>day);
+    text=swap(text,/(^|\s)(\d{1,2})\.(\d{1,2})\.?(?=\s|$)/g,(all,lead,mo,da,at,whole)=>{const rest=whole.slice(at+all.length);return Number(mo)>=1&&Number(mo)<=12&&Number(da)>=1&&Number(da)<=31&&!DOT_UNIT.test(rest)&&!DOT_BEFORE.test(whole.slice(0,at))?lead+mo+'/'+da:all;});
+    text=swap(text,/(오늘|내일|모레|글피|\d일|요일)(\d{1,2}(?:시|:[0-5]\d))/g,(all,day,time)=>day+' '+time);
+    text=swap(text,/(^|[\s,，]|새벽|아침|오전|낮|오후|저녁|밤)(열두|열한|다섯|여섯|일곱|여덟|아홉|한|두|세|네|열)\s?시(?=\s|$|반|에|까지|부터|쯤)/g,(all,lead,hour)=>lead+KO_HOURS[hour]+'시');
+    return swap(text,/(^|[\s,，])(\d{1,2})(?::([0-5]\d))?\s?(am|pm)(?=[\s,，]|$|[~\-–—])/gi,(all,lead,hour,minute,half)=>lead+(half.toLowerCase()==='am'?'오전 ':'오후 ')+hour+(minute?':'+minute:'시'));
+  }
+  // Whole words only: 「금일 오늘의집 주문」 read 금일 as the day, and 오늘의집 is a name, not the word it became (Codex fifth review, recheck N1).
+  const wordAt=(line,word)=>{for(let at=line.indexOf(word);at>=0;at=line.indexOf(word,at+1)){const end=at+word.length;if((at===0||/[\s,，]/.test(line[at-1]))&&(end===line.length||/[\s,，]/.test(line[end])))return at;}return -1;};
+  const quickTyped=(text,undo)=>undo.reduceRight((line,[out,was])=>{const at=wordAt(line,out);return at<0?line:line.slice(0,at)+was+line.slice(at+out.length);},text);
+  // 「7시 팀 회식」 is in the evening; a bare hour reads as the day otherwise (quickClock, parseEventKo).
+  const EVENING=/회식|저녁|뒤풀이|술자리|야식|송년회|망년회|신년회|치맥|dinner|supper|drinks?|party|concert/i;
+  // 「2시 방향」, 「16:10 모니터」: an hour's shape, not a time.
+  const NOT_A_TIME=/^\s*(?:방향|방면|쪽|모니터|화면|비율|ratio|aspect|monitor|display|screen)/i;
+  // A new event typed as one line (2026-11-05 owner, Notion Calendar / Apple Calendar quick event): a time (「2시」, 「오후 2시」, 「10:30」, 「저녁 7시
+  // 반」 — with no period word 1–6 is afternoon and 7–11 morning, as an event's hour is meant, evening with 회식·저녁 in the line), a range (「2시~4시」,
+  // 「2-3시」, 「1시부터 3시까지」, 「3시부터 1시간」 — 까지 alone is a deadline and stays typed), a date (parseQuickKo's words), and the rest: split at
+  // commas, the last part is the place (the first when only it names one: 「강남역, 2시, 동기 모임」); with no comma a last word that names a place
+  // (…실·…관·…역, 412호, 3층 회의실), 「…에서」, 「장소: …」, 「@…」, or a place right before the time. Nothing understood → null.
+  const EVENT_PLACE=/(?:회의실|강의실|세미나실|연구실|실험실|상담실|연습실|휴게실|교실|본부장실|사장실|대표실|임원실|원장실|교수실|행정실|교무실|보건실|접견실|대기실|사무[실]|도서관|미술관|박물관|체육관|전시관|영화관|공학관|과학관|학생회관|회관|센터|병원|의원|치과|약국|학교|유치원|어린이집|캠퍼스|카페|공원|호텔|리조트|식당|레스토랑|강당|교회|성당|운동장|경기장|수영장|헬스장|공연장|교육장|예식장|웨딩홀|컨벤션홀|아트홀|콘서트홀|스터디룸|미팅룸|세미나룸|터미널|공항|마트|백화점|보건소|연구소|구청|시청|군청|법원|세무서|경찰서|우체국|은행|본사|지사|지점|사옥|코엑스|벡스코|킨텍스|스타벅스|투썸플레이스|이디야|메가박스|롯데시네마|CGV)$/; // a last word ending only in 실·관·점 is not enough (Codex third review N2: 개선점, 세계관)
+  // 사무[실]: a character class, as the plain word is one the public export refuses (scripts/public-text-rules.cjs); tests/nl-corpus.test.cjs reads it.
+  const EVENT_AREA=/^(?:강남|홍대|신촌|이태원|명동|종로|광화문|을지로|여의도|잠실|판교|성수|압구정|합정|상암|마곡|건대|서초|송파|용산|마포|동대문|청담|역삼|선릉|사당|노원|부산|대구|대전|광주|울산|세종|제주|인천|수원|일산|분당|성남|용인)$/;
+  const EVENT_STATION=/^[가-힣]{1,8}역$/,NOT_STATION=/(?:지역|영역|구역|전역|무역|번역|통역|직역|의역|배역|주역|용역|권역|해역|성역|수역)$/;
+  const placeWord=word=>EVENT_PLACE.test(word)||EVENT_AREA.test(word)||(EVENT_STATION.test(word)&&!NOT_STATION.test(word))||/^[A-Za-z]?\d{3,4}호$/.test(word);
+  const PLACE_BEFORE=/^(?:지하|시내|동네|근처|\d+층|[A-Za-z]\d+층|지하\d+층|\d+학년|\d+반|\d+관|[A-Z]동|\d+동)$/; // what may stand before the place word: 3층 회의실
+  // Where a line's place starts among its words, or -1: its last word (or one before a room's letter: 회의실 B), with what stands before it.
+  function placeStart(words){
+    let at=words.length-1;
+    if(at>=1&&/^(?:[A-Z]|\d{1,2})$/.test(words[at])&&placeWord(words[at-1]))at--;
+    else if(!placeWord(words[at]))return -1;
+    while(at>0&&(PLACE_BEFORE.test(words[at-1])||placeWord(words[at-1])))at--;
+    return at;
+  }
+  const EVENT_HOUR=String.raw`(\d{1,2})(?:시(?:\s?(반|\d{1,2}분))?|:([0-5]\d))`;
+  const EVENT_PERIOD='(?:(새벽|아침|오전|낮|오후|저녁|밤)\\s?)?';
+  // Groups: 1 lead, then period·hour·반/분·MM of the start (2–5) and the end (6–9).
+  const EVENT_DASH=new RegExp(String.raw`(^|[\s,，])${EVENT_PERIOD}(\d{1,2})(?:시(?:\s?(반|\d{1,2}분))?|:([0-5]\d))?\s?[~\-–—]\s?${EVENT_PERIOD}${EVENT_HOUR}(?:까지)?(?=[\s,，]|$|에)(?:에)?`);
+  const EVENT_SPAN=new RegExp(String.raw`(^|[\s,，])${EVENT_PERIOD}${EVENT_HOUR}(?:부터|에서)\s?${EVENT_PERIOD}${EVENT_HOUR}(?:까지)?(?=[\s,，]|$)`);
+  const EVENT_LONG=new RegExp(String.raw`(^|[\s,，])${EVENT_PERIOD}${EVENT_HOUR}부터\s?(?:(\d{1,2})시간(?:\s?(반))?|(\d{1,3})분)(?:\s?동안)?(?=[\s,，]|$)`);
+  const EVENT_AT=new RegExp(String.raw`(^|[\s,，])${EVENT_PERIOD}${EVENT_HOUR}(?=[\s,，]|$|에|부터|까지|쯤|경|\s전까지|\s전에)(?:에|부터|까지|쯤|경|\s전까지|\s전에)?`);
+  const minutesOf=(word,mm)=>word==='반'?30:word?parseInt(word,10):mm?Number(mm):0;
+  // An hour as it is meant: a period word decides; with none 1–6 is afternoon, 7–11 morning, or evening when the line says so. 「03:30」 is 24-hour.
+  function eventClock(period,hourText,word,mm,evening){
+    let hour=Number(hourText);const minute=minutesOf(word,mm);
+    if(hour>23||minute>59)return null;
+    if(period==='오후'||period==='저녁'||period==='밤')hour=hour<12?hour+12:hour;
+    else if(period==='오전'||period==='아침'||period==='새벽')hour=hour===12?0:hour;
+    else if(period==='낮')hour=hour>=1&&hour<=6?hour+12:hour;
+    else if(!/^0/.test(hourText)&&hour>=1&&hour<=6)hour+=12;
+    else if(!/^0/.test(hourText)&&hour>=7&&hour<=11&&evening)hour+=12;
+    return hour<24?{h:hour,m:minute}:null;
+  }
+  // The end of a range after its start: its own period word decides; otherwise the first reading of the hour after the start (오전 11시~1시 is 13:00).
+  function eventEnd(start,period,hourText,word,mm){
+    const hour=Number(hourText);const minute=minutesOf(word,mm);const from=start.h*60+start.m;
+    if(period){const at=eventClock(period,hourText,word,mm,false);return at&&at.h*60+at.m>from?at:null;}
+    if(hour>23||minute>59)return null;
+    for(const h of hour<=12?[hour,hour+12]:[hour])if(h<24&&h*60+minute>from)return {h,m:minute};
+    return null;
+  }
+  // A line the reader leaves alone on purpose (a deadline, the midnight, a repeat), told apart from one it found nothing in: 자주 쓰는 일정 stays out of the first.
+  const halted=seen=>{if(seen)seen.stopped=true;return null;};
+  function parseEventKo(raw,now=new Date(),seen){
+    const typed=String(raw||'').trim();if(!typed)return null;
+    const undo=[];let text=quickPlain(typed,undo);
+    // 「오전까지 결재」, 「자정 점검」: a deadline and the midnight stay as typed (Codex third review N1, N6).
+    if(/(^|\s)(?:(?:오전|오후|점심|정오)\s?까지|자정)(?=\s|$)/.test(text))return halted(seen);
+    let location='',allDay=false;
+    const whole=text.match(/(^|[\s,，])하루\s?종일(?=[\s,，]|$)/);
+    if(whole){allDay=true;text=(text.slice(0,whole.index)+whole[1]+text.slice(whole.index+whole[0].length)).trim();}
+    // 「장소: 코엑스 3시 박람회」: the place ends at the comma or the hour.
+    const named=text.match(/(^|[\s,，])(?:장소|위치)\s?[:：]\s?([^,，]+?)(?=\s*(?:[,，]|$|(?:새벽|아침|오전|낮|오후|저녁|밤)\s?\d|\d{1,2}시|\d{1,2}:\d\d))/)||text.match(/(^|[\s,，])@\s?([^\s,，]+)/);
+    if(named){location=named[2].trim();text=(text.slice(0,named.index)+named[1]+text.slice(named.index+named[0].length)).trim();}
+    const evening=EVENING.test(text);let time=null,end=null,at=-1;
+    const cut=m=>{at=m.index;text=(text.slice(0,m.index)+m[1]+' '+text.slice(m.index+m[0].length)).trim();};
+    const dash=text.match(EVENT_DASH),span=dash?null:text.match(EVENT_SPAN),long=dash||span?null:text.match(EVENT_LONG);
+    if(dash||span){
+      const r=dash||span;const start=eventClock(r[2],r[3],r[4],r[5],evening);const stop=start&&eventEnd(start,r[6],r[7],r[8],r[9]);
+      if(start&&stop){time=start;end=stop;cut(r);}
+    }else if(long){
+      const start=eventClock(long[2],long[3],long[4],long[5],evening);const minutes=long[8]?Number(long[8]):Number(long[6])*60+(long[7]?30:0);const stop=start?start.h*60+start.m+minutes:0;
+      if(start&&minutes>0&&stop<1440){time=start;end={h:Math.floor(stop/60),m:stop%60};cut(long);}
+    }
+    if(!time){
+      const t=text.match(EVENT_AT);
+      if(t){
+        const after=text.slice(t.index+t[0].length);
+        // 「7시까지 제출」 is a deadline, 「2시 방향」 a direction, 「밤 12시」 midnight of the next day — none is when the event starts, so the line
+        // stays as typed. 「24시 편의점」 is a name: the hour stays in the line.
+        if(/(?:까지|전까지|전에)$/.test(t[0])||NOT_A_TIME.test(after)||(t[2]==='밤'&&Number(t[3])===12))return halted(seen);
+        if(Number(t[3])!==24){const clock=eventClock(t[2],t[3],t[4],t[5],evening);if(clock){time=clock;cut(t);}}
+      }else{const noon=text.match(/(^|[\s,，])정오(?:에)?(?=[\s,，]|$)/);if(noon){time={h:12,m:0};cut(noon);}}
+    }
+    const today=dateKey(now);const before=at>0?text.slice(0,at).trim():'';
+    const day=quickDayKo(text,today);const date=day.dueDate;if(date)text=day.title;
+    if(day.stop&&!time&&!location&&!allDay)return halted(seen); // 「매주 화요일 피아노 학원」: a repeat is chosen in the card
+    if(!location){
+      // Only a word that names a place: 「보고서에서 오타 찾기」 is not at 보고서 (Codex fifth review F3); other names go after a comma, 장소: or @.
+      const from=text.match(/(^|[\s,，])([^\s,，]+?)에서(?=[\s,，]|$)/);
+      if(from&&(placeWord(from[2])||/^(?:집|댁|회사|직장|온라인|줌|Zoom|Teams|팀즈)$/i.test(from[2]))&&!/까지(?:\s|$)/.test(text.slice(from.index+from[0].length))){
+        const left=text.slice(0,from.index+from[1].length).split(/\s+/).filter(Boolean);const place=[from[2]];
+        while(left.length&&(PLACE_BEFORE.test(left.at(-1))||placeWord(left.at(-1))))place.unshift(left.pop());
+        location=place.join(' ');text=(left.join(' ')+' '+text.slice(from.index+from[0].length)).trim();
+      }
+    }
+    const parts=text.split(/[,，]/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+    let title='';
+    if(location)title=parts.join(' · ');
+    else if(parts.length>=2){
+      if(parts[0].split(' ').every(word=>placeWord(word)||PLACE_BEFORE.test(word))&&!placeWord(parts.at(-1).split(' ').at(-1))){location=parts[0];title=parts.slice(1).join(' · ');}
+      else{title=parts.slice(0,-1).join(' · ');location=parts.at(-1);}
+    }else{
+      const words=(parts[0]||'').split(' ').filter(Boolean);const start=words.length>=2?placeStart(words):-1;
+      if(start>0){location=words.slice(start).join(' ');title=words.slice(0,start).join(' ');}
+      else{
+        const lead=before?quickDayKo(before,today).title.trim():'';
+        if(lead&&words.length>=2&&words[0]===lead&&placeWord(lead)){location=lead;title=words.slice(1).join(' ');}
+        else title=words.join(' ');
+      }
+    }
+    if(!time&&!date&&!location&&!allDay)return null;
+    return{title:quickTyped(title,undo)||typed,date,time,...(end?{end}:{}),location:quickTyped(location,undo),...(allDay&&!time?{allDay:true}:{})};
+  }
+  // The last day of a month from today's (0: this one); N months on, on the same day or the month's last.
+  const monthEnd=(today,months)=>{const d=fromDate(today);return dateKey(new Date(d.getFullYear(),d.getMonth()+months+1,0));};
+  const monthsOn=(today,months)=>{const d=fromDate(today);const last=new Date(d.getFullYear(),d.getMonth()+months+1,0).getDate();return dateKey(new Date(d.getFullYear(),d.getMonth()+months,Math.min(d.getDate(),last)));};
+  const KO_DAYS={이틀:2,사흘:3,나흘:4,닷새:5,엿새:6,이레:7,열흘:10,보름:15};const KO_COUNT={한:1,두:2,세:3};
+  // 「11월 3일 회의록 정리」, "Nov 3 minutes": a day just past is what the line is about, not that day next year.
+  const justPast=(today,mo,da)=>{const key=`${today.slice(0,4)}-${pad(mo)}-${pad(da)}`;return key<today&&key>=dayOffset(today,-31);};
+  // The day a line names, and the line without it. stop: a repeat, nothing is read from the line.
+  function quickDayKo(text,today){
+    let result={title:text,dueDate:'',stop:false};
+    // 「3일 후」, 「이틀 뒤」, 「2주 뒤」, 「한 달 후」 from today.
+    const later=text.match(/(^|\s)(?:(\d{1,3})일|(이틀|사흘|나흘|닷새|엿새|이레|열흘|보름)|(\d{1,2}|한|두|세)\s?주일?|(일주일)|(\d{1,2}|한|두|세)\s?달)\s?(?:후|뒤)(?:에는|에|까지)?(?=\s|$)/);
+    if(later){
+      const count=v=>KO_COUNT[v]||Number(v);
+      const date=later[2]?dayOffset(today,Number(later[2])):later[3]?dayOffset(today,KO_DAYS[later[3]]):later[4]?dayOffset(today,7*count(later[4])):later[5]?dayOffset(today,7):monthsOn(today,count(later[6]));
+      return {title:quickStrip(text,later)||text,dueDate:date,stop:false};
+    }
     // A date word may run straight into the time or a digit (「내일오후3시」, 「내일3시」, 「내일밤11시」) and M/D is a date too (2026-10-26 usability review).
-    const m=text.match(/(^|\s)((다음|이번|담)\s?주\s?([월화수목금토일])요일|오늘|내일|모레|다음\s?주|담주|([월화수목금토일])요일|(\d{1,2})월\s?(\d{1,2})일|(\d{1,2})\/(\d{1,2})|(다음|이번)\s?달\s?(\d{1,2})일)(?:까지|에는|에|엔)?(?=\s|$|새벽|아침|오전|낮|오후|저녁|밤|정오|자정|\d)/);
-    if(m&&repeatBefore(text,m))return result;
+    const m=text.match(/(^|\s)((다다음|다음|이번|담)\s?주\s?([월화수목금토일])요일|오늘|내일|모레|그글피|글피|다다음\s?주|다음\s?주|담주|([월화수목금토일])요일|(\d{1,2})월\s?(\d{1,2})일|(\d{1,2})\/(\d{1,2})|(다음|이번)\s?달\s?(\d{1,2})일|(?:다음|이번|이)\s?달\s?말|(?:월말|연말|올해\s?말)(?=까지)|(\d{1,2})일(?!\s*(?:후|뒤|전|동안)(?:에는|에|엔|부터|까지|만|은|는|도|면|의|쯤|로|인)*(?=\s|$|[.,!?…:;]))(?!\s*(?:완성|챌린지|코스|과정|플랜|프로그램|분량|연속)(?:\s|$))(?!\d+(?!\d)(?!시|:)))(?:\s?(?:중으로|중에|중|내로|안에|안으로))?(?:까지|부터|쯤|에는|에|엔)?(?=\s|$|[,，]|새벽|아침|오전|낮|오후|저녁|밤|정오|자정|\d)/);
+    if(m&&repeatBefore(text,m))return {...result,stop:true};
     if(m){
       const token=m[2].replace(/\s/g,'');let date='';
-      if(m[4])date=quickWeekDay(today,m[3]==='이번'?0:1,QUICK_WEEK_KO.indexOf(m[4]));
+      if(m[4])date=quickWeekDay(today,m[3]==='이번'?0:m[3]==='다다음'?2:1,QUICK_WEEK_KO.indexOf(m[4]));
       else if(token==='오늘')date=today;
       else if(token==='내일')date=dayOffset(today,1);
       else if(token==='모레')date=dayOffset(today,2);
+      else if(token==='글피')date=dayOffset(today,3);
+      else if(token==='그글피')date=dayOffset(today,4);
       else if(token==='다음주'||token==='담주')date=dayOffset(today,7);
+      else if(token==='다다음주')date=dayOffset(today,14);
       else if(m[5])date=quickNextDay(today,QUICK_WEEK_KO.indexOf(m[5]));
-      else if(m[6])date=quickMonthDay(today,Number(m[6]),Number(m[7]));
-      else if(m[8])date=quickMonthDay(today,Number(m[8]),Number(m[9]));
+      else if(m[6])date=justPast(today,Number(m[6]),Number(m[7]))?'':quickMonthDay(today,Number(m[6]),Number(m[7]));
+      else if(m[8])date=justPast(today,Number(m[8]),Number(m[9]))?'':quickMonthDay(today,Number(m[8]),Number(m[9]));
       else if(m[10])date=(m[10]==='다음'?quickNextMonth:quickThisMonth)(today,Number(m[11]));
-      if(date)result={title:quickStrip(text,m)||text,dueDate:date,reminderAt:''};
+      else if(/^(?:이번|이)달말$|^월말$/.test(token))date=monthEnd(today,0);
+      else if(token==='다음달말')date=monthEnd(today,1);
+      else if(/^(?:연말|올해말)$/.test(token))date=today.slice(0,4)+'-12-31';
+      // A bare 「N일」 (2026-11-05 owner 「월을 안 쓰고 일만 쓰면 자동적으로 해당 월의 18일로」): this month's while it is still ahead, else
+      // next month's (a past day, or one this month lacks — 「31일」 in November); 「3일간」·「2일째」 stay words (the lookahead).
+      else if(m[12])date=quickThisMonth(today,Number(m[12]))||quickNextMonth(today,Number(m[12]));
+      if(date)result={title:quickStrip(text,m)||text,dueDate:date,stop:false};
     }
+    return result;
+  }
+  function parseQuickKo(raw,today=dateKey(),now=new Date()){
+    const typed=String(raw||'').trim();const undo=[];const text=quickPlain(typed,undo);
+    const read=quickLineKo(text,today,now);
+    return read.dueDate||read.reminderAt?{...read,title:!read.title||read.title===text?typed:quickTyped(read.title,undo)}:{...read,title:typed};
+  }
+  function quickLineKo(text,today,now){
+    const day=quickDayKo(text,today);let result={title:day.title,dueDate:day.dueDate,reminderAt:''};
+    if(day.stop)return result;
     // 「15시」 is 24-hour; a bare 「3시」 reads like a bare 「3:00」 (quickClock) — the event card accepts both, so quick add does too
     // (2026-10-26 usability review; 「3시간」 stays a word). A period word (PERIOD_KO, also before H:MM: 「밤 11:30」) or 정오/자정 is part of the
     // match, so it leaves the title and never reaches quickClock.
-    const t=result.title.match(/(^|\s)(?:(새벽|아침|오전|낮|오후|저녁|밤)\s?(\d{1,2})(?:시(?:\s?(반|\d{1,2}분))?|:([0-5]\d))|(\d{1,2})시(?:\s?(반|\d{1,2}분))?|([01]?\d|2[0-3]):([0-5]\d)|(정오|자정))(?:까지|에)?(?=\s|$)/);
-    if(!t||repeatBefore(result.title,t))return result;
+    // 「오전까지」·「점심까지」 with no clock is a deadline at noon (2026-11-06 owner: 「"오늘 오전까지 FDI 보고서 송부" … 오전까지 니깐 12시까지로
+    // 설정해주는 게 맞지 않을까?」), 「오후까지」 the end of the working day.
+    const noon=result.title.match(/(^|\s)(오전|점심|오후)\s?까지(?=\s|$)/);
+    if(noon&&!repeatBefore(result.title,noon))return quickTime(result,noon,noon[2]==='오후'?18:12,0,today,now);
+    const t=result.title.match(/(^|\s)(?:(새벽|아침|오전|낮|오후|저녁|밤)\s?(\d{1,2})(?:시(?:\s?(반|\d{1,2}분))?|:([0-5]\d))|(\d{1,2})시(?:\s?(반|\d{1,2}분))?|([01]?\d|2[0-3]):([0-5]\d)|(정오|자정))(?:\s전까지|\s전에|까지|쯤|경|에)?(?=\s|$)/);
+    if(!t||repeatBefore(result.title,t)||NOT_A_TIME.test(result.title.slice(t.index+t[0].length)))return result;
     const mins=v=>!v?0:v==='반'?30:parseInt(v,10);
     if(t[10])return t[10]==='정오'?quickTime(result,t,12,0,today,now):quickNight(result,t,0,0,today,now);
     if(t[2]){
@@ -625,7 +819,7 @@
   const QUICK_WEEK_EN=['sun','mon','tue','wed','thu','fri','sat'];
   const QUICK_MONTHS_EN=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
   const QUICK_WD_EN='sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?|sat(?:urday)?';
-  const QUICK_DATE_EN=new RegExp(String.raw`(^|\s)(?:(?:by|on|due)\s+)?((next|this)\s+(${QUICK_WD_EN})|today|tomorrow|next\s?week|(${QUICK_WD_EN})|(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s?(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})\/(\d{1,2})|(next|this)\s+month\s+(\d{1,2})(?:st|nd|rd|th)?)(?=\s|$)`,'i');
+  const QUICK_DATE_EN=new RegExp(String.raw`(^|\s)(?:(?:by|on|due)\s+)?((next|this)\s+(${QUICK_WD_EN})|today|tomorrow|next\s?week|(${QUICK_WD_EN})|(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s?(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})\/(\d{1,2})|(next|this)\s+month\s+(\d{1,2})(?:st|nd|rd|th)?)(?=[\s,，]|$)`,'i');
   // Period words with a bare hour, before or after it ("tonight at 11", "7 tonight"), mirror PERIOD_KO (2026-11-02 review usability-3):
   // tonight / this evening / this afternoon / this night are PM, this morning AM; "tonight at 1"–"at 4" and "tonight / this evening at 12" are
   // night hours (quickNight), "dinner tonight at 5" stays 5 PM. A bare evening / afternoon / morning / night is a time only right before
@@ -640,12 +834,32 @@
   // evening", "book 2 night stay"); before, the bare "at N" guess won and put the reminder in the wrong half of the day with the words left
   // in the title (2026-11-02 r60 integration cal-1).
   const QUICK_AFTER_EN=String.raw`(?<=(?:(?:^|\s)at\s+\d{1,2}(?::[0-5]\d)?(?:\s?(?:am|pm))?|\d{1,2}:[0-5]\d(?:\s?(?:am|pm))?|\d{1,2}\s?(?:am|pm))\s+)(?:in\s+the\s+(?:morning|afternoon|evening)|at\s+night|morning|afternoon|evening|night)`;
-  const QUICK_TIME_EN=new RegExp(String.raw`(^|\s)(?:at\s+)?(?:(?:in\s+the\s+)?(${QUICK_PERIOD_EN}|(?:evening|afternoon|morning|night)(?=\s+at\s))\s+(?:at\s+)?(\d{1,2})(?::([0-5]\d))?(?:\s?(am|pm))?|(\d{1,2})(?::([0-5]\d))?(?:\s?(am|pm))?\s+(${QUICK_PERIOD_EN}|${QUICK_AFTER_EN})|(\d{1,2})(?::([0-5]\d))?\s?(am|pm)|([01]?\d|2[0-3]):([0-5]\d)|(noon|midnight)|at\s+(\d{1,2}))(?=\s|$)`,'i');
+  const QUICK_TIME_EN=new RegExp(String.raw`(^|\s)(?:(?:at|by|before)\s+)?(?:(?:in\s+the\s+)?(${QUICK_PERIOD_EN}|(?:evening|afternoon|morning|night)(?=\s+at\s))\s+(?:at\s+)?(\d{1,2})(?::([0-5]\d))?(?:\s?(am|pm))?|(\d{1,2})(?::([0-5]\d))?(?:\s?(am|pm))?\s+(${QUICK_PERIOD_EN}|${QUICK_AFTER_EN})|(\d{1,2})(?::([0-5]\d))?\s?(am|pm)|([01]?\d|2[0-3]):([0-5]\d)|(noon|midnight)|at\s+(\d{1,2}))(?=\s|$)`,'i');
   // "tomorrow dentist", "next friday report", "due oct 25 wedding", "10/25 trip", "call mom 3pm", "next month 1 rent".
-  function parseQuickEn(raw,today=dateKey(),now=new Date()){
-    const text=String(raw||'').trim();let result={title:text,dueDate:'',reminderAt:''};
-    const m=text.match(QUICK_DATE_EN);
-    if(m&&repeatBefore(text,m))return result;
+  // An English line gets what a Korean one gets (2026-11-07 owner: 「영문 설정에서 … 한글로 입력했을 때 처럼 … 잘 이해하는 거 맞지?」 — it was 47% of the lines of
+  // tests/fixtures/nl-corpus.jsonl's English part): the day, 「in 2 weeks」, 「the 25th」, 「end of month」, 「tonight」, 「by noon」, and for an event a range, a
+  // length, a place. Which rules read a line goes by the line, not the app's language: Hangul in it, the Korean ones (parseQuickLine, parseEvent).
+  const EN_COUNT={a:1,an:1,one:1,two:2,three:3,four:4,five:5,six:6};
+  function quickDayEn(text,today){
+    const found=(m,dueDate)=>({title:quickStrip(text,m)||text,dueDate,stop:false});
+    let m=text.match(/(^|\s)(?:on\s+|by\s+)?(?:the\s+)?day\s+after\s+tomorrow(?=[\s,，]|$)/i);
+    if(m)return found(m,dayOffset(today,2));
+    m=text.match(/(^|\s)in\s+(an?|one|two|three|four|five|six|\d{1,3})\s+(day|week|month)s?(?=[\s,，]|$)/i);
+    if(m){const n=EN_COUNT[m[2].toLowerCase()]??Number(m[2]);const unit=m[3].toLowerCase();return found(m,unit==='day'?dayOffset(today,n):unit==='week'?dayOffset(today,7*n):monthsOn(today,n));}
+    m=text.match(/(^|\s)(?:by\s+)?(?:the\s+)?end\s+of\s+(?:the\s+)?(month|year)(?=[\s,，]|$)/i);
+    if(m)return found(m,m[2].toLowerCase()==='month'?monthEnd(today,0):today.slice(0,4)+'-12-31');
+    m=text.match(/(^|\s)(?:on\s+|by\s+)?the\s+(\d{1,2})(?:st|nd|rd|th)(?=[\s,，]|$)/i);
+    if(m){const date=quickThisMonth(today,Number(m[2]))||quickNextMonth(today,Number(m[2]));if(date)return found(m,date);}
+    // Three of the short days are words too: 「Sun cream」, 「SAT prep」, 「Mon Cheri」. Alone they need an on/by, a time after them or the line's end; the
+    // search goes on past one, for the day the line does name (「SAT prep tomorrow」, Codex sixth review N6).
+    for(let from=0;;){
+      m=text.slice(from).match(QUICK_DATE_EN);
+      if(!m)break;
+      m.index+=from;
+      if(!(m[5]&&/^(?:sun|sat|mon)$/i.test(m[5])&&!/^\s*(?:by|on|due)\s/i.test(m[0])&&!/^\s*(?:$|,|(?:at\s+)?\d{1,2}(?::\d\d)?\s?(?:am|pm)?(?:\s|,|$))/i.test(text.slice(m.index+m[0].length))))break;
+      from=m.index+m[0].length;
+    }
+    if(m&&repeatBefore(text,m))return {title:text,dueDate:'',stop:true};
     if(m){
       const token=m[2].toLowerCase().replace(/\s/g,'');let date='';
       if(m[4])date=quickWeekDay(today,m[3].toLowerCase()==='this'?0:1,QUICK_WEEK_EN.indexOf(m[4].slice(0,3).toLowerCase()));
@@ -653,15 +867,40 @@
       else if(token==='tomorrow')date=dayOffset(today,1);
       else if(token==='nextweek')date=dayOffset(today,7);
       else if(m[5])date=quickNextDay(today,QUICK_WEEK_EN.indexOf(m[5].slice(0,3).toLowerCase()));
-      else if(m[6])date=quickMonthDay(today,QUICK_MONTHS_EN.indexOf(m[6].slice(0,3).toLowerCase())+1,Number(m[7]));
-      else if(m[8])date=quickMonthDay(today,Number(m[8]),Number(m[9]));
+      else if(m[6]){const mo=QUICK_MONTHS_EN.indexOf(m[6].slice(0,3).toLowerCase())+1;date=justPast(today,mo,Number(m[7]))?'':quickMonthDay(today,mo,Number(m[7]));}
+      else if(m[8])date=justPast(today,Number(m[8]),Number(m[9]))?'':quickMonthDay(today,Number(m[8]),Number(m[9]));
       else if(m[10])date=(m[10].toLowerCase()==='next'?quickNextMonth:quickThisMonth)(today,Number(m[11]));
-      if(date)result={title:quickStrip(text,m)||text,dueDate:date,reminderAt:''};
+      if(date)return found(m,date);
+      return {title:text,dueDate:'',stop:false};
     }
+    m=text.match(/(^|\s)next\s+month(?=[\s,，]|$)/i);
+    if(m)return found(m,monthsOn(today,1));
+    return {title:text,dueDate:'',stop:false};
+  }
+  // "tomorrow 3 reports" keeps its count, "buy 2 tonight" too; what is read leaves the line, and a line nothing is read from stays as typed.
+  function parseQuickEn(raw,today=dateKey(),now=new Date()){
+    const typed=String(raw||'').trim();
+    const text=typed.replace(/(^|\s)by\s+(today|tomorrow)\s+(morning|afternoon)(?=\s|$)/i,'$1$2 by $3');
+    const read=quickLineEn(text,today,now);
+    if(!read.dueDate&&!read.reminderAt)return {...read,title:typed};
+    return {...read,title:(read.title===text?typed:read.title).replace(/^(?:please\s+)?(?:remind\s+me\s+to|remember\s+to|don['’]?t\s+forget\s+to)\s+/i,'')||typed};
+  }
+  function quickLineEn(text,today,now){
+    const day=quickDayEn(text,today);let result={title:day.title,dueDate:day.dueDate,reminderAt:''};
+    if(day.stop)return result;
+    // 「by morning」 as 「오전까지」, 「by afternoon」 and the end of the day as 「오후까지」.
+    const soon=result.title.match(/(^|\s)(?:(?:by\s+)?(?:the\s+)?(?:end\s+of\s+(?:the\s+)?day|eod)|by\s+(?:morning|afternoon))(?=\s|$)/i);
+    if(soon&&!repeatBefore(result.title,soon))return quickTime(result,soon,/morning/i.test(soon[0])?12:18,0,today,now);
     // "at 3" reads like Korean 「3시」 (bare-clock rule), noon is 12:00 and midnight 00:00 of the next day (like 자정); a bare "3" after a
     // date word stays a word ("tomorrow 3 reports", 2026-10-27 review).
     const t=result.title.match(QUICK_TIME_EN);
-    if(!t||repeatBefore(result.title,t))return result;
+    if(!t){
+      // 「Pick up laundry tonight」: today, the hour left open. A number before it is a count ("buy 2 tonight", 2026-11-02).
+      const part=result.title.match(/(^|\s)(tonight|this\s+(?:morning|afternoon|evening))$/i);
+      if(part&&!result.dueDate&&!/\d\s*$/.test(result.title.slice(0,part.index)))return {title:quickStrip(result.title,part)||result.title,dueDate:today,reminderAt:''};
+      return result;
+    }
+    if(repeatBefore(result.title,t)||NOT_A_TIME.test(result.title.slice(t.index+t[0].length)))return result;
     const period=(t[2]||t[9]||'').toLowerCase().replace(/^(?:this|in\s+the|at)\s+/,'');
     if(period){
       const h12=Number(t[3]||t[6]);const minute=Number(t[4]||t[7]||0),ampm=(t[5]||t[8]||'').toLowerCase(),clock=Boolean(t[4]||t[7]);
@@ -689,6 +928,152 @@
       return hour>=13||hour===0||/^0/.test(t[16])?quickTime(result,t,hour,0,today,now):quickClock(result,t,t[16],hour,0,today,now);
     }
     return quickClock(result,t,t[13],Number(t[13]),Number(t[14]),today,now);
+  }
+  // An event typed as one line in English, as parseEventKo reads a Korean one: a time (「3pm」, 「at 7」, 「15:00」, 「noon」; a bare hour reads 1–6 afternoon, 7–11
+  // morning, evening with dinner·drinks·party in the line or tonight/night around it), a range (「2-3pm」, 「9am to 5pm」, 「from 2 to 4」, 「3pm for 2 hours」), a
+  // date (quickDayEn), a place (「at Main Hall」, 「in Room 204」, 「at home」, after a comma, 「Location: …」, 「@ …」, a last word that names one, a place right before
+  // the time). 「by 5pm」 is a deadline and midnight stays typed, as in Korean. 「at the store」, 「in on the team」: lower case and no place word, not a place.
+  const EN_PLACE=/^(?:room|station|airport|hall|center|centre|hotel|cafe|café|library|hospital|clinic|park|mall|office|campus|school|university|gym|theater|theatre|restaurant|church|stadium|terminal|coex|starbucks|plaza|tower)$/i;
+  const EN_NOT_PLACE=/^(?:january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|noon)$/i;
+  const EN_AT=/(^|[\s,，])(?:at|in)\s+((?:the\s+)?[A-Z][\w'’&.-]*(?:\s+(?:[A-Z][\w'’&.-]*|\d{1,4}[A-Za-z]?|of|the))*)(?=[\s,，]|$)/;
+  const EN_AT_LOWER=/(^|[\s,，])(?:at|in)\s+((?:the\s+)?(?:home|work|office|school|gym|library|hospital|clinic|airport|station|church|park|cafe|restaurant))(?=[\s,，]|$)/i;
+  const EN_SPAN=/(^|[\s,，])(from\s+)?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?\s?(?:[-–—~]|to|until|till)\s?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?(?=[\s,，]|$)/i;
+  const EN_FOR=/(^|[\s,，])(at\s+)?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?\s+for\s+(?:(an?\s+hour)|(\d{1,2})\s?(?:hours?|hrs?)|(\d{1,3})\s?(?:minutes?|mins?))(?=[\s,，]|$)/i;
+  const EN_CLOCK=[/(^|[\s,，])(?:at\s+)?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)(?=[\s,，]|$)/i,/(^|[\s,，])at\s+(\d{1,2})(?::([0-5]\d))?()(?=[\s,，]|$)/i,/(^|[\s,，])(\d{1,2}):([0-5]\d)()(?=[\s,，]|$)/];
+  const enPeriod=half=>(half==='am'||half==='morning'?'오전':half?'오후':undefined);
+  const enPlaceTail=word=>/^[A-Z]/.test(word)&&EN_PLACE.test(word);
+  const enCapital=word=>/^[A-Z0-9]/.test(word);
+  function enPlaceStart(words){
+    let at=words.length-1;
+    if(at>=1&&/^(?:[A-Z]|\d{1,4}[A-Za-z]?)$/.test(words[at])&&enPlaceTail(words[at-1]))at--;
+    else if(!enPlaceTail(words[at]))return -1;
+    while(at>0&&enCapital(words[at-1]))at--;
+    return at;
+  }
+  function parseEventEn(raw,now=new Date(),seen){
+    const typed=String(raw||'').trim();if(!typed)return null;
+    let text=typed,half='',location='',allDay=false;
+    // 「until 5pm」 alone is a deadline; 「9am until 5pm」 a range (Codex sixth review N5).
+    const ranged=text.match(EN_SPAN);const outside=ranged&&(ranged[2]||ranged[4]||ranged[5]||ranged[7]||ranged[8])?text.slice(0,ranged.index)+ranged[1]+text.slice(ranged.index+ranged[0].length):text;
+    if(/(^|\s)(?:by|before|until|due)\s+(?:\d{1,2}(?::\d\d)?\s?(?:am|pm)?|noon|midnight)(?=[\s,，]|$)/i.test(outside)||/(^|\s)(?:at\s+)?midnight(?=[\s,，]|$)/i.test(text))return halted(seen);
+    const whole=text.match(/(^|[\s,，])all[\s-]day(?=[\s,，]|$)/i);
+    if(whole){allDay=true;text=(text.slice(0,whole.index)+whole[1]+text.slice(whole.index+whole[0].length)).trim();}
+    const named=text.match(/(^|[\s,，])(?:location|place|where)\s?:\s?([^,，]+?)(?=\s*(?:[,，]|$|\d{1,2}(?::\d\d)?\s?(?:am|pm)|at\s+\d))/i)||text.match(/(^|[\s,，])@\s?([^\s,，]+(?:\s+[A-Z][^\s,，]*)*)/);
+    if(named){location=named[2].trim();text=(text.slice(0,named.index)+named[1]+text.slice(named.index+named[0].length)).trim();}
+    text=text.replace(/(^|[\s,，])(today|tomorrow|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s+(morning|afternoon|evening|night)(?=[\s,，]|$)/i,(all,lead,day,part)=>{half=part.toLowerCase();return lead+day;});
+    text=text.replace(/(^|[\s,，])(?:tonight|this\s+(morning|afternoon|evening|night))(?=[\s,，]|$)/i,(all,lead,part)=>{half=(part||'night').toLowerCase();return lead+'today';});
+    const evening=EVENING.test(text);let time=null,end=null,at=-1;
+    const STOP='\u0001'; // where the time stood: 「Flight 7am Incheon Airport」, the place starts after it
+    const cut=m=>{at=m.index;text=(text.slice(0,m.index)+m[1]+' '+STOP+' '+text.slice(m.index+m[0].length)).trim();};
+    const clock=(hour,mm,mark)=>eventClock(enPeriod((mark||'').toLowerCase()||half),hour,undefined,mm,evening);
+    const span=text.match(EN_SPAN);
+    if(span&&(span[2]||span[4]||span[5]||span[7]||span[8])){
+      const a=(span[5]||'').toLowerCase(),b=(span[8]||'').toLowerCase();
+      const first=a||(b?(Number(span[3])%12<=Number(span[6])%12?b:b==='pm'?'am':'pm'):'');
+      const start=clock(span[3],span[4],first);const stop=start&&eventEnd(start,b?enPeriod(b):undefined,span[6],undefined,span[7]);
+      if(start&&stop){time=start;end=stop;cut(span);}
+    }
+    if(!time){
+      const long=text.match(EN_FOR);
+      if(long&&(long[2]||long[4]||long[5])){
+        const start=clock(long[3],long[4],long[5]);const minutes=long[6]?60:long[7]?Number(long[7])*60:Number(long[8]);const stop=start?start.h*60+start.m+minutes:0;
+        if(start&&minutes>0&&stop<1440){time=start;end={h:Math.floor(stop/60),m:stop%60};cut(long);}
+      }
+    }
+    if(!time)for(const re of EN_CLOCK){
+      const t=text.match(re);if(!t||NOT_A_TIME.test(text.slice(t.index+t[0].length)))continue;
+      const made=clock(t[2],t[3],t[4]);if(made){time=made;cut(t);break;}
+    }
+    if(!time){const noon=text.match(/(^|[\s,，])(?:at\s+)?noon(?=[\s,，]|$)/i);if(noon){time={h:12,m:0};cut(noon);}}
+    const today=dateKey(now);const before=at>0?text.slice(0,at).trim():'';
+    const day=quickDayEn(text,today);const date=day.dueDate;if(date)text=day.title;
+    if(day.stop&&!time&&!location&&!allDay)return halted(seen); // 「Standup every Monday」: a repeat is chosen in the card
+    if(!location){
+      // A place needs a place word (「at Main Hall」); 「at Marios」 counts beside a time or a date; 「Training in Python」, 「Alice in Wonderland」 stay titles
+      // (Codex sixth review N1).
+      const m=text.match(EN_AT)||text.match(EN_AT_LOWER);const words=m?m[2].split(/\s+/):[];
+      if(m&&!EN_NOT_PLACE.test(words[0])&&(EN_AT_LOWER.test(m[0])||words.some(word=>EN_PLACE.test(word))||(/^\S*\s*at\s/i.test(m[0])&&(time||date)))){location=m[2];text=(text.slice(0,m.index)+m[1]+text.slice(m.index+m[0].length)).trim();}
+    }
+    const raws=text.split(/[,，]/).filter(s=>s.replace(STOP,'').trim());
+    const parts=raws.map(s=>s.replace(STOP,' ').replace(/\s+/g,' ').trim().replace(/\s+(?:at|in|on|from|for)$/i,'').trim()).filter(Boolean);
+    let title='';
+    const isPlace=part=>{const words=part.split(' ');return enPlaceStart(words)===0;};
+    if(location)title=parts.join(' · ');
+    else if(parts.length>=2){
+      if(isPlace(parts[0])&&!isPlace(parts.at(-1))){location=parts[0];title=parts.slice(1).join(' · ');}
+      else{title=parts.slice(0,-1).join(' · ');location=parts.at(-1);}
+    }else{
+      const words=(parts[0]||'').split(' ').filter(Boolean);const marked=(raws[0]||'').trim().split(/\s+/).indexOf(STOP);
+      let start=words.length>=2?enPlaceStart(words):-1;if(start>=0&&marked>0&&start<marked&&marked<words.length)start=marked;
+      if(start>0){location=words.slice(start).join(' ');title=words.slice(0,start).join(' ');}
+      else{
+        const lead=before?quickDayEn(before.replace(STOP,' '),today).title.trim():'';
+        if(lead&&isPlace(lead)&&words.join(' ').startsWith(lead+' ')){location=lead;title=words.join(' ').slice(lead.length+1);}
+        else title=words.join(' ');
+      }
+    }
+    if(!time&&!date&&!location&&!allDay)return null;
+    return{title:title||typed,date,time,...(end?{end}:{}),location,...(allDay&&!time?{allDay:true}:{})};
+  }
+  // Hangul in the line: the Korean rules; none: the English ones. The app's language has no say: people type what they type.
+  const hasHangul=text=>/[가-힣]/.test(String(text||''));
+  const parseQuickLine=(raw,today=dateKey(),now=new Date())=>(hasHangul(raw)?parseQuickKo:parseQuickEn)(raw,today,now);
+  const parseEvent=(raw,now=new Date(),seen)=>(hasHangul(raw)?parseEventKo:parseEventEn)(raw,now,seen);
+  // 자주 쓰는 일정 (2026-11-08 owner: 「점심 이준우」 → 11:30–12:30, 「🍽️ 이준우」, each user's own words and hours). The line is read as ever first; then
+  // the first word of what is left, whole and in any case, names an item. The title always takes the item's shape; a time typed in the line beats
+  // hours the user chose (the time grid, the card, days drawn), and those beat the item's. main checks what is saved, the store heals what is read.
+  // Twenty is what one makes in the sheet; lists merged from several PCs keep up to three times that, so a merge never drops one (Argon 2026-11-08 G2).
+  const SHORTCUT_MAX=20;const SHORTCUT_KEEP=60;
+  const SHORTCUT_ID=/^[\w-]{1,64}$/;const SHORTCUT_CLOCK=/^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  const shortcutKey=word=>String(word||'').normalize('NFC').toLowerCase();
+  const oneLine=(value,max)=>typeof value==='string'?value.replace(/\s+/g,' ').trim().slice(0,max):'';
+  const clockOrder=(start,end)=>SHORTCUT_CLOCK.test(start)&&SHORTCUT_CLOCK.test(end)&&start<end;
+  function cleanShortcut(raw){
+    if(!raw||typeof raw!=='object'||typeof raw.id!=='string'||!SHORTCUT_ID.test(raw.id))return null;
+    const word=oneLine(raw.word,30);if(!word||/\s/.test(word))return null;
+    const allDay=raw.allDay===true;const start=allDay?'':String(raw.start||'');const end=allDay?'':String(raw.end||'');
+    if(!allDay&&!clockOrder(start,end))return null;
+    const item={id:raw.id,word,before:oneLine(raw.before,30),after:oneLine(raw.after,30),start,end,allDay,calendarId:typeof raw.calendarId==='string'&&raw.calendarId.length<=400?raw.calendarId:'',color:typeof raw.color==='string'&&/^#[\da-f]{6}$/i.test(raw.color)?raw.color:''};
+    if(raw.alert===null||alertOk(raw.alert))item.alert=raw.alert;
+    if(Number.isSafeInteger(raw.created)&&raw.created>0)item.created=raw.created; // when it was made (2026-11-09): the sheet lists items in that order
+    return item;
+  }
+  // One word once, in the order they were made (2026-11-09 owner: 「제일 처음한 게 제일 위에 보이는 게 낫지 않을까?」); the stamp travels in the item,
+  // so every PC lists them alike. Items from before the stamp come first, by word, as they did.
+  function cleanShortcuts(list){
+    if(!Array.isArray(list))return [];
+    const words=new Set();const ids=new Set();const kept=[];
+    for(const raw of list){const item=cleanShortcut(raw);if(!item||words.has(shortcutKey(item.word))||ids.has(item.id))continue;words.add(shortcutKey(item.word));ids.add(item.id);kept.push(item);if(kept.length===SHORTCUT_KEEP)break;}
+    return kept.sort((a,b)=>(a.created||0)-(b.created||0)||(shortcutKey(a.word)<shortcutKey(b.word)?-1:1));
+  }
+  // Why an item cannot be saved, '' when it can: the sheet says so beside the field. 'date': a word the line reads as a day or a time never reaches the items.
+  function shortcutProblem(item,others=[]){
+    const word=oneLine(item?.word,30);if(!word)return 'empty';if(/\s/.test(word))return 'space';
+    const key=shortcutKey(word);if(others.some(other=>other.id!==item.id&&shortcutKey(other.word)===key))return 'same';
+    if(!item.allDay&&!clockOrder(item.start,item.end))return 'time';
+    for(const name of ['가나다','sample']){const seen={};const line=parseEvent(word+' '+name,new Date(),seen);if(seen.stopped||(line&&shortcutKey(oneLine(line.title,500).split(' ')[0])!==key))return 'date';}
+    return '';
+  }
+  // The document's form (lib/viewsync.cjs K:): one value, so an item never mixes two PCs' edits (a start from one, an end from the other).
+  const shortcutValue=item=>[item.word,item.before,item.after,item.start,item.end,item.allDay,item.calendarId,item.color,item.alert===undefined?'':item.alert,item.created===undefined?'':item.created];
+  function shortcutFromValue(id,value){
+    if(!Array.isArray(value))return null;
+    const [word,before,after,start,end,allDay,calendarId,color,alert,created]=value;
+    return cleanShortcut({id,word,before,after,start,end,allDay,calendarId,color,...(alert===''?{}:{alert}),...(created===''||created===undefined?{}:{created})});
+  }
+  function applyShortcut(raw,parsed,list,{chosen=false,stopped=false}={}){
+    if(stopped||!Array.isArray(list)||!list.length)return null;
+    const title=oneLine(parsed?parsed.title:raw,500);const words=title?title.split(' '):[];const find=word=>{const key=shortcutKey(word);return list.find(entry=>shortcutKey(entry.word)===key);};
+    let item=words.length?find(words[0]):null;let rest=words.slice(1);
+    if(!item&&words.length>1){item=find(words.at(-1));rest=words.slice(0,-1);}
+    if(!item)return null;
+    /* 「lunch with Alex」, 「lunch w/ Alex」: English joins the name with a word that goes with the shortcut's (2026-11-08 English check) */if(rest.length>1&&words[0]!==rest[0]&&/^(?:with|w\/)$/i.test(rest[0]))rest=rest.slice(1);
+    const hit={...(parsed||{}),title:item.before||item.after?[item.before,rest.join(' ')||item.word,item.after].filter(Boolean).join(' '):title,shortcut:item};
+    const onClock=value=>Number(value.slice(0,2))*60+Number(value.slice(3,5));const clock=minutes=>({h:Math.floor(minutes/60)%24,m:minutes%60});
+    const length=item.allDay?0:onClock(item.end)-onClock(item.start);
+    if(parsed?.time){/* hours picked on the time grid keep their length (Codex 2026-11-08 F3) */if(!parsed.end&&!chosen&&length){hit.minutes=length;hit.end=clock(parsed.time.h*60+parsed.time.m+length);}}
+    else if(!parsed?.allDay&&!chosen){if(item.allDay)hit.allDay=true;else{hit.time=clock(onClock(item.start));hit.end=clock(onClock(item.end));hit.minutes=length;}}
+    return hit;
   }
   // ---- 「날짜로 이동」 (Apple Calendar ⌘⇧T): the whole box is one date. Unlike quick add, a month-day already past stays in
   // this year (going back is the point), and a year and month alone go to its 1st. Words quick add reads (내일, 다음 주 금요일,
@@ -722,8 +1107,10 @@
   const collators=new Map();
   function collatorFor(locale){const key=locale||'';if(!collators.has(key))collators.set(key,new Intl.Collator(locale||undefined,{numeric:true,sensitivity:'base'}));return collators.get(key);}
   // importantOf: the 중요 flag as the screen holds it (a flag just clicked keeps its row in place until the pointer leaves).
+  // A timed task sorts by its time within its day, after the day's date-only ones (2026-11-05: as a calendar's all-day row comes first).
   function sortTasks(tasks,mode,order,locale,importantOf=t=>t.important){
-    const byDue=(a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999');
+    const dueKey=t=>{const next=nextDueOf(t);return !next?'9999':next===t.dueDate?next+(dueTimeOk(t.dueTime)?'T'+t.dueTime:''):next;};
+    const byDue=(a,b)=>dueKey(a).localeCompare(dueKey(b));
     const byImportant=(a,b)=>Number(Boolean(importantOf(b)))-Number(Boolean(importantOf(a)));
     const byCreated=(a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''));
     let cmp;
@@ -734,10 +1121,30 @@
     else cmp=(a,b)=>byDue(a,b)||byImportant(a,b)||byCreated(a,b);
     return [...tasks].sort(cmp);
   }
+  // ---- A task's time on its date (2026-11-05 owner, with iPhone screenshots: 「아이폰에서 … 할 일을 11/6 금요일 오후 2시로 만들었더니 달력에도
+  // 오후 2시로 나와 … 할 일에 날짜와 시간 설정이 되도록 해줘」): 'HH:MM' on this PC's clock beside dueDate, as Apple Reminders has a date and,
+  // on it, an optional time. The reminder stays its own field (reminderAt, an instant). Microsoft To Do and this PC keep the time; Google
+  // Tasks has none (its API drops the time of `due`), so a Google list never gets one.
+  const DUE_TIME=/^([01]\d|2[0-3]):[0-5]\d$/;
+  const dueTimeOk=value=>typeof value==='string'&&DUE_TIME.test(value);
+  // The instant a timed task is due (its date at its time here); null for a date only.
+  function dueAt(task){if(!task?.dueDate||!dueTimeOk(task.dueTime))return null;const at=new Date(`${task.dueDate}T${task.dueTime}:00`);return Number.isFinite(at.getTime())?at:null;}
+  // The editor's quick 알림 for a timed task, in minutes before its time (Apple Reminders' early reminder): 제시간에, 5분·30분·1시간·1일 전.
+  const TASK_ALERTS=[0,5,30,60,1440];
+  // How many minutes before its time a timed task's reminder rings, when that reads as Apple's early-reminder words do — 제시간에, every 5
+  // minutes within the hour, whole hours up to a day, whole days up to a week —; null otherwise (a date-only task, a reminder after the
+  // time, 「350분 전」): the row and the 알림 field then show the reminder's own time.
+  function alertBefore(task){const due=dueAt(task);const at=Date.parse(task?.reminderAt||'');if(!due||!Number.isFinite(at))return null;const gap=(due.getTime()-at)/60000;if(!Number.isInteger(gap)||gap<0)return null;return (gap<60&&gap%5===0)||(gap%60===0&&gap<=1440)||(gap%1440===0&&gap<=10080)?gap:null;}
+  // The time 「시간」 gives a date first (2026-11-05 review): the next full hour, as Apple Reminders does — never 자정 (00:00) nor the hour
+  // that is midnight UTC on that day (오전 9:00 in Korea), which To Do answers as a date only (lib/providers/microsoft.cjs dueFrom), so the
+  // phone may show them all day; the hour after then.
+  function defaultDueTime(date,now=new Date()){const utc=new Date(`${date}T00:00:00Z`);const clash=Number.isFinite(utc.getTime())&&utc.getMinutes()===0?utc.getHours():-1;let hour=(now.getHours()+1)%24;while(hour===0||hour===clash)hour=(hour+1)%24;return String(hour).padStart(2,'0')+':00';}
   // ---- Repeating tasks (Reminders, To Do): completing one adds the next, dated the rule's first day after its due date (not
   // after the day it was done — To Do and Reminders count from the due date). '' when the rule has ended (UNTIL, COUNT).
   function nextDue(rruleText,dueKey){
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(dueKey||''))||!parseRRule(rruleText))return '';
+    const rule=parseRRule(rruleText);
+    /* the last of a counted repeat ends it: a date moved off the rule's days would otherwise count as not yet taken (2026-11-08 Argon review) */
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(dueKey||''))||!rule||rule.count===1)return '';
     let next='';
     walkRRule({start:dueKey,allDay:true,rrule:rruleText},o=>{const key=dateKey(o);if(key>dueKey){next=key;return false;}return true;});
     return next;
@@ -757,11 +1164,11 @@
   }
   // New event times (Apple Calendar's +): today after 09:00 starts at the next whole hour (at most 23:00) for one hour,
   // so a new event never opens in the past; other days 09:00-10:00. Values are datetime-local strings.
+  // The hour an event gets when its time is asked for and none was chosen: the next whole hour of the clock, on any day, an hour long
+  // (2026-11-07 owner: 「지금 현재 시간에 가까운 정시로」; 오전 9:00 on every other day read as a setting nobody made). Late evening stays on the day.
   function defaultEventTimes(day,now=new Date()){
-    if(day!==dateKey(now)||now.getHours()<9)return [day+'T09:00',day+'T10:00'];
-    const local=d=>`${dateKey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    const s=new Date(now);s.setHours(Math.min(now.getHours()+1,23),0,0,0);const e=new Date(s);e.setHours(e.getHours()+1);
-    return [local(s),local(e)];
+    const hour=Math.min(now.getHours()+1,23);
+    return [`${day}T${pad(hour)}:00`,hour===23?`${dayOffset(day,1)}T00:00`:`${day}T${pad(hour+1)}:00`];
   }
   // Moving an event's start keeps its length (Apple, Google, Notion): the end moves by the same amount. The strings are
   // read as wall-clock time, so time zones and DST do not matter, and a half-typed year (Chromium fires 'change' per
@@ -810,6 +1217,15 @@
     return {bars,lanes:lanes.length};
   }
   // A timed event moved to start at key + minutes keeps its length.
+  // One end of an event dragged to another day (2026-11-08 owner: 「일정을 잡고 옆으로 늘리면 늘린 날까지 그 일정이 이어지고」): the other end stays.
+  // All day: never under one day. With times: the day moves and the clock stays, and an end never comes before its start.
+  function stretchedEvent(event,side,day){
+    if(event.allDay){const first=String(event.start).slice(0,10),end=String(event.end||'').slice(0,10)||dayOffset(first,1),last=dayOffset(end,-1);return side==='end'?{start:event.start,end:dayOffset(day<first?first:day,1)}:{start:day>last?last:day,end};}
+    const s=new Date(event.start),en=new Date(event.end||event.start);const moved=(at,days)=>{const t=new Date(at);/* no days, no change: setDate would pick the first of an hour that comes twice (Codex recheck N3) */if(days)t.setDate(t.getDate()+days);return t;};const between=(a,b)=>Math.round((fromDate(b)-fromDate(a))/86400000);
+    /* a clock that would end before it starts on that day: an hour, as a new event (Argon recheck GN2: 18:00 to 10:00 could not be drawn back to one day) */
+    if(side==='end'){const next=moved(en,between(dateKey(new Date(en.getTime()-1)),day));return {start:event.start,end:(next>s?next:new Date(s.getTime()+3600000)).toISOString()};}
+    const next=moved(s,between(dateKey(s),day));return {start:(next<en?next:new Date(en.getTime()-3600000)).toISOString(),end:en.toISOString()};
+  }
   function movedTimes(event,key,minutes){const s=new Date(event.start),e=new Date(event.end||event.start);const start=atWall(key,minutes);return {start:start.toISOString(),end:new Date(start.getTime()+Math.max(0,e-s)).toISOString()};}
   // Dropped on another day (month grid, all-day row): the same clock time (timed) or the same number of days (all-day).
   function shiftedDays(event,days){
@@ -852,7 +1268,7 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassLookApp,widgetTheme,isCustomColor,clampColor,titleColor,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
+  const api={RANGE,SHORTCUT_MAX,SHORTCUT_KEEP,applyShortcut,cleanShortcuts,shortcutKey,shortcutProblem,shortcutValue,shortcutFromValue,stretchedEvent,nextDueOf,stepsDueOn,hexToHsv,hsvToHex,appPassword,parseQuickLine,parseEvent,parseEventEn,dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassLookApp,widgetTheme,isCustomColor,clampColor,titleColor,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,parseEventKo,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,dueTimeOk,dueAt,TASK_ALERTS,alertBefore,defaultDueTime,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

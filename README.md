@@ -1,78 +1,80 @@
+<p align="center"><b>English</b> · <a href="README.ko.md">한국어</a></p>
+
 <div align="center">
 
 <img src="assets/icon.png" width="80" alt="">
 
 # Dayboard
 
-Clean like a Mac or iPhone. Quick on Windows.<br>Tasks, calendar and notes, with desktop widgets.
+**Your tasks and calendar on one board, at a glance. For Windows.**<br>
+A clean, Mac- and iPhone-style look for everything on your plate today.
 
-**English** · [한국어](README.ko.md)
+[**Download for Windows**](https://github.com/nowsummer/Dayboard/releases/latest)
 
-[**Download for Windows**](https://github.com/nowsummer/Dayboard/releases/latest) · [Website](https://nowsummer.github.io/Dayboard/en/) · [Privacy](https://nowsummer.github.io/Dayboard/en/privacy.html)
+<img src="images/en/demo.webp" width="860" alt="A short tour: finishing a task, typing an event in one line, a Quick event, dragging an event, searching notes, and the desktop widgets">
 
-<img src="images/en/demo.webp" width="860" alt="Adding and completing a task, dragging events in the month and week calendar, notes, then a widget put on the desktop and its glass adjusted in Dayboard">
+<img src="images/en/board.png" width="860" alt="The Dayboard board, with today's tasks, the calendar and notes on one screen">
 
 </div>
 
-## Why
+## Tasks: nothing slips through
 
-The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, look good and are a pleasure to use. I wanted the same on Windows, so I built it. Two rules from the start: keep it clean, keep it quick.
+Write it down, then tick it off when it's done.
 
-- **Clean** — a tidy layout, glassy desktop widgets, light and dark mode.
-- **Quick** — your data is kept on your PC, so screens open without waiting.
-- **All in one place** — connect Microsoft, Google or iCloud and stay in sync with your other PCs and phones. Or use it with no account at all.
-- **Private** — no server, no sign-up, no ads.
+- Today, Scheduled and Flagged fill themselves
+- Sort tasks into lists and groups, and break big ones into subtasks
+- Add dates, reminders and repeats
 
-## Features
+<p align="center"><img src="images/en/clips/tasks.webp" width="720" alt="Adding a task, opening its subtasks, then clicking the circle to finish it"></p>
 
-<table>
-  <tr><td><b>Tasks</b></td><td>Smart lists · lists and groups · repeats and subtasks · drag to reorder · quick add: "tomorrow 3pm"</td></tr>
-  <tr><td><b>Calendar</b></td><td>Day, week, month · drag to move or resize · edit in a side card · repeats and alerts · go to any date</td></tr>
-  <tr><td><b>Notes</b></td><td>Grouped by date · pinning · find · earlier versions · synced across PCs via your Google account</td></tr>
-  <tr><td><b>Widgets</b></td><td>Tasks, calendar and notes on the desktop, in Liquid Glass style</td></tr>
-  <tr><td><b>Everyday</b></td><td>Search, undo and redo, shortcuts (press <kbd>?</kbd>), light and dark mode, English and Korean</td></tr>
-</table>
+## Calendar: just type what's on your mind
 
-## Screenshots
+No hunting for the day, picking a time or filling in the place. Type it in one line and Dayboard works out the date, time, title and place, then puts it on your calendar.
 
-<table>
-  <tr>
-    <td width="50%"><img src="images/en/tasks-list.png" alt="Tasks"></td>
-    <td width="50%"><img src="images/en/calendar.png" alt="Month calendar"></td>
-  </tr>
-  <tr><td align="center">Tasks</td><td align="center">Calendar</td></tr>
-  <tr>
-    <td><img src="images/en/notes.png" alt="Notes"></td>
-    <td><img src="images/en/tasks-today-dark.png" alt="Dark theme"></td>
-  </tr>
-  <tr><td align="center">Notes</td><td align="center">Dark theme</td></tr>
-  <tr>
-    <td><img src="images/en/calendar-week.png" alt="Week calendar"></td>
-    <td><img src="images/en/help.png" alt="Shortcut help"></td>
-  </tr>
-  <tr><td align="center">Week view</td><td align="center">Shortcut help</td></tr>
-</table>
+`Oct 6, 2–3pm, Economics exam, Main Hall`<br>
+→ Oct 6, 2:00–3:00 PM · Economics exam · Main Hall
 
-<p align="center"><img src="images/en/widgets.png" width="860" alt="Notes, Today and calendar widgets on the desktop"><br>Desktop widgets</p>
+<p align="center"><img src="images/en/clips/entry.webp" width="720" alt="Typing one line, and the event appears on October 6 with its title, time and place filled in"></p>
 
-## Install
+Drag to move an event, stretch to change its time.
 
-1. Download `Dayboard-<version>.exe` from the [latest release](https://github.com/nowsummer/Dayboard/releases/latest) and run it. No admin rights needed.
-2. Once installed, new versions download on their own. Choose **Restart now to update** in Settings to switch to the new version.
+<p align="center"><img src="images/en/clips/drag.webp" width="720" alt="Dragging an event to another day in the month view, then stretching its end in that week's view"></p>
 
-> [!NOTE]
-> The installer isn't signed yet, so Windows Smart App Control may block it at first. Wait a moment and run it again. Windows x64 only.
+### Quick events: same plan, different person
 
-**Connecting accounts**
+Some plans never change except for who you're meeting. Set up the word "lunch" once with its time and icon, and from then on that word is all you need.
 
-- Google may say it hasn't verified the app. Choose **Advanced** to continue — it's a personal project.
-- iCloud connects with an app-specific password from your Apple Account. iCloud Reminders aren't supported.
+`lunch Alex`<br>
+→ 🍽️ Alex · 12:00–1:00 PM
 
-## Privacy
+<p align="center"><img src="images/en/clips/quick.webp" width="720" alt="Saving the word lunch with an icon and a time in Settings, then typing lunch Alex and seeing the event on the calendar"></p>
 
-Tasks, events and notes stay on your PC (`%APPDATA%\Dayboard`), and data from connected accounts moves only between your PC and that service. Details: [Privacy policy](https://nowsummer.github.io/Dayboard/en/privacy.html) · [Security](SECURITY.md).
+## Notes: jot it down, find it fast
 
-## Build from source
+The Wi-Fi password. The office printer's IP address. You only need them now and then, the sticky note has vanished, and opening a heavy notes app to dig for them takes forever. Dayboard's notes are quick to jot down and one search away. Keep the ones you use most on your desktop.
+
+<p align="center"><img src="images/en/clips/notes.webp" width="720" alt="Writing a note, then typing Wi-Fi in the search box and seeing the Wi-Fi password note right away"></p>
+
+## Widgets: see it all without opening the app
+
+Keep your tasks, calendar and notes on the desktop. The Liquid Glass-style design lets your wallpaper show through, and you choose how clear it is.
+
+<p align="center"><img src="images/en/clips/widget.webp" width="720" alt="Tasks, calendar and notes widgets on the desktop, with the glass effect being adjusted"></p>
+
+## Accounts
+
+Connect Microsoft, Google or iCloud Calendar to stay in sync with your phone and other PCs. Or use it on this PC alone, no account needed.
+
+## Download
+
+[**Download for Windows**](https://github.com/nowsummer/Dayboard/releases/latest)
+
+Dayboard isn't code-signed yet, so Windows may warn you about the installer or block it.
+
+---
+
+<details>
+<summary>Build from source</summary>
 
 ```powershell
 git clone https://github.com/nowsummer/Dayboard.git
@@ -81,7 +83,7 @@ npm ci
 npm test
 npm start           # run from source
 npm run package     # app bundle (needed by dist)
-npm run dist        # unsigned installer in dist\
+npm run dist        # unsigned installer in the dist folder
 ```
 
 Needs Windows x64, Git and Node.js 22.12 or later.
@@ -89,10 +91,9 @@ Needs Windows x64, Git and Node.js 22.12 or later.
 - Official installers include the Google sign-in client. Your own build asks for your own Google Cloud OAuth client (see `assets/google-oauth.example.json`).
 - Your own build still offers official releases. Turn off **Check for new versions automatically** to stay on it.
 
-## Contact
+</details>
 
-Questions or feedback: nowsummer.apps@gmail.com
+Contact nowsummer.apps@gmail.com · [Security](SECURITY.md) · [MIT License](LICENSE) ([fonts and service logos](docs/licenses/THIRD-PARTY.txt))<br>
+Dayboard isn't affiliated with Microsoft, Google or Apple.
 
-## License
-
-[MIT](LICENSE). Fonts and service logos keep their own licenses ([notices](docs/licenses/THIRD-PARTY.txt)). Dayboard isn't affiliated with Microsoft, Google or Apple.
+[Privacy Policy](https://nowsummer.github.io/Dayboard/en/privacy.html)

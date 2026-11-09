@@ -55,7 +55,7 @@ function glassHarness() {
     render() { renders++; }, glassSlide: x => x, glassFromSlide: x => Math.round((1 - Number(x)) * 100) / 100, glassLevel: () => 0.5,
     previewGlassVars: () => ({}), glassPreviews() {},
   });
-  h.loadApp('let resizingWidget=false,renderPending=false,composing=false;', 'let glassHeld=', 'function releaseGlass(', "if(!isWidget){for(const t of ['pointerup','pointercancel'])", 'function glassControl(');
+  h.loadApp('let resizingWidget=false,renderPending=false,composing=false;', 'let glassHeld=', 'function releaseGlass(', "if(!isWidget){for(const t of ['pointerup','pointercancel'])", 'function glassRange(' /* the slider itself since batch G W4 (2026-11-09) */, 'function glassControl(');
   const row = h.eval('glassControl')(); h.app.append(row);
   const range = row.querySelector('input');
   const fire = (type, target) => { for (const l of listeners.filter(x => x.type === type)) l.fn({ type, target }); };

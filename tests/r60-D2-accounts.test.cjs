@@ -2,7 +2,7 @@
 // 2026-11-02 review, area D2 (accounts dialog): app-design-14 — the 할 일·달력·메모 sync toggles are the app's switch rows
 // (.checkbox-field: appearance none, 34×20) on a full-width second row of the card, 「연결 해제」 the trailing action of the
 // top-aligned first row; app-design-7 ② ⑤ — the intro sentence and the two-line iCloud paragraph are gone (the iCloud option's
-// small text carries 「미리 알림 미지원」), the connect form's credentials sentence is one line without the OneDrive clause;
+// small text carries 「Apple 달력 (미리 알림 제외)」 since 2026-11-06 — the owner read 「Apple 달력 · 미리 알림 미지원」 as neither), the connect form's credentials sentence is one line without the OneDrive clause;
 // app-design-6 ② — the disconnect confirm is opened with noClose (a two-button alert, no X once modal() honours it).
 // Real renderer/app.js openAccounts(), connectAccount(), accountNotice(), modal() over the small DOM of tests/r50-F-dom.cjs;
 // the stylesheet's cascade through tests/r50-F-css.cjs. Fake accounts live in the renderer `state` only.
@@ -44,7 +44,7 @@ test('every sync toggle is the app\'s switch row: .checkbox-field, appearance no
   const h = accountsHarness();
   await h.openAccounts();
   const toggles = [...h.modalRoot.querySelectorAll('.sync-toggle')];
-  assert.deepEqual(toggles.map(t => h.text(t)), ['할 일', '달력', '할 일', '달력', '메모', '달력'], 'Microsoft 2, Google 3 (메모 is Google-only), iCloud 1');
+  assert.deepEqual(toggles.map(t => h.text(t)), ['할 일', '달력', '메모', '할 일', '달력', '메모', '달력'], 'Microsoft 3, Google 3, iCloud 1 (메모 goes through Google or OneDrive)');
   for (const t of toggles) {
     assert.ok(t.classList.contains('checkbox-field'), `${h.text(t)}: the switch rules apply`);
     const box = t.querySelector('input');
@@ -105,7 +105,7 @@ test('the card wraps: logo · name/status (with any notice) · 연결 해제 on 
   assert.equal(ms.querySelector(':scope>.sync-toggles .account-notice') === null, true, 'no notice among the toggles');
 });
 
-test('no intro sentence, no iCloud paragraph; the iCloud option says 미리 알림 미지원 (KO and EN)', async () => {
+test('no intro sentence, no iCloud paragraph; the iCloud option says the calendar only and that 미리 알림 is not supported (KO and EN)', async () => {
   const h = accountsHarness();
   const dialog = await h.openAccounts();
   const body = dialog.querySelector('.accounts-body');
@@ -113,9 +113,28 @@ test('no intro sentence, no iCloud paragraph; the iCloud option says 미리 알�
   assert.ok(!body.textContent.includes('익숙한 목록'));
   assert.ok(!body.textContent.includes('iCloud 미리 알림은'), 'the two-line iCloud paragraph is gone');
   const options = [...body.querySelectorAll('.provider-option')].map(o => [h.text(o.querySelector('strong')), h.text(o.querySelector('small'))]);
-  assert.deepEqual(options, [['Microsoft', 'To Do · Outlook 달력 · 바로 로그인'], ['Google', 'Tasks · Google Calendar'], ['iCloud', 'Apple 달력 · 미리 알림 미지원']]);
-  assert.equal(I.translate('en', 'Apple 달력 · 미리 알림 미지원'), 'Apple Calendar · Reminders not supported');
-  assert.ok(!/reminders? (are|is) supported|supports reminders/i.test(I.translate('en', 'Apple 달력 · 미리 알림 미지원')), 'never claims iCloud Reminders support (CLAUDE.md)');
+  // Google's line in Korean like the others (2026-11-06 review of batch A: 'Google Calendar' stood in English beside 「Outlook 달력」).
+  assert.deepEqual(options, [['Microsoft', 'To Do · Outlook 달력'], ['Google', 'Tasks · Google 달력'], ['iCloud', 'Apple 달력 (미리 알림 제외)']]);
+  // 2026-11-06 owner: 「“Apple 달력·미리알림 미지원” 이거만 봤을 때는 달력이랑 미리 알림 모두 미지원하는 거 같이 느껴져」 — no 「A · B 미지원」 that reads as both;
+  // the review of batch A: what is left out in brackets, not a negative closing a 「·」 list (「…만 · …지원 안 함」 said it twice, 「안 함」 read as a setting).
+  assert.equal(/ · [^·]*(미지원|안 함)$/.test(options[2][1]), false, 'no negative closing a list');
+  assert.equal(JSON.stringify(['Tasks · Google 달력', 'Apple 달력 (미리 알림 제외)'].map(k => I.translate('en', k))), JSON.stringify(['Tasks · Google Calendar', 'Apple Calendar (no Reminders)']));
+  assert.ok(!/reminders? (are|is) supported|supports reminders/i.test(I.translate('en', 'Apple 달력 (미리 알림 제외)')), 'never claims iCloud Reminders support (CLAUDE.md)');
+  for (const old of ['Apple 달력 · 미리 알림 미지원', 'Apple 달력만 · 미리 알림은 지원 안 함']) assert.equal(I.translate('en', old), old, 'the old words are gone from the dictionary');
+});
+
+// The iCloud connect form says what it connects and what it leaves out, where the user commits (2026-11-06 review of batch A: 「iCloud
+// 달력을 읽어옵니다.」 read as read-only, and nothing said 미리 알림 and 메모 stay out); 합니다체 like the Microsoft and Google sentences beside it.
+test('iCloud connect form: it connects the calendars, 미리 알림 and 메모 are not (KO and EN)', async () => {
+  const h = accountsHarness();
+  await h.eval('connectAccount')('icloud');
+  await h.tick();
+  // two short lines since 2026-11-09 (owner: 「간결하게」; tests/connect-dialog-1109.test.cjs has the three dialogs)
+  const intro = [...h.modalRoot.querySelectorAll('.dialog .connect-intro p')].map(h.text);
+  assert.equal(intro.join(' / '), 'iCloud 달력을 연결해요. / 미리 알림과 메모는 연결되지 않아요.');
+  assert.equal(I.translate('en', 'iCloud 달력을 연결해요.'), 'Connects your iCloud calendars.');
+  assert.equal(I.translate('en', '미리 알림과 메모는 연결되지 않아요.'), 'Reminders and Notes aren’t included.');
+  assert.equal(I.translate('en', 'iCloud 달력을 읽어옵니다.'), 'iCloud 달력을 읽어옵니다.', 'the old sentence is gone from the dictionary');
 });
 
 // 2026-11-02 r60 integration (X-2): the tour's 계정 연결 step promised 「iCloud의 할 일」 / "iCloud tasks". Every tour text, read
@@ -165,9 +184,71 @@ for (const provider of ['microsoft', 'google', 'icloud']) {
     assert.ok(dialog !== null, 'the connect form opened');
     assert.ok(!dialog.textContent.includes('OneDrive'), 'OneDrive is the owner\'s own setup');
     const helps = [...dialog.querySelectorAll('p.field-help')].map(p => h.text(p));
-    assert.ok(helps.includes('인증 정보는 이 PC의 Windows 암호화 저장소에만 저장됩니다.'), JSON.stringify(helps));
+    assert.ok(helps.includes('인증 정보는 이 PC의 Windows 암호화 저장소에만 저장돼요.'), JSON.stringify(helps)); // 해요체 with the dialog's other lines since 2026-11-09
     assert.ok(!helps.some(t => t.includes('암호화 저장소를 사용합니다')), 'the old two-sentence line is gone');
-    const en = I.translate('en', '인증 정보는 이 PC의 Windows 암호화 저장소에만 저장됩니다.');
+    const en = I.translate('en', '인증 정보는 이 PC의 Windows 암호화 저장소에만 저장돼요.');
     assert.equal(en, 'Credentials are stored only in this PC’s Windows encrypted store.');
   });
 }
+
+// iCloud as easy as Apple allows (2026-11-06): Apple offers other apps no sign-in for iCloud, so the app password stays; the dialog gives its
+// steps in Apple's own menu names (support.apple.com/102654), offers the email last used, and shapes what is pasted.
+test('the iCloud form gives Apple\'s steps, the link, the email last used, and shapes a pasted password', async () => {
+  const h = accountsHarness();
+  h.context.state.settings.appleId = 'me@example.com';
+  await h.eval('connectAccount')('icloud'); await h.tick();
+  const dialog = h.modalRoot.querySelector('.dialog');
+  assert.equal([...dialog.querySelectorAll('.setup-guide ol li')].map(h.text).join(' / '), 'Apple 계정에 로그인해요. / 로그인 및 보안 → 앱 암호 → 앱 암호 생성을 눌러요. / 이름을 Dayboard로 적고, 만든 암호를 아래에 붙여 넣어요.');
+  assert.ok(h.text(dialog.querySelector('.setup-guide')).includes('이중 인증이 켜져 있어야 앱 암호가 보여요.'));
+  // 2026-11-07 owner: asked for 「앱 암호」 cold, people read it as their Apple password and as a hack; it says what it is first.
+  assert.equal(h.text(dialog.querySelector('.setup-guide .guide-lead')), '앱 암호는 Apple 계정 암호가 아니에요. Apple에서 Dayboard용으로 따로 만들고, 언제든 지울 수 있어요.'); // trimmed 2026-11-09
+  assert.equal(dialog.querySelector('input[name=appPassword]').getAttribute('placeholder'), '앱 암호'); // the lead and the warning say what it is not (2026-11-09 review)
+  const open = [...dialog.querySelectorAll('.setup-guide button')].find(node => h.text(node) === 'Apple 계정 열기');
+  open.click(); await h.tick();
+  assert.equal(JSON.stringify(h.calls.at(-1).payload), '{"url":"https://account.apple.com/"}');
+  assert.equal(dialog.querySelector('input[name=email]').value, 'me@example.com', 'the email last used');
+  const pass = dialog.querySelector('input[name=appPassword]'); const warn = dialog.querySelector('.field-help.error-text');
+  const paste = value => { pass.value = value; pass.dispatchEvent(new h.context.Event('input', { bubbles: true })); return [pass.value, warn.hidden].join('|'); };
+  assert.equal(warn.hidden, true);
+  assert.equal(paste(' ABCD EFGH IJKL MNOP '), 'ABCD-EFGH-IJKL-MNOP|true', 'spaces go and the hyphens come');
+  assert.equal(paste('AbCdEfGhIjKlMnOp'), 'AbCd-EfGh-IjKl-MnOp|true', 'the case stays');
+  assert.equal(paste('ABCD-EFGH-IJKL-MNOP'), 'ABCD-EFGH-IJKL-MNOP|true');
+  assert.equal(paste('MyApplePassword1!'), 'MyApplePassword1!|false', 'another shape warns');
+  assert.equal(h.text(warn), 'Apple 계정 암호가 아닌지 확인해 주세요.');
+  assert.equal(pass.required, true);
+  assert.equal(dialog.querySelector('button[type=submit]').disabled, false, 'and never stops the save: Apple documents no format');
+  assert.equal(paste(''), '|true');
+});
+
+test('an iCloud account Apple refused offers a new app password, and the dialog signs the same account in again', async () => {
+  const h = accountsHarness();
+  const card = h.context.state.accounts.find(item => item.provider === 'icloud');
+  Object.assign(card, { name: 'me@example.com', status: 'error', authFailed: true, error: 'Apple 계정 암호를 바꾸면 앱 암호가 모두 무효가 돼요. 새로 만들어 붙여 넣어 주세요.' });
+  await h.openAccounts();
+  const again = [...h.modalRoot.querySelectorAll('.account-notice button')].find(node => h.text(node) === '새 앱 암호 넣기');
+  assert.ok(again, 'on the account');
+  again.click(); await h.tick(8);
+  const form = [...h.modalRoot.querySelectorAll('form')].at(-1);
+  assert.ok(h.text(form.querySelector('.setup-guide')).includes('무효가 돼요'), 'it says why, with the steps again');
+  assert.equal(form.querySelector('input[name=email]').value, 'me@example.com');
+  form.querySelector('input[name=appPassword]').value = 'ABCD-EFGH-IJKL-MNOP';
+  form.dispatchEvent(new h.context.Event('submit', { bubbles: true, cancelable: true })); await h.tick(8);
+  const sent = h.calls.find(call => call.name === 'account:connect');
+  assert.equal([sent?.payload.accountId, sent?.payload.provider, sent?.payload.email].join('|'), card.id + '|icloud|me@example.com');
+});
+
+test('the accounts sheet carries no iPhone help (2026-11-07 owner: 「복잡해보여」)', async () => {
+  const h = accountsHarness();
+  const body = await h.openAccounts();
+  assert.equal(h.text(body).includes('iPhone'), false);
+});
+
+test('an app password\'s shape', () => {
+  const D = require('../renderer/domain.js');
+  const read = text => { const shape = D.appPassword(text); return shape.value + '|' + shape.ok; };
+  assert.equal(read('ABCDEFGHIJKLMNOP'), 'ABCD-EFGH-IJKL-MNOP|true');
+  assert.equal(read('ABCD-EFGH-IJKL-MNOP\n'), 'ABCD-EFGH-IJKL-MNOP|true');
+  assert.equal(read('abcdefghijklmno'), 'abcdefghijklmno|false', 'one short is not touched');
+  assert.equal(read('abcd1234efgh5678'), 'abcd1234efgh5678|false', 'digits: not what Apple shows');
+  assert.equal(read(''), '|false');
+});

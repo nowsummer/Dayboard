@@ -148,7 +148,7 @@ test('every synced field goes from one PC to the other and back', async t => {
   a.edit(state => {
     const list = find(state.lists, L1); list.color = '#ff3b30'; list.icon = 'star';
     state.groups.push({ id: 'group-a', name: '공부', collapsed: true }); list.groupId = 'group-a';
-    state.settings.hiddenLists.push(L2);
+    state.settings.hiddenLists.push(L2); state.settings.notInAll = [L3];
     state.settings.taskSort[L1] = 'manual'; state.settings.taskOrder[L1] = ['A-task-3', 'A-task-1', 'A-task-2'];
     state.settings.listOrder = [L3, L1, L2, M2, M1];
     find(state.calendars, CG).customColor = '#34c759'; state.settings.hiddenCalendars.push(CM);
@@ -160,6 +160,7 @@ test('every synced field goes from one PC to the other and back', async t => {
   assert.equal(find(s.lists, L1).color, '#ff3b30'); assert.equal(find(s.lists, L1).icon, 'star'); assert.equal(find(s.lists, L1).groupId, 'group-a');
   assert.deepEqual(find(s.groups, 'group-a'), { id: 'group-a', name: '공부', collapsed: false }, 'the same group id; folding stays per PC');
   assert.ok(s.settings.hiddenLists.includes(L2)); assert.equal(s.settings.taskSort[L1], 'manual');
+  assert.equal(s.settings.notInAll.join(), L3, 'left out of 전체 on the other PC too');
   assert.deepEqual(s.settings.taskOrder[L1], ['B-task-3', 'B-task-1', 'B-task-2'], 'the order follows the tasks by their service ids');
   assert.deepEqual(orderOf(s, GOOGLE), [L3, L1, L2]); assert.deepEqual(orderOf(s, MS), [M2, M1]);
   assert.equal(find(s.calendars, CG).customColor, '#34c759'); assert.ok(s.settings.hiddenCalendars.includes(CM));
@@ -171,7 +172,7 @@ test('every synced field goes from one PC to the other and back', async t => {
   b.edit(state => {
     const list = find(state.lists, L1); list.color = '#007aff'; delete list.icon; delete list.groupId;
     find(state.groups, 'group-a').name = '스터디';
-    state.settings.hiddenLists = []; delete state.settings.taskSort[L1]; state.settings.taskOrder[L1] = ['B-task-2', 'B-task-3', 'B-task-1'];
+    state.settings.hiddenLists = []; state.settings.notInAll = []; delete state.settings.taskSort[L1]; state.settings.taskOrder[L1] = ['B-task-2', 'B-task-3', 'B-task-1'];
     state.settings.listOrder = [L2, L3, L1, M1, M2];
     delete find(state.calendars, CG).customColor; state.settings.hiddenCalendars = [];
     delete find(state.events, E1).color;
@@ -182,6 +183,7 @@ test('every synced field goes from one PC to the other and back', async t => {
   assert.equal(find(s.lists, L1).color, '#007aff'); assert.equal(find(s.lists, L1).icon, undefined); assert.equal(find(s.lists, L1).groupId, undefined);
   assert.equal(find(s.groups, 'group-a').name, '스터디');
   assert.deepEqual(s.settings.hiddenLists, []); assert.equal(s.settings.taskSort[L1], undefined);
+  assert.equal(s.settings.notInAll.length, 0, 'and back in 전체');
   assert.deepEqual(s.settings.taskOrder[L1], ['A-task-2', 'A-task-3', 'A-task-1']);
   assert.deepEqual(orderOf(s, GOOGLE), [L2, L3, L1]); assert.deepEqual(orderOf(s, MS), [M1, M2]);
   assert.equal(find(s.calendars, CG).customColor, undefined); assert.deepEqual(s.settings.hiddenCalendars, []);
@@ -196,6 +198,21 @@ test('every synced field goes from one PC to the other and back', async t => {
   for (const field of ['lists', 'calendars', 'events', 'groups', 'seriesColors']) assert.deepEqual(byId(after[field]), byId(s[field]), field);
   assert.deepEqual(orderOf(after, GOOGLE), [L2, L3, L1]);
   assert.deepEqual(after.settings.taskOrder, s.settings.taskOrder);
+});
+
+test('a step\'s date goes from one PC to the other by the step\'s service id and comes off again; To Do and Google keep none (2026-11-07)', async t => {
+  const cloud = services();
+  const steps = who => state => { state.tasks.find(item => item.remoteId === 'r1').steps = [{ id: who + '-s1', remoteId: 'st1', title: '초안', completed: false }, { id: who + '-s2', title: '아직 안 보낸 것', completed: false }]; };
+  const a = pc(t, cloud, { name: 'A', before: steps('A') }); const b = pc(t, cloud, { name: 'B', before: steps('B') });
+  await converge(cloud, [a, b]);
+  const of = (s, at) => s.tasks.find(item => item.remoteId === 'r1').steps[at];
+  a.edit(state => { of(state, 0).dueDate = '2026-12-20'; of(state, 1).dueDate = '2026-12-21'; });
+  await converge(cloud, [a, b]);
+  assert.equal(of(b.state(), 0).dueDate, '2026-12-20', 'reached B');
+  assert.equal(of(b.state(), 1).dueDate, undefined, 'one with no service id waits for it');
+  b.edit(state => { delete of(state, 0).dueDate; });
+  await converge(cloud, [a, b]);
+  assert.equal(of(a.state(), 0).dueDate, undefined, 'taken off on B, gone on A');
 });
 
 test('two PCs changing different fields of one list keep both; the same field goes to the later change', async t => {
@@ -764,4 +781,262 @@ test('R02: a lost answer of a create leaves two files of this PC; the extra goes
   const own = [...cloud.files.values()].filter(file => file.appProperties.device === id);
   assert.deepEqual(own.map(file => file.id), ['f0']);
   assert.equal(sanitizeDoc(JSON.parse(own[0].content)).items[`L:${L1}`].c[0], '#ff3b30');
+});
+
+// ---- A To Do task's time between PCs (2026-11-06 owner chose 「Dayboard끼리 보관」: To Do keeps no time of day) ----
+const TODO = 'todo-remote-1', DAY1 = '2026-11-07', DAY2 = '2026-11-09';
+const todoTask = (who, extra = {}) => ({ id: `${who}-todo`, remoteId: TODO, listId: M1, title: '치과', notes: '', dueDate: DAY1, important: false, completed: false, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z', syncStatus: 'synced', ...extra });
+const withTodo = extra => state => { state.tasks.push(todoTask(extra?.who || 'x', extra?.task)); };
+const timeOf = side => { const task = side.state().tasks.find(item => item.remoteId === TODO); return `${task?.dueDate}|${task?.dueTime ?? ''}`; };
+const setTime = (state, time, day) => { const task = state.tasks.find(item => item.remoteId === TODO); if (day) task.dueDate = day; if (time) task.dueTime = time; else delete task.dueTime; };
+// The clock of the tests above has run on past these dates: a time seeded on a date long gone would be left out.
+const rewind = () => { wall = Date.parse('2026-11-01T00:00:00.000Z'); };
+const toDoPair = async (t, a = {}, b = {}) => { rewind(); const cloud = services(); const pcA = pc(t, cloud, { name: 'A', before: withTodo({ who: 'A' }), ...a }); const pcB = pc(t, cloud, { name: 'B', before: withTodo({ who: 'B' }), ...b }); await converge(cloud, [pcA, pcB]); return { cloud, a: pcA, b: pcB }; };
+
+test('a To Do time set on one PC shows on the other, by the task\'s service id, and goes when taken off; nothing bounces back', async t => {
+  const { cloud, a, b } = await toDoPair(t);
+  a.edit(state => setTime(state, '14:00'));
+  await converge(cloud, [a, b]);
+  assert.equal(timeOf(b), `${DAY1}|14:00`, 'B\'s task has its own id, the same service id');
+  const writes = cloud.writes(); await converge(cloud, [a, b]);
+  assert.equal(cloud.writes(), writes, 'the PCs agree: no write goes round');
+  b.edit(state => setTime(state, '16:30'));
+  await converge(cloud, [a, b]);
+  assert.equal(timeOf(a), `${DAY1}|16:30`, 'and back');
+  a.edit(state => setTime(state, ''));
+  await converge(cloud, [a, b]);
+  assert.equal(timeOf(b), `${DAY1}|`, 'taken off on A, gone on B');
+});
+
+test('a To Do time goes only with its date: a date changed on the phone leaves it out, and it lands once the date is there', async t => {
+  const { cloud, a, b } = await toDoPair(t);
+  // The phone moved the date; B synced that before it read A's time.
+  b.store.mutate(state => { settle(state, () => setTime(state, '', DAY2), { now: wall }); });
+  a.edit(state => setTime(state, '14:00'));
+  await converge(cloud, [a, b]);
+  assert.equal(timeOf(b), `${DAY2}|`, 'A\'s time was for another date');
+  // A moved the task to that date with a time: B had the date already and takes it.
+  a.edit(state => setTime(state, '09:15', DAY2));
+  await converge(cloud, [a, b]);
+  assert.equal(timeOf(b), `${DAY2}|09:15`);
+  // A's date reaching B by the task sync after the document did: the snapshot lays the document over it.
+  a.edit(state => setTime(state, '10:00', DAY1));
+  await converge(cloud, [a, b]);
+  assert.equal(timeOf(b), `${DAY2}|09:15`, 'B still on the old date');
+  b.store.mutate(state => { settle(state, () => { state.tasks.find(item => item.remoteId === TODO).dueDate = DAY1; }, { apply: true, now: wall }); });
+  assert.equal(timeOf(b), `${DAY1}|10:00`, 'the date arrived: the time lands with it');
+});
+
+test('two PCs setting a To Do time: the later one wins on both', async t => {
+  const { cloud, a, b } = await toDoPair(t);
+  a.edit(state => setTime(state, '10:00'));
+  b.edit(state => setTime(state, '11:00'));
+  await converge(cloud, [a, b]);
+  assert.equal([timeOf(a), timeOf(b)].join(), `${DAY1}|11:00,${DAY1}|11:00`);
+  // One cleared here against a time set later there: still the later one.
+  a.edit(state => setTime(state, ''));
+  b.edit(state => setTime(state, '12:00'));
+  await converge(cloud, [a, b]);
+  assert.equal([timeOf(a), timeOf(b)].join(), `${DAY1}|12:00,${DAY1}|12:00`);
+});
+
+test('a time from before this kind travelled goes out from the first run after the update; a stamped one beats it', async t => {
+  rewind(); const cloud = services();
+  const beforeUpdate = time => state => { state.tasks.push(todoTask('A', { dueTime: time })); state.viewSync.seen = {}; };
+  const a = pc(t, cloud, { name: 'A', before: beforeUpdate('14:00') });
+  const seeded = a.state().viewSync.doc.items;
+  assert.equal(Object.keys(seeded).filter(key => key[0] === 'T').length, 1, 'held at time 0');
+  assert.equal(Object.values(seeded).find(item => item.t).t[1], 0);
+  const b = pc(t, cloud, { name: 'B', before: withTodo({ who: 'B' }) });
+  await converge(cloud, [a, b]);
+  assert.equal(timeOf(b), `${DAY1}|14:00`);
+  const c = pc(t, cloud, { name: 'C', before: beforeUpdate('15:00') });
+  await converge(cloud, [c, a, b]);
+  assert.equal(timeOf(c), `${DAY1}|14:00`, 'the first PC to sync gives the time, as it gives a look');
+});
+
+test('a time on a task To Do got later (made offline) goes out once the task has its service id', async t => {
+  const { cloud, a, b } = await toDoPair(t);
+  a.edit(state => { state.tasks.push(todoTask('A', { id: 'A-offline', remoteId: undefined, title: '병원', dueTime: '08:00' })); });
+  a.store.mutate(state => { settle(state, () => { state.tasks.find(item => item.id === 'A-offline').remoteId = 'todo-remote-2'; }, { now: wall }); });
+  b.edit(state => { state.tasks.push(todoTask('B', { id: 'B-new', remoteId: 'todo-remote-2', title: '병원' })); });
+  await converge(cloud, [a, b]);
+  assert.equal(b.state().tasks.find(item => item.id === 'B-new').dueTime, '08:00');
+});
+
+test('only To Do tasks: a Google task or this PC\'s own never travels, and no list of them changes on the other PC', async t => {
+  const cloud = services();
+  const extra = who => state => {
+    state.lists.push({ id: 'local-list', provider: 'local', name: '내 할 일', kind: 'none' });
+    state.tasks.push(todoTask(who, { id: `${who}-g`, remoteId: 'g-remote', listId: L1 }), todoTask(who, { id: `${who}-l`, remoteId: undefined, listId: 'local-list' }));
+  };
+  const a = pc(t, cloud, { name: 'A', before: extra('A') }); const b = pc(t, cloud, { name: 'B', before: extra('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { for (const task of state.tasks) if (task.id === 'A-g' || task.id === 'A-l') task.dueTime = '14:00'; });
+  await converge(cloud, [a, b]);
+  assert.equal(Object.keys(a.state().viewSync.doc.items).filter(key => key[0] === 'T').length, 0);
+  assert.equal(b.state().tasks.filter(task => task.dueTime).length, 0);
+});
+
+test('a To Do time leaves the document 45 days past its date; a date ahead stays; each item stays small for Microsoft\'s 48 KB', () => {
+  const at = Date.parse('2026-11-06T00:00:00.000Z'); const stampedLong = at - 50 * DAY;
+  const doc = { v: 1, items: { 'T:aaaaaaaaaaaa': { t: ['2026-09-01T14:00', stampedLong] }, 'T:bbbbbbbbbbbb': { t: ['2027-03-01T14:00', stampedLong] }, 'T:cccccccccccc': { t: [null, stampedLong] }, 'T:dddddddddddd': { t: ['2026-09-01T14:00', at - DAY] } } };
+  views.pruneDoc(doc, { accounts: [], lists: [], tasks: [] }, at, {});
+  assert.deepEqual(['a', 'b', 'c', 'd'].map(letter => Object.keys(doc.items[`T:${letter.repeat(12)}`]).join()), ['z', 't', 'z', 't'], 'past and unchanged goes; ahead stays; just changed stays');
+  const many = { v: 1, items: Object.fromEntries(Array.from({ length: 500 }, (_, i) => [`T:${String(i).padStart(12, '0')}`, { t: ['2026-11-07T14:00', 1793000000000 + i] }])) };
+  assert.ok(Buffer.byteLength(canonical(many)) < 48 * 1024, '500 timed tasks fit in the Microsoft store');
+});
+
+test('a time from a store is checked: a bad one is dropped, and an empty or wrong shape never reaches a task', () => {
+  const doc = sanitizeDoc({ v: 1, items: { 'T:aaaaaaaaaaaa': { t: ['내일', 5] }, 'T:bbbbbbbbbbbb': { t: ['2026-11-07T14:00', 5] }, 'T:cccccccccccc': { t: [null, 5] } } });
+  assert.deepEqual(Object.keys(doc.items), ['T:bbbbbbbbbbbb', 'T:cccccccccccc']);
+});
+
+// 자주 쓰는 일정 (2026-11-08 owner: 「PC끼리 맞춰서 만들어줘」).
+const SHORTCUT = { id: 'k-lunch', word: '점심', before: '🍽️', after: '', start: '11:30', end: '12:30', allDay: false, calendarId: '', color: '' };
+// An item's id is this PC's own: the word is what the PCs share.
+const shortcuts = side => side.state().settings.eventShortcuts.map(({ id, ...item }) => item);
+const setShortcuts = (side, fn) => side.edit(state => { state.settings.eventShortcuts = fn(state.settings.eventShortcuts); });
+
+test('자주 쓰는 일정: made, changed and deleted on one PC, the same on the other', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' }); const b = pc(t, cloud, { name: 'B' });
+  await converge(cloud, [a, b]);
+  setShortcuts(a, () => [SHORTCUT]);
+  await converge(cloud, [a, b]);
+  assert.deepEqual(shortcuts(b), shortcuts(a));
+  assert.equal(shortcuts(b)[0].before, '🍽️');
+  setShortcuts(b, list => list.map(item => ({ ...item, start: '12:00', end: '13:00' })));
+  await converge(cloud, [a, b]);
+  assert.deepEqual(shortcuts(a).map(item => item.start), ['12:00']);
+  setShortcuts(a, () => []);
+  await converge(cloud, [a, b]);
+  assert.deepEqual(shortcuts(b), []);
+});
+
+test('자주 쓰는 일정: an item never mixes two PCs\' edits; the later of an edit and a deletion stands, on both', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' }); const b = pc(t, cloud, { name: 'B' });
+  await converge(cloud, [a, b]);
+  setShortcuts(a, () => [SHORTCUT]);
+  await converge(cloud, [a, b]);
+  setShortcuts(a, list => list.map(item => ({ ...item, start: '09:00', end: '10:00' })));
+  setShortcuts(b, list => list.map(item => ({ ...item, end: '14:00' })));
+  await converge(cloud, [a, b]);
+  assert.deepEqual([shortcuts(a)[0].start, shortcuts(a)[0].end], ['11:30', '14:00'], 'the later edit, whole');
+  assert.deepEqual(shortcuts(a), shortcuts(b));
+  setShortcuts(a, () => []);
+  setShortcuts(b, list => list.map(item => ({ ...item, before: '🍱' })));
+  await converge(cloud, [a, b]);
+  assert.deepEqual([shortcuts(a).map(item => item.before), shortcuts(b).map(item => item.before)], [['🍱'], ['🍱']], 'edited after the deletion');
+  setShortcuts(a, list => list.map(item => ({ ...item, before: '🥗' })));
+  setShortcuts(b, () => []);
+  await converge(cloud, [a, b]);
+  assert.deepEqual([shortcuts(a), shortcuts(b)], [[], []], 'deleted after the edit');
+  setShortcuts(a, () => [SHORTCUT]);
+  await converge(cloud, [a, b]);
+  assert.deepEqual(shortcuts(b).map(item => item.word), ['점심'], 'a word made again after its deletion');
+});
+
+// Codex 2026-11-08 F1: each PC tidying the pair from what it had seen took both away.
+test('자주 쓰는 일정: one word made on two PCs, edited on both while apart, is one item and never lost; a rename leaves no old word behind', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' }); const b = pc(t, cloud, { name: 'B' });
+  await converge(cloud, [a, b]);
+  setShortcuts(a, () => [{ ...SHORTCUT, id: 'k-a' }]);
+  setShortcuts(b, () => [{ ...SHORTCUT, id: 'k-b', before: '🍱' }]);
+  await b.run();
+  setShortcuts(a, list => list.map(item => ({ ...item, start: '12:00', end: '13:00' })));
+  await a.run(); await b.run();
+  setShortcuts(b, list => list.map(item => ({ ...item, after: '(식사)' })));
+  await converge(cloud, [a, b]);
+  assert.deepEqual(shortcuts(a).map(item => [item.word, item.after]), [['점심', '(식사)']]);
+  assert.deepEqual(shortcuts(a).map(item => item.after), shortcuts(b).map(item => item.after));
+  setShortcuts(a, list => list.map(item => ({ ...item, word: '식사' })));
+  await converge(cloud, [a, b]);
+  assert.deepEqual([shortcuts(a).map(item => item.word), shortcuts(b).map(item => item.word)], [['식사'], ['식사']]);
+});
+
+test('자주 쓰는 일정: two PCs that each made one word end with one, and it stays gone when that one is deleted', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' }); const b = pc(t, cloud, { name: 'B' });
+  await converge(cloud, [a, b]);
+  setShortcuts(a, () => [{ ...SHORTCUT, id: 'k-a' }]);
+  setShortcuts(b, () => [{ ...SHORTCUT, id: 'k-b', before: '🍱' }]);
+  await converge(cloud, [a, b]);
+  assert.deepEqual(shortcuts(a).map(item => item.before), ['🍱'], 'the later one');
+  assert.deepEqual(shortcuts(a), shortcuts(b));
+  setShortcuts(a, () => []);
+  await converge(cloud, [a, b]);
+  assert.deepEqual([shortcuts(a), shortcuts(b)], [[], []]);
+});
+
+test('자주 쓰는 일정: a PC joining later takes the account\'s item over its own unsent one, and keeps a word only it has', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' });
+  setShortcuts(a, () => [SHORTCUT]);
+  await converge(cloud, [a]);
+  tick(5000);
+  const b = pc(t, cloud, { name: 'B', before: state => { state.settings.eventShortcuts = [{ ...SHORTCUT, id: 'k-own', before: '🍱' }, { ...SHORTCUT, id: 'k-gym', word: '운동', before: '' }]; } });
+  await converge(cloud, [b, a]);
+  assert.deepEqual(shortcuts(b).map(item => `${item.word}:${item.before}`), ['운동:', '점심:🍽️']);
+  assert.deepEqual(shortcuts(a), shortcuts(b));
+});
+
+test('자주 쓰는 일정: lists merged from PCs keep every item; a bad item from a store does not reach the state', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' }); const b = pc(t, cloud, { name: 'B' });
+  await converge(cloud, [a, b]);
+  setShortcuts(a, () => Array.from({ length: 20 }, (_, at) => ({ ...SHORTCUT, id: `a${at}`, word: `가${at}` })));
+  tick(5000);
+  setShortcuts(b, () => Array.from({ length: 5 }, (_, at) => ({ ...SHORTCUT, id: `b${at}`, word: `나${at}` })));
+  await converge(cloud, [a, b]);
+  assert.equal(shortcuts(a).length, 25);
+  assert.equal(shortcuts(a).filter(item => item.word.startsWith('나')).length, 5);
+  assert.deepEqual(shortcuts(a), shortcuts(b));
+  const doc = sanitizeDoc({ v: 1, items: { 'K:bad': { v: [['점 심'], 5] }, 'K:good': { v: [[...views.project({ settings: { eventShortcuts: [SHORTCUT] } }).values()][0].v, 5] } } });
+  assert.deepEqual(Object.keys(doc.items), ['K:good']);
+});
+
+test('자주 쓰는 일정: nothing is written once the PCs agree; a deletion stays for good, so a PC back after months does not bring it back', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' }); const b = pc(t, cloud, { name: 'B' });
+  setShortcuts(a, () => [SHORTCUT]);
+  await converge(cloud, [a, b]);
+  const writes = cloud.writes();
+  await a.run(); await b.run();
+  assert.equal(cloud.writes(), writes);
+  const away = structuredClone(b.state().viewSync.doc);
+  setShortcuts(a, () => []);
+  await converge(cloud, [a, b]);
+  const doc = structuredClone(a.state().viewSync.doc);
+  views.pruneDoc(doc, a.state(), wall + 91 * DAY);
+  const key = Object.keys(doc.items).find(item => item[0] === 'K');
+  assert.deepEqual(Object.keys(doc.items[key]), ['x'], 'only the mark is left');
+  const back = views.mergeDocs(doc, away); const state = a.state();
+  views.applyDoc(state, back);
+  assert.deepEqual(state.settings.eventShortcuts, []);
+});
+
+// Codex 2026-11-08 N1: an item that came with the id made from its word keeps that id when renamed, and the old word coming back took the same id.
+test('자주 쓰는 일정: a word renamed, then made again on the other PC, leaves both words on both PCs', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' }); const b = pc(t, cloud, { name: 'B' });
+  await converge(cloud, [a, b]);
+  setShortcuts(a, () => [SHORTCUT]);
+  await converge(cloud, [a, b]);
+  setShortcuts(b, list => list.map(item => ({ ...item, word: '식사' })));
+  await converge(cloud, [a, b]);
+  setShortcuts(a, list => [...list, { ...SHORTCUT, id: 'k-again' }]);
+  setShortcuts(b, list => list.map(item => ({ ...item, before: '🍱' })));
+  await converge(cloud, [a, b]);
+  const words = side => shortcuts(side).map(item => item.word);
+  assert.deepEqual(words(b), ['식사', '점심']);
+  assert.deepEqual(shortcuts(a), shortcuts(b));
+  assert.equal(new Set(b.state().settings.eventShortcuts.map(item => item.id)).size, 2);
+});
+
+// Argon 2026-11-08 G2: two PCs' twenties merged left some out, and each deletion then brought one of them back.
+test('자주 쓰는 일정: two PCs\' lists merged keep every item, and a deletion takes one away', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A' }); const b = pc(t, cloud, { name: 'B' });
+  await converge(cloud, [a, b]);
+  setShortcuts(a, () => Array.from({ length: 20 }, (_, at) => ({ ...SHORTCUT, id: `a${at}`, word: `가${at}` })));
+  setShortcuts(b, () => Array.from({ length: 5 }, (_, at) => ({ ...SHORTCUT, id: `b${at}`, word: `나${at}` })));
+  await converge(cloud, [a, b]);
+  assert.equal(shortcuts(a).length, 25);
+  setShortcuts(a, list => list.filter(item => item.word !== '가0'));
+  await converge(cloud, [a, b]);
+  assert.deepEqual([shortcuts(a).length, shortcuts(b).length], [24, 24]);
 });
