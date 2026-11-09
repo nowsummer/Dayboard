@@ -3,11 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dayboard</title>
-<meta name="description" content="Clean like a Mac or iPhone. Quick on Windows. Tasks, calendar and notes, with desktop widgets.">
+<title>Dayboard: tasks, calendar and notes for Windows</title>
+<meta name="description" content="Your tasks and calendar on one board, at a glance. For Windows. A clean, Mac- and iPhone-style look for everything on your plate today.">
 <link rel="alternate" hreflang="ko" href="https://nowsummer.github.io/Dayboard/">
 <link rel="alternate" hreflang="en" href="https://nowsummer.github.io/Dayboard/en/">
 <link rel="alternate" hreflang="x-default" href="https://nowsummer.github.io/Dayboard/">
+<link rel="canonical" href="https://nowsummer.github.io/Dayboard/en/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dayboard">
+<meta property="og:title" content="Dayboard: tasks, calendar and notes for Windows">
+<meta property="og:description" content="Your tasks and calendar on one board, at a glance. For Windows. A clean, Mac- and iPhone-style look for everything on your plate today.">
+<meta property="og:url" content="https://nowsummer.github.io/Dayboard/en/">
+<meta property="og:image" content="https://nowsummer.github.io/Dayboard/images/en/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Dayboard: clean like a Mac or iPhone, quick on Windows">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="../assets/icon.png">
 <style>
   :root { color-scheme: light dark; --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --muted:#6e6e73; --line:rgba(0,0,0,.08); --accent:#0071e3; --accent-text:#ffffff; --button:#0071e3; --shadow:0 18px 50px rgba(0,0,0,.10); }
@@ -29,33 +41,26 @@
   .button.primary { background: var(--button); color: var(--accent-text); }
   .button.secondary { color: var(--accent); border: 1px solid var(--accent); }
   .button:hover { text-decoration: none; filter: brightness(1.06); }
-  .fine { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
   figure { margin: 40px 0; }
   figure img { display: block; width: 100%; height: auto; border-radius: 16px; box-shadow: var(--shadow); }
-  figcaption { color: var(--muted); font-size: 14px; text-align: center; margin-top: 12px; }
-  .why { max-width: 680px; margin: 56px auto 8px; text-align: center; }
+  figure.clip { max-width: 800px; margin: 28px auto 0; }
   h2 { font-size: 32px; line-height: 1.2; letter-spacing: -0.015em; margin: 0 0 14px; }
-  .why p { font-size: 19px; color: var(--muted); margin: 0; }
-  .why p strong { color: var(--text); }
-  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 36px 0; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 24px 26px; }
-  .card h3 { font-size: 20px; margin: 0 0 6px; letter-spacing: -0.01em; }
-  .card p { margin: 0; color: var(--muted); font-size: 16px; }
-  .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 40px 0 0; }
-  .shots figure { margin: 0; }
-  .note { color: var(--muted); font-size: 13px; text-align: center; margin: 14px 0 0; }
-  section.box { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px; margin: 20px 0; }
-  section.box h2 { font-size: 22px; margin-bottom: 10px; }
-  section.box p, section.box li { color: var(--muted); font-size: 16px; }
-  section.box p { margin: 0; }
-  section.box ul { margin: 0; padding-left: 20px; }
-  section.box li { margin: 4px 0; }
-  section.box code { white-space: nowrap; }
-  footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 40px; }
+  h3 { font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; margin: 0 0 10px; }
+  .point { max-width: 680px; margin: 72px auto 0; text-align: center; }
+  .point h2 { margin-bottom: 10px; }
+  .point p { font-size: 19px; color: var(--muted); margin: 0; }
+  .point ul { display: inline-block; text-align: left; font-size: 19px; color: var(--muted); margin: 14px 0 0; padding-left: 22px; }
+  .point li { margin: 4px 0; }
+  .lines { max-width: 720px; margin: 22px auto 0; }
+  .line { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 20px; }
+  .line code { font-family: inherit; font-size: 17px; font-weight: 600; }
+  .line span { color: var(--muted); font-size: 16px; }
+  .download .actions { margin-top: 16px; }
+  .download p.fine { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+  footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 72px; }
   footer p { margin: 6px 0; }
   @media (max-width: 680px) {
-    h1 { font-size: 38px; } .tagline { font-size: 22px; } .sub, .why p { font-size: 17px; } h2 { font-size: 26px; }
-    .grid, .shots { grid-template-columns: 1fr; }
+    h1 { font-size: 38px; } .tagline { font-size: 22px; } .sub, .point p, .point ul { font-size: 17px; } h2 { font-size: 26px; } h3 { font-size: 21px; }
   }
 </style>
 </head>
@@ -70,54 +75,79 @@
   <header class="hero">
     <img class="icon" src="../assets/icon.png" alt="">
     <h1>Dayboard</h1>
-    <p class="tagline">Clean like a Mac or iPhone.<br>Quick on Windows.</p>
-    <p class="sub">Tasks, calendar and notes in one app, with desktop widgets.</p>
+    <p class="tagline">Your tasks and calendar on one board,<br>at a glance. For Windows.</p>
+    <p class="sub">A clean, Mac- and iPhone-style look for everything on your plate today.</p>
     <div class="actions">
       <a class="button primary" href="https://github.com/nowsummer/Dayboard/releases/latest">Download for Windows</a>
       <a class="button secondary" href="https://github.com/nowsummer/Dayboard">View on GitHub</a>
     </div>
-    <p class="fine">Free · Windows x64 · Open source (MIT)</p>
   </header>
 
-  <figure><img src="../images/en/demo.webp" alt="Dayboard in action: adding and completing a task, dragging an event in the month view, stretching one in the week view, an event card, notes, and a widget put on the desktop with its glass adjusted" width="960" height="617"></figure>
+  <figure><img src="../images/en/demo.webp" alt="A short tour: finishing a task, typing an event in one line, a Quick event, dragging an event, searching notes, and the desktop widgets" width="1315" height="846"></figure>
+  <figure><img src="../images/en/board.png" alt="The Dayboard board, with today's tasks, the calendar and notes on one screen" loading="lazy" width="2478" height="1640"></figure>
 
-  <section class="why">
-    <h2>Why Dayboard</h2>
-    <p>The Reminders, Calendar and Notes apps on a Mac or iPhone, and their widgets, look good and are a pleasure to use. I wanted the same on Windows, so I built it. <strong>Keep it clean, keep it quick</strong> — those are the two rules it's built on.</p>
-  </section>
-
-  <div class="grid">
-    <div class="card"><h3>Clean</h3><p>A tidy layout and glassy desktop widgets: toward clear they follow the wallpaper, toward tinted the app's light or dark mode.</p></div>
-    <div class="card"><h3>Quick</h3><p>Your data lives on your PC, so every screen opens without waiting. Type "tomorrow 3pm meeting" and the date is set.</p></div>
-    <div class="card"><h3>All in one place</h3><p>Connect Microsoft, Google or iCloud and stay in sync with your other PCs and phones — or use it with no account at all.</p></div>
-    <div class="card"><h3>Private</h3><p>No server, no sign-up, no ads. Deleted notes stay for 30 days, and each note keeps earlier versions.</p></div>
-  </div>
-
-  <div class="shots">
-    <figure><img src="../images/en/tasks-list.png" alt="Dayboard tasks" width="2478" height="1640" loading="lazy"><figcaption>Tasks</figcaption></figure>
-    <figure><img src="../images/en/calendar.png" alt="Dayboard month calendar" width="2478" height="1640" loading="lazy"><figcaption>Calendar</figcaption></figure>
-    <figure><img src="../images/en/notes.png" alt="Dayboard notes" width="2478" height="1640" loading="lazy"><figcaption>Notes</figcaption></figure>
-    <figure><img src="../images/en/tasks-today-dark.png" alt="Dayboard in the dark theme" width="2478" height="1640" loading="lazy"><figcaption>Dark theme</figcaption></figure>
-  </div>
-  <figure><img src="../images/en/widgets.png" alt="Notes, Today and calendar widgets on the desktop" width="2320" height="1144" loading="lazy"><figcaption>Desktop widgets</figcaption></figure>
-
-  <section class="box">
-    <h2>Install</h2>
+  <section class="point">
+    <h2>Tasks: nothing slips through</h2>
+    <p>Write it down, then tick it off when it's done.</p>
     <ul>
-      <li>Download <code>Dayboard-&lt;version&gt;.exe</code> from the <a href="https://github.com/nowsummer/Dayboard/releases/latest">latest release</a> and run it. No admin rights needed.</li>
-      <li>Once installed, new versions download on their own. Choose "Restart now to update" in Settings to switch to the new version.</li>
-      <li>The installer isn't signed yet, so Windows Smart App Control may block it at first. Wait a moment and run it again.</li>
+      <li>Today, Scheduled and Flagged fill themselves</li>
+      <li>Sort tasks into lists and groups, and break big ones into subtasks</li>
+      <li>Add dates, reminders and repeats</li>
     </ul>
   </section>
+  <figure class="clip"><img src="../images/en/clips/tasks.webp" alt="Adding a task, opening its subtasks, then clicking the circle to finish it" loading="lazy" width="1100" height="706"></figure>
 
-  <section class="box">
-    <h2>Connecting Google</h2>
-    <p>You sign in on Google's own page. Dayboard asks only to read and edit Google Tasks and Calendar, to use its own hidden folder in Google Drive to sync notes and list and calendar view settings with your other PCs, and for your email and profile to confirm the account. What it receives stays on your PC and is never sent to the developer or anyone else. Disconnect any time from the Accounts screen or on your <a href="https://myaccount.google.com/permissions" rel="noopener">Google Account permissions page</a>. Details are in the <a href="privacy.html">Privacy Policy</a>.</p>
+  <section class="point">
+    <h2>Calendar: just type what's on your mind</h2>
+    <p>No hunting for the day, picking a time or filling in the place. Type it in one line and Dayboard works out the date, time, title and place, then puts it on your calendar.</p>
+  </section>
+  <div class="lines">
+    <div class="line"><code>Oct 6, 2–3pm, Economics exam, Main Hall</code><span>→ Oct 6, 2:00–3:00 PM · Economics exam · Main Hall</span></div>
+  </div>
+  <figure class="clip"><img src="../images/en/clips/entry.webp" alt="Typing one line, and the event appears on October 6 with its title, time and place filled in" loading="lazy" width="1100" height="706"></figure>
+
+  <section class="point" style="margin-top:44px">
+    <p>Drag to move an event, stretch to change its time.</p>
+  </section>
+  <figure class="clip"><img src="../images/en/clips/drag.webp" alt="Dragging an event to another day in the month view, then stretching its end in that week's view" loading="lazy" width="1100" height="706"></figure>
+
+  <section class="point">
+    <h3>Quick events: same plan, different person</h3>
+    <p>Some plans never change except for who you're meeting. Set up the word "lunch" once with its time and icon, and from then on that word is all you need.</p>
+  </section>
+  <div class="lines">
+    <div class="line"><code>lunch Alex</code><span>→ 🍽️ Alex · 12:00–1:00 PM</span></div>
+  </div>
+  <figure class="clip"><img src="../images/en/clips/quick.webp" alt="Saving the word lunch with an icon and a time in Settings, then typing lunch Alex and seeing the event on the calendar" loading="lazy" width="1100" height="706"></figure>
+
+  <section class="point">
+    <h2>Notes: jot it down, find it fast</h2>
+    <p>The Wi-Fi password. The office printer's IP address. You only need them now and then, the sticky note has vanished, and opening a heavy notes app to dig for them takes forever. Dayboard's notes are quick to jot down and one search away. Keep the ones you use most on your desktop.</p>
+  </section>
+  <figure class="clip"><img src="../images/en/clips/notes.webp" alt="Writing a note, then typing Wi-Fi in the search box and seeing the Wi-Fi password note right away" loading="lazy" width="1100" height="706"></figure>
+
+  <section class="point">
+    <h2>Widgets: see it all without opening the app</h2>
+    <p>Keep your tasks, calendar and notes on the desktop. The Liquid Glass-style design lets your wallpaper show through, and you choose how clear it is.</p>
+  </section>
+  <figure class="clip"><img src="../images/en/clips/widget.webp" alt="Tasks, calendar and notes widgets on the desktop, with the glass effect being adjusted" loading="lazy" width="1100" height="708"></figure>
+
+  <section class="point">
+    <h2>Accounts</h2>
+    <p>Connect Microsoft, Google or iCloud Calendar to stay in sync with your phone and other PCs. Or use it on this PC alone, no account needed.</p>
+  </section>
+
+  <section class="point download">
+    <h2>Download</h2>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/nowsummer/Dayboard/releases/latest">Download for Windows</a>
+    </div>
+    <p class="fine">Dayboard isn't code-signed yet, so Windows may warn you about the installer or block it.</p>
   </section>
 
   <footer>
-    <p><a href="privacy.html">Privacy Policy</a> · <a href="https://github.com/nowsummer/Dayboard/blob/main/SECURITY.md">Security</a> · <a href="https://github.com/nowsummer/Dayboard/releases">Releases</a></p>
-    <p>A personal project, not affiliated with Microsoft, Google or Apple.</p>
+    <p>Dayboard isn't affiliated with Microsoft, Google or Apple.</p>
+    <p><a href="privacy.html">Privacy Policy</a></p>
   </footer>
 </main>
 </body>

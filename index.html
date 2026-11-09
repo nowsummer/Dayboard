@@ -3,11 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dayboard</title>
-<meta name="description" content="Mac·iPhone처럼 깔끔하게, Windows에서 빠릿하게. 할 일·달력·메모 앱과 바탕화면 위젯.">
+<title>Dayboard: Windows용 할 일·달력·메모 앱</title>
+<meta name="description" content="할 일과 일정을 현황판처럼 한눈에 보는 Windows 앱. Mac·iPhone처럼 깔끔한 화면에서, 오늘 할 일과 일정을 한곳에 모아 봐요.">
 <link rel="alternate" hreflang="ko" href="https://nowsummer.github.io/Dayboard/">
 <link rel="alternate" hreflang="en" href="https://nowsummer.github.io/Dayboard/en/">
 <link rel="alternate" hreflang="x-default" href="https://nowsummer.github.io/Dayboard/">
+<link rel="canonical" href="https://nowsummer.github.io/Dayboard/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dayboard">
+<meta property="og:title" content="Dayboard: Windows용 할 일·달력·메모 앱">
+<meta property="og:description" content="할 일과 일정을 현황판처럼 한눈에 보는 Windows 앱. Mac·iPhone처럼 깔끔한 화면에서, 오늘 할 일과 일정을 한곳에 모아 봐요.">
+<meta property="og:url" content="https://nowsummer.github.io/Dayboard/">
+<meta property="og:image" content="https://nowsummer.github.io/Dayboard/images/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Dayboard: Mac·iPhone처럼 깔끔하게, Windows에서 빠릿하게">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/icon.png">
 <style>
   :root { color-scheme: light dark; --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --muted:#6e6e73; --line:rgba(0,0,0,.08); --accent:#0071e3; --accent-text:#ffffff; --button:#0071e3; --shadow:0 18px 50px rgba(0,0,0,.10); }
@@ -29,33 +41,26 @@
   .button.primary { background: var(--button); color: var(--accent-text); }
   .button.secondary { color: var(--accent); border: 1px solid var(--accent); }
   .button:hover { text-decoration: none; filter: brightness(1.06); }
-  .fine { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
   figure { margin: 40px 0; }
   figure img { display: block; width: 100%; height: auto; border-radius: 16px; box-shadow: var(--shadow); }
-  figcaption { color: var(--muted); font-size: 14px; text-align: center; margin-top: 12px; }
-  .why { max-width: 680px; margin: 56px auto 8px; text-align: center; }
+  figure.clip { max-width: 800px; margin: 28px auto 0; }
   h2 { font-size: 32px; line-height: 1.2; letter-spacing: -0.015em; margin: 0 0 14px; }
-  .why p { font-size: 19px; color: var(--muted); margin: 0; }
-  .why p strong { color: var(--text); }
-  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 36px 0; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 24px 26px; }
-  .card h3 { font-size: 20px; margin: 0 0 6px; letter-spacing: -0.01em; }
-  .card p { margin: 0; color: var(--muted); font-size: 16px; }
-  .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 40px 0 0; }
-  .shots figure { margin: 0; }
-  .note { color: var(--muted); font-size: 13px; text-align: center; margin: 14px 0 0; }
-  section.box { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px; margin: 20px 0; }
-  section.box h2 { font-size: 22px; margin-bottom: 10px; }
-  section.box p, section.box li { color: var(--muted); font-size: 16px; }
-  section.box p { margin: 0; }
-  section.box ul { margin: 0; padding-left: 20px; }
-  section.box li { margin: 4px 0; }
-  section.box code { white-space: nowrap; }
-  footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 40px; }
+  h3 { font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; margin: 0 0 10px; }
+  .point { max-width: 680px; margin: 72px auto 0; text-align: center; }
+  .point h2 { margin-bottom: 10px; }
+  .point p { font-size: 19px; color: var(--muted); margin: 0; }
+  .point ul { display: inline-block; text-align: left; font-size: 19px; color: var(--muted); margin: 14px 0 0; padding-left: 22px; }
+  .point li { margin: 4px 0; }
+  .lines { max-width: 720px; margin: 22px auto 0; }
+  .line { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 20px; }
+  .line code { font-family: inherit; font-size: 17px; font-weight: 600; }
+  .line span { color: var(--muted); font-size: 16px; }
+  .download .actions { margin-top: 16px; }
+  .download p.fine { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+  footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 72px; }
   footer p { margin: 6px 0; }
   @media (max-width: 680px) {
-    h1 { font-size: 38px; } .tagline { font-size: 22px; } .sub, .why p { font-size: 17px; } h2 { font-size: 26px; }
-    .grid, .shots { grid-template-columns: 1fr; }
+    h1 { font-size: 38px; } .tagline { font-size: 22px; } .sub, .point p, .point ul { font-size: 17px; } h2 { font-size: 26px; } h3 { font-size: 21px; }
   }
 </style>
 </head>
@@ -70,54 +75,79 @@
   <header class="hero">
     <img class="icon" src="assets/icon.png" alt="">
     <h1>Dayboard</h1>
-    <p class="tagline">Mac·iPhone처럼 깔끔하게,<br>Windows에서 빠릿하게.</p>
-    <p class="sub">할 일·달력·메모를 한 앱에서, 바탕화면 위젯으로.</p>
+    <p class="tagline">할 일과 일정을 현황판처럼<br>한눈에 보는 Windows 앱</p>
+    <p class="sub">Mac·iPhone처럼 깔끔한 화면에서, 오늘 할 일과 일정을 한곳에 모아 봐요.</p>
     <div class="actions">
       <a class="button primary" href="https://github.com/nowsummer/Dayboard/releases/latest">Windows용 내려받기</a>
       <a class="button secondary" href="https://github.com/nowsummer/Dayboard">GitHub에서 보기</a>
     </div>
-    <p class="fine">무료 · Windows x64 · 오픈 소스(MIT)</p>
   </header>
 
-  <figure><img src="images/demo.webp" alt="Dayboard 사용 모습: 할 일 빠른 추가와 완료, 월 달력에서 일정 끌어 옮기기, 주 달력에서 늘리기, 일정 카드, 메모, 바탕화면에 위젯 놓기와 유리 효과 조절" width="960" height="617"></figure>
+  <figure><img src="images/demo.webp" alt="할 일을 끝내고, 줄글로 일정을 넣고, 자주 쓰는 일정과 일정 끌어 옮기기, 메모 검색, 바탕화면 위젯까지 차례로 보여 주는 소개 영상" width="1315" height="846"></figure>
+  <figure><img src="images/board.png" alt="오늘 할 일과 달력, 메모가 한 화면에 함께 보이는 Dayboard 현황판" loading="lazy" width="2478" height="1640"></figure>
 
-  <section class="why">
-    <h2>만든 이유</h2>
-    <p>Mac·iPhone의 미리 알림·캘린더·메모 앱과 위젯은 보기 좋고 쓰기 편해요. Windows에서도 그렇게 쓰고 싶어서 직접 만들었어요. <strong>화면은 깔끔하게, 움직임은 빠릿하게.</strong> 이 두 가지를 기준으로 다듬고 있어요.</p>
-  </section>
-
-  <div class="grid">
-    <div class="card"><h3>보기 좋게</h3><p>정돈된 화면과 유리처럼 비치는 바탕화면 위젯. 투명하게 두면 바탕화면 밝기를, 불투명하게 두면 앱의 라이트·다크 모드를 따라요.</p></div>
-    <div class="card"><h3>빠릿하게</h3><p>데이터가 내 PC에 있어서 화면이 바로 열려요. 「내일 오후 3시 회의」처럼 쓰면 날짜까지 들어가요.</p></div>
-    <div class="card"><h3>한곳에</h3><p>Microsoft·Google·iCloud 계정을 연결하면 다른 PC·iPhone·Android와 동기화돼요. 계정 없이도 쓸 수 있어요.</p></div>
-    <div class="card"><h3>가입·광고 없이</h3><p>서버도, 회원 가입도, 광고도 없어요. 지운 메모는 30일 남고, 메모마다 이전 버전을 되살릴 수 있어요.</p></div>
-  </div>
-
-  <div class="shots">
-    <figure><img src="images/tasks-list.png" alt="Dayboard 할 일 화면" width="2478" height="1640" loading="lazy"><figcaption>할 일</figcaption></figure>
-    <figure><img src="images/calendar.png" alt="Dayboard 월간 달력" width="2478" height="1640" loading="lazy"><figcaption>달력</figcaption></figure>
-    <figure><img src="images/notes.png" alt="Dayboard 메모 화면" width="2478" height="1640" loading="lazy"><figcaption>메모</figcaption></figure>
-    <figure><img src="images/tasks-today-dark.png" alt="Dayboard 다크 테마" width="2478" height="1640" loading="lazy"><figcaption>다크 테마</figcaption></figure>
-  </div>
-  <figure><img src="images/widgets.png" alt="바탕화면의 메모·오늘·달력 위젯" width="2320" height="1144" loading="lazy"><figcaption>바탕화면 위젯</figcaption></figure>
-
-  <section class="box">
-    <h2>설치</h2>
+  <section class="point">
+    <h2>할 일: 해야 할 일을 놓치지 않게</h2>
+    <p>적어 두고, 끝나면 동그라미만 누르면 돼요.</p>
     <ul>
-      <li><a href="https://github.com/nowsummer/Dayboard/releases/latest">최신 릴리스</a>에서 <code>Dayboard-&lt;버전&gt;.exe</code>를 받아 실행하세요. 관리자 권한은 필요 없어요.</li>
-      <li>설치한 뒤에는 새 버전이 나오면 알아서 내려받아져요. 설정에서 「지금 다시 시작해 적용」을 누르면 새 버전으로 바뀌어요.</li>
-      <li>아직 서명되지 않은 설치 파일이라 Windows 스마트 앱 컨트롤이 처음에 막을 수 있어요. 잠시 뒤 다시 실행해 주세요.</li>
+      <li>오늘·예정·중요로 저절로 모여요</li>
+      <li>목록과 그룹으로 나누고, 큰 일은 하위 할 일로 쪼개요</li>
+      <li>날짜와 알림, 반복을 걸어 둘 수 있어요</li>
     </ul>
   </section>
+  <figure class="clip"><img src="images/clips/tasks.webp" alt="새 할 일을 적고 하위 할 일을 펼친 뒤, 동그라미를 눌러 끝내는 모습" loading="lazy" width="1100" height="706"></figure>
 
-  <section class="box">
-    <h2>Google 계정 연결</h2>
-    <p>Google의 공식 로그인 화면에서 연결해요. 요청하는 권한은 Google Tasks·캘린더 읽기와 편집, 메모와 목록·달력 보기 설정을 내 다른 PC와 맞추기 위한 드라이브의 Dayboard 전용 숨은 폴더, 계정 확인용 이메일·프로필뿐이에요. 받은 데이터는 내 PC에만 두고 개발자나 다른 곳으로 보내지 않아요. 앱의 「계정」 화면이나 <a href="https://myaccount.google.com/permissions" rel="noopener">Google 계정 권한 페이지</a>에서 언제든 끊을 수 있어요. 자세한 내용은 <a href="privacy.html">개인정보처리방침</a>에 있어요.</p>
+  <section class="point">
+    <h2>달력: 떠오르는 대로 쓰면 일정이 돼요</h2>
+    <p>날짜를 찾아 누르고, 시간을 고르고, 장소를 따로 넣을 필요 없어요. 생각나는 대로 쭉 쓰면 Dayboard가 날짜·시간·제목·장소를 알아보고 달력에 저장해 줘요.</p>
+  </section>
+  <div class="lines">
+    <div class="line"><code>10/6, 오후 2시~3시, 경제학 원론 시험, 대강의실</code><span>→ 10월 6일 오후 2시~3시 · 경제학 원론 시험 · 대강의실</span></div>
+  </div>
+  <figure class="clip"><img src="images/clips/entry.webp" alt="일정 한 줄을 쓰자 달력의 10월 6일 칸에 일정이 생기고, 제목과 시간, 장소가 채워진 모습" loading="lazy" width="1100" height="706"></figure>
+
+  <section class="point" style="margin-top:44px">
+    <p>일정은 끌어서 옮기고, 늘려서 시간을 바꿔요.</p>
+  </section>
+  <figure class="clip"><img src="images/clips/drag.webp" alt="월간 달력에서 일정을 다른 날로 끌어 옮기고, 그 주의 주간 보기에서 일정 끝을 끌어 늘리는 모습" loading="lazy" width="1100" height="706"></figure>
+
+  <section class="point">
+    <h3>자주 쓰는 일정: 사람만 바뀌는 약속은 틀을 만들어 두세요</h3>
+    <p>점심 약속처럼 시간과 형식은 늘 같고 사람만 바뀌는 일정이 있어요. 「점심」이라는 낱말에 시간과 아이콘을 한 번 정해 두면, 다음부터는 낱말만 쓰면 정해 둔 대로 저장돼요.</p>
+  </section>
+  <div class="lines">
+    <div class="line"><code>점심 민수</code><span>→ 🍽️ 민수 · 낮 12시~1시</span></div>
+  </div>
+  <figure class="clip"><img src="images/clips/quick.webp" alt="설정에서 점심이라는 낱말에 아이콘과 시간을 저장한 뒤, 점심 민수라고 쓰자 달력에 민수와의 점심 일정이 생기는 모습" loading="lazy" width="1100" height="706"></figure>
+
+  <section class="point">
+    <h2>메모: 가볍게 적고, 바로 찾아요</h2>
+    <p>와이파이 비밀번호나 프린터 IP 주소처럼, 가끔 필요한데 막상 찾으면 없는 것들이 있어요. 포스트잇은 어디 뒀는지 모르겠고, 무거운 노트 앱은 켜고 찾는 데 한참 걸리죠. Dayboard 메모는 가볍게 적어 두고, 검색 한 번으로 바로 찾을 수 있어요. 자주 보는 메모는 바탕화면에 올려 둘 수 있어요.</p>
+  </section>
+  <figure class="clip"><img src="images/clips/notes.webp" alt="메모를 적고 검색칸에 와이파이를 치자 와이파이 비밀번호 메모가 바로 나오는 모습" loading="lazy" width="1100" height="706"></figure>
+
+  <section class="point">
+    <h2>위젯: 앱을 열지 않아도 바탕화면에서</h2>
+    <p>할 일과 달력, 메모를 바탕화면에 올려 두고 바로 확인해요. 뒤 배경이 은은하게 비치는 리퀴드 글라스 디자인이고, 투명도도 원하는 만큼 조절돼요.</p>
+  </section>
+  <figure class="clip"><img src="images/clips/widget.webp" alt="바탕화면에 할 일·달력·메모 위젯을 올려 두고 유리 효과를 조절하는 모습" loading="lazy" width="1100" height="708"></figure>
+
+  <section class="point">
+    <h2>계정 연결</h2>
+    <p>Microsoft, Google, iCloud 달력을 연결하면 휴대폰이나 다른 PC와 맞춰져요. 계정 없이 이 PC에서만 써도 돼요.</p>
+  </section>
+
+  <section class="point download">
+    <h2>내려받기</h2>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/nowsummer/Dayboard/releases/latest">Windows용 내려받기</a>
+    </div>
+    <p class="fine">아직 코드 서명이 없어서 Windows가 설치를 경고하거나 막을 수 있어요.</p>
   </section>
 
   <footer>
-    <p><a href="privacy.html">개인정보처리방침</a> · <a href="https://github.com/nowsummer/Dayboard/blob/main/SECURITY.ko.md">보안</a> · <a href="https://github.com/nowsummer/Dayboard/releases">릴리스</a></p>
     <p>Microsoft·Google·Apple과 관계없는 개인 프로젝트예요.</p>
+    <p><a href="privacy.html">개인정보처리방침</a></p>
   </footer>
 </main>
 </body>
