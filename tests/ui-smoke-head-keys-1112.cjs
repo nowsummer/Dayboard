@@ -57,7 +57,7 @@ async function chosenAtFoot({ mainWindow, run }, dir, name) {
   const px = pixels(mainWindow, dir);
   const R = `const R = n => { const r = n.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };`;
   const dom = await run(mainWindow, `${R}
-    const side = document.querySelector('#app .sidebar-scroll'), row = side?.querySelector('.list-nav.selected');
+    const side = sidebarScroller(), row = side?.querySelector('.list-nav.selected'); // the lists' box, or the short body (2026-11-13)
     if (!row) return null;
     const dot = row.querySelector('.list-dot'), words = document.createRange(); words.selectNodeContents(row.querySelector('.list-name'));
     return { view: innerWidth, side: R(side), row: R(row), dot: R(dot), name: R(words), id: row.dataset.nav,
@@ -70,10 +70,10 @@ async function chosenAtFoot({ mainWindow, run }, dir, name) {
   const cx = Math.round((dom.dot.l + dom.dot.r) / 2 * k), cy = (dom.dot.t + dom.dot.b) / 2;
   const up = px.rgb(p, cx, Math.round((cy - 9.5) * k)), down = px.rgb(p, cx, Math.round((cy + 9.5) * k));
   px.crop(p, { l: dom.side.l, t: Math.max(dom.side.t, dom.row.t - 40), r: dom.side.r, b: dom.side.b }, `sidebar-foot-${name}-x3`);
-  const left = await run(mainWindow, `const side = document.querySelector('#app .sidebar-scroll'), now = side.scrollTop; side.scrollTop = side.scrollHeight;
+  const left = await run(mainWindow, `const side = sidebarScroller(), now = side.scrollTop; side.scrollTop = side.scrollHeight;
     const end = side.scrollTop; side.scrollTop = now; return Math.round((end - now) * 1000) / 1000;`);
   const hex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
-  return { name, chosen: true, id: dom.id, k: Math.round(k * 1000) / 1000, scrolls: dom.scrolls, top: dom.top, left, fade: dom.fade, footRoom: Math.round((dom.side.b - dom.row.b) * 100) / 100,
+  return { name, chosen: true, id: dom.id, k: Math.round(k * 1000) / 1000, short: await run(mainWindow, `return Boolean(document.querySelector('#app .sidebar-body.short'));`), scrolls: dom.scrolls, top: dom.top, left, fade: dom.fade, footRoom: Math.round((dom.side.b - dom.row.b) * 100) / 100,
     fill, fillAt, fillMid: hex(mid), dot: [hex(up), hex(down)], dotGap: px.gap(up, down) };
 }
 // At the end nothing is left to scroll and the fade is off; anywhere the row's fill and circle are even (2 levels: the fade lightened them 6–8).
@@ -100,7 +100,7 @@ module.exports = async function headKeys({ mainWindow, invoke, output, run, sett
       return { kind: n.className.split(' ')[0], id: n.dataset.nav || '', row: R(n), dot: dot ? R(dot) : null, emoji: Boolean(dot && dot.classList.contains('emoji')), name: name ? words(name) : null, count: count && count.textContent ? words(count) : null,
         more: n.parentElement.querySelector(':scope > .list-more') ? R(n.parentElement.querySelector(':scope > .list-more')) : null };
     });
-    const buttons = [...head.querySelectorAll('.icon-button')], plus = buttons.at(-1).getBoundingClientRect(), scroller = document.querySelector('.sidebar-scroll');
+    const buttons = [...head.querySelectorAll('.icon-button')], plus = buttons.at(-1).getBoundingClientRect(), scroller = sidebarScroller();
     return { view: innerWidth, side: R(document.querySelector('.sidebar')), tiles: Math.max(...[...document.querySelectorAll('.smart-tile')].map(t => t.getBoundingClientRect().bottom)),
       word: words(head.querySelector(':scope > span')), head: R(head), button: Math.round(plus.width * 100) / 100 + 'x' + Math.round(plus.height * 100) / 100,
       svg: [...head.querySelectorAll('.inline-actions svg')].map(s => getComputedStyle(s).width).join(),

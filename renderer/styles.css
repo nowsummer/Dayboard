@@ -38,7 +38,7 @@
 
 /* Symbol picker (icon or emoji) and a quieter sidebar scrollbar. */
 .symbol-picker{display:flex;flex-direction:column;gap:8px}.picker-label{font-size:12px;color:var(--muted)}.emoji-grid .icon-choice{font-size:17px;line-height:1}.emoji-input{max-width:200px;font-size:13px}.emoji-custom{display:flex;align-items:center;gap:8px}.emoji-custom .emoji-input{flex:1 1 auto;min-width:0}.emoji-more{flex:none}
-.sidebar-scroll::-webkit-scrollbar-thumb{background:transparent}.sidebar-scroll:hover::-webkit-scrollbar-thumb{background:#9199ab33}
+.sidebar-scroll::-webkit-scrollbar-thumb,.sidebar-body.short::-webkit-scrollbar-thumb{background:transparent}.sidebar-scroll:hover::-webkit-scrollbar-thumb,.sidebar-body.short:hover::-webkit-scrollbar-thumb{background:#9199ab33}
 .widget-body .icon-grid{grid-template-columns:repeat(6,1fr)}
 
 /* List dialogs: wide layout keeps colours, icons and emoji visible without scrolling. */
@@ -2017,6 +2017,84 @@ body:not(.widget-body) .task-row.pane-open>.row-add:hover,body:not(.widget-body)
 .widget-body .widget-tasks .task-step.timed>.step-remove{order:1}
 .widget-body .widget-tasks .task-step.timed>.step-date{order:2;margin:-2px 0 0 17px}
 }
+/* Spacing 2026-11-13 (owner's choices on 간격 검토 2026-11-12, artifacts/간격 검토 2026-11-12; tests/spacing-1113.test.cjs, smoke spacing-1113).
+   1 — a scrollbar's place is kept: the 5px bar (::-webkit-scrollbar) took its width out of the content when a list grew past the box, so the
+   tiles' numbers and +, the panel's month arrows, the rows' flags, the widget cards and a week's columns stepped 5px left. Each scroller
+   reserves the bar's place always (scrollbar-gutter) and gives back as much of its own right padding, so its content stands where it stood
+   without a bar; the week and day grid, which always scrolls, lends its bar to the gap beside it and ends where the month does. The
+   calendar's day panel is left as it is: its resizer saves the box's drawn width, which a bar lent outside would grow by 5px a drag. */
+.sidebar-scroll{scrollbar-gutter:stable;padding-right:1px}
+.context-pane{scrollbar-gutter:stable;padding-right:17px}
+@media(max-width:1080px){.context-pane{padding-right:12px}}
+.task-scroll{scrollbar-gutter:stable;padding-right:4px}
+.widgets-view{scrollbar-gutter:stable;padding-right:calc(var(--gutter) - 5px)}
+.time-scroll{scrollbar-gutter:stable;margin-right:-5px}
+/* 2 — a group title (지난 할 일, 오늘, 이번 주 …) belongs to the tasks under it: twice as far from what is above (the row before, or the
+   toolbar's line for the first) as from its first task — 30 above, 15 below, as 「나의 목록」 over its lists. The first title too. */
+.tasks-view .task-group-head{padding:26px 1px 0;line-height:20px;margin-bottom:-4px}
+.tasks-view .task-group-head:first-child{padding-top:22px}
+/* 3 — 「예정된 일정이 없어요」 sits with its own heading, not halfway to 「할 일」, and 「할 일」 is twice as far from what is above it as from
+   its first task, in the task screen's right panel and the calendar's day panel alike. */
+.context-pane .agenda>.no-events,.day-panel .agenda>.no-events{padding:0}
+.context-pane .context-day-tasks{margin-top:30px}
+.day-panel>.agenda-sub{margin:28px 0 0;line-height:20px}
+/* 5 — no half pixels (CLAUDE.md 1.2.7 ⑫): a 13px line at 1.5 is 19.5px, so a task row was 73.5px high and came out 73 and 74 by turns,
+   a detail field 41.5 (41 and 42); a note's 14px at 1.9 is 26.6. Whole-pixel lines in the same families, in the main window — the
+   calendar's day panel too (review 2026-11-13: its subtasks' names and its 이날 할 일 추가 line were 13px on 19.5, inside 28px and 48px
+   rows that kept their places), the notes widget's body as the note's. Widgets are left as they are (their subtask names are 13px on
+   19.5 still — the owner's call). The toolbar over a list is 20px, so the list starts on a whole pixel (105, was 104.5) whether or not
+   its words show. */
+.task-toolbar>span{min-height:20px;line-height:20px}
+body:not(.widget-body) .task-meta{line-height:20px}
+body:not(.widget-body) .form-input{line-height:20px}
+body:not(.widget-body) textarea.form-input{line-height:23px}
+body:not(.widget-body) .dialog-body textarea.form-input[name=notes],.task-pane-body textarea.form-input[name=notes],body:not(.widget-body) textarea.form-input.title-field{line-height:20px}
+.task-pane-body .pane-step-add,body:not(.widget-body) .checkbox-field.field-switch{line-height:20px}
+.context-pane .no-events,.day-panel .no-events{line-height:20px}
+.day-panel .task-steps .step-title,.day-panel .task-steps .step-title-input,.day-panel .quick-input{line-height:20px}
+.note-body{line-height:27px}
+.context-note p{line-height:23px}
+.widget-body.note-widget .note-body{line-height:25px}
+.topbar-main h1,.topbar-count{line-height:24px}
+/* the detail panel's four 41.5px fields are 42 now: 2px more in a panel that had none to spare at 1180×780 (smoke task-pane-budget-subtasks:
+   no scroll, 메모 → 「할 일 삭제」 18, its foot 12). The head under 세부 정보 gives them back — 10px to the first label, not 12. */
+.task-pane-head{margin-bottom:10px}
+/* 6 and the flag (2026-11-13 owner: 「깃발 아이콘이 글자보다 조금 더 아래에 있는 걸로 보이는데」): the 26px flag button stood on the top of
+   its title's line (21px in the panels, 22px in the list), so the flag's middle was 2.5–3px under the words' and, in the calendar's day panel,
+   a flagged row grew to 52px. The button stands 3px above the title's line and takes no height of its own: its 15px flag (5.5px in, drawn
+   on the next whole pixel) has its middle on the words' middle in the list and half a pixel under it in the panels (the cloth is at the
+   flag's top), and every panel row is 50px. ⋯ and + follow the flag (anchor). Widgets keep theirs. In the list the 3px it stands above the
+   line is given back below it (review 2026-11-13): a row with no second line keeps its 52px of 1.2.11 (the 26px button set it), not 51. */
+body:not(.widget-body) .task-row>.task-flag{margin-block:-3px}
+body:not(.widget-body) .tasks-view .task-row>.task-flag{margin-bottom:3px}
+/* The sidebar, 2026-11-13 (owner: 「할일 목록이 여러 개 만들어져 스크롤이 생겼을 때 스크롤을 내리면 그 할일 목록들만 스크롤로 움직여야지, 그 위의 스마트
+   분류(오늘·예정·전체·중요 타일)까지 스크롤로 내려가면 안 돼」): .sidebar-body holds the tiles, 「나의 목록」 and .sidebar-scroll, and only that last one
+   scrolls (its scrollbar's place, foot padding and fades as before), so the tiles and the heading stand. In the old scroller's block flow the
+   grid's 12px under it gave way to the heading's 29 (margins collapse; a flex item's do not): 0 here keeps the heading 35 / 13 where it was.
+   A window that leaves the lists less than two rows (app.js sidebarFit: 75 CSS px) scrolls the whole body again (.short), with the old
+   scroller's geometry and fades (tests/sidebar-lists-1113.test.cjs, tests/spacing-1113.test.cjs ⑦, smoke sidebar-lists-only·sidebar-short). */
+.sidebar-body{flex:1;min-height:0;display:flex;flex-direction:column;container:sidebar-body / scroll-state}
+.sidebar-body>.smart-grid,.sidebar-body>.sidebar-section-head{flex:none}
+body:not(.widget-body) .sidebar-body>.smart-grid{margin-bottom:0}
+/* the + on the rows' ⋯ at every text size: the lists' box keeps its 5px bar's place, drawn on whole device px (4.44 CSS px at 크게), the heading above it has no bar; its buttons keep a place as wide (scrollbar-gutter on a box that never scrolls, 6px round them for the focus ring) and the heading reaches 5px further right (−2, was 3) */
+.sidebar-body>.sidebar-section-head{margin-right:-2px}
+.sidebar-body>.sidebar-section-head>.inline-actions{overflow:hidden;scrollbar-gutter:stable;padding:6px;margin-block:-6px;margin-right:-6px}
+/* a short window (.short): the body has the bar's place, so the heading is 1.2.11's again (3px in, its buttons no place of their own; the place's 6px
+   reached past the body and scrolled it sideways). The + on the ⋯ there too: smoke sidebar-short, tests/spacing-1113.test.cjs ⑦ */
+.sidebar-body.short>.sidebar-section-head{margin-right:3px}.sidebar-body.short>.sidebar-section-head>.inline-actions{overflow:visible;scrollbar-gutter:auto;padding:0;margin:0}
+.sidebar-body.short{overflow:auto;margin:0 -6px;padding:0 1px 6px 6px;scrollbar-gutter:stable}
+.sidebar-body.short>.sidebar-scroll{flex:none;overflow:visible;margin:0;padding:0}
+.sidebar-body.short::before{content:"";display:block;flex:none;position:sticky;top:0;z-index:1;height:20px;margin-bottom:-20px;background:linear-gradient(var(--side),transparent);pointer-events:none;opacity:0;transition:opacity .2s ease}
+.sidebar-body.short::after{content:"";display:block;flex:none;position:sticky;bottom:-6px;height:20px;margin-top:-20px;background:linear-gradient(transparent,var(--side));pointer-events:none;opacity:0;transition:opacity .2s ease}
+@container sidebar-body scroll-state(scrollable: top){.sidebar-body.short::before{opacity:1}}
+@container sidebar-body scroll-state(scrollable: bottom){.sidebar-body.short::after{opacity:1}}
+/* A flagged task's flag is filled (2026-11-13 owner: 「중요 표시를 하면 속이 색깔이 찬 깃발로 바꿔 주는 게 좋지 않을까」, as Apple's Reminders): the
+   cloth in its outline's own colour (the flag's orange; a widget's --w-flag), in the list, the right panel, the calendar's day panel and the widgets.
+   Not flagged it stays the outline shown on hover and focus. The 중요 tile's icon is no task's flag and keeps its outline. */
+.task-flag.on>svg{fill:currentColor}
+/* 5 in the widgets too (2026-11-13): a subtask's name 13px on 20px, as in the main window and the day panel (was 19.5); a one-line subtask
+   row stays 28px (its title box 26 and 1px above it, was 25.5 and 1.25). */
+.widget-body .widget-tasks .task-steps .step-title,.widget-body .widget-tasks .task-steps .step-title-input{line-height:20px}
 /* r60-apple — one surface rule (2026-11-02 owner: Apple surfaces — 「음영있는 pill 안에 흰색을 넣는건 좀 애플 스타일이 아닌거 같아. 전반적으로 다시
    봐줘. 애플 스타일에 맞춰줘.」, after 「설정창 … 투톤 같아서 좀 촌스럽고 난잡해보이던데」), as macOS System Settings · Calendar · Reminders:
    no control stands on more than two layers. Layer 1 is a surface (window --bg, sheet --sheet, popover --glass, note paper). Layer 2 is

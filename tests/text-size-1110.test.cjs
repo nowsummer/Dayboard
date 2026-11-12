@@ -121,14 +121,14 @@ function node(chain) {
 }
 const MAIN = 'html[data-theme=light] > body > div#app > ';
 const SIDE = MAIN + 'div.app-layout > aside.sidebar > ';
-const LISTS = SIDE + 'div.sidebar-scroll > nav > section.list-section > div.lists-nav > ';
+const LISTS = SIDE + 'div.sidebar-body > div.sidebar-scroll > nav > section.list-section > div.lists-nav > ';
 const TASKS = MAIN + 'div.app-layout > main.main-content > section.tasks-view > ';
 const ROW = TASKS + 'div.task-scroll > div.task-list > div.task-row.has-steps.steps-open > ';
 const WIDGET = 'html[data-theme=dark] > body.widget-body.tasks-widget.attached.has-backdrop.tone-dark > div#app > main.widget-surface.lg > div.widget-task-content > ';
 const CAL = MAIN + 'div.app-layout > main.main-content.full-view > section.calendar-view > ';
 const at = {
-  tileName: SIDE + 'div.sidebar-scroll > div.smart-grid > button.smart-tile[data-nav=today] > span',
-  tileNumber: SIDE + 'div.sidebar-scroll > div.smart-grid > button.smart-tile[data-nav=today] > div.tile-top > strong',
+  tileName: SIDE + 'div.sidebar-body > div.smart-grid > button.smart-tile[data-nav=today] > span',
+  tileNumber: SIDE + 'div.sidebar-body > div.smart-grid > button.smart-tile[data-nav=today] > div.tile-top > strong',
   nav: SIDE + 'nav.main-nav > button.nav-item[type=button]',
   navSelected: SIDE + 'nav.main-nav > button.nav-item.selected[type=button]',
   listName: LISTS + 'div.list-nav-wrap > button.list-nav > span.list-name',
@@ -136,12 +136,12 @@ const at = {
   listCount: LISTS + 'div.group-lists > div.list-nav-wrap > button.list-nav > span.list-count',
   groupName: LISTS + 'div.list-nav-wrap > button.group-row > span.group-name',
   groupCount: LISTS + 'div.list-nav-wrap > button.group-row > span.list-count',
-  sectionHead: SIDE + 'div.sidebar-scroll > div.sidebar-section-head > span',
-  sectionHeadBox: SIDE + 'div.sidebar-scroll > div.sidebar-section-head',
-  sectionHeadButton: SIDE + 'div.sidebar-scroll > div.sidebar-section-head > span.inline-actions > button.icon-button',
-  smartGrid: SIDE + 'div.sidebar-scroll > div.smart-grid',
-  listSection: SIDE + 'div.sidebar-scroll > nav > section.list-section',
-  listsNav: SIDE + 'div.sidebar-scroll > nav > section.list-section > div.lists-nav',
+  sectionHead: SIDE + 'div.sidebar-body > div.sidebar-section-head > span',
+  sectionHeadBox: SIDE + 'div.sidebar-body > div.sidebar-section-head',
+  sectionHeadButton: SIDE + 'div.sidebar-body > div.sidebar-section-head > span.inline-actions > button.icon-button',
+  smartGrid: SIDE + 'div.sidebar-body > div.smart-grid',
+  listSection: SIDE + 'div.sidebar-body > div.sidebar-scroll > nav > section.list-section',
+  listsNav: SIDE + 'div.sidebar-body > div.sidebar-scroll > nav > section.list-section > div.lists-nav',
   groupRow: LISTS + 'div.list-nav-wrap > button.group-row',
   listRow: LISTS + 'div.list-nav-wrap > button.list-nav',
   taskTitle: ROW + 'button.task-text > span.task-title',
@@ -263,13 +263,13 @@ const pxOf = (node, prop, env) => { const w = declared(node, [prop], env); retur
 const DOT = Number(/function listDot\(l,size=(\d+)\)/.exec(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8'))[1]);
 // The space from the tiles' lower edge to the em box of 「나의 목록」 (above), and from that em box to the first thing of the row under it
 // (below): a group's name (its chevron and folder start no higher: the picture's ink 10.5px under the row's top) or a list's dot. The row of
-// 「나의 목록」 is as high as its + buttons and holds the word in its middle (align-items:center); the margins of the grid and of that row meet
-// and collapse (block siblings). Measured in the app (readme sample, 1240×820): before, ink 23.5 above and 22 below.
+// 「나의 목록」 is as high as its + buttons and holds the word in its middle (align-items:center); the grid and that row are flex items of
+// .sidebar-body since 2026-11-13 (the lists alone scroll), so their margins add up (in the old scroller's block flow they collapsed). Measured in the app (readme sample, 1240×820): before, ink 23.5 above and 22 below.
 function headGaps(env) {
   const font = fontSize(el.sectionHead, env);
   const box = Math.max(parseFloat(line(el.sectionHead, env)), pxOf(el.sectionHeadButton, 'height', env));
   const inset = (box - font) / 2;
-  const above = Math.max(sideOf(el.smartGrid, 'margin', 'bottom', env), sideOf(el.sectionHeadBox, 'margin', 'top', env)) + inset;
+  const above = sideOf(el.smartGrid, 'margin', 'bottom', env) + sideOf(el.sectionHeadBox, 'margin', 'top', env) + inset;
   const into = inset + sideOf(el.sectionHeadBox, 'margin', 'bottom', env) + sideOf(el.listSection, 'margin', 'top', env) + sideOf(el.listsNav, 'padding', 'top', env);
   return { above, group: into + (pxOf(el.groupRow, 'min-height', env) - fontSize(el.groupName, env)) / 2, list: into + (pxOf(el.listRow, 'min-height', env) - DOT) / 2 };
 }
@@ -288,7 +288,7 @@ test('「나의 목록」 belongs to the lists under it: at least twice as far f
 // 2026-11-12 (owner's crop of 「나의 목록」 over its lists): the heading's buttons were 26px with 20px icons, larger than every other heading's,
 // and its + stood 4px left of the rows' ⋯. They are the right panel headings' 16px icons in 24px buttons (the icon on whole pixels), and the
 // + is centred on the ⋯ a row shows under the pointer. The white under the word, as drawn: ui-smoke sidebar-head-on-rhythm.
-const HEAD_SVG = node(SIDE + 'div.sidebar-scroll > div.sidebar-section-head > span.inline-actions > button.icon-button > svg');
+const HEAD_SVG = node(SIDE + 'div.sidebar-body > div.sidebar-section-head > span.inline-actions > button.icon-button > svg');
 const CONTEXT_SVG = node(MAIN + 'div.app-layout > aside.context-pane > div.context-heading > button.icon-button > svg');
 const LIST_MORE = node(LISTS + 'div.list-nav-wrap > button.icon-button.list-more');
 test('「나의 목록」 buttons: 24px with the headings\' 16px icons, the + on the rows\' ⋯', () => {
@@ -301,7 +301,10 @@ test('「나의 목록」 buttons: 24px with the headings\' 16px icons, the + on
     assert.equal(pxOf(HEAD_SVG, 'height', env), 16, `${width}: icon height`);
     assert.equal(icon, pxOf(CONTEXT_SVG, 'width', env), `${width}: the right panel headings' icon`);
     assert.equal(Number.isInteger((button - icon) / 2), true, `${width}: the icon ${(button - icon) / 2}px in, on whole pixels`);
-    const plus = sideOf(el.sectionHeadBox, 'margin', 'right', env) + button / 2;
+    // the buttons keep a bar's place as the lists' box does (2026-11-13: the lists scroll alone, the heading stands above them)
+    const actions = node(SIDE + 'div.sidebar-body > div.sidebar-section-head > span.inline-actions');
+    const gutter = declared(actions, ['scrollbar-gutter'], env)?.d.value === 'stable' ? 5 : 0;
+    const plus = sideOf(el.sectionHeadBox, 'margin', 'right', env) + sideOf(actions, 'margin', 'right', env) + sideOf(actions, 'padding', 'right', env) + gutter + button / 2;
     const more = pxOf(LIST_MORE, 'right', env) + pxOf(LIST_MORE, 'width', env) / 2;
     assert.equal(plus, more, `${width}: + ${plus}px from the right edge, a row's ⋯ ${more}px`);
   }
@@ -319,7 +322,7 @@ test('task screen: titles (open and done) and 「새로운 할 일」 15px on 22
       assert.equal(line(el[k], env), '21px', `${k} at ${width}`);
     }
     assert.equal(size(el.taskMeta, env), '13px', 'date, list, alert and progress line');
-    assert.equal(line(el.taskMeta, env), '19.5px');
+    assert.equal(line(el.taskMeta, env), '20px', 'whole pixels (2026-11-13 spacing ⑤: 13 × 1.5 = 19.5 made the rows 73.5px — tests/spacing-1113)');
     assert.equal(size(el.h1, env), '19px', 'the screen\'s title');
     assert.equal(size(el.topbarDate, env), '13px', 'the date beside it');
     assert.equal(size(el.groupHead, env), '13px', '예정\'s 오늘 · 내일 heads');
@@ -332,11 +335,11 @@ test('task screen: titles (open and done) and 「새로운 할 일」 15px on 22
 
 test('the rest keeps its size: calendar chips and day panel, the right panel\'s tasks, the detail pane, the tasks widget', () => {
   const same = [
-    ['chip', '12px', '16.2px'], ['dayTitle', '14px', '21px'], ['dayStep', '13px', '19.5px'], ['dayQuick', '13px', '19.5px'],
-    ['contextTitle', '14px', '21px'], ['contextMeta', '13px', '19.5px'], ['paneTitle', '13px', '19.5px'],
+    ['chip', '12px', '16.2px'], ['dayTitle', '14px', '21px'], ['dayStep', '13px', '20px'], ['dayQuick', '13px', '20px'], // the day panel's 19.5 lines whole since 2026-11-13 too
+    ['contextTitle', '14px', '21px'], ['contextMeta', '13px', '20px'], ['paneTitle', '13px', '20px'], // the size kept; the line a whole 20px since 2026-11-13 (tests/spacing-1113)
   ];
   for (const [k, s, l] of same) { assert.equal(size(el[k]), s, k); assert.equal(line(el[k]), l, k); }
-  for (const [k, s, l] of [['widgetTitle', '14px', '21px'], ['widgetStep', '13px', '19.5px'], ['widgetQuick', '14px', '21px'], ['widgetMeta', '12px', '18px']]) {
+  for (const [k, s, l] of [['widgetTitle', '14px', '21px'], ['widgetStep', '13px', '20px'] /* whole since 2026-11-13 (tests/spacing-1113 ⑤) */, ['widgetQuick', '14px', '21px'], ['widgetMeta', '12px', '18px']]) {
     assert.equal(size(el[k], WIDGET_ENV), s, k); assert.equal(line(el[k], WIDGET_ENV), l, k);
   }
 });

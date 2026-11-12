@@ -42,7 +42,7 @@ function harness(extra = {}) {
     state: { settings: {}, lists: [], tasks: [], notes: [], events: [], calendars: [], accounts: [], widgets: [], groups: [] },
     isWidget: false, view: 'today', search: '', menuRoot: null, selectedDate: D.dateKey(), month: new Date(),
     composing: false, // app.js: the Korean IME making a syllable (compositionstart … compositionend)
-    render() {}, renderMain() {}, closeMenu() {}, sidebarLists: () => [],
+    render() {}, renderMain() {}, closeMenu() {}, sidebarLists: () => [], sidebarShort: false, // app.js sidebarFit's last answer, read by sidebar() (2026-11-13)
     taskPane: null, taskPaneFits: () => false, taskPaneOpen() {}, datePopNode: null, // a row's claim of the right panel (2026-11-09) finds no panel unless a test gives one
     isTaskView: v => !['calendar', 'notes', 'widgets'].includes(v), // the app's own (2026-11-11: a row's + is drawn in the task screen's list)
     ...extra,

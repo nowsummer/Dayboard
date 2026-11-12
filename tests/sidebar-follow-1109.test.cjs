@@ -23,10 +23,10 @@ function sidebarOn(view) {
 test('the screens\' row stands with the search, above the part that scrolls', () => {
   const { aside } = sidebarOn('today');
   const nav = aside.querySelector('.main-nav');
-  const scroller = aside.querySelector('.sidebar-scroll');
+  const scroller = aside.querySelector('.sidebar-body'); // the tiles, 「나의 목록」 and the lists' own scroller (2026-11-13: tests/sidebar-lists-1113)
   assert.equal(Boolean(nav && scroller), true);
   assert.equal(nav.parentNode === aside, true, 'a child of the sidebar, as the search is');
-  assert.equal(scroller.querySelector('.main-nav'), null, 'not inside .sidebar-scroll');
+  assert.equal(scroller.querySelector('.main-nav'), null, 'not inside .sidebar-body');
   const kids = [...aside.children];
   assert.deepEqual([kids.indexOf(aside.querySelector('.search')) < kids.indexOf(nav), kids.indexOf(nav) < kids.indexOf(scroller)], [true, true], 'search, screens, then the lists');
 });

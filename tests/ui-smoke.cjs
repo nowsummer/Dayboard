@@ -35,6 +35,10 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   if (process.env.DAYBOARD_SMOKE_ONLY === 'under-cursor') return require('./ui-smoke-under-cursor-1112.cjs')({ mainWindow, invoke, output, run, settle, expect, calm, pointer, stir: true });
   // Every row of the shortcut sheet on one line, ko and en (2026-11-12): DAYBOARD_SMOKE_ONLY=sheet-lines; the whole smoke runs it just before the pointer guard's check.
   if (process.env.DAYBOARD_SMOKE_ONLY === 'sheet-lines') return require('./ui-smoke-sheet-lines-1112.cjs')({ mainWindow, invoke, output, run, settle, expect, calm });
+  // Spacing 2026-11-13 (scrollbar places, group titles, panel subheads, whole pixels, the flag) and the list chosen again: DAYBOARD_SMOKE_ONLY=spacing; the whole smoke runs it last.
+  // The sidebar's lists scrolling alone, the filled flag, a widget's subtask lines (2026-11-13): DAYBOARD_SMOKE_ONLY=sidebar-lists; the whole smoke runs it after spacing.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'sidebar-lists') return require('./ui-smoke-sidebar-lists-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm });
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'spacing') return require('./ui-smoke-spacing-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm });
 
   // Main screens render real content and no view throws while switching.
   for (const [label, selector, marker, file] of [
@@ -5297,7 +5301,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   // The lists fade out above the 계정·?·설정 row while more are below, and not once the last is in view (2026-11-06 review of batch A: at
   // 더 크게 「운동 · 주 3회」 was cut in half there with nothing saying the list went on). The fade's 0.2 s settles before each reading.
   const sideFade = () => run(mainWindow, `
-    const side = document.querySelector('.sidebar-scroll'); const fade = () => getComputedStyle(side, '::after').opacity;
+    const side = sidebarScroller(); const fade = () => getComputedStyle(side, '::after').opacity; // the lists' box, or the short body (2026-11-13)
     const pause = () => new Promise(resolve => setTimeout(resolve, 350));
     side.scrollTop = 0; await pause();
     const more = side.scrollHeight - side.clientHeight > 1, top = fade();
@@ -5760,6 +5764,10 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
 
   // The keyboard after a task delete and its undo: the row beside it, the task brought back, no ring after a mouse press (2026-11-12)
   checks.push(...await require('./ui-smoke-focus-delete-1112.cjs')({ mainWindow, invoke, output, run, settle, expect, calm }));
+
+  // The spacing the owner chose on 간격 검토 2026-11-12 and the flag on its title's line, by the pixels; the list chosen again goes home (2026-11-13)
+  checks.push(...await require('./ui-smoke-spacing-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm }));
+  checks.push(...await require('./ui-smoke-sidebar-lists-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm }));
 
   // Every description of the shortcut sheet on one line: ko and en, 기본 · 크게 · 더 크게, 1180 and 900 wide, with pictures (2026-11-12);
   // the last screen block, then only the pointer guard's check

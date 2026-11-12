@@ -146,11 +146,12 @@ function tourStart(auto=false){
   document.addEventListener('keydown',tourKey,true);window.addEventListener('resize',tourPlace);
   tourShow();
 }
-// The step's element, or null when it is not on screen (also when scrolled out of the sidebar's list).
+// The step's element, or null when it is not on screen (also when scrolled out of the sidebar's box that scrolls: the lists, or the whole
+// body in a window too short for them — app.js sidebarFit).
 function tourTarget(step){
   const t=step.target?document.querySelector('#app '+step.target):null;
   if(!t||!t.getClientRects().length)return null;
-  const box=t.closest('.sidebar-scroll');if(!box)return t;
+  const box=t.closest('.sidebar-body.short')||t.closest('.sidebar-scroll');if(!box)return t;
   const r=t.getBoundingClientRect(),b=box.getBoundingClientRect();
   return r.top>=b.top-1&&r.bottom<=b.bottom+1?t:null;
 }
@@ -159,7 +160,7 @@ function tourShow(){
   const step=tour.steps[tour.i];const first=tour.i===0,last=tour.i===tour.steps.length-1;
   if(step.view&&!isTaskView(view))goto(step.view);
   const el=step.target?document.querySelector('#app '+step.target):null;
-  if(el&&el.closest('.sidebar-scroll'))el.scrollIntoView({block:'nearest'});
+  if(el&&el.closest('.sidebar-body'))el.scrollIntoView({block:'nearest'});
   // The card itself takes focus (no ring for a mouse user); keys still work, Tab reaches the buttons.
   const card=h('div',{class:'tour-card'+(step.target?'':' welcome'),role:'dialog','aria-modal':'true','aria-labelledby':'tour-title','aria-describedby':'tour-text',tabindex:'-1'},
     first?h('img',{class:'tour-mark',src:'../assets/icon.png',width:56,height:56,alt:''}):h('p',{class:'tour-count'},tr('{0} / {1}',[tour.i,tour.steps.length-1])),

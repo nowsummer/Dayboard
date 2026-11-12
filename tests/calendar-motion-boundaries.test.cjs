@@ -24,7 +24,7 @@ function screen({ reduced = false } = {}) {
     requestAnimationFrame: fn => { const id = next++; frames.set(id, fn); return id; }, cancelAnimationFrame: id => frames.delete(id),
     render() {}, tr: value => value, $: () => null, search: '', I: { locale: () => 'ko-KR' }, closeMenu() {},
     api: { invoke: () => Promise.resolve() }, run: () => Promise.resolve(),
-    flagHold: new Set(), rowHolds: new Map(), /* goto drops the held rows too (2026-11-11) */ isTaskView: () => false, eventsBetween: () => [],
+    flagHold: new Set(), rowHolds: new Map(), /* goto drops the held rows too (2026-11-11) */ taskPane: null, /* and reads the task panel (2026-11-13: the list on show chosen again closes it) */ isTaskView: () => false, eventsBetween: () => [],
   });
   vm.runInContext(calendar, context);
   const line = name => app.split(/\r?\n/).find(value => value.startsWith(`function ${name}(`));

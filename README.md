@@ -19,29 +19,31 @@ A clean, Mac- and iPhone-style look for everything on your plate today.
 
 Write it down, then tick it off when it's done.
 
-- Set a date and it sorts itself into Today or Scheduled. Flag it to send it to Flagged
-- Sort tasks into lists and groups, and break big ones into subtasks
-- Add dates, reminders and repeats
-- Tasks with a date show on the calendar too, right alongside your events
+- Give a task a due date and it shows up in Today or Scheduled on the left
+- Flag the important ones to gather them in Flagged
+- Keep separate lists, like Work and Home, and group them when you have many
+- Break a task into smaller steps, called subtasks
+- Set a reminder to get an alert on time, and repeat the tasks you do every week
+- Tasks with a due date show on the calendar too, next to your events
 
 <p align="center"><img src="images/en/clips/tasks.webp" width="720" alt="Adding a task, opening its subtasks, then clicking the circle to finish it"></p>
 
 ## Calendar: just type what's on your mind
 
-No hunting for the day, picking a time or filling in the place. Type it in one line and Dayboard works out the date, time and title, then puts it on your calendar. Add the place after a comma.
+No hunting for the day, picking a time or filling in the place. Click New event, type it in one line, and Dayboard works out the date, time and title, then puts it on your calendar. Add the place after a comma.
 
 `Oct 6, 2–3pm, Economics exam, Main Hall`<br>
 → Oct 6, 2:00–3:00 PM · Economics exam · Main Hall
 
 <p align="center"><img src="images/en/clips/entry.webp" width="720" alt="Typing one line, and the event appears on October 6 with its title, time and place filled in"></p>
 
-Drag to move an event, stretch to change its time.
+Drag an event to another day, or drag its end to change the time.
 
 <p align="center"><img src="images/en/clips/drag.webp" width="720" alt="Dragging an event to another day in the month view, then stretching its end in that week's view"></p>
 
 ### Quick events: one word for the plans you repeat
 
-Lunch with a friend, the gym after work: some plans always happen at the same hours. Set up a word once with its time and icon, and from then on that word is all you need.
+Lunch with a friend, the gym after work: some plans always happen at the same hours. Set up a word once in Settings with its time and icon, and from then on that word is all you need.
 
 `lunch Alex`<br>
 → 🍽️ Alex · 12:00–1:00 PM
@@ -53,19 +55,19 @@ Lunch with a friend, the gym after work: some plans always happen at the same ho
 
 ## Notes: jot it down, find it fast
 
-The Wi-Fi password. The office printer's IP address. You only need them now and then, the sticky note has vanished, and opening a heavy notes app to dig for them takes forever. Dayboard's notes are quick to jot down and one search away. Keep the ones you use most on your desktop.
+The Wi-Fi password. The office printer's IP address. You only need them now and then, the sticky note has vanished, and opening a heavy notes app to dig for them takes forever. Dayboard's notes are quick to jot down and one search away. Keep the ones you use most on your desktop as a widget.
 
 <p align="center"><img src="images/en/clips/notes.webp" width="720" alt="Writing a note, then typing Wi-Fi in the search box and seeing the Wi-Fi password note right away"></p>
 
 ## Widgets: see it all without opening the app
 
-Keep your tasks, calendar and notes on the desktop. The Liquid Glass-style design lets your wallpaper show through, and you choose how clear it is.
+Pick Desktop widgets on the left to put your tasks, calendar and notes on your desktop. The Liquid Glass-style design lets your wallpaper show through, and you choose how clear it is.
 
 <p align="center"><img src="images/en/clips/widget.webp" width="720" alt="Tasks, calendar and notes widgets on the desktop, with the glass effect being adjusted"></p>
 
 ## Accounts
 
-Connect a Microsoft or Google account to keep your tasks and calendars in sync with your phone and other PCs, and your notes between PCs. iCloud connects calendars only. Or use it on this PC alone, no account needed.
+Click the person button at the bottom left and add a Microsoft or Google account to keep your tasks and calendars in sync with your phone and other PCs, and your notes between PCs. iCloud connects calendars only. Or use it on this PC alone, no account needed.
 
 ## Download
 
