@@ -55,8 +55,10 @@ test('W3: the calendar widget lists the day\'s tasks and dated steps after its e
   // + 4 = 34, the cell as it was). A day's dots sit nearer its own number than the circle of the row below (2 + 24 + 3 + 5 left them 10px from the '2' and 3px
   // from the today circle under it). The larger text size zooms all of it (--wz), so the proportions hold.
   const grid = el(h, 'div', 'widget-calendar-content'), cell = el(h, 'button', 'calendar-day is-today', grid), num = el(h, 'span', 'day-number', cell), dots = el(h, 'span', 'day-dots', cell);
-  assert.equal([computed(cell, 'padding-top').value, computed(num, 'width').value, computed(num, 'height').value, computed(dots, 'margin-top').value, computed(dots, 'height').value, computed(cell, 'min-height').value].join('|'), '3px|22px|22px|1px|4px|34px');
-  const px = n => parseFloat(computed(n[0], n[1]).value), pad = px([cell, 'padding-top']), circle = px([num, 'width']), gap = px([dots, 'margin-top']), dotH = px([dots, 'height']), rowGap = 1;
+  // the circle's 22px in whole even device pixels since 2026-11-11, so the dots fall under its middle (tests/mini-dots-1111): 22 at 100%
+  const even22 = 'calc(round(nearest,22px + var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200)'; // a tie up (2026-11-11 recheck)
+  assert.equal([computed(cell, 'padding-top').value, computed(num, 'width').value, computed(num, 'height').value, computed(dots, 'margin-top').value, computed(dots, 'height').value, computed(cell, 'min-height').value].join('|'), `3px|${even22}|${even22}|1px|4px|34px`);
+  const px = n => { const v = computed(n[0], n[1]).value; return v === even22 ? 22 : parseFloat(v); }, pad = px([cell, 'padding-top']), circle = px([num, 'width']), gap = px([dots, 'margin-top']), dotH = px([dots, 'height']), rowGap = 1;
   const toOwnNumber = circle / 2 - 5 + gap; // from a 14px digit's foot (about 10px tall, centred in the circle) down to the dots
   const toCircleBelow = px([cell, 'min-height']) - pad - circle - gap - dotH + rowGap + pad; // from the dots down to the next row's circle
   assert.equal(toOwnNumber < toCircleBelow, true, `the dots belong to their own day: ${toOwnNumber}px to its number, ${toCircleBelow}px to the circle below`);

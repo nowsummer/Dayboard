@@ -245,7 +245,7 @@ test('quick add: a time typed with a date goes as the task\'s time to this PC an
 test('되돌리기 gives the time back: of a deletion on this PC, and of 날짜 없음 from the menu; a whole list to Google says the times stay behind', async () => {
   const undos = [];
   const h = harness({ undoToast(text, label, undo, redo) { undos.push({ text, undo, redo }); }, staleUndo: () => new Error('stale'), plainSteps: s => s || [], shortTitle: x => x });
-  h.loadApp(...LABELS, 'const listBy=', 'function deleteLocalTask(');
+  h.loadApp(...LABELS, 'const listBy=', 'function goneFocus(', 'function backFocus(', 'function deleteLocalTask('); // its keyboard helpers (2026-11-12)
   const day = D.dayOffset(D.dateKey(), 1);
   h.context.state.lists = [{ id: 'l1', name: '장보기', provider: 'local' }];
   h.context.state.tasks = [task({ dueDate: day, dueTime: '14:00' })];

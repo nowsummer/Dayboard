@@ -64,7 +64,7 @@ function mainHarness(t) {
   const context = {
     store, tr, publicRecord, todayKey: () => localKey(new Date().toISOString()),
     text: V.text, rawText: V.rawText, noteText: V.noteText, dateOnly: V.dateOnly, reminderAt: V.reminderAt, boolean: V.boolean, taskSteps: V.taskSteps, identifier: V.identifier,
-    setRepeat: T.setRepeat, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
+    setRepeat: T.setRepeat, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, rolledBackSteps: T.rolledBackSteps, pastStepAlerts: require('../lib/alerts.cjs').pastStepAlerts, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
     lookup(collection, id) { const item = store.peek(collection, V.identifier(id)); if (!item) throw new Error('항목이 없거나 이미 삭제되었습니다.'); return item; },
     commit: fn => store.mutate(fn),
     sync: { async mutateTask() { throw new Error('no account list in this test'); } },
@@ -167,7 +167,7 @@ test('an account\'s list: To Do\'s steps take a tick, a rename, a removal from t
 
 // ---------------- renderer/app.js: the rows ----------------
 const LABELS = ['const timeFormat=', 'function fmtTime(', 'const dueCache=', 'function dueLabel(', 'function dueLabelRaw(', 'function toLocalInput(', 'function reminderLabel(', 'function alertLabel('];
-const STEPS = ['const stepFold=', 'const plainSteps=', 'function foldSteps(', 'function stepFoldKey(', 'let stepEdit=', 'function stepDateButton(', 'function stepRow(', 'function stepDrag(', 'let dragTaskId=', 'let dragStep=', 'let dragListId=', 'function taskDragEnd(', 'function dragFlush(', 'function stepTitle(', 'function stepField(', 'function stepRename(',
+const STEPS = ['const stepFold=', 'const plainSteps=', 'function foldSteps(', 'function stepFoldKey(', 'let stepEdit=', 'function stepDateButton(', 'function stepAlertWord(', 'function stepRow(', 'function stepDrag(', 'let dragTaskId=', 'let dragStep=', 'let dragListId=', 'function taskDragEnd(', 'function dragFlush(', 'function stepTitle(', 'function stepField(', 'function stepRename(',
   'function stepRemove(', 'function stepMenu(', 'function stepsToggle('];
 const task = extra => ({ id: 't1', listId: 'l1', title: '장보기', notes: '', dueDate: '', completed: false, important: false, createdAt: '2026-11-01T00:00:00.000Z', steps: [{ id: 'a', title: '우유', completed: false }, { id: 'b', title: '계란', completed: true }, { id: 'c', title: '빵', completed: false }], ...extra });
 function rowHarness(extra = {}) {
@@ -353,6 +353,23 @@ test('styles: the arrow in the gutter, steps under the title, × on hover, the r
   assert.ok(css.indexOf('.task-steps{flex-basis:100%;display:flex;flex-direction:column;padding:0 0 0 33px}') > 0, 'a step\'s circle 33px in: under the title (21px circle + 12px gap)');
 });
 
+// 2026-11-10 owner: 「하위 할 일 표시를 좀 더 직관적이고 잘 보이면서」 — the arrow was 12px in --muted (4×8px of ink) on an 18×23 press.
+test('the arrow: 14px in --secondary on a 24×28 press where the gutter has room (2px clear of the sidebar where it has not), the text colour on --hover under the pointer; the day panel\'s too', () => {
+  const css = read('renderer/styles.css').replace(/\r\n/g, '\n');
+  assert.ok(read('renderer/app.js').includes("h('span',{class:'group-chevron'+(folded?'':' open')},icon('right',14))"));
+  assert.ok(css.includes('.steps-toggle{--w:min(24px,calc(var(--gutter) - 4px));position:absolute;top:10.5px;left:calc(-2px - var(--w));width:var(--w);height:28px;display:grid;place-items:center;border-radius:6px;color:var(--secondary)}'),
+    'in the gutter 2px left of the circle and 2px or more clear of the sidebar: 24 wide in a 32px gutter, 20 in a 24px one; its centre where the 23px press had it');
+  assert.ok(css.includes('.steps-toggle:hover{background:var(--hover);color:var(--text)}'));
+  // 2026-11-11 visual review: in a 16px gutter the press is the arrow's own 14px and met the sidebar's edge, its shade squeezed between the edge and the
+  // circle — there it takes no shade, the colour alone answers the pointer (the gutter is 16 or less at 860px and under: :root's --gutter)
+  assert.ok(css.includes('@media(max-width:860px){.task-scroll .steps-toggle{--w:min(14px,calc(var(--gutter) - 2px))}.task-scroll .steps-toggle:hover{background:none}}'));
+  assert.ok(/@media\(min-width:651px\) and \(max-width:860px\)\{:root\{--gutter:16px/.test(css) && /@media\(max-width:1080px\)\{:root\{--gutter:24px/.test(css), 'where the gutter narrows');
+  assert.ok(css.includes('.steps-toggle .group-chevron{width:auto;color:inherit}'), 'the chevron takes the button\'s ink (.group-chevron alone is --muted)');
+  assert.ok(css.includes('.day-panel .steps-toggle{--w:14px;left:-15px;top:9px;height:28px}'), 'the day panel: 14 wide clear of its resizer, the same 28px press on its 18px circle\'s centre');
+  assert.ok(css.includes('.widget-body .widget-tasks .steps-toggle{display:none}'), 'widgets keep it hidden');
+  assert.ok(css.includes('.task-row.pane-open::after{content:"";position:absolute;inset:3px -8px 3px calc(0px - min(28px,var(--gutter) - 2px));'), 'the open task\'s shade reaches past the wider press, 2px short of the sidebar (2026-11-13 review)');
+});
+
 test('the shortcut sheet and 시작하기.md name Alt+↓ / Alt+↑; the keys are taken by no other handler', () => {
   const help = read('renderer/help.js');
   // one row: two rows made the sheet scroll in the default window (smoke shortcuts-sheet-list-keys)
@@ -444,7 +461,7 @@ test('To Do: a stop half-way loses no step — a refused or lost insert leaves t
 });
 
 // The rows, with main's task:add and task:delete as they are.
-const MOVES = ['function stepReorder(', 'function askLine(', 'const stepTask=', 'async function stepHolds(', 'function stepOver(', 'function stepOut(', 'async function nestTask(', 'async function nestRun(', 'const stepsCross=', 'function rowDrop(', 'function moveTaskRow(', 'function setTaskSort('];
+const MOVES = ['function stepReorder(', 'function askLine(', 'const stepTask=', 'async function stepHolds(', 'function stepOver(', 'function stepOut(', 'async function nestTask(', 'function nestWhen(', 'async function nestRun(', 'const stepsCross=', 'function rowDrop(', 'function moveTaskRow(', 'function setTaskSort('];
 function moveHarness(extra = {}) {
   const asked = []; const toasts = [];
   const h = rowHarness({ modal: (title, content) => { asked.push({ title, line: content.querySelector('p').textContent, yes: [...content.querySelectorAll('button')].at(-1) }); }, closeModal() {}, toast: (text, error) => toasts.push(`${text}|${Boolean(error)}`), tasksFor: () => h.context.state.tasks.map(x => x), ...extra });
@@ -499,6 +516,45 @@ test('a dated subtask comes out a dated task, and 되돌리기 takes it back wit
   assert.equal(h.context.state.tasks.find(x => x.id === 't1').steps[0].dueDate, '2026-11-15');
 });
 
+// 2026-11-11 recheck: a task put under another kept its date only — its time and its alert went, named as lost, while a subtask taken out to be a
+// task keeps both (stepOut). Apple Reminders keeps them when a reminder goes under another: so does this, the alert as minutes before the time.
+test('a task on a task keeps its time and, while still to come, its reminder as the subtask\'s alert; only what goes is named; 되돌리기 checks them', async () => {
+  const h = moveHarness(); const D = h.context.D;
+  const day = D.dayOffset(D.dateKey(), 2), past = D.dayOffset(D.dateKey(), -1);
+  const at = (date, time) => new Date(`${date}T${time}:00`).toISOString();
+  h.context.state.tasks = [task(), { id: 'r', listId: 'l1', title: '보고', notes: '', dueDate: day, dueTime: '10:00', reminderAt: at(day, '09:30'), completed: false, important: false }]; h.context.render();
+  await h.eval(`nestTask('r','t1')`); await h.wait();
+  assert.equal(h.asked.length, 0, 'nothing goes: not asked');
+  const step = () => h.context.state.tasks.find(x => x.id === 't1').steps.at(-1);
+  assert.equal([step().title, step().dueDate, step().dueTime, step().alert].join('|'), `보고|${day}|10:00|30`);
+  await h.undos.at(-1).undo(); await h.wait();
+  const back = h.context.state.tasks.find(x => x.title === '보고');
+  assert.equal([back.dueDate, back.dueTime, back.reminderAt].join('|'), `${day}|10:00|${at(day, '09:30')}`, '되돌리기: the task as it was');
+  // a reminder after its time stands as its minutes after it (a subtask's alert goes either way)
+  h.context.state.tasks = [task(), { id: 'w', listId: 'l1', title: '늦게', notes: '', dueDate: day, dueTime: '10:00', reminderAt: at(day, '11:00'), completed: false, important: false }]; h.context.render();
+  await h.eval(`nestTask('w','t1')`); await h.wait();
+  assert.equal([h.asked.length, step().dueTime, step().alert].join('|'), '0|10:00|-60');
+  // one that rang: not rung again — it goes, and is named
+  h.context.state.tasks = [task(), { id: 'y', listId: 'l1', title: '어제', notes: '', dueDate: past, dueTime: '10:00', reminderAt: at(past, '09:30'), completed: false, important: false }]; h.context.render();
+  await h.eval(`nestTask('y','t1')`); await h.wait();
+  assert.equal(h.asked.at(-1).line, '제목과 날짜, 시간만 남아요. 사라지는 것: 알림');
+  h.asked.at(-1).yes.click(); await h.wait();
+  assert.equal([step().title, step().dueDate, step().dueTime, step().alert ?? ''].join('|'), `어제|${past}|10:00|`);
+  // a reminder on a date without a time has no time to stand before: it goes
+  h.context.state.tasks = [task(), { id: 'z', listId: 'l1', title: '날짜만', notes: '자료', dueDate: day, reminderAt: at(day, '09:00'), completed: false, important: false }]; h.context.render();
+  await h.eval(`nestTask('z','t1')`); await h.wait();
+  assert.equal(h.asked.at(-1).line, '제목과 날짜만 남아요. 사라지는 것: 알림, 메모');
+  // with its alert kept, the line says so
+  h.context.state.tasks = [task(), { id: 'v', listId: 'l1', title: '메모 있음', notes: '자료', dueDate: day, dueTime: '10:00', reminderAt: at(day, '09:30'), completed: false, important: false }]; h.context.render();
+  await h.eval(`nestTask('v','t1')`); await h.wait();
+  assert.equal(h.asked.at(-1).line, '제목과 날짜, 시간, 알림만 남아요. 사라지는 것: 메모');
+  // 되돌리기 after its time was changed in its new place: left as it is
+  h.asked.at(-1).yes.click(); await h.wait();
+  const id = step().id;
+  h.context.state.tasks = h.context.state.tasks.map(x => (x.id === 't1' ? { ...x, steps: x.steps.map(s => (s.id === id ? { ...s, dueTime: '11:00' } : s)) } : x));
+  await assert.rejects(h.undos.at(-1).undo(), /stale/);
+});
+
 test('a task on a task: nothing to lose, no question; a date and a note named in one line, and nothing happens until agreed; one with subtasks refused; 되돌리기 makes it again', async () => {
   const h = moveHarness();
   h.context.state.tasks = [task(), { id: 'p', listId: 'l1', title: '전화', notes: '', dueDate: '', completed: false, important: false }]; h.context.render();
@@ -511,10 +567,13 @@ test('a task on a task: nothing to lose, no question; a date and a note named in
   assert.equal(h.titles('t1'), '우유,계란✓,빵');
   h.context.state.tasks = [task(), { id: 'q', listId: 'l1', title: '회의', notes: '자료', dueDate: '2026-11-07', dueTime: '10:00', important: true, completed: false }]; h.context.render();
   await h.eval(`nestTask('q','t1')`); await h.wait();
-  assert.equal(h.asked.at(-1).line, '제목과 날짜만 남아요. 사라지는 것: 시간, 메모, 중요');
+  // its time stays on the subtask (2026-11-11 recheck: it went, while a subtask taken out keeps it)
+  assert.equal(h.asked.at(-1).line, '제목과 날짜, 시간만 남아요. 사라지는 것: 메모, 중요');
   assert.equal(h.context.state.tasks.some(x => x.id === 'q'), true, 'still there until agreed');
   h.asked.at(-1).yes.click(); await h.wait();
   assert.equal(h.context.state.tasks.some(x => x.id === 'q'), false);
+  const put = h.context.state.tasks.find(x => x.id === 't1').steps.at(-1);
+  assert.equal([put.title, put.dueDate, put.dueTime, put.alert ?? ''].join('|'), '회의|2026-11-07|10:00|');
   h.context.state.tasks = [task(), task({ id: 't2' })]; h.context.render();
   await h.eval(`nestTask('t2','t1')`); await h.wait();
   assert.equal(h.toasts.at(-1), '하위 할 일이 있는 할 일은 하위 할 일로 넣을 수 없어요.|true');

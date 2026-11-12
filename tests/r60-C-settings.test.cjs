@@ -16,7 +16,7 @@ test('openSettings: three groups in the System Settings order, no widget look, n
   const groups = src.split("h('div',{class:'settings-group'}").slice(1).map(part => [...part.matchAll(/tr\('([^']+)'\)/g)].map(m => m[1]));
   assert.equal(groups.length, 3, 'three grouped cards');
   assert.deepEqual(groups[0], ['언어', '화면 모드', '시간 표시', '글자 크기'], 'general first (글자 크기: r60-X, 2026-11-02 owner: text size)');
-  assert.deepEqual(groups[1], ['할 일 화면 메모', '새 할 일 기본 목록', '새 일정 기본 달력', '새 위젯 표시 방식'], 'this app: its screens, then new items');
+  assert.deepEqual(groups[1], ['할 일 화면 메모', '달력에 할 일', '새 할 일 기본 목록', '새 일정 기본 달력', '새 위젯 표시 방식'], 'this app: its screens (달력에 할 일 beside 할 일 화면 메모, 2026-11-11 owner, tests/calendar-tasks-1111), then new items');
   assert.deepEqual(groups[2].slice(0, 4), ['일정의 알림 시간에 Windows 알림을 띄워요.', '일정 알림 표시', 'Windows 시작 시 실행', '새 버전 자동 확인']);
   for (const gone of ["tr('위젯 화면 모드')", "tr('위젯 유리 효과')", 'glass-ticks-settings', 'widgetThemeSelect()', "type:'range'"]) assert.ok(!src.includes(gone), `${gone} left the sheet (the 위젯 tab has it)`);
   assert.match(src, /h\('footer',\{class:'dialog-footer bare'\}\)\),false,\{live:true\}\)/, 'an empty footer, still live');
@@ -98,14 +98,14 @@ test('styles: 44px rows with 28px borderless selects and 13px labels in the grou
   assert.equal(computed(group, 'background').value, 'var(--field)');
   assert.equal(computed(footer, 'padding').value, '0');
   // an option sentence in a dialog (the transfer dialog's rows) keeps the settings' size on a 32px row; the task editor's 「중요한 할 일」
-  // and the event dialog's 「하루 종일」 are labelled as the fields around them since 2026-11-05 (owner: 「중요한 할 일과 하위 할 일 이거
-  // 글자 크기가 서로 다를 이유가 있어?」) — .field-switch, the labels' 12px/600 --secondary, the same 32px row
+  // and the event dialog's 「하루 종일」 are a settings switch row's words in the date field's grey box since 2026-11-10 (owner: 「중요한 할 일
+  // 글자 크기와 옆의 on/off 버튼의 크기가 잘 어울리게 맞아?」; it was the labels' 12px/600 grey) — .field-switch, 13px/450 in the text colour on 42px
   const form = el('div', 'dialog-body', el('div', 'dialog', h.app)), option = el('label', 'checkbox-field', form), important = el('label', 'checkbox-field field-switch', form);
   assert.equal(computed(option, 'font-size').value, '13px');
   assert.equal(computed(option, 'min-height').value, '32px');
-  const fieldLabel = el('span', '', el('label', 'field', form));
-  for (const prop of ['font-size', 'font-weight', 'color']) assert.equal(computed(important, prop).value, computed(fieldLabel, prop).value, `「중요한 할 일」 ${prop} as a field label`);
-  assert.equal(computed(important, 'min-height').value, '32px');
+  for (const prop of ['font-size', 'font-weight', 'color']) assert.equal(computed(important, prop).value, computed(label, prop).value, `「중요한 할 일」 ${prop} as a settings row's words`);
+  assert.equal(computed(important, 'background').value, computed(group, 'background').value, 'on the grey of the settings card');
+  assert.equal(computed(important, 'min-height').value, '42px', 'the date field\'s height');
   h.document.body.className = 'widget-body';
   assert.equal(computed(option, 'font-size').value, '12px', 'widget windows keep their 12px forms');
   assert.equal(computed(important, 'font-size').value, '12px');
@@ -118,7 +118,7 @@ test('long values: the label keeps one line, the select may take the rest of the
   const src = settingsLine();
   const fit = /\[([\w,]+)\]\.forEach\(s=>s\.prepend\(h\('button',\{type:'button'\},h\('selectedcontent'\)\)\)\)/.exec(src);
   assert.ok(fit, 'the selects draw their value through <selectedcontent> (base-select has no ellipsis of its own)');
-  assert.deepEqual(fit[1].split(',').sort(), ['clock', 'def', 'defCal', 'language', 'mode', 'sidePick', 'size', 'theme'], 'every select of the sheet');
+  assert.deepEqual(fit[1].split(',').sort(), ['calTasks', 'clock', 'def', 'defCal', 'language', 'mode', 'sidePick', 'size', 'theme'], 'every select of the sheet (calTasks: 달력에 할 일, 2026-11-11)');
   assert.ok(src.indexOf('.forEach(s=>s.prepend(') < src.indexOf("modal(tr('설정')"), 'before the sheet is drawn');
   assert.match(src, /hiddenDef\?h\('option',\{value:hiddenDef\.id\},h\('span',\{\},listVisual\(hiddenDef\)\.title\+' · '\+tr\('숨김'\),h\('span',\{class:'option-more'\},' · '\+tr\('다시 표시할 때까지 자동 목록 사용'\)\)\)\):null/,
     'closed 「{title} · 숨김」, the why in the open list only');

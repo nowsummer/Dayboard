@@ -69,7 +69,7 @@ Outside that folder:
 
 ### Settings matched between PCs
 
-- Between your PCs that use the same accounts, Dayboard matches list and calendar view settings (colour, icon, order, group, hidden state, sort), Quick events, To Do task times and subtask dates.
+- Between your PCs that use the same accounts, Dayboard matches list and calendar view settings (colour, icon, order, group, hidden state, sort), Quick events, To Do task times, and subtask dates, times and alerts.
 - They hold no task, event or note titles or text. A task is referred to only by a short hash of its service id.
 - They are kept in the Google Drive app data folder and as Dayboard's own data on the default Microsoft To Do list, and stop when you disconnect the account.
 

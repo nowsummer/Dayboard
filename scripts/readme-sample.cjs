@@ -43,8 +43,9 @@ const COLOURS = {
 const CALENDAR_IDS = { work: 'sample-work', personal: 'local-calendar', fitness: 'sample-fitness', family: 'sample-family' };
 
 // The month, the same in both languages (the words are in TEXT): [calendar, event, day, from, to, extra]. An all-day event has no
-// `from`, and `to` is the day after its last. At most three lines a day, the 할 일 line included: the month's cells hold three, and the
-// rest would fold into 「+n개」 (owner, above). Three only today; at least 16 of the grid's 42 days empty, even with the exam and the
+// `from`, and `to` is the day after its last. At most three lines a day, each open task a line of its own (its chip: settings.calendarTasks
+// 'title', the default since 1.2.11): the month's cells hold three, and the rest would fold into 「+n개」 (owner, above). Today alone
+// folds, with the board's five tasks beside its two events; at most two other days of three; at least 16 of the grid's 42 days empty, even with the exam and the
 // lunch on them, as the pictures have them; the days around those two and along the drag light (tests/r50-M-sample-text.test.cjs counts
 // them). The one repeat is the team meeting, every other Monday: a daily habit on every row was what hid the rest. The gym is written
 // day by day, on the days one goes: what the Quick event word is for.
@@ -76,8 +77,10 @@ const MONTH = [
 ];
 
 // The tasks, the same in both languages: [list, task, due, flagged, extra]. Done tasks and those with no date are in the lists only, and
-// so are those due after the month's last row (8 November on); the others are on the month's 할 일 line of their day, so only a few days
-// have one: today, tomorrow and the week of the work trip. Off EXAM_DAY and LUNCH_DAY.
+// so are those due after the month's last row (8 November on); the others are chips in the month on their day, so only a few days
+// have them: today, tomorrow, the Sunday before the Jeju trip, the week of the work trip and a Friday. Off EXAM_DAY and LUNCH_DAY, and
+// off the days beside them and along the drag (their cells stay light in the film). Tomorrow keeps two of its four tasks of 1.2.10: four
+// chips beside the dinner folded it into 「+3개」 (2026-11-13, the month's task chips).
 const TASKS = [
   ['work', 'report', DEMO_DAY, true, { steps: 'reportSteps' }],
   ['work', 'budget', DEMO_DAY, false],
@@ -91,7 +94,7 @@ const TASKS = [
   ['home', 'recycling', '2026-10-02', false, { remind: '19:30' }],
   ['home', 'fee', '2026-11-09', true],
   ['home', 'clean', '2026-11-14', false, { steps: 'cleanSteps' }],
-  ['trip', 'car', '2026-10-02', true],
+  ['trip', 'car', '2026-10-04', true],
   ['trip', 'checkin', '', false],
   ['trip', 'pack', '', false, { steps: 'packSteps' }],
   ['fitness', 'renew', '2026-11-10', false],
@@ -99,7 +102,7 @@ const TASKS = [
   ['fitness', 'shoes', '', false],
   ['inbox', 'demian', DEMO_DAY, false],
   ['inbox', 'questions', '', false],
-  ['inbox', 'papers', '2026-10-02', false],
+  ['inbox', 'papers', '2026-10-30', false],
   ['inbox', 'insurance', '2026-10-13', true],
   ['inbox', 'return', '', false, { done: true }],
 ];

@@ -57,6 +57,44 @@ test('sidebarFollow and a resize scroll the sidebar\'s own box, never with scrol
   assert.equal(scroller.scrollTop, 0, 'the small DOM puts the row in view: nothing moves');
 });
 
+// 2026-11-12 check of the 24px heading buttons (ui-smoke subtasks-narrow, 900×780 at 더 크게): the last list chosen stood under the foot's fade.
+// scrollHeight − clientHeight is whole pixels (45 there) while the true end at ×1.25 is not (45.6), so the scroll went to 45, the browser drew
+// it at 44.8 (56 device px), scroll-state(scrollable: bottom) held and the fade lay over the row — and the next call took 44.8 for the end.
+// A scroller as Chromium's: whole-pixel scrollHeight, positions on the device grid, clamped to the fractional end.
+function zoomedScroller(h, { end, client, rowTop, rowHeight, k = 1.25 }) {
+  const box = h.document.createElement('div'); box.className = 'sidebar-scroll';
+  const row = h.document.createElement('a'); row.className = 'list-nav selected'; box.append(row); h.app.append(box);
+  let at = 0;
+  Object.defineProperty(box, 'scrollTop', { get: () => at, set: v => { at = Math.min(end, Math.max(0, Math.round(v * k) / k)); } });
+  Object.defineProperty(box, 'scrollHeight', { get: () => Math.round(client + end - 0.4) });
+  Object.defineProperty(box, 'clientHeight', { get: () => client });
+  box.getBoundingClientRect = () => ({ left: 0, top: 0, right: 228, bottom: client, width: 228, height: client });
+  row.getBoundingClientRect = () => ({ left: 0, top: rowTop - at, right: 228, bottom: rowTop + rowHeight - at, width: 228, height: rowHeight });
+  return box;
+}
+
+test('the chosen list at the foot goes to the true end, a fraction past scrollHeight − clientHeight, and stays there', () => {
+  const h = harness();
+  h.loadApp('function sidebarScrollTarget(', 'let sidebarShown=');
+  const box = zoomedScroller(h, { end: 45.6, client: 389, rowTop: 391.6, rowHeight: 37 });
+  assert.equal(box.scrollHeight - box.clientHeight, 45, 'whole pixels, as Chromium reports them');
+  h.eval('sidebarKeepChosen()');
+  assert.equal(box.scrollTop, 45.6, 'the end itself (before: 44.8, 0.8px short, the fade drawn)');
+  h.eval('sidebarKeepChosen()');
+  assert.equal(box.scrollTop, 45.6, 'once there, it stays');
+  // a scroll left short of the end (as the old reckoning did) is taken for what it is: the fade drawn, the row brought clear
+  box.scrollTop = 44.8;
+  assert.equal(box.scrollTop, 44.8);
+  h.eval('sidebarKeepChosen()');
+  assert.equal(box.scrollTop, 45.6, 'from 44.8 to the end');
+  // a sidebar scrolled by hand with the chosen row well in view stays where it is
+  const shown = zoomedScroller(h, { end: 45.6, client: 389, rowTop: 200, rowHeight: 37 });
+  shown.scrollTop = 20;
+  box.remove();
+  h.eval('sidebarKeepChosen()');
+  assert.equal(shown.scrollTop, 20);
+});
+
 test('the scroller fades at its top too once scrolled, so a tile under the screens\' row dissolves instead of ending in a cut', () => {
   const css = read('renderer/styles.css').replace(/\r\n/g, '\n');
   assert.match(css, /\.sidebar-scroll::before\{content:"";display:block;position:sticky;top:0;z-index:1;height:20px;margin-bottom:-20px;background:linear-gradient\(var\(--side\),transparent\);pointer-events:none;opacity:0;transition:opacity \.2s ease\}/);

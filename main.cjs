@@ -10,6 +10,7 @@ const { spawn } = require('node:child_process');
 const { UpdateManager, releasePage, releasesPage, releaseTag, STAGING_ID } = require('./lib/updater.cjs');
 const { createStore, resolveUserDataDirectory, TRASH_DAYS, publicNote, publicRecord } = require('./lib/store.cjs');
 const { createDesktopManager, clampBounds, resizedBounds, RESIZE_EDGES, onScreen } = require('./lib/desktop.cjs');
+const { homeOf, homeOn, ownPlace, asideOf, onAnyScreen, sameRect, validHome, spotOf, rememberSpot, spotOn, createPlaceWatch, SETTLE_MS } = require('./lib/widgethome.cjs');
 const { createTaskbarIcon } = require('./lib/windowicon.cjs');
 const { createStartMenu } = require('./lib/startmenu.cjs');
 const { createSync, seriesKey, dropSeriesColors } = require('./lib/sync.cjs');
@@ -30,8 +31,8 @@ const i18n = require('./lib/i18n.cjs');
 const { tr } = i18n;
 // Input validators and the local-series helpers live in lib/ since the 2026-10-27 review (tests run them without Electron).
 const { text, rawText, noteText, identifier, boolean, color, dateOnly, dateTime, dueTime, reminderAt, idList, eventColor, rruleText, scopeOf, taskSorts, taskSteps, eventAlert, taskOrders } = require('./lib/validate.cjs');
-const { dueAlerts, alertLine, pruneFired, taskDueLine } = require('./lib/alerts.cjs');
-const { setRepeat, setDueTime, followDue, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries, wantedSteps, stepsDone } = require('./lib/tasks.cjs');
+const { dueAlerts, alertLine, pruneFired, taskDueLine, dueStepAlerts, passedStepAlerts, pastStepAlerts } = require('./lib/alerts.cjs');
+const { setRepeat, setDueTime, followDue, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries, rolledBackSteps, wantedSteps, stepsDone } = require('./lib/tasks.cjs');
 const { WARNS, isAccountList, moveSummary, settleMovesAtStart } = require('./lib/taskmove.cjs');
 const { createCalendarHistory } = require('./lib/calhistory.cjs');
 const { BACKUP_LIMIT, backupRunner, parseBackup, restorePlan, applyRestore, undoRestore } = require('./lib/backup.cjs');
@@ -56,6 +57,7 @@ const rendererFile = path.join(__dirname, 'renderer', 'index.html');
 const preloadFile = path.join(__dirname, 'preload.cjs');
 const desktop = createDesktopManager();
 const widgetWindows = new Map();
+const places = createPlaceWatch(); // which widget moves are the user's own place (lib/widgethome.cjs, 2026-11-11)
 const resizeAnchors = new Map(); // widget id → { key, bounds }: the widget as a resizing drag found it (widget:resize)
 const smokeErrors = [];
 const pendingFlushes = new Map();
@@ -64,6 +66,8 @@ const closingWindows = new Map();
 const boundsTimers = new Map();
 const readyWindows = new WeakSet();
 let store, sync, history, mainWindow, tray, quitting = false, timer;
+// Smoke windows ignore the OS mouse: only the smoke's own injected input moves their hover (lib/smoke-pointer.cjs, 2026-11-12).
+const smokePointer = smoke ? require('./lib/smoke-pointer.cjs').guardSmokeWindows({ app, screen, main: () => mainWindow }) : null;
 let quitInFlight = false;
 let updater = null, trayUpdateStatus = null;
 
@@ -145,9 +149,42 @@ function persistWidgetBounds() {
   commit(state => {
     for (const widget of state.widgets) {
       const win = widgetWindows.get(widget.id);
-      if (win && !win.isDestroyed()) widget.bounds = desktop.getBounds(win, screen);
+      if (win && !win.isDestroyed()) keepPlace(state, widget.id, win, true);
     }
   });
+}
+// What a widget's record keeps after its window moved or changed size (2026-11-11 owner: 「크기 좀 키운 후 고정한 상태보다 작게」). Nothing
+// while it is locked — the place it was locked at is where it goes back — or while it is on no connected screen: Electron reads such a
+// window at another screen's scale (360×450 became 289×361 when the HDMI screen at 100% went and the laptop at 125% stayed). Its own
+// place (home) only when the move was the user's (places.judge); null: not known yet, the caller asks again. final: quitting.
+function keepPlace(state, id, win, final = false) {
+  const record = state.widgets.find(item => item.id === id);
+  if (!record || record.locked || win.isDestroyed()) return false;
+  const displays = screen.getAllDisplays();
+  const rect = desktop.getBounds(win, screen);
+  if (!onAnyScreen(rect, displays)) return false;
+  record.bounds = rect;
+  const mine = places.judge(win.id, rect, { final });
+  if (mine) { setPlace(record, rect, displays); places.placed(win.id, rect); }
+  return mine;
+}
+// A place the user gives a widget by a drag, a size or a lock (2026-11-11): its own place (home) while its own screen is here or it has
+// none yet; while that screen is away, the spot for the setup connected now (spots: the laptop alone, the laptop with the home monitor),
+// and the place on the away screen stays for when that screen is back — as Windows remembers a window per monitor setup. An older
+// absolute place (homeBounds) on a connected screen gives way to either; one on no screen may be on a monitor that is away, so it stays
+// aside (asideOf) and this setup keeps the user's place as its spot, for when that one comes back as the home (2026-11-13 Codex review N2).
+function setPlace(record, rect, displays) {
+  const aside = asideOf(record.homeBounds, displays);
+  if (validHome(record.home) && !homeOn(record.home, displays)) record.spots = rememberSpot(record.spots, spotOf(rect, displays));
+  else record.home = homeOf(rect, displays);
+  if (!aside) { delete record.homeBounds; return; }
+  record.homeBounds = aside;
+  record.spots = rememberSpot(record.spots, spotOf(rect, displays));
+}
+// Dayboard itself moves a widget window (a return, a wait on the main screen, a minimum): the app's move, never the user's place.
+function moveWidget(win, bounds) {
+  places.placed(win.id, bounds);
+  desktop.setBounds(win, bounds, screen);
 }
 
 // The lanes the IPC handler runs commands in (lib/lanes.cjs, 2026-10-28 Codex review R8): this PC's data at once, connected
@@ -195,15 +232,35 @@ function checkReminders() {
   const now = Date.now();
   // Hidden account sections and hidden lists (settings.hiddenSections / hiddenLists) are left out everywhere, reminders included.
   // Read without a copy of the whole state (store.read; 2026-10-27 review: two full copies every 30 s stalled the main process).
-  const { due, timeFormat } = store.read(current => {
+  // A subtask's alert (2026-11-11 owner, lib/alerts.cjs dueStepAlerts) by the same rules, recorded in alertsFired as an event's is.
+  const { due, steps, timeFormat } = store.read(current => {
     const shown = new Set(visibleState(current).lists.map(list => list.id));
     const hiddenLists = new Set(current.lists.filter(list => !shown.has(list.id)).map(list => list.id));
     return { timeFormat: current.settings.timeFormat, due: current.tasks.filter(task => task.reminderAt && !task.completed && !task.reminderFiredAt && !hiddenLists.has(task.listId) && Date.parse(task.reminderAt) <= now && Date.parse(task.reminderAt) > now - 12 * 3600 * 1000)
-      .map(task => ({ id: task.id, title: task.title, dueDate: task.dueDate, dueTime: task.dueDate && task.dueTime || '', listName: current.lists.find(item => item.id === task.listId)?.name || '' })) };
+      .map(task => ({ id: task.id, title: task.title, dueDate: task.dueDate, dueTime: task.dueDate && task.dueTime || '', listName: current.lists.find(item => item.id === task.listId)?.name || '' })),
+      steps: dueStepAlerts(current, now, hiddenLists).map(item => ({ key: item.key, taskId: item.task.id, stepId: item.step.id, title: item.step.title, parent: item.task.title, dueDate: item.step.dueDate, dueTime: item.step.dueTime })) };
   });
-  if (!due.length) return;
-  commit(state => { for (const task of state.tasks) if (due.some(item => item.id === task.id)) task.reminderFiredAt = new Date().toISOString(); });
+  if (!due.length && !steps.length) return;
+  commit(state => {
+    for (const task of state.tasks) if (due.some(item => item.id === task.id)) task.reminderFiredAt = new Date().toISOString();
+    if (steps.length) { const fired = pruneFired(state.alertsFired); for (const item of steps) fired[item.key] = new Date().toISOString(); state.alertsFired = fired; }
+  });
   if (!Notification.isSupported()) return;
+  // The subtask by its title, its task and its time under it; a click opens that task with its subtasks in view (renderer openTaskNotice).
+  for (const item of steps) {
+    try {
+      const notification = new Notification({ title: item.title, body: [item.parent, taskDueLine(item, { now, timeFormat })].filter(Boolean).join(' · '), icon: path.join(__dirname, 'assets', 'toast.png') });
+      notification.on('click', () => {
+        showMain();
+        try {
+          if (!mainWindow || mainWindow.isDestroyed()) return;
+          const send = () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dayboard:open-task', item.taskId, item.stepId); };
+          if (mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', send); else send();
+        } catch { /* the window is closing */ }
+      });
+      notification.show();
+    } catch (error) { console.error('subtask alert notification failed:', error.message); }
+  }
   for (const task of due) {
     try {
       const notification = new Notification({ title: task.title, body: [task.listName, task.dueDate ? tr("마감 {0}", [taskDueLine(task, { now, timeFormat }) /* with its time (2026-11-05), as the task row writes it (2026-11-09 review F9) */]) : tr('할 일 알림')].filter(Boolean).join(' · '), icon: path.join(__dirname, 'assets', 'toast.png') });
@@ -342,7 +399,7 @@ function applyWidgetMinimums() {
     const minimum = widgetMinimum(widget.type, store.read(s => s.settings.widgetTextSize));
     try {
       const current = desktop.getBounds(win, screen);
-      if (current.width < minimum.minWidth || current.height < minimum.minHeight) { const next = clampBounds(current, screen.getAllDisplays(), current, minimum); logWidgetMove(widget, 'minimum', current, next); desktop.setBounds(win, next, screen); queueBackdrop(win); }
+      if (current.width < minimum.minWidth || current.height < minimum.minHeight) { const next = clampBounds(current, screen.getAllDisplays(), current, minimum); logWidgetMove(widget, 'minimum', current, next); moveWidget(win, next); queueBackdrop(win); }
     } catch (error) { console.error('widget minimum not applied:', error.message); }
   }
 }
@@ -413,6 +470,23 @@ function freeSlot(size, area) {
   }
   return { x: area.x + area.width - size.width - 16 - taken.length * 24, y: area.y + 16 + taken.length * 24 };
 }
+// Where a widget waits while its own screen is away: the spot the user gave it in the setup connected now (spots, setPlace);
+// else the first free spot on the main screen, at its own size as far as that screen holds it — the size itself stays in its home.
+// stay: a widget the older build left waiting (homeBounds) keeps the spot it waited at when that spot is still free, so the first
+// start of this build moves nothing.
+function waitingPlace(widget, want, minimum, displays, stay) {
+  const chosen = spotOn(widget.spots, displays);
+  if (chosen) return clampBounds(chosen.rect, [chosen.display], chosen.rect, minimum);
+  const area = screen.getPrimaryDisplay().workArea;
+  const size = { width: Math.max(minimum.minWidth, Math.min(Math.round(want.width), area.width - 32)), height: Math.max(minimum.minHeight, Math.min(Math.round(want.height), area.height - 32)) };
+  if (stay && widget.bounds && onScreen(widget.bounds, displays)) {
+    const kept = clampBounds({ x: widget.bounds.x, y: widget.bounds.y, ...size }, displays, { ...widget.bounds }, minimum);
+    const others = [...widgetWindows].filter(([id, win]) => id !== widget.id && !win.isDestroyed()).map(([, win]) => desktop.getBounds(win, screen));
+    if (!others.some(r => kept.x < r.x + r.width && kept.x + kept.width > r.x && kept.y < r.y + r.height && kept.y + kept.height > r.y)) return kept;
+  }
+  const spot = { ...freeSlot(size, area), ...size };
+  return clampBounds(spot, displays, spot, minimum);
+}
 async function openWidget(widget) {
   if (widgetWindows.has(widget.id)) { widgetWindows.get(widget.id).show(); return widget; }
   if (quitting) { const cancelled = new Error(tr('위젯을 여는 중에 닫혔어요.')); cancelled.cancelled = true; throw cancelled; } // no new window once the quit began
@@ -420,26 +494,28 @@ async function openWidget(widget) {
   const size = { ...(WIDGET_OPEN[widget.type] || WIDGET_OPEN.note) };
   const minimum = widgetMinimum(widget.type, store.read(s => s.settings.widgetTextSize)); // WIDGET_MIN at the widgets' text size (r60-X)
   const displays = screen.getAllDisplays();
-  // A widget whose screen is not connected (second monitor off or undocked) waits in a free spot on the main screen,
-  // never piled on another widget, and keeps its own place (homeBounds) for when that screen returns (rehomeWidgets),
-  // like Windows' "remember window locations based on monitor connection".
-  const home = widget.homeBounds || widget.bounds;
+  // A widget opens at its own place (home, lib/widgethome.cjs): on its own screen, wherever that screen now is, at its own size. While
+  // that screen is not connected (second monitor off or undocked) it waits in a free spot on the main screen, never piled on another
+  // widget, and goes back when the screen returns (rehomeWidgets), like Windows' "remember window locations based on monitor connection".
+  const own = ownPlace(widget, displays);
+  const there = own.home && homeOn(own.home, displays);
   let bounds;
-  if (home && !onScreen(home, displays)) {
-    const away = { width: Math.max(minimum.minWidth, Math.round(home.width) || size.width), height: Math.max(minimum.minHeight, Math.round(home.height) || size.height) };
-    bounds = clampBounds({ ...freeSlot(away, area), ...away }, displays, { ...freeSlot(size, area), ...size }, minimum);
-    if (!widget.homeBounds) commit(state => { const current = state.widgets.find(item => item.id === widget.id); if (current) current.homeBounds = { ...home }; });
-    logWidgetMove(widget, 'opened-screen-gone', home, bounds);
-  } else {
-    bounds = clampBounds(home, displays, { ...freeSlot(size, area), ...size }, minimum);
-    if (home && ['x', 'y', 'width', 'height'].some(key => Math.round(home[key]) !== bounds[key])) logWidgetMove(widget, 'opened-corrected', home, bounds);
-    if (widget.homeBounds) commit(state => { const current = state.widgets.find(item => item.id === widget.id); if (current) delete current.homeBounds; });
-  }
+  if (there) {
+    bounds = clampBounds(there.rect, [there.display], there.rect, minimum); // kept on that screen, even one now smaller
+    if (!sameRect(there.rect, bounds, 0)) logWidgetMove(widget, 'opened-corrected', there.rect, bounds);
+    if (own.migrated) commit(state => { const current = state.widgets.find(item => item.id === widget.id); if (current) { current.home = own.home; delete current.homeBounds; } });
+  } else if (own.home || own.legacy) {
+    const want = own.home || own.legacy;
+    bounds = waitingPlace(widget, want, minimum, displays, Boolean(own.legacy));
+    if (own.legacy && !widget.homeBounds) commit(state => { const current = state.widgets.find(item => item.id === widget.id); if (current) current.homeBounds = { ...own.legacy }; });
+    logWidgetMove(widget, 'opened-screen-gone', want, bounds);
+  } else bounds = clampBounds(undefined, displays, { ...freeSlot(size, area), ...size }, minimum); // a new widget
   const win = new BrowserWindow({ ...commonWindow(), ...bounds, ...minimum,
     title: tr("Dayboard {0}", [widget.type === 'tasks' ? tr('할 일') : widget.type === 'calendar' ? tr('달력') : tr('메모')]),
     skipTaskbar: true, maximizable: false, minimizable: false, fullscreenable: false,
     transparent: true, backgroundColor: '#00000000', hasShadow: true, resizable: false });
   widgetWindows.set(widget.id, win);
+  places.placed(win.id, bounds);
   secureWindow(win);
   win.on('system-context-menu', event => event.preventDefault());
   watchResponsive(win, () => reloadHung(win));
@@ -448,21 +524,25 @@ async function openWidget(widget) {
     boundsTimers.set(widget.id, setTimeout(() => {
       boundsTimers.delete(widget.id);
       if (win.isDestroyed() || quitting) return;
+      let later = false;
       try {
         // Saved without a broadcast: no window reads a widget's bounds, and a broadcast redraws every window (2026-10-27 review).
-        store.mutate(state => {
-          const current = state.widgets.find(item => item.id === widget.id);
-          if (current) current.bounds = desktop.getBounds(win, screen);
-        });
+        store.mutate(state => { later = keepPlace(state, widget.id, win) === null; });
       } catch (error) {
         // A transient file lock (indexer, antivirus) must not raise a crash dialog
         // from a widget move; retry once, then give up quietly (bounds are cosmetic).
         if (attempt < 1) persistBounds(attempt + 1); else console.error('widget bounds not saved:', error.message);
+        return;
       }
+      // A move nothing explains yet is judged again once it has settled (keepPlace); a new move or the quit cancels the wait.
+      if (later) boundsTimers.set(widget.id, setTimeout(() => persistBounds(), SETTLE_MS));
     }, attempt ? 1500 : 400));
   };
-  win.on('move', () => { persistBounds(); queueBackdrop(win); });
-  win.on('resize', () => { persistBounds(); queueBackdrop(win); });
+  // 'will-move' comes only while the user drags the window (Electron: "only emitted when the window is being moved manually"):
+  // that place is the user's. Not 'moved', which is not said to be manual only.
+  win.on('will-move', () => places.user(win.id));
+  win.on('move', () => { places.moved(win.id); persistBounds(); queueBackdrop(win); });
+  win.on('resize', () => { places.moved(win.id); persistBounds(); queueBackdrop(win); });
   // A reloading or crashed renderer paints nothing (black on the desktop host), so hide the widget and
   // reveal it again once the new page has painted its wallpaper.
   const hideWhileReloading = () => setImmediate(() => { if (!win.isDestroyed() && desktop.isAttached(win) && desktop.shapeOf(win) !== 'hidden') { try { desktop.setShape(win, 'hidden'); } catch { /* best effort */ } } });
@@ -485,6 +565,7 @@ async function openWidget(widget) {
     backdropKeys.delete(win.id);
     revealTokens.delete(win.id);
     resizeAnchors.delete(widget.id);
+    places.forget(win.id);
     widgetWindows.delete(widget.id);
     // An Explorer restart destroys child windows of the desktop host. If the
     // widget is still wanted (its record survived), reopen it once the shell is back.
@@ -501,9 +582,45 @@ async function openWidget(widget) {
   const status = await placeWidget(win, widget.mode, widget.id);
   commit(state => {
     const current = state.widgets.find(item => item.id === widget.id);
-    if (current) Object.assign(current, widgetStatus(status), { bounds });
+    if (!current) return;
+    Object.assign(current, widgetStatus(status), { bounds });
+    delete current.openFailures; // it opened (widgetNotOpened)
+    const opened = !current.home && !current.homeBounds && homeOf(bounds, displays); // a new widget's own place: where it opened
+    if (opened) current.home = opened;
   });
   return lookup('widgets', widget.id);
+}
+// The widgets of the last session, opened again at start.
+async function reopenWidgets() {
+  for (const widget of store.get().widgets) {
+    if (quitting) break; // a quit during the start-up opens: the rest stay saved for the next launch
+    // A note widget whose note is gone or in the trash (another PC, while this one was off) is not reopened: its card
+    // would only offer 「메모 추가」 and create stray notes (2026-10-26 review).
+    if (widget.type === 'note') { const note = store.get().notes.find(item => item.id === widget.noteId); if (!note || note.trashedAt) { commit(state => { state.widgets = state.widgets.filter(item => item.id !== widget.id); }); continue; } }
+    await openWidget(widget).catch(error => widgetNotOpened(widget, error, true));
+  }
+}
+// A widget whose window did not open at start. That is mostly a moment's trouble (the desktop still starting, a file in use), and the
+// record holds the user's place, size and lock: it stays, the window is tried again in 10 s and at the next start, and only a widget
+// that failed at three starts in a row is let go — one that can never open is not listed forever (2026-11-11 owner: 「응 막아줘」,
+// a start used to delete the record at the first failure).
+function widgetNotOpened(widget, error, atStart) {
+  if (error.cancelled || quitting) return; // the window was cut short, not broken: the record stays for the next launch
+  if (smoke) { smokeErrors.push(error.message); return; }
+  widgetWindows.get(widget.id)?.destroy();
+  console.error('widget not reopened:', error.message);
+  if (!atStart) return;
+  let kept = false;
+  commit(state => {
+    const record = state.widgets.find(item => item.id === widget.id);
+    if (!record) return;
+    record.openFailures = (record.openFailures || 0) + 1;
+    if (record.openFailures >= 3) state.widgets = state.widgets.filter(item => item.id !== widget.id); else kept = true;
+  });
+  if (kept) setTimeout(() => {
+    const record = !quitting && store.get().widgets.find(item => item.id === widget.id);
+    if (record && !widgetWindows.has(widget.id)) perWidget(widget.id, () => openWidget(record)).catch(again => widgetNotOpened(record, again, false));
+  }, 10000);
 }
 // A failed desktop attach falls back to "항상 위" for this session only; the
 // user's chosen mode stays stored so the next launch tries the desktop again.
@@ -656,36 +773,44 @@ function watchWallpaper() {
   // Screens come and go (docking, a second monitor switched off): move widgets off a missing screen without piling
   // them up, and back to their own place when that screen returns. Debounced: Windows reports a change in steps,
   // and the event can arrive inside a native call (no koffi from there).
+  // Every one of these is also a time Windows moves and resizes windows by itself: no move then is the user's place (places.screens).
   let rehomeTimer = null;
-  for (const name of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(name, () => { clearTimeout(rehomeTimer); rehomeTimer = setTimeout(rehomeWidgets, 1500); });
+  for (const name of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(name, () => { places.screens(); clearTimeout(rehomeTimer); rehomeTimer = setTimeout(rehomeWidgets, 1500); });
   // Waking or unlocking the PC can bring a screen back without a display event reaching here: a widget waiting for it goes home then too (2026-11-08).
-  for (const name of ['resume', 'unlock-screen']) powerMonitor.on(name, () => { clearTimeout(rehomeTimer); rehomeTimer = setTimeout(rehomeWidgets, 3000); });
+  for (const name of ['resume', 'unlock-screen']) powerMonitor.on(name, () => { places.screens(); clearTimeout(rehomeTimer); rehomeTimer = setTimeout(rehomeWidgets, 3000); });
   setInterval(scheduleBackdropRefresh, 5 * 60 * 1000).unref?.();
 }
 function rehomeWidgets() {
   if (!store || quitting) return;
   const displays = screen.getAllDisplays();
-  const area = screen.getPrimaryDisplay().workArea;
   for (const widget of store.get().widgets) {
     const win = widgetWindows.get(widget.id);
     if (!win || win.isDestroyed()) continue;
     const minimum = widgetMinimum(widget.type, store.read(s => s.settings.widgetTextSize));
     try {
-      if (widget.homeBounds && onScreen(widget.homeBounds, displays)) {
-        const back = clampBounds(widget.homeBounds, displays, widget.homeBounds, minimum);
-        logWidgetMove(widget, 'screen-back', desktop.getBounds(win, screen), back);
-        desktop.setBounds(win, back, screen);
-        commit(state => { const current = state.widgets.find(item => item.id === widget.id); if (current) delete current.homeBounds; });
+      // Its own screen is connected (back, or now the main one, or elsewhere in the row): exactly to its own place on it.
+      const own = ownPlace(widget, displays);
+      const there = own.home && homeOn(own.home, displays);
+      const current = desktop.getBounds(win, screen);
+      if (there) {
+        const back = clampBounds(there.rect, [there.display], there.rect, minimum);
+        if (own.migrated) commit(state => { const stored = state.widgets.find(item => item.id === widget.id); if (stored) { stored.home = own.home; delete stored.homeBounds; } });
+        if (sameRect(current, back)) { places.placed(win.id, current); continue; }
+        logWidgetMove(widget, 'screen-back', current, back);
+        moveWidget(win, back);
         queueBackdrop(win);
         continue;
       }
-      const current = desktop.getBounds(win, screen);
-      if (onScreen(current, displays)) continue;
-      const away = { width: Math.max(minimum.minWidth, current.width), height: Math.max(minimum.minHeight, current.height) };
-      const target = clampBounds({ ...freeSlot(away, area), ...away }, displays, { ...freeSlot(away, area), ...away }, minimum);
-      commit(state => { const stored = state.widgets.find(item => item.id === widget.id); if (stored && !stored.homeBounds) stored.homeBounds = { ...(stored.bounds || current) }; });
-      logWidgetMove(widget, 'screen-gone', current, target);
-      desktop.setBounds(win, target, screen);
+      // Its screen is away. The setup connected now has a spot the user gave it (the laptop with the home monitor just plugged in):
+      // there. Otherwise a widget still on a connected screen waits where it is (Windows may have put it there), and one left on no
+      // screen waits in a free spot on the main screen, at its own size — not at the size Electron reads off a missing screen.
+      const chosen = spotOn(widget.spots, displays);
+      const spot = chosen && clampBounds(chosen.rect, [chosen.display], chosen.rect, minimum);
+      if (spot ? sameRect(current, spot) : onScreen(current, displays)) { places.placed(win.id, current); continue; }
+      const target = spot || waitingPlace(widget, own.home || own.legacy || current, minimum, displays, false);
+      if (own.legacy && !widget.homeBounds) commit(state => { const stored = state.widgets.find(item => item.id === widget.id); if (stored) stored.homeBounds = { ...own.legacy }; });
+      logWidgetMove(widget, spot ? 'setup-spot' : 'screen-gone', current, target);
+      moveWidget(win, target);
       queueBackdrop(win);
     } catch (error) { console.error('widget not moved after a display change:', error.message); }
   }
@@ -828,9 +953,11 @@ async function command(commandName, payload, sourceWindow) {
       const list = lookup('lists', previous.listId);
       // Unticking the completed copy To Do made when it moved a series on is 되돌리기 of that series (lib/tasks.cjs rolledSeries).
       // (되돌리기 brings the subtasks' ticks along since 2026-11-09, lib/tasks.cjs stepsDone: steps + stepsBase are part of that same undo.)
+      // The series' dated subtasks go back to the done day with it, as the row's 되돌리기 sends them (2026-11-13 review: they stayed on the next
+      // occurrence and their alerts never rang; lib/tasks.cjs rolledBackSteps, laid over the stored steps as 'roll' lays them).
       if (list.provider === 'microsoft' && payload.completed === false && Object.keys(payload).every(key => ['id', 'completed', 'steps', 'stepsBase'].includes(key))) {
-        const series = store.read(state => rolledSeries(previous, state.tasks, Date.now())?.id);
-        if (series) return command('task:update', { id: series, completed: false });
+        const series = store.read(state => { const found = rolledSeries(previous, state.tasks, Date.now()); return found ? { id: found.id, steps: rolledBackSteps(found) } : null; });
+        if (series) return command('task:update', { id: series.id, completed: false, ...(series.steps ? { steps: series.steps } : {}) });
       }
       let task = { ...previous, updatedAt: now() };
       if ('title' in payload) task.title = text(payload.title, tr('할 일 제목'), 500);
@@ -839,7 +966,8 @@ async function command(commandName, payload, sourceWindow) {
       if ('reminderAt' in payload) { task.reminderAt = reminderAt(payload.reminderAt); if (task.reminderAt !== (previous.reminderAt || '')) delete task.reminderFiredAt; }
       if ('important' in payload) task.important = boolean(payload.important, tr('중요'));
       if ('completed' in payload) task.completed = boolean(payload.completed, tr('완료'));
-      // Steps (To Do's 단계, Google's subtasks): the dialog and the right panel send them all, with the steps they opened on; a row sends
+      // Steps (To Do's 단계, Google's subtasks): the dialog sends them all with the steps it opened on (the docked panel sends none since
+      // 2026-11-11: it lists no subtasks, tests/pane-no-steps-1111); a row sends
       // one step — ticked, renamed, removed or put back —, applied to the steps as they are now, so two quick changes both stay (2026-10-27
       // review: the whole list sent from the screen undid the first tick; 2026-11-06: the list shows them under their task). lib/tasks.cjs
       // wantedSteps.
@@ -873,13 +1001,13 @@ async function command(commandName, payload, sourceWindow) {
         task.listId = target.id;
       }
       const completing = task.completed && !previous.completed, reopening = !task.completed && previous.completed;
-      let added = null; const dropped = new Set();
+      let added = null; const dropped = new Set(); let rung = [];
       if (list.provider !== 'local') {
         if (hints) Object.assign(task, hints); // the 되돌리기 hints (cloudUndo, above)
         // What the service answered, or after a failure part-way (steps) what it has now: the same bookkeeping (lib/tasks.cjs
         // settleAnswer) — hints taken off, a moved reminder rings, a completion can be undone.
         const settle = answer => settleAnswer(task, previous, answer, { keepsReminder: 'reminderAt' in payload || followed, undone: Boolean(hints) || reopening, completing });
-        let settled;
+        let settled; const asSent = task.steps;
         try { settled = settle(await sync.mutateTask('update', task, list)); }
         catch (error) {
           if (!error.partial) throw error;
@@ -902,15 +1030,23 @@ async function command(commandName, payload, sourceWindow) {
           }
         }
         task = settled.task; for (const remoteId of settled.dropped) dropped.add(remoteId);
+        // To Do moved the series on and its subtasks with it (settleAnswer): an alert that lands on a moment already past is taken as rung, as
+        // the task's reminder is (movedReminder) — a daily task done a day late rang its subtasks at once (2026-11-11 review).
+        if (completing) rung = passedStepAlerts(asSent, task.steps, Date.now());
+        // 되돌리기 puts them back on the done day: one whose moment passed meanwhile is taken as rung too, as the task's reminder is (2026-11-13 review).
+        else if (hints) rung = passedStepAlerts(previous.steps, task.steps, Date.now());
       } else {
         // This PC (Reminders, To Do): completing a repeating task adds the next one; undoing it takes that back (lib/tasks.cjs). A next
         // task given back by 되돌리기 of its deletion has a new id: it is found by its title and time (its twin).
         const twin = done => store.read(state => { const found = state.tasks.find(item => item.id !== done.id && item.listId === done.listId && !item.completed && item.rrule && item.title === done.title && Date.parse(item.createdAt) >= Date.parse(done.repeatAt) - 1000); return found ? structuredClone(found) : null; });
         const plan = localRepeat(previous, task, id => store.peek('tasks', id) || null, { today: todayKey(), findTwin: twin });
         task = plan.task; added = plan.added; for (const id of plan.dropped) dropped.add(id);
+        // Done late, the next one's subtask alerts already past are taken as rung, as its reminder is (lib/tasks.cjs nextRepeat; 2026-11-13 review).
+        if (added) rung = pastStepAlerts(added.steps, Date.now());
       }
       commit(state => {
         state.tasks = state.tasks.map(item => item.id === task.id ? task : item).filter(item => item.id === task.id || !(list.provider === 'local' ? dropped.has(item.id) : item.listId === list.id && dropped.has(item.remoteId)));
+        if (rung.length) { const fired = pruneFired(state.alertsFired); for (const key of rung) fired[key] = new Date().toISOString(); state.alertsFired = fired; }
         const fresh = added && !state.tasks.some(item => item.id === added.id);
         if (fresh) state.tasks.push(added);
         // In a list sorted by hand the next one takes the done one's place, and 되돌리기 gives it back (lib/tasks.cjs placeInOrder).
@@ -1569,6 +1705,11 @@ async function command(commandName, payload, sourceWindow) {
         if (!['month', 'week', 'day'].includes(payload.calendarView)) throw new Error(tr('지원하지 않는 달력 보기입니다.'));
         settings.calendarView = payload.calendarView;
       }
+      // 달력에 할 일 (2026-11-11 owner): the tasks by their titles in the calendar, or the one count line of before (this PC only, lib/viewsync.cjs leaves it).
+      if ('calendarTasks' in payload) {
+        if (!['title', 'count'].includes(payload.calendarTasks)) throw new Error(tr('지원하지 않는 달력 할 일 표시입니다.'));
+        settings.calendarTasks = payload.calendarTasks;
+      }
       if ('calendarPanel' in payload) {
         if (!['auto', 'open', 'closed'].includes(payload.calendarPanel)) throw new Error(tr('지원하지 않는 패널 설정입니다.'));
         settings.calendarPanel = payload.calendarPanel;
@@ -1691,14 +1832,34 @@ async function command(commandName, payload, sourceWindow) {
       if ('listId' in payload) widget.listId = widgetList(payload.listId);
       if ('noteId' in payload) widget.noteId = liveNote(payload.noteId).id;
       // 위치와 크기 고정 (2026-11-08 owner): the widget no longer drags or sizes from itself (renderer), nor through widget:resize.
-      if ('locked' in payload) { if (boolean(payload.locked, tr('위치와 크기 고정'))) widget.locked = true; else delete widget.locked; }
+      // Locked where it is now: that is its place from here on (setPlace: its own place, or this screen's spot while its own screen is away), whatever older place it held (2026-11-11).
+      let lockedAt = null;
+      if ('locked' in payload) {
+        if (boolean(payload.locked, tr('위치와 크기 고정'))) {
+          widget.locked = true;
+          const win = widgetWindows.get(widget.id), displays = screen.getAllDisplays();
+          const rect = win && !win.isDestroyed() ? desktop.getBounds(win, screen) : null;
+          if (rect && onAnyScreen(rect, displays)) lockedAt = { bounds: rect, displays };
+        } else delete widget.locked;
+      }
       if ('mode' in payload) {
         if (!['desktop', 'top'].includes(payload.mode)) throw new Error(tr('지원하지 않는 위젯 모드입니다.'));
         widget.mode = payload.mode;
         const win = widgetWindows.get(widget.id);
         if (win) Object.assign(widget, widgetStatus(await perWidget(widget.id, () => placeWidget(win, widget.mode, widget.id))));
       }
-      commit(state => { state.widgets = state.widgets.map(w => w.id === widget.id ? widget : w); }); return widget;
+      // Its place is main's to keep (keepPlace, openWidget, rehomeWidgets) and may have changed while this waited for the window:
+      // the stored one stays, not this copy's.
+      commit(state => {
+        state.widgets = state.widgets.map(w => {
+          if (w.id !== widget.id) return w;
+          const next = { ...widget };
+          for (const key of ['bounds', 'home', 'spots', 'homeBounds']) { if (key in w) next[key] = w[key]; else delete next[key]; }
+          if (lockedAt) { next.bounds = lockedAt.bounds; setPlace(next, lockedAt.bounds, lockedAt.displays); }
+          return next;
+        });
+      });
+      return widget;
     }
     case 'widget:resize': {
       const widget = lookup('widgets', payload.id);
@@ -1717,6 +1878,7 @@ async function command(commandName, payload, sourceWindow) {
       const current = held && held.key === key ? held.bounds : desktop.getBounds(win, screen);
       if (key && !(held && held.key === key)) resizeAnchors.set(widget.id, { key, bounds: current });
       const bounds = resizedBounds(current, { width: payload.width, height: payload.height, edge }, screen.getAllDisplays(), widgetMinimum(widget.type, store.read(s => s.settings.widgetTextSize)));
+      places.user(win.id); // the user's own size: kept as its place (keepPlace)
       desktop.setBounds(win, bounds, screen);
       return bounds;
     }
@@ -1984,7 +2146,7 @@ async function runSmokeTest() {
     }
     await mainWindow.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     fs.writeFileSync(path.join(output, 'main.png'), (await mainWindow.webContents.capturePage()).toPNG());
-    const extra = await require('./tests/ui-smoke.cjs')({ mainWindow, widgetWindows, invoke, output, runBackup });
+    const extra = await require('./tests/ui-smoke.cjs')({ mainWindow, widgetWindows, invoke, output, runBackup, pointer: smokePointer });
     report.checks.push(...extra);
     // A reminder that is already due must be recorded as fired exactly once.
     const reminded = await invoke('task:add', { title: tr('Dayboard 알림 시험'), reminderAt: new Date(Date.now() - 60000).toISOString() });
@@ -1992,6 +2154,17 @@ async function runSmokeTest() {
     if (!store.get().tasks.find(task => task.id === reminded.id)?.reminderFiredAt) throw new Error(tr('알림 발송 기록 실패'));
     report.checks.push(`reminder-${Notification.isSupported() ? 'notified' : 'unsupported'}`);
     await invoke('task:delete', { id: reminded.id });
+    // A subtask's alert that came due rings once (2026-11-11): recorded in alertsFired by its instant, and the next check finds nothing new.
+    const soon = new Date(Date.now() + 4 * 60000);
+    const stepped = await invoke('task:add', { title: tr('Dayboard 알림 시험'), listId: 'local-inbox' });
+    await invoke('task:update', { id: stepped.id, steps: [{ title: tr('Dayboard 알림 시험'), completed: false, dueDate: localKey(soon.toISOString()), dueTime: `${String(soon.getHours()).padStart(2, '0')}:${String(soon.getMinutes()).padStart(2, '0')}`, alert: 5 }] });
+    const stepFired = () => Object.keys(store.get().alertsFired || {}).filter(key => key.startsWith(`step|${store.get().tasks.find(task => task.id === stepped.id)?.steps?.[0]?.id}|`)).length;
+    checkReminders();
+    const stepOnce = stepFired();
+    checkReminders();
+    if (stepOnce !== 1 || stepFired() !== 1) throw new Error(tr('알림 발송 기록 실패'));
+    report.checks.push(`subtask-alert-${Notification.isSupported() ? 'notified' : 'unsupported'}`);
+    await invoke('task:delete', { id: stepped.id });
     // An event's alert that came due rings once (1.1.3): recorded in alertsFired, and the next check finds nothing new.
     const alerted = await invoke('event:add', { calendarId: 'local-calendar', title: tr('Dayboard 알림 시험'), start: new Date(Date.now() + 5 * 60000).toISOString(), end: new Date(Date.now() + 35 * 60000).toISOString(), alert: 10 });
     const firedFor = () => Object.keys(store.get().alertsFired || {}).filter(key => key.startsWith(`${alerted.id}|`)).length;
@@ -2007,6 +2180,7 @@ async function runSmokeTest() {
     if (!report.renderer.text.trim()) throw new Error(tr('렌더러 화면이 비어 있습니다.'));
     report.ok = smokeErrors.length === 0;
   } catch (error) { report.ok = false; report.errors.push(error.stack || error.message); }
+  report.pointer = smokePointer.stats(); // whether the OS mouse was kept out, and the pointer while DAYBOARD_SMOKE_UNDER_CURSOR ran
   fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2), 'utf8');
   console.log(`DAYBOARD_SMOKE_REPORT=${path.join(output, 'report.json')}`);
   // Optional on-screen verification: reopen the widgets and keep the app alive
@@ -2018,6 +2192,7 @@ async function runSmokeTest() {
       for (const type of ['tasks', 'calendar', 'note']) {
         const widget = await command('widget:open', { type }, mainWindow);
         const win = widgetWindows.get(widget.id);
+        smokePointer.release(win); // left for a person and a screen capture: the widget as the app shows it
         const bounds = desktop.getBounds(win, screen);
         const handle = win.getNativeWindowHandle();
         opened.push({ type, desktopStatus: widget.desktopStatus, bounds, screenBounds: screen.dipToScreenRect(null, bounds), hwnd: String(handle.length >= 8 ? handle.readBigUInt64LE() : handle.readUInt32LE()) });
@@ -2097,20 +2272,7 @@ else if (process.argv.includes(QUIT_FOR_INSTALL)) {
     if (!smoke) { createUpdater(); trayMenu(); repointLogin(); }
     // An update restart (--updated) comes back like a login start: widgets on the desktop, the window in the tray.
     if ((!process.argv.includes('--hidden') && !process.argv.includes('--updated')) || smoke) showMain();
-    for (const widget of store.get().widgets) {
-      if (quitting) break; // a quit during the start-up opens: the rest stay saved for the next launch
-      // A note widget whose note is gone or in the trash (another PC, while this one was off) is not reopened: its card
-      // would only offer 「메모 추가」 and create stray notes (2026-10-26 review).
-      if (widget.type === 'note') { const note = store.get().notes.find(item => item.id === widget.noteId); if (!note || note.trashedAt) { commit(state => { state.widgets = state.widgets.filter(item => item.id !== widget.id); }); continue; } }
-      await openWidget(widget).catch(error => {
-        if (error.cancelled || quitting) return; // the window was cut short, not broken: the record stays for the next launch
-        if (smoke) { smokeErrors.push(error.message); return; }
-        // A widget whose window cannot be created would otherwise stay listed forever.
-        widgetWindows.get(widget.id)?.destroy();
-        commit(state => { state.widgets = state.widgets.filter(item => item.id !== widget.id); });
-        console.error('widget not reopened:', error.message);
-      });
-    }
+    await reopenWidgets();
     if (smoke) await runSmokeTest();
     else {
       // Accounts, then notes, every 5 minutes and at start; notes also when Dayboard comes back to the front (at most once a

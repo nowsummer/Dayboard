@@ -50,26 +50,27 @@ test('reading stays fast, on long and repeating lines too (no backtracking blow-
   assert.ok(ms < 4000, `20,000 reads took ${Math.round(ms)} ms`);
 });
 
-// The preview under the title says what saving does: the card's own functions over a draft.
+// The preview under the title says what saving does that the form cannot show — the title and the place; the day and the hours are in the form
+// itself as the line is typed (2026-11-11, tests/shortcut-live-1111.test.cjs): the card's own functions over a draft.
 const source = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'calendar.js'), 'utf8').split(/\r?\n/);
 function card(title) {
   const context = { D, state: { settings: {} }, I: { locale: () => 'ko-KR' }, tr: text => text, toLocalInput: iso => { const d = new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }, fmtTime: d => pad(d.getHours()) + ':' + pad(d.getMinutes()) };
   vm.createContext(context);
-  for (const prefix of ['function calReadTitle(', 'function calApplyTitle(', 'function calTitleHint(']) vm.runInContext(source.find(line => line.startsWith(prefix)), context);
+  for (const prefix of ['function calReadTitle(', 'function calApplyTitle(', 'function calTitleHint(', 'function calAlertKind(', 'const calAlertOther=']) vm.runInContext(source.find(line => line.startsWith(prefix)), context); // calAlertKind: the line's 하루 종일 and an alert picked for the other kind (2026-11-11 review)
   const c = { mode: 'create', titleParseText: title, titleParseNow: NOW, v: { title, start: '2026-11-06T10:00', end: '2026-11-06T11:00', allDay: false, location: '' } };
   return { hint: context.calTitleHint(c), c, save() { context.calApplyTitle(c); return c.v; } };
 }
 
-test('a range is saved with its end, and the preview says it', () => {
+test('a range is saved with its end, and the preview says the title and the place', () => {
   const draft = card('내일 2시~4시 반 세미나, 대강당');
-  assert.ok(draft.hint.includes('14:00\u2009–\u200916:30'), draft.hint); // thin spaces round the dash (2026-11-08)
+  assert.equal(draft.hint, '세미나 · 대강당');
   const v = draft.save();
   assert.equal([v.title, v.start, v.end, v.location, v.allDay].join('|'), '세미나|2026-11-07T14:00|2026-11-07T16:30|대강당|false');
 });
 
-test('하루 종일 in the line makes an all-day event on that day, and the preview says it', () => {
+test('하루 종일 in the line makes an all-day event on that day, and the preview says its title (the switch says the rest)', () => {
   const draft = card('내일 하루 종일 워크숍');
-  assert.ok(draft.hint.includes('하루 종일'), draft.hint);
+  assert.equal(draft.hint, '워크숍');
   const v = draft.save();
   assert.equal([v.title, v.start, v.end, v.allDay].join('|'), '워크숍|2026-11-07|2026-11-07|true', 'the card keeps the last day itself: one day, not two (Codex sixth review N2)');
 });

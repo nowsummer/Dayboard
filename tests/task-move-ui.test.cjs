@@ -940,7 +940,7 @@ test('a row on its way takes no change from its menu, its open steps or its keys
   const s = h.context.state;
   s.tasks = [task('a', 'l1'), task('b', 'l1', { dueDate: '2030-01-02', steps: [{ id: 's1', title: '첫 단계', completed: false }] })];
   const b = s.tasks[1];
-  const MENU = ['편집', '중요로 표시', '오늘', '내일', '다음 주', '날짜 없음', '삭제'];
+  const MENU = ['편집', '하위 할 일 추가', '중요로 표시', '오늘', '내일', '다음 주', '날짜 없음', '삭제'];
   const changing = items => items.filter(i => i !== '-' && MENU.includes(i.label));
   const shown = items => changing(items).map(i => i.label + (i.disabled ? ' (off)' : '')).join('|');
   const done = () => [runs.length, edits.length, deletes.length, h.undos.length].join('/');
@@ -1325,7 +1325,7 @@ test('main\'s move records reach every window (contract a): a sending row is dim
   assert.equal(look(h.eval('taskRow')(t)) + ' | ' + look(h.eval('taskRow')(t, true)), 'true/true/true | true/true/true', 'dimmed and busy in the main window and in a widget');
   assert.equal(offered(), '', 'no second move, not even between this PC\'s lists');
   h.eval('taskMenu')(t, 0, 0);
-  assert.equal(labelsOf(menus.at(-1)), '편집 (off)|중요로 표시 (off)|오늘 (off)|내일 (off)|다음 주 (off)|삭제 (off)', 'its menu waits: no 목록으로 옮기기, no review yet');
+  assert.equal(labelsOf(menus.at(-1)), '편집 (off)|하위 할 일 추가 (off)|중요로 표시 (off)|오늘 (off)|내일 (off)|다음 주 (off)|삭제 (off)', 'its menu waits (하위 할 일 추가 too, 2026-11-10): no 목록으로 옮기기, no review yet');
   const start = new h.context.Event('dragstart', { bubbles: true, cancelable: true }); start.dataTransfer = { setData() { assert.fail('not picked up'); } };
   h.eval('taskDragStart')(h.document.createElement('div'), t).dispatchEvent(start);
   assert.equal(start.defaultPrevented, true, 'no drag either');

@@ -116,12 +116,13 @@ function event(id, remoteId, seriesId = '', day = 3) {
 }
 // One PC: a store, its view sync (runs only when the test says), `edit` = a command then main's noteLocal. `offset` sets its clock
 // ahead (+) or behind (-) the others; `before` shapes its state before the view sync first sees it (its look from before 1.2.2).
-function pc(t, cloud, { name = 'PC', offset = 0, google = true, microsoft = true, access = true, before } = {}) {
+// `module`: the view sync it runs — tests/fixtures/viewsync-1110.cjs for a PC that has not updated yet (2026-11-11).
+function pc(t, cloud, { name = 'PC', offset = 0, google = true, microsoft = true, access = true, before, module = views } = {}) {
   const store = createStore(temporary(t));
   store.mutate(state => { base(state, name, { google, microsoft, access }); before?.(state); });
   const memory = new Map(); let broadcasts = 0;
   const self = { name, store, get broadcasts() { return broadcasts; } };
-  self.views = createViewSync({ store, onChange: () => { broadcasts++; }, requestFor: () => (url, options) => cloud.request(url, options, self), hasAccess: id => id === GOOGLE && access,
+  self.views = module.createViewSync({ store, onChange: () => { broadcasts++; }, requestFor: () => (url, options) => cloud.request(url, options, self), hasAccess: id => id === GOOGLE && access,
     memoryFor: id => { if (!memory.has(id)) memory.set(id, {}); return memory.get(id); }, delay: 1e9, retryDelay: 1e9, now: () => wall + offset });
   t.after(() => self.views.dispose());
   self.edit = fn => { tick(); store.mutate(fn); return self.views.noteLocal(); };
@@ -1039,4 +1040,395 @@ test('자주 쓰는 일정: two PCs\' lists merged keep every item, and a deleti
   setShortcuts(a, list => list.filter(item => item.word !== '가0'));
   await converge(cloud, [a, b]);
   assert.deepEqual([shortcuts(a).length, shortcuts(b).length], [24, 24]);
+});
+
+// ---- A step's time and alert (2026-11-11 owner: 「신간 알림 둘 다 넣어줘」): R items beside P, which a PC of 2026-11-10 reads as it did ----
+const oldViews = require('./fixtures/viewsync-1110.cjs');
+const stepped = who => state => { state.tasks.find(item => item.remoteId === 'r1').steps = [{ id: `${who}-s1`, remoteId: 'st1', title: '초안', completed: false, dueDate: '2026-12-20' }]; };
+const firstStep = state => state.tasks.find(item => item.remoteId === 'r1').steps[0];
+const whenOn = side => { const x = firstStep(side.state()); return [x.dueDate || '', x.dueTime || '', x.alert ?? ''].join('|'); };
+
+test('a step\'s time and alert go from one PC to the other by the step\'s service id and come off again; P stays the day alone (2026-11-11)', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', before: stepped('A') }); const b = pc(t, cloud, { name: 'B', before: stepped('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b]);
+  assert.equal(whenOn(b), '2026-12-20|15:00|30', 'set on A, on B');
+  const items = b.state().viewSync.doc.items; const r = Object.keys(items).find(key => key.startsWith('R:'));
+  assert.equal(JSON.stringify([items[`P:${r.slice(2)}`].d[0], items[r].t[0], items[r].m[0]]), '["2026-12-20","15:00",30]', 'P holds the day as before; R the time and alert');
+  const writes = cloud.writes(); await converge(cloud, [a, b]);
+  assert.equal(cloud.writes(), writes, 'nothing bounces back');
+  b.edit(state => { delete firstStep(state).alert; });
+  await converge(cloud, [a, b]);
+  assert.equal(whenOn(a), '2026-12-20|15:00|', 'the alert taken off on B');
+  a.edit(state => { firstStep(state).alert = 0; firstStep(state).dueDate = '2026-12-21'; });
+  await converge(cloud, [a, b]);
+  assert.equal(whenOn(b), '2026-12-21|15:00|0', '정각에, and a date moved with its time');
+  b.edit(state => { const x = firstStep(state); delete x.dueTime; delete x.alert; });
+  await converge(cloud, [a, b]);
+  assert.equal(whenOn(a), '2026-12-21||', 'the time taken off takes the alert');
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '09:00', alert: 5 }); });
+  await converge(cloud, [a, b]);
+  b.edit(state => { const x = firstStep(state); delete x.dueDate; delete x.dueTime; delete x.alert; });
+  await converge(cloud, [a, b]);
+  assert.equal(whenOn(a), '||', 'the date taken off takes both');
+});
+
+test('a PC that knows only P keeps the time and alert in the document, its date edits still flow, and a date it takes off takes them along', async t => {
+  const cloud = services();
+  const a = pc(t, cloud, { name: 'A', before: stepped('A') }); const old = pc(t, cloud, { name: 'OLD', before: stepped('OLD'), module: oldViews });
+  await converge(cloud, [a, old]);
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, old]);
+  assert.equal(whenOn(old), '2026-12-20||', 'the old PC shows the day alone, as it can');
+  assert.equal(Object.keys(old.state().viewSync.doc.items).some(key => key.startsWith('R:')), true, 'and keeps the R item it cannot read');
+  old.edit(state => { firstStep(state).dueDate = '2026-12-22'; });
+  await converge(cloud, [a, old]);
+  assert.equal(whenOn(a), '2026-12-22|15:00|30', 'its date edit reached A: the time and alert on the new day');
+  old.edit(state => { find(state.lists, L1).color = '#ff3b30'; });
+  await converge(cloud, [a, old]);
+  assert.equal(whenOn(a), '2026-12-22|15:00|30', 'its writes of other things never take them away');
+  const c = pc(t, cloud, { name: 'C', before: stepped('C') });
+  await converge(cloud, [a, old, c]);
+  assert.equal(whenOn(c), '2026-12-22|15:00|30', 'a PC joining later gets them all');
+  old.edit(state => { delete firstStep(state).dueDate; });
+  await converge(cloud, [a, old, c]);
+  assert.equal([whenOn(a), whenOn(c)].join(' / '), '|| / ||', 'the date taken off on the old PC: the time and alert go with it');
+  old.edit(state => { firstStep(state).dueDate = '2026-12-24'; });
+  await converge(cloud, [a, old, c]);
+  assert.equal([whenOn(a), whenOn(c), whenOn(old)].join(' / '), '2026-12-24|| / 2026-12-24|| / 2026-12-24||', 'a date set again later brings no old time back');
+});
+
+test('a step\'s time set before the step reached its service goes out once it has its service id', async t => {
+  const cloud = services();
+  const second = who => state => { stepped(who)(state); state.tasks.find(item => item.remoteId === 'r1').steps.push({ id: `${who}-s2`, title: '표', completed: false }); };
+  const a = pc(t, cloud, { name: 'A', before: second('A') }); const b = pc(t, cloud, { name: 'B', before: stepped('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { Object.assign(state.tasks.find(item => item.remoteId === 'r1').steps[1], { dueDate: '2026-12-23', dueTime: '11:00', alert: 60 }); });
+  await converge(cloud, [a, b]);
+  // the next sync: the step has its service id on A, and B reads it from the service
+  a.store.mutate(state => settle(state, () => { state.tasks.find(item => item.remoteId === 'r1').steps[1].remoteId = 'st2'; }, { now: wall }));
+  b.store.mutate(state => settle(state, () => { state.tasks.find(item => item.remoteId === 'r1').steps.push({ id: 'B-s2', remoteId: 'st2', title: '표', completed: false }); }, { now: wall }));
+  await converge(cloud, [a, b]);
+  const x = b.state().tasks.find(item => item.remoteId === 'r1').steps[1];
+  assert.equal([x.dueDate, x.dueTime, x.alert].join('|'), '2026-12-23|11:00|60');
+});
+
+test('R items: a bad value from a store is dropped; they leave the document 45 days past their step\'s date; a date taken off nulls them', () => {
+  const doc = sanitizeDoc({ v: 1, items: { 'R:abcdefabcdef': { t: ['25:00', 5], m: ['30', 5] }, 'R:bbbbbbbbbbbb': { t: ['15:00', 5], m: [30, 5] } } });
+  assert.equal(JSON.stringify(doc.items), '{"R:bbbbbbbbbbbb":{"t":["15:00",5],"m":[30,5]}}');
+  const at = Date.parse('2027-03-01T00:00:00Z');
+  const pruned = { v: 1, items: { 'P:aaaaaaaaaaaa': { d: ['2026-12-01', 10] }, 'R:aaaaaaaaaaaa': { t: ['15:00', 10] }, 'P:cccccccccccc': { d: ['2027-03-10', 10] }, 'R:cccccccccccc': { t: ['09:00', 10], m: [5, 10] } } };
+  views.pruneDoc(pruned, { accounts: [], lists: [], tasks: [], calendars: [], events: [] }, at, {});
+  assert.equal(JSON.stringify([pruned.items['R:aaaaaaaaaaaa'], pruned.items['R:cccccccccccc']]), `[{"z":[true,${at}]},{"t":["09:00",10],"m":[5,10]}]`);
+  const merged = views.mergeDocs({ v: 1, items: { 'P:dddddddddddd': { d: [null, 20] }, 'R:dddddddddddd': { t: ['15:00', 10], m: [30, 30] } } });
+  // 2026-11-11 review: whatever its stamp — a PC whose clock runs ahead, or a change made at the same time elsewhere, would otherwise keep it there
+  // for a date set later
+  assert.equal(JSON.stringify(merged.items['R:dddddddddddd']), '{"t":[null,20],"m":[null,30]}', 'a step with no date has no time nor alert, at the later stamp');
+});
+
+// ---- The review of 2026-11-11 (its data and alerts checks): two PCs changing one step before they meet, a PC whose clock runs ahead, a PC of
+// 2026-11-10 making a step anew, and the document's size limit. The document holds no alert without a time and no time without a date (mergeDocs). ----
+const rItem = side => { const items = side.state().viewSync.doc.items; const key = Object.keys(items).find(item => item.startsWith('R:')); return JSON.stringify(items[key]); };
+test('a time taken off on A while B changed its alert: a time A sets later brings back no alert', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', before: stepped('A') }); const b = pc(t, cloud, { name: 'B', before: stepped('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b]);
+  a.edit(state => { const x = firstStep(state); delete x.dueTime; delete x.alert; });
+  b.edit(state => { firstStep(state).alert = 60; }); // before B has heard of it
+  await converge(cloud, [a, b]);
+  assert.equal([whenOn(a), whenOn(b)].join(' / '), '2026-12-20|| / 2026-12-20||', 'the time went on A later: no time, no alert');
+  assert.equal(JSON.stringify(Object.values(JSON.parse(rItem(a))).map(field => field[0])), '[null,null]', 'and no alert kept for a time to come');
+  a.edit(state => { firstStep(state).dueTime = '10:00'; });
+  await converge(cloud, [a, b]);
+  assert.equal([whenOn(a), whenOn(b)].join(' / '), '2026-12-20|10:00| / 2026-12-20|10:00|', 'a new time with no alert rings nothing');
+});
+
+test('a date taken off on A while B moved its time: a date A sets later brings back no time', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', before: stepped('A') }); const b = pc(t, cloud, { name: 'B', before: stepped('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b]);
+  a.edit(state => { const x = firstStep(state); delete x.dueDate; delete x.dueTime; delete x.alert; });
+  b.edit(state => { firstStep(state).dueTime = '16:00'; });
+  await converge(cloud, [a, b]);
+  assert.equal([whenOn(a), whenOn(b)].join(' / '), '|| / ||');
+  a.edit(state => { firstStep(state).dueDate = '2026-12-25'; });
+  await converge(cloud, [a, b]);
+  assert.equal([whenOn(a), whenOn(b)].join(' / '), '2026-12-25|| / 2026-12-25||');
+});
+
+// The removal and the other PC's change need not meet while the date (or time) is off: the PC that sets it again says at that stamp that the
+// step has no time or alert yet (stampPending), so a time or alert stamped before it cannot come back with the new date or time.
+test('a date taken off on A while B moved its time and alert: a date A sets and sends before it hears of B brings back no time or alert', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', before: stepped('A') }); const b = pc(t, cloud, { name: 'B', before: stepped('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b]);
+  a.edit(state => { const x = firstStep(state); delete x.dueDate; delete x.dueTime; delete x.alert; });
+  b.edit(state => { Object.assign(firstStep(state), { dueTime: '16:00', alert: 60 }); }); // before B has heard of it
+  await a.run();
+  a.edit(state => { firstStep(state).dueDate = '2026-12-25'; });
+  await a.run(); // A's new date goes out before B runs
+  await converge(cloud, [b, a]);
+  assert.equal([whenOn(a), whenOn(b)].join(' / '), '2026-12-25|| / 2026-12-25||');
+});
+
+test('a time taken off on A while B changed its alert: a time A sets and sends before it hears of B brings back no alert', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', before: stepped('A') }); const b = pc(t, cloud, { name: 'B', before: stepped('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b]);
+  a.edit(state => { const x = firstStep(state); delete x.dueTime; delete x.alert; });
+  b.edit(state => { firstStep(state).alert = 60; });
+  await a.run();
+  a.edit(state => { firstStep(state).dueTime = '10:00'; });
+  await a.run();
+  await converge(cloud, [b, a]);
+  assert.equal([whenOn(a), whenOn(b)].join(' / '), '2026-12-20|10:00| / 2026-12-20|10:00|');
+});
+
+// 2026-11-13 Codex review U2: that rule (mergeDocs nulls a step's time and alert while its date or time is off, whatever their stamps) leaves every
+// PC on one date, time and alert whatever order the PCs meet in, through the whole path (the stores, stampPending, applyDoc). Two PCs changing one
+// step before they meet end the same in either order. Three may end on another value by that order — B's alert is nulled when it meets A's time
+// taken off before C's new time reaches it, and stays when C's comes first — but the same on every PC: the rule's price for no value coming back.
+const orders = xs => (xs.length <= 1 ? [xs] : xs.flatMap((x, i) => orders([...xs.slice(0, i), ...xs.slice(i + 1)]).map(rest => [x, ...rest])));
+const timeOff = state => { const x = firstStep(state); delete x.dueTime; delete x.alert; };
+for (const [label, edits] of [
+  ['two PCs: the time taken off on A, the alert changed on B', [timeOff, state => { firstStep(state).alert = 60; }]],
+  ['two PCs: the date taken off on A, the time moved on B', [state => { const x = firstStep(state); delete x.dueDate; delete x.dueTime; delete x.alert; }, state => { firstStep(state).dueTime = '11:00'; }]],
+  ['three PCs: the time taken off on A, the alert changed on B, the time changed on C', [timeOff, state => { firstStep(state).alert = 60; }, state => { firstStep(state).dueTime = '10:00'; }]],
+]) test(`every PC ends on one date, time and alert whatever order they meet in — ${label}`, async t => {
+  const ends = new Set();
+  for (const order of orders(edits.map((_, i) => i))) {
+    const cloud = services(); const sides = edits.map((_, i) => pc(t, cloud, { name: 'ABC'[i], before: stepped('ABC'[i]) }));
+    await converge(cloud, sides);
+    sides[0].edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+    await converge(cloud, sides);
+    edits.forEach((edit, i) => sides[i].edit(edit)); // before any of them hears of another
+    await converge(cloud, order.map(i => sides[i]));
+    const faces = sides.map(whenOn);
+    assert.equal(new Set(faces).size, 1, `order ${order.join('')}: ${faces.join(' / ')}`);
+    ends.add(faces[0]);
+  }
+  if (edits.length === 2) assert.equal([...ends].join(' ; '), [...ends][0], 'two PCs: the same in either order');
+});
+
+test('a date set on a step that had none: no R item for a step that never had a time, and a time set with the date stays', async t => {
+  const cloud = services(); const a = pc(t, cloud, { name: 'A', before: stepped('A') }); const b = pc(t, cloud, { name: 'B', before: stepped('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { delete firstStep(state).dueDate; });
+  await converge(cloud, [a, b]);
+  a.edit(state => { firstStep(state).dueDate = '2026-12-22'; });
+  await converge(cloud, [a, b]);
+  assert.equal(Object.keys(b.state().viewSync.doc.items).some(key => key.startsWith('R:')), false, 'no R item for a step that never had a time');
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b]);
+  a.edit(state => { const x = firstStep(state); delete x.dueDate; delete x.dueTime; delete x.alert; });
+  await converge(cloud, [a, b]);
+  a.edit(state => { Object.assign(firstStep(state), { dueDate: '2026-12-23', dueTime: '09:30' }); });
+  await converge(cloud, [a, b]);
+  assert.equal([whenOn(a), whenOn(b)].join(' / '), '2026-12-23|09:30| / 2026-12-23|09:30|', 'the time set with the date stays');
+  b.edit(state => { firstStep(state).alert = 10; });
+  await converge(cloud, [a, b]);
+  assert.equal([whenOn(a), whenOn(b)].join(' / '), '2026-12-23|09:30|10 / 2026-12-23|09:30|10', 'and an alert set after it goes as before');
+});
+
+test('a date taken off on a PC of 2026-11-10 while a new PC set an alert: no alert stays in the document for a date set again', async t => {
+  const cloud = services();
+  const a = pc(t, cloud, { name: 'A', before: stepped('A') }); const old = pc(t, cloud, { name: 'OLD', before: stepped('OLD'), module: oldViews });
+  await converge(cloud, [a, old]);
+  a.edit(state => { firstStep(state).dueTime = '15:00'; });
+  await converge(cloud, [a, old]);
+  old.edit(state => { delete firstStep(state).dueDate; });
+  a.edit(state => { firstStep(state).alert = 30; });
+  await converge(cloud, [a, old]);
+  assert.equal([whenOn(a), JSON.stringify(Object.values(JSON.parse(rItem(a))).map(field => field[0]))].join(' '), '|| [null,null]');
+  old.edit(state => { firstStep(state).dueDate = '2026-12-26'; });
+  await converge(cloud, [a, old]);
+  assert.equal([whenOn(a), whenOn(old)].join(' / '), '2026-12-26|| / 2026-12-26||');
+});
+
+test('a PC whose clock runs five minutes ahead: a date the old PC takes off a minute after it set a time still takes the time and alert along', async t => {
+  const cloud = services();
+  const a = pc(t, cloud, { name: 'A', offset: 5 * 60000, before: stepped('A') }); const old = pc(t, cloud, { name: 'OLD', before: stepped('OLD'), module: oldViews });
+  await converge(cloud, [a, old]);
+  tick(3600000);
+  a.edit(state => { Object.assign(firstStep(state), { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, old]);
+  tick(60000);
+  old.edit(state => { delete firstStep(state).dueDate; });
+  await converge(cloud, [a, old]);
+  assert.equal(whenOn(a), '||');
+  tick(60000);
+  old.edit(state => { firstStep(state).dueDate = '2026-12-24'; });
+  await converge(cloud, [a, old]);
+  assert.equal(whenOn(a), '2026-12-24||', 'a date set again later brings no old time or alert back');
+});
+
+test('the old PC\'s copy of the document, merged again, does not bring back what the rule nulled (a tie goes to null)', () => {
+  const nulled = views.mergeDocs({ v: 1, items: { 'P:eeeeeeeeeeee': { d: ['2026-12-20', 5] }, 'R:eeeeeeeeeeee': { t: [null, 10], m: [60, 11] } } });
+  assert.equal(JSON.stringify(nulled.items['R:eeeeeeeeeeee']), '{"t":[null,10],"m":[null,11]}', 'no alert without a time');
+  const old = { v: 1, items: { 'P:eeeeeeeeeeee': { d: ['2026-12-20', 5] }, 'R:eeeeeeeeeeee': { t: [null, 10], m: [60, 11] } } };
+  assert.equal(JSON.stringify(views.mergeDocs(nulled, old).items['R:eeeeeeeeeeee']), '{"t":[null,10],"m":[null,11]}');
+  const dated = views.mergeDocs({ v: 1, items: { 'P:ffffffffffff': { d: [null, 5] }, 'R:ffffffffffff': { t: ['15:00', 9], m: [30, 9] } } });
+  assert.equal(JSON.stringify(views.mergeDocs(dated, { v: 1, items: { 'R:ffffffffffff': { t: ['15:00', 9], m: [30, 9] } } }).items['R:ffffffffffff']), '{"t":[null,9],"m":[null,9]}');
+});
+
+// A To Do task of steps on every PC (2026-11-11 recheck), and a read of To Do giving it the steps `fetched` (no date: no service holds one).
+const msTask = steps => who => state => { state.tasks.push({ id: `${who}-m`, remoteId: 'rm', listId: M1, accountId: MS, title: '보고', notes: '', dueDate: '', important: false, completed: false,
+  createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z', steps: steps(who) }); };
+const readTodo = (side, fetched) => {
+  const s = side.state();
+  const snapshot = { lists: s.lists.filter(list => list.accountId === MS), calendars: s.calendars.filter(item => item.accountId === MS), events: [],
+    tasks: s.tasks.filter(task => task.accountId === MS).map(task => (task.remoteId === 'rm' ? { ...task, steps: fetched } : task)) };
+  side.store.mutate(state => settle(state, () => replaceAccountSnapshot(state, MS, structuredClone(snapshot), 'microsoft', wall), { now: wall, apply: true }));
+};
+const msStep = (side, title) => side.state().tasks.find(item => item.remoteId === 'rm').steps.find(step => step.title === title);
+const stepFace = x => (x ? [x.dueDate || '', x.dueTime || '', x.alert ?? ''].join('|') : 'none');
+
+test('a step a PC of 2026-11-10 made anew at To Do (its order changed there): its id stays by its name and its date comes by that PC; its time and alert go', async t => {
+  const cloud = services();
+  const two = msTask(who => [{ id: `${who}-s1`, remoteId: 'st1', title: '초안', completed: false, dueDate: '2026-12-20' }, { id: `${who}-s2`, remoteId: 'st2', title: '표', completed: false }]);
+  const a = pc(t, cloud, { name: 'A', before: two('A') }); const b = pc(t, cloud, { name: 'B', before: two('B') }); const old = pc(t, cloud, { name: 'OLD', before: two('OLD'), module: oldViews });
+  await converge(cloud, [a, b, old]);
+  a.edit(state => { Object.assign(state.tasks.find(item => item.remoteId === 'rm').steps[0], { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b, old]);
+  // OLD drags 초안 below 표: To Do keeps no order, so 초안 is made anew under a new service id (microsoft.cjs rewriteFrom); OLD sends its date by it
+  old.edit(state => { const task = state.tasks.find(item => item.remoteId === 'rm'); const [first, second] = task.steps; task.steps = [second, { ...first, remoteId: 'st9' }]; });
+  await converge(cloud, [a, b, old]);
+  const fetched = [{ id: 'ms-st2', remoteId: 'st2', title: '표', completed: false }, { id: 'ms-st9', remoteId: 'st9', title: '초안', completed: false }];
+  readTodo(a, fetched);
+  const x = msStep(a, '초안');
+  // 2026-11-11 recheck: the read cannot tell this from a step deleted and made again under its name (below), so it hands on its id only — the
+  // time and alert a PC of 2026-11-10 never sent go, the update's limit
+  assert.equal([x.id, x.remoteId, stepFace(x)].join('|'), 'A-s1|st9|2026-12-20||', 'its id by its name; its date by the old PC\'s P under the new id');
+  await converge(cloud, [a, b, old]);
+  readTodo(b, fetched);
+  await converge(cloud, [a, b, old]);
+  const y = msStep(b, '초안');
+  assert.equal([y.id, stepFace(y)].join('|'), 'B-s1|2026-12-20||', 'on B too');
+  assert.equal(Object.keys(a.state().viewSync.doc.items).includes(`R:${views.taskKey('st9')}`), false, 'no time or alert under the new service id');
+});
+
+// 2026-11-11 recheck (rk vs-readd): a step deleted on A and made again under its name, both read by B at once, took the old date, time and
+// alert on B, which sent them on to A — set by nobody, rung on both PCs.
+for (const [label, again] of [['no date', {}], ['a date of its own', { dueDate: '2026-12-25' }]]) test(`a step deleted and made again under its name (${label}), both read at once by another PC: no old date, time or alert comes with it`, async t => {
+  const cloud = services();
+  const one = msTask(who => [{ id: `${who}-s1`, remoteId: 'st1', title: '초안', completed: false, dueDate: '2026-12-20' }]);
+  const a = pc(t, cloud, { name: 'A', before: one('A') }); const b = pc(t, cloud, { name: 'B', before: one('B') });
+  await converge(cloud, [a, b]);
+  a.edit(state => { Object.assign(state.tasks.find(item => item.remoteId === 'rm').steps[0], { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b]);
+  assert.equal(stepFace(msStep(b, '초안')), '2026-12-20|15:00|30');
+  // A: the old one deleted and a new one of its name made (written to To Do as st9)
+  a.edit(state => { state.tasks.find(item => item.remoteId === 'rm').steps = [{ id: 'A-new', remoteId: 'st9', title: '초안', completed: false, ...again }]; });
+  await converge(cloud, [a, b]);
+  readTodo(b, [{ id: 'ms-st9', remoteId: 'st9', title: '초안', completed: false }]);
+  const want = [again.dueDate || '', '', ''].join('|');
+  assert.equal(stepFace(msStep(b, '초안')), want, 'B\'s read');
+  tick(60000); await converge(cloud, [a, b]);
+  assert.equal([stepFace(msStep(a, '초안')), stepFace(msStep(b, '초안'))].join(' / '), `${want} / ${want}`, 'nothing sent back to A');
+  assert.equal(Object.keys(b.state().viewSync.doc.items).includes(`R:${views.taskKey('st9')}`), false);
+});
+
+// To Do after the phone's completion of 주간 보고 (every Wednesday, 2026-12-16): the task a week on, its checklist open again, and the done
+// occurrence's completed copy beside it, made by To Do at `doneAt` (createdDateTime).
+const weeklyTask = (who, steps) => state => { state.tasks.push({ id: `${who}-w`, remoteId: 'rw', listId: M1, accountId: MS, title: '주간 보고', notes: '', dueDate: '2026-12-16', rrule: 'FREQ=WEEKLY;BYDAY=WE', important: false, completed: false,
+  createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z', steps: steps(who) }); };
+const readRolled = (side, doneAt) => {
+  const s = side.state(); const mine = s.tasks.find(item => item.remoteId === 'rw');
+  const snapshot = { lists: s.lists.filter(list => list.accountId === MS), calendars: s.calendars.filter(item => item.accountId === MS), events: [], tasks: [
+    { ...mine, id: 'ms-w', dueDate: '2026-12-23', steps: mine.steps.map(step => ({ id: `ms-${step.remoteId}`, remoteId: step.remoteId, title: step.title, completed: false })) },
+    { id: 'ms-done', remoteId: 'rw-done', listId: M1, accountId: MS, title: '주간 보고', notes: '', dueDate: '2026-12-16', important: false, completed: true, createdAt: doneAt, updatedAt: doneAt }] };
+  side.store.mutate(state => settle(state, () => replaceAccountSnapshot(state, MS, structuredClone(snapshot), 'microsoft', wall), { now: wall, apply: true }));
+};
+const weeklyStep = (side, remoteId) => side.state().tasks.find(item => item.remoteId === 'rw').steps.find(step => step.remoteId === remoteId);
+
+test('a repeating To Do task the phone moved on: the first PC to read it moves its subtasks\' days — one after the done day too — and stamps them; the next does not move them twice', async t => {
+  const cloud = services();
+  // 초안 on the Wednesday at 3:00 PM, 자료 정리 on the Thursday after it (2026-11-11 recheck: one after the done day stayed on the done week and rang)
+  const steps = who => [{ id: `${who}-ws`, remoteId: 'wst', title: '초안 보내기', completed: false, dueDate: '2026-12-16' }, { id: `${who}-wt`, remoteId: 'wth', title: '자료 정리', completed: false, dueDate: '2026-12-17' }];
+  const a = pc(t, cloud, { name: 'A', before: weeklyTask('A', steps) }); const b = pc(t, cloud, { name: 'B', before: weeklyTask('B', steps) }); const old = pc(t, cloud, { name: 'OLD', before: weeklyTask('OLD', steps), module: oldViews });
+  await converge(cloud, [a, b, old]);
+  a.edit(state => { Object.assign(state.tasks.find(item => item.remoteId === 'rw').steps[0], { dueTime: '15:00', alert: 30 }); });
+  await converge(cloud, [a, b, old]);
+  tick(10 * 60000); const doneAt = new Date(wall).toISOString(); tick(60000); // the phone completes it; To Do makes the copy then
+  const both = side => [stepFace(weeklyStep(side, 'wst')), stepFace(weeklyStep(side, 'wth'))].join(' + ');
+  readRolled(a, doneAt);
+  assert.equal(both(a), '2026-12-23|15:00|30 + 2026-12-24||', 'a week on, both; the document laid over the read does not put the old days back');
+  await converge(cloud, [a, b, old]);
+  assert.equal([both(b), both(old)].join(' / '), '2026-12-23|15:00|30 + 2026-12-24|| / 2026-12-23|| + 2026-12-24||', 'the other PCs take the new days before they read To Do themselves');
+  readRolled(b, doneAt);
+  await converge(cloud, [a, b, old]);
+  assert.equal([both(a), both(b)].join(' / '), '2026-12-23|15:00|30 + 2026-12-24|| / 2026-12-23|15:00|30 + 2026-12-24||', 'B\'s own read moves them no further');
+});
+
+test('a repeating To Do task the phone moved on: a subtask\'s day set on another PC after that, which this PC has not read yet, stays over this PC\'s move', async t => {
+  const cloud = services();
+  const steps = who => [{ id: `${who}-ws`, remoteId: 'wst', title: '초안 보내기', completed: false, dueDate: '2026-12-16' }];
+  const a = pc(t, cloud, { name: 'A', before: weeklyTask('A', steps) }); const b = pc(t, cloud, { name: 'B', before: weeklyTask('B', steps) });
+  await converge(cloud, [a, b]);
+  tick(10 * 60000); const doneAt = new Date(wall).toISOString(); tick(60000);
+  readRolled(a, doneAt);
+  a.edit(state => { state.tasks.find(item => item.remoteId === 'rw').steps[0].dueDate = '2026-12-26'; }); // the user's own day for next week's
+  tick(60000);
+  // B reads To Do before its view sync brings A's document: it moves its own, unmoved, a week on — stamped as at the completion, not now
+  // (2026-11-11 recheck: stamped now, it overwrote A's 12-26 on every PC)
+  readRolled(b, doneAt);
+  assert.equal(stepFace(weeklyStep(b, 'wst')), '2026-12-23||');
+  await converge(cloud, [a, b]);
+  assert.equal([stepFace(weeklyStep(a, 'wst')), stepFace(weeklyStep(b, 'wst'))].join(' / '), '2026-12-26|| / 2026-12-26||');
+});
+
+// A day set by hand on this PC up to two minutes before To Do made the copy is stamped inside the window that otherwise means 「moved already」:
+// this PC keeps the stamps of its own step days (viewSync.own, never sent) and moves those. Whichever PC reads first, it moves once.
+for (const first of ['A', 'B']) test(`a repeating To Do task the phone moved on: a subtask's day set on this PC a minute before the completion moves with it, once (${first} reads first)`, async t => {
+  const cloud = services();
+  const steps = who => [{ id: `${who}-ws`, remoteId: 'wst', title: '초안 보내기', completed: false, dueDate: '2026-12-16', dueTime: '15:00', alert: 30 }];
+  const a = pc(t, cloud, { name: 'A', before: weeklyTask('A', steps) }); const b = pc(t, cloud, { name: 'B', before: weeklyTask('B', steps) });
+  await converge(cloud, [a, b]);
+  tick(10 * 60000);
+  a.edit(state => { state.tasks.find(item => item.remoteId === 'rw').steps[0].dueDate = '2026-12-17'; }); // Wednesday's subtask to Thursday
+  await converge(cloud, [a, b]);
+  const doneAt = new Date(wall + 60000).toISOString(); tick(120000); // the phone completes it a minute later; To Do makes the copy then
+  const order = first === 'A' ? [a, b] : [b, a];
+  readRolled(order[0], doneAt); await converge(cloud, [a, b]);
+  readRolled(order[1], doneAt); await converge(cloud, [a, b]);
+  assert.equal([stepFace(weeklyStep(a, 'wst')), stepFace(weeklyStep(b, 'wst'))].join(' / '), '2026-12-24|15:00|30 / 2026-12-24|15:00|30', 'a week on with the task, as when a PC completes it (settleAnswer), and not two');
+});
+
+test('a repeating To Do task the phone moved on: a subtask\'s day set on this PC after the completion stays; the own stamps survive a load only while current and are never sent', async t => {
+  const cloud = services();
+  const steps = who => [{ id: `${who}-ws`, remoteId: 'wst', title: '초안 보내기', completed: false, dueDate: '2026-12-16' }];
+  const a = pc(t, cloud, { name: 'A', before: weeklyTask('A', steps) }); const b = pc(t, cloud, { name: 'B', before: weeklyTask('B', steps) });
+  await converge(cloud, [a, b]);
+  tick(30 * 60000); const doneAt = new Date(wall).toISOString(); tick(30000);
+  a.edit(state => { state.tasks.find(item => item.remoteId === 'rw').steps[0].dueDate = '2026-12-26'; }); // set by hand 30 s after the completion
+  tick(30000);
+  readRolled(a, doneAt);
+  await converge(cloud, [a, b]); readRolled(b, doneAt); await converge(cloud, [a, b]);
+  assert.equal([stepFace(weeklyStep(a, 'wst')), stepFace(weeklyStep(b, 'wst'))].join(' / '), '2026-12-26|| / 2026-12-26||');
+  const sync = a.state().viewSync; const key = `P:${views.taskKey('wst')}`; const stampOf = sync.doc.items[key].d[1];
+  const loaded = views.normalizeViewSync(JSON.parse(JSON.stringify({ ...sync, own: { [key]: stampOf, 'P:zzzzzzzzzzzz': 5, [`R:${views.taskKey('wst')}`]: 5 } })));
+  assert.equal(JSON.stringify(loaded.own), JSON.stringify({ [key]: stampOf }), 'the stamp the document still has for that day is kept; others go');
+  const stale = views.normalizeViewSync(JSON.parse(JSON.stringify({ ...sync, own: { [key]: stampOf - 1 } })));
+  assert.equal('own' in stale, false, 'a stamp the document no longer has is not kept');
+  assert.equal([...cloud.files.values()].some(file => file.content.includes('"own"')), false, 'never sent');
+});
+
+test('the document over its size: a step\'s time and alert leave with its date, never stay without it', () => {
+  const at = Date.parse('2026-11-11T00:00:00Z'); const items = {};
+  for (let i = 0; i < 1800; i++) { const key = views.taskKey(`step${i}`); items[`P:${key}`] = { d: ['2026-12-20', at + i] }; items[`R:${key}`] = { t: ['15:00', at + i], m: [30, at + i] }; }
+  const doc = { v: 1, items };
+  assert.equal(Buffer.byteLength(canonical(doc)) > views.DOC_MAX, true);
+  const dropped = views.capDoc(doc);
+  const keys = Object.keys(doc.items);
+  assert.equal([dropped > 0, Buffer.byteLength(canonical(doc)) <= views.DOC_MAX, keys.filter(key => key[0] === 'R' && !doc.items[`P:${key.slice(2)}`]).length].join('|'), 'true|true|0');
+});
+
+test('a step\'s date must be a day of the calendar: 2026-02-31 from a store is dropped', () => {
+  const doc = sanitizeDoc({ v: 1, items: { 'P:abcdefabcdef': { d: ['2026-02-31', 5] }, 'P:bbbbbbbbbbbb': { d: ['2026-02-28', 5] } } });
+  assert.equal(JSON.stringify(doc.items), '{"P:bbbbbbbbbbbb":{"d":["2026-02-28",5]}}');
 });

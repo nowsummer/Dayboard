@@ -14,9 +14,16 @@
   // and its open steps' is when it next needs looking at, in 오늘, 예정 and the sort by date.
   // A time range's dash (2026-11-08 owner: 「오후 8:00-오후 9:00 … 반칸씩이라도 띄우는 게」): an en dash between thin spaces, as Apple's date ranges set it.
   const RANGE='\u2009–\u2009';
+  // A month chip's time (2026-11-11 owner, beside Notion Calendar's 「11:30 AM 🍽️ …」: 「짧은 시간이 나을거 같아. 노션 처럼 am pm으로 하면 좀 더 줄일 수
+  // 잇지 않을까?」): 「11:30 AM」, on the hour 「9 PM」, noon 「12 PM」, midnight 「12 AM」 — Latin AM/PM in Korean too, as it is shorter than 오전/오후
+  // (Chromium 2026-11-11: the longest 50.1px against 「오전 12:01」 56.3px). A no-break space before AM/PM keeps the time in one piece; Pretendard has it
+  // at its space's 2.8px, where a narrow one (1.5px) would set AM against the digits. 24 hours: H:MM — no leading zero (「9:00」, 「0:30」), the minutes
+  // kept on the hour, since a bare 「21」 reads as a number and 「21시」 would be Korean alone. The month grid only (app.js fmtTime 'month'): the week,
+  // the panel, the cards and every tooltip keep the full time.
+  function monthClock(hours,minutes,h24=false){const mm=pad(minutes);if(h24)return hours+':'+mm;return (minutes?(hours%12||12)+':'+mm:String(hours%12||12))+'\u00a0'+(hours<12?'AM':'PM');}
   function nextDueOf(t){let next=t.dueDate||'';for(const x of Array.isArray(t.steps)?t.steps:[])if(x.dueDate&&!x.completed&&(!next||x.dueDate<next))next=x.dueDate;return next;}
-  // The open steps of open tasks due on a day, for the calendar.
-  function stepsDueOn(tasks,day){const out=[];for(const t of tasks||[]){if(t.completed||!Array.isArray(t.steps))continue;for(const x of t.steps)if(x.dueDate===day&&!x.completed)out.push({task:t,step:x});}return out;}
+  // The open steps of open tasks due on a day, for the calendar: those with no time first, then by their time (2026-11-11), as the day's tasks are.
+  function stepsDueOn(tasks,day){const out=[];for(const t of tasks||[]){if(t.completed||!Array.isArray(t.steps))continue;for(const x of t.steps)if(x.dueDate===day&&!x.completed)out.push({task:t,step:x});}const time=s=>dueTimeOk(s.step.dueTime)?s.step.dueTime:'';return out.sort((a,b)=>time(a).localeCompare(time(b)));}
   function matches(t,view,today=dateKey()){
     if(view==='today'){const next=nextDueOf(t);return !!next&&next<=today;}
     if(view==='planned')return !!nextDueOf(t);
@@ -1129,16 +1136,45 @@
   const dueTimeOk=value=>typeof value==='string'&&DUE_TIME.test(value);
   // The instant a timed task is due (its date at its time here); null for a date only.
   function dueAt(task){if(!task?.dueDate||!dueTimeOk(task.dueTime))return null;const at=new Date(`${task.dueDate}T${task.dueTime}:00`);return Number.isFinite(at.getTime())?at:null;}
+  // The calendar shows each task by its title (2026-11-11 owner: 「달력 메인탭에서 할 일이 그냥 "할 일 n개" 이렇게만 보이는 데, 할 일 내용도 표기해주는 게
+  // 스케줄 인식하기에 좋지 않을까?」): the open tasks of each day drawn, bucketed in one pass over the tasks — a pass per cell would scan them 42
+  // times a render, as calDayBuckets avoids for events. Those with no time first, in their stored order, then by time: the day panel's order
+  // (calendar.js dayTasksOf). A subtask is never a chip of its own, but its date stays on the grid (2026-11-11 review: the dates the owner gave
+  // subtasks on 2026-11-07 had gone from the default grid): a day holding an open subtask's date and not its task holds the task once, as a
+  // copy with no time (its time belongs to its own day) whose stepsDue lists that day's subtasks — the day panel names them under it the same way.
+  // A subtask with a time (2026-11-11 owner: 「신간 알림 둘 다 넣어줘」, its parent's chip as decided for subtask dates) puts that copy at its time,
+  // one copy for each time of the day (stepTime says which) — on the task's own day too, unless the task is due at that very minute.
+  // {oneADay: true} (the month, 2026-11-11 review: three subtask times made three chips of one name, their times hidden at a cell's width): one
+  // chip a day — the task, or its copy — at the earliest of its own time (ownTime, on its own day) and its subtasks' there, stepsDue naming them all.
+  function taskBuckets(tasks,keys,opt={}){const one=Boolean(opt&&opt.oneADay);const out=new Map((keys||[]).map(k=>[k,[]]));const copies=new Map();for(const t of tasks||[]){if(!t||t.completed)continue;const own=t.dueDate?out.get(t.dueDate):null;if(own)own.push(t);for(const x of Array.isArray(t.steps)?t.steps:[]){if(!x||x.completed||!x.dueDate)continue;const at=dueTimeOk(x.dueTime)?x.dueTime:'';if(x.dueDate===t.dueDate&&(!at||(dueTimeOk(t.dueTime)&&t.dueTime===at)))continue;const list=out.get(x.dueDate);if(!list)continue;if(one){const key=x.dueDate+'\n'+t.id;let copy=copies.get(key);if(!copy){const home=x.dueDate===t.dueDate,mine=home&&dueTimeOk(t.dueTime)?t.dueTime:'';copy={...t,dueDate:x.dueDate,dueTime:mine,stepsDue:[],...(home?{ownTime:mine}:{})};copies.set(key,copy);const was=home?list.indexOf(t):-1;if(was>=0)list[was]=copy;else list.push(copy);}copy.stepsDue.push(x);if(at&&(!copy.dueTime||at<copy.dueTime)){copy.dueTime=at;copy.stepTime=at;}continue;}const key=x.dueDate+'\n'+t.id+'\n'+at;let copy=copies.get(key);if(!copy){copy={...t,dueDate:x.dueDate,dueTime:at,stepsDue:[],...(at?{stepTime:at}:{})};copies.set(key,copy);list.push(copy);}copy.stepsDue.push(x);}}const time=t=>dueTimeOk(t.dueTime)?t.dueTime:'';for(const list of out.values())list.sort((a,b)=>time(a).localeCompare(time(b)));return out;}
+  // A day's events and tasks in one order: the all-day events, then the timed events and the timed tasks together by time, an event first at
+  // the same minute (an appointment before a deadline), and the tasks with no time last (2026-11-11 owner, 「회의 먼저」: a short cell folds
+  // those into 「+n개」 first and the day's meetings stay in view, where the tasks with no time had pushed them into it). The events come
+  // in eventsOn's order and keep it, the tasks are put in time order here; each item is {event} or {task}.
+  function dayItems(events,tasks){const at=x=>x.task?dueAt(x.task).getTime():Date.parse(x.event.start);const timed=(events||[]).filter(e=>!e.allDay).map(event=>({event})),clocked=(tasks||[]).filter(t=>dueAt(t)).sort((a,b)=>dueAt(a)-dueAt(b)).map(task=>({task}));const out=(events||[]).filter(e=>e.allDay).map(event=>({event}));let i=0,j=0;while(i<timed.length||j<clocked.length){if(j>=clocked.length||(i<timed.length&&!(at(timed[i])>at(clocked[j]))))out.push(timed[i++]);else out.push(clocked[j++]);}for(const task of tasks||[])if(!dueAt(task))out.push({task});return out;}
   // The editor's quick 알림 for a timed task, in minutes before its time (Apple Reminders' early reminder): 제시간에, 5분·30분·1시간·1일 전.
   const TASK_ALERTS=[0,5,30,60,1440];
   // How many minutes before its time a timed task's reminder rings, when that reads as Apple's early-reminder words do — 제시간에, every 5
   // minutes within the hour, whole hours up to a day, whole days up to a week —; null otherwise (a date-only task, a reminder after the
   // time, 「350분 전」): the row and the 알림 field then show the reminder's own time.
-  function alertBefore(task){const due=dueAt(task);const at=Date.parse(task?.reminderAt||'');if(!due||!Number.isFinite(at))return null;const gap=(due.getTime()-at)/60000;if(!Number.isInteger(gap)||gap<0)return null;return (gap<60&&gap%5===0)||(gap%60===0&&gap<=1440)||(gap%1440===0&&gap<=10080)?gap:null;}
+  function alertBefore(task){const due=dueAt(task);const at=Date.parse(task?.reminderAt||'');if(!due||!Number.isFinite(at))return null;const gap=(due.getTime()-at)/60000;return alertReadable(gap)?gap:null;}
+  // Minutes before a time that read as those words (a subtask's alert says itself so too, 2026-11-11).
+  function alertReadable(gap){return Number.isInteger(gap)&&gap>=0&&((gap<60&&gap%5===0)||(gap%60===0&&gap<=1440)||(gap%1440===0&&gap<=10080));}
   // The time 「시간」 gives a date first (2026-11-05 review): the next full hour, as Apple Reminders does — never 자정 (00:00) nor the hour
   // that is midnight UTC on that day (오전 9:00 in Korea), which To Do answers as a date only (lib/providers/microsoft.cjs dueFrom), so the
   // phone may show them all day; the hour after then.
   function defaultDueTime(date,now=new Date()){const utc=new Date(`${date}T00:00:00Z`);const clash=Number.isFinite(utc.getTime())&&utc.getMinutes()===0?utc.getHours():-1;let hour=(now.getHours()+1)%24;while(hour===0||hour===clash)hour=(hour+1)%24;return String(hour).padStart(2,'0')+':00';}
+  // ---- A subtask's time and alert (2026-11-11 owner: 「신간 알림 둘 다 넣어줘」, Apple Reminders' subtask details): 'HH:MM' on its date (dueTime, only
+  // with a date) and an alert in minutes before that time (alert, only with a time) — the task's quick choices, or the minutes a picked date and
+  // time stand before it —, so a date moved, by hand or by a repeat, takes the alert along. No service holds either (lib/viewsync.cjs R items).
+  const STEP_ALERT_MAX=527040;/* a year of minutes, either way */
+  const stepAlertOk=v=>Number.isInteger(v)&&Math.abs(v)<=STEP_ALERT_MAX;
+  // What a step holds of when it is due, each part only with the one before it: {dueDate?, dueTime?, alert?}.
+  // A day of the calendar as 'YYYY-MM-DD' (2026-11-11 review: 2026-02-31 parses, as 3 March, and the editor then refused the task's save).
+  function realDay(v){if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const d=new Date(v+'T00:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===v;}
+  function stepWhen(x){const out={};if(!x||!realDay(x.dueDate))return out;out.dueDate=x.dueDate;if(dueTimeOk(x.dueTime)){out.dueTime=x.dueTime;if(stepAlertOk(x.alert))out.alert=x.alert;}return out;}
+  // The instant a step's alert rings, or null.
+  function stepAlertAt(x){const w=stepWhen(x);if(!('alert' in w))return null;const at=dueAt(w);return at?new Date(at.getTime()-w.alert*60000):null;}
   // ---- Repeating tasks (Reminders, To Do): completing one adds the next, dated the rule's first day after its due date (not
   // after the day it was done — To Do and Reminders count from the due date). '' when the rule has ended (UNTIL, COUNT).
   function nextDue(rruleText,dueKey){
@@ -1268,7 +1304,12 @@
     const monthly=!provider&&Boolean(dayChanged)&&!ruleChanged&&['MONTHLY','YEARLY'].includes(parseRRule(event?.rrule||'')?.freq);
     return {one:!ruleChanged,future:!onlyOne,all:!onlyOne&&!monthly};
   }
-  const api={RANGE,SHORTCUT_MAX,SHORTCUT_KEEP,applyShortcut,cleanShortcuts,shortcutKey,shortcutProblem,shortcutValue,shortcutFromValue,stretchedEvent,nextDueOf,stepsDueOn,hexToHsv,hsvToHex,appPassword,parseQuickLine,parseEvent,parseEventEn,dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassLookApp,widgetTheme,isCustomColor,clampColor,titleColor,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,parseEventKo,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,dueTimeOk,dueAt,TASK_ALERTS,alertBefore,defaultDueTime,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
+  // Where a day number's ink sits sideways, so one rule can centre every date number (styles.css .day-number and its list). Side bearings of Pretendard's digits in em,
+  // index = digit, read from the font at 120px (weight 600 tabular, 700 proportional: the weights a circle draws them in). Height is the same for every number of a row: styles.css --digit-mid.
+  const DIGIT_BEARINGS={tabular:{lead:[.05,.141,.076,.06,.043,.074,.05,.074,.049,.05],trail:[.046,.197,.065,.05,.035,.055,.05,.075,.05,.05]},proportional:{lead:[.042,.046,.045,.048,.041,.057,.042,.033,.042,.044],trail:[.044,.105,.045,.046,.039,.042,.042,.04,.041,.041]}};
+  function discInk(day,proportional=false){const s=String(day),b=DIGIT_BEARINGS[proportional?'proportional':'tabular'];return {'--disc-ink':((b.trail[+s[s.length-1]]-b.lead[+s[0]])/2).toFixed(4)+'em'};}
+
+  const api={discInk,RANGE,monthClock,SHORTCUT_MAX,SHORTCUT_KEEP,applyShortcut,cleanShortcuts,shortcutKey,shortcutProblem,shortcutValue,shortcutFromValue,stretchedEvent,nextDueOf,stepsDueOn,hexToHsv,hsvToHex,appPassword,parseQuickLine,parseEvent,parseEventEn,dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassLookApp,widgetTheme,isCustomColor,clampColor,titleColor,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,parseEventKo,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,dueTimeOk,dueAt,taskBuckets,dayItems,TASK_ALERTS,alertBefore,alertReadable,defaultDueTime,STEP_ALERT_MAX,stepAlertOk,realDay,stepWhen,stepAlertAt,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

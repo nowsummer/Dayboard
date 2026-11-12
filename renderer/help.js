@@ -6,8 +6,10 @@
 // Loaded before app.js like calendar.js: app.js's globals are read only when these functions run.
 
 // ---- Shortcuts ----
-// A shortcut lists key combinations shown as alternatives: [['Ctrl','F'],['Ctrl','K']] reads Ctrl F / Ctrl K. A mouse action ({mouse:…}) is words, not a key cap (2026-11-09 V56).
-function helpKeys(combos){return h('span',{class:'keys'},combos.map((combo,i)=>[i?h('span',{class:'keys-or'},'/'):null,combo.map(k=>k&&k.mouse?h('span',{class:'keys-mouse'},k.mouse):h('kbd',{},k))]));}
+// A shortcut lists key combinations shown as alternatives: [['Ctrl','F'],['Ctrl','K']] reads Ctrl F / Ctrl K. A mouse action ({mouse:…}) is one
+// key cap holding its words, drawn by the keys' own rule (2026-11-12 owner: 「다른건 키보드 느낌인데 더블클릭은 그냥 적혀 있어서 이상해」 — over V56's
+// plain words of 2026-11-09). The class only names it; a rule of its own would draw it apart from the keys (visual-1109b V56).
+function helpKeys(combos){return h('span',{class:'keys'},combos.map((combo,i)=>[i?h('span',{class:'keys-or'},'/'):null,combo.map(k=>k&&k.mouse?h('kbd',{class:'keys-mouse'},k.mouse):h('kbd',{},k))]));}
 function shortcutGroups(){
   return [
     [tr('어디서나'),[
@@ -61,7 +63,7 @@ function usefulShortcuts(){
 }
 function openShortcuts(){
   helpClose();
-  const marks=['keyboard','tasks','calendar','note'];
+  const marks=['globe','tasks','calendar','note'];
   const groups=shortcutGroups().map(([title,rows],at)=>h('section',{class:'shortcut-group'},h('h3',{},marks[at]?icon(marks[at],16):null,title),h('dl',{},rows.map(([label,combos])=>h('div',{class:'shortcut-row'},h('dt',{},label),h('dd',{},helpKeys(combos)))))));
   // Two stacked columns, 어디서나 + 할 일 | 달력 + 메모: rows of the 2×2 grid left 180px empty under 할 일 once 어디서나 had nine rows, and the
   // sheet scrolled 105px in the 900×650 window (2026-11-02 r60 integration rr-app-ui-4). The order stays the reading order; ≤720px stacks them.

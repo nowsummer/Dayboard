@@ -19,8 +19,9 @@ function rowHarness(extra = {}) {
     taskLeave: (id, done) => { leaves.push(id); done(); }, listColor: () => '#3478f6', taskMoving: () => false, staleUndo: () => new Error('stale'), doneText: () => '완료했어요.',
     undoToast: (text, label, undo, redo) => undos.push({ text, undo, redo }), calEnter: () => ({}), datePopNode: null, isTaskView: () => true, pendingFocus: null,
     setTimeout: (fn, ms) => { timers.push({ fn, ms, live: true }); return timers.length; }, clearTimeout: id => { if (timers[id - 1]) timers[id - 1].live = false; },
-    deleteTaskFlow: t => { h.context.state.tasks = h.context.state.tasks.filter(x => x.id !== t.id); h.context.render(); }, ...extra });
-  h.loadApp(...LABELS, 'const listBy=', 'function listVisual(', 'const lingering=', 'const flagHold=', ...STEPS, 'const smart=', 'const nearRow=', 'function focusPending(', 'function taskRow(');
+    // as the real one: the keys of goneFocus first (2026-11-12), then the task goes and the list is drawn anew
+    deleteTaskFlow: t => { const g = h.context.goneFocus(t.id); h.context.state.tasks = h.context.state.tasks.filter(x => x.id !== t.id); h.context.render(); g.done(); }, ...extra });
+  h.loadApp(...LABELS, 'const listBy=', 'function listVisual(', 'const lingering=', 'const flagHold=', ...STEPS, 'const smart=', 'const nearRow=', 'function focusPending(', 'function goneFocus(', 'function backFocus(', 'function taskRow(');
   const c = h.context;
   c.state.lists = [{ id: 'l1', name: '장보기', provider: 'local' }];
   c.answer = (name, payload) => {
@@ -106,6 +107,8 @@ test('F22: the row\'s ⋯ has a key of its own, so a menu opened from it comes b
   h.context.state.tasks = [task()];
   h.context.render();
   assert.equal(h.row('t1').querySelector('.row-more').getAttribute('data-focus-key'), 'task-more-t1');
+  // and the row's + (2026-11-11): Esc in the line it opened from the keyboard comes back to it (tests/row-add-1111)
+  assert.equal(h.row('t1').querySelector('.row-add')?.getAttribute('data-focus-key'), 'task-add-t1');
 });
 
 // Behaviour review after F23: the circle's pending focus goes after 1.5 s as the other paths' do, so a late answer while the keyboard was

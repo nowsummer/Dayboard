@@ -172,7 +172,7 @@ test('task:update between this PC\'s lists keeps the order of the list it left: 
   const context = {
     store, tr, publicRecord, todayKey: () => localKey(new Date().toISOString()),
     text: V.text, rawText: V.rawText, noteText: V.noteText, dateOnly: V.dateOnly, reminderAt: V.reminderAt, boolean: V.boolean, taskSteps: V.taskSteps, identifier: V.identifier,
-    setRepeat: T.setRepeat, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
+    setRepeat: T.setRepeat, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, rolledBackSteps: T.rolledBackSteps, pastStepAlerts: require('../lib/alerts.cjs').pastStepAlerts, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
     lookup(collection, id) { const item = store.peek(collection, V.identifier(id)); if (!item) throw new Error('항목이 없거나 이미 삭제되었습니다.'); return item; },
     commit: fn => store.mutate(fn),
     sync: { async mutateTask() { throw new Error('no account list in this test'); } },

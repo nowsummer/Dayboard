@@ -113,7 +113,7 @@ function mainCommands(t) {
   const context = {
     store, tr, publicRecord, randomUUID: () => `id-${++n}`, todayKey: () => '2026-11-05',
     text: V.text, rawText: V.rawText, noteText: V.noteText, dateOnly: V.dateOnly, reminderAt: V.reminderAt, boolean: V.boolean, taskSteps: V.taskSteps, identifier: V.identifier, dueTime: V.dueTime,
-    setRepeat: T.setRepeat, setDueTime: T.setDueTime, followDue: T.followDue, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
+    setRepeat: T.setRepeat, setDueTime: T.setDueTime, followDue: T.followDue, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, rolledBackSteps: T.rolledBackSteps, pastStepAlerts: require('../lib/alerts.cjs').pastStepAlerts, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
     lookup(collection, id) { const item = store.peek(collection, V.identifier(id)); if (!item) throw new Error('항목이 없거나 이미 삭제되었습니다.'); return item; },
     commit: fn => store.mutate(fn),
     cloudTask: async (kind, task) => { sent.push(structuredClone(task)); return { ...task, remoteId: 'R-' + task.id }; },

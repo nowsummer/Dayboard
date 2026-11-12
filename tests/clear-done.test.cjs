@@ -16,7 +16,7 @@ function setup(tasks, { fail = [] } = {}) {
     toast: (text, error) => { seen.toasts.push(`${error ? '!' : ''}${text}`); },
     undoToast: (text, label, undo, redo) => { seen.undo = { text, label, undo, redo }; },
     confirmDelete: (title, action, description) => { seen.confirm = { title, action, description }; },
-    staleUndo: () => new Error('stale'),
+    staleUndo: () => new Error('stale'), goneFocus: () => ({ done() {}, back() {} }), // the keyboard beside them: tests/focus-delete-1112
   });
   h.context.state.tasks = tasks.map(t => ({ ...t }));
   h.context.run = async (name, payload) => {

@@ -13,7 +13,7 @@ const before = text => { const at = css.indexOf(text); return at > 0 && at < css
 
 test('V18: in the main list a subtask date follows its title by 12px; an empty one stays at the end', () => {
   assert.equal(before('.tasks-view .task-step .step-title{flex:0 1 auto}'), true, 'the title takes its own width (and still shrinks and wraps)');
-  assert.equal(before('.tasks-view .task-step .step-date:not(.empty){margin:0 auto 0 2px}'), true, 'the 10px gap + 2px = 12px after the title; the rest of the row after it');
+  assert.equal(before('.tasks-view .task-step .step-date:not(.empty){margin-left:2px;margin-right:auto}'), true, 'the 10px gap + 2px = 12px after the title; the rest of the row after it (its top: the first line, 2026-11-13)');
   assert.equal(before('.tasks-view .task-step .step-date.empty{margin-left:auto}'), true, 'no date: its icon at the end as before');
   const base = css.match(/\n\.step-date\{([^}]*)\}/)[1];
   assert.equal(base.includes('flex:none') && base.includes('font-size:12px') && base.includes('color:var(--secondary)') && base.includes('white-space:nowrap'), true, 'never shrinks, 12px --secondary');

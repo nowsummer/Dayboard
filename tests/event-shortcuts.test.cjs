@@ -163,8 +163,9 @@ test('English lines read as Korean ones do', () => {
   for (const word of ['today', 'noon', 'tomorrow', 'Monday']) assert.equal(D.shortcutProblem({ ...LUNCH, word }, []), 'date', word);
 });
 
-// 2026-11-09 사용자 결정 V46 「지금처럼 안내 줄만」: the form keeps its values until the save, so the dim line under a new event's title
-// says what the save will make — 「저장하면 🍽️ 민수 · …」 — not as though it were already applied. The card's own functions over a draft.
+// 2026-11-09 사용자 결정 V46 「지금처럼 안내 줄만」, reversed 2026-11-11 (「저녁 치면 … 토글이 off로 바뀌어야」): the form now follows the line
+// (calFollowLine, tests/shortcut-live-1111.test.cjs), so the dim line under a new event's title says only what the form cannot show — the title
+// the save makes, 「저장하면 🍽️ 민수」 — and nothing for a line saved as typed. The card's own functions over a draft.
 test('the card\'s hint line starts with 「저장하면」 (Saves as …), nothing when the line reads as itself', () => {
   const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
   const I = require('../renderer/i18n.js');
@@ -179,8 +180,9 @@ test('the card\'s hint line starts with 「저장하면」 (Saves as …), nothi
     return context.calHintText(c);
   };
   try {
-    assert.match(hint('점심 민수', 'ko'), /^저장하면 🍽️ 민수 · .*11:30.+12:30$/);
-    assert.match(hint('meeting tomorrow 3pm', 'en'), /^Saves as /);
+    assert.equal(hint('점심 민수', 'ko'), '저장하면 🍽️ 민수', 'the hours are in the form, not the hint');
+    assert.equal(hint('meeting tomorrow 3pm', 'en'), 'Saves as meeting');
+    assert.equal(hint('3시', 'ko'), '', 'a line saved as typed says nothing: its hour is in the form');
     assert.equal(hint('', 'ko'), '');
   } finally { I.setLanguage('ko'); }
 });

@@ -52,7 +52,7 @@
 .reminder-label{display:inline-flex;align-items:center;gap:3px;color:#b8721a}
 .list-nav.dragging{opacity:.35}.list-nav.drop-before{box-shadow:inset 0 2px 0 var(--blue)}.group-row.drop-into,.list-section.drop-into{background:color-mix(in srgb,var(--blue) 10%,transparent);border-radius:8px}
 .list-emoji,.emoji-choice{font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif}
-.main-nav{margin:14px 0 4px}.main-nav .nav-item{padding:8px 12px;font-size:14px;line-height:22px}.smart-grid{margin:10px 0 12px}
+.main-nav{margin:14px 0 4px}.main-nav .nav-item{padding:8px 12px;font-size:var(--side-text);line-height:22px}.smart-grid{margin:10px 0 12px}
 [data-theme=dark] .context-note p{color:#c9bd9a}
 
 /* Task rows size to their content: a single-line task has no empty meta line beneath it. */
@@ -107,7 +107,7 @@
 #toast{display:flex;align-items:center;gap:12px}#toast .toast-action{color:#9dc4ff;font-weight:600;white-space:nowrap;padding:0}#toast.show:has(.toast-action){pointer-events:auto}.dialog:focus,.dialog:focus-visible{outline:none}
 .note-title-input::placeholder{color:var(--muted)}.notes-search-empty{font-size:13px;color:var(--secondary);padding:12px 4px}
 @media(max-width:930px){.calendar-view{grid-template-columns:1fr;grid-template-rows:auto auto;overflow:auto}.calendar-main{min-height:calc(100vh - var(--topbar) - var(--content-top) - var(--content-bottom))}.day-panel{border-left:0;padding-left:0;padding-top:var(--content-top);overflow:visible}}
-@media(prefers-reduced-motion:reduce){.task-row.just-added{animation:none}}
+@media(prefers-reduced-motion:reduce){.task-row.just-added,.task-step.just-added{animation:none}}
 
 /* Month grid: the weekday header keeps its natural height; only the six week rows share the remaining space. */
 .calendar-grid.large{grid-template-rows:auto repeat(6,minmax(0,1fr));grid-auto-rows:auto}.large .weekday{padding:7px 0}
@@ -115,14 +115,14 @@
 /* Month chips: all-day = filled band in the event/calendar colour (Notion), timed = colour bar + time + title (Apple). Right-click opens the colour/action menu. */
 .day-event{display:flex;align-items:center;gap:5px;min-width:0;line-height:1.35;padding:2px 5px 2px 4px;border-radius:4px;font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden}
 .day-event.allday{background:color-mix(in srgb,var(--cal-color) 26%,var(--bg));color:color-mix(in srgb,var(--cal-color) 55%,#1e2230);font-weight:500;padding-left:6px}.day-event.allday:hover{background:color-mix(in srgb,var(--cal-color) 38%,var(--bg))}
-.day-event.timed{background:transparent;color:var(--text)}.day-event.timed:hover{background:var(--hover)}.day-event.timed .chip-time{color:var(--secondary);font-weight:400}.day-event.timed .chip-title{font-weight:500;color:color-mix(in srgb,var(--text) 88%,var(--secondary))}
+.day-event.timed{background:transparent;color:var(--text)}.day-event.timed:hover{background:var(--hover)}.day-event.timed .chip-title{font-weight:500;color:color-mix(in srgb,var(--text) 88%,var(--secondary))}
 .chip-bar{width:3px;height:13px;border-radius:2px;background:var(--cal-color);flex-shrink:0}.chip-time{color:var(--secondary);font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:500}.chip-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}.chip-repeat{display:inline-flex;color:var(--muted);flex-shrink:0;margin-left:3px;vertical-align:middle}
 [data-theme=dark] .day-event.allday{background:color-mix(in srgb,var(--cal-color) 34%,var(--bg));color:color-mix(in srgb,var(--cal-color) 70%,#fff)}[data-theme=dark] .day-event.timed{background:transparent;color:var(--text)}[data-theme=dark] .day-event.timed:hover{background:var(--hover)}
 .event-row strong{display:flex;align-items:center;gap:2px}
 /* Context menu */
 .context-menu{position:fixed;z-index:60;min-width:208px;padding:6px;border-radius:12px;background:var(--glass);border:1px solid rgba(255,255,255,.7);box-shadow:0 12px 40px rgba(25,35,60,.22),0 0 0 1px rgba(30,36,50,.06);backdrop-filter:blur(30px) saturate(130%);animation:reveal .12s ease-out;-webkit-app-region:no-drag}
 .menu-colors{display:flex;gap:7px;padding:7px 8px 9px;border-bottom:1px solid var(--line);margin-bottom:4px;flex-wrap:wrap;max-width:240px}.menu-swatch{width:18px;height:18px;border-radius:50%;background:var(--swatch);flex-shrink:0;padding:0}.menu-swatch.selected{box-shadow:0 0 0 2px var(--glass),0 0 0 4px var(--swatch)}.menu-swatch.reset{background:transparent;border:2px dashed var(--swatch)}
-.menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--text)}.menu-item:hover,.menu-item:focus-visible{background:var(--hover);outline:none}.menu-item.danger{color:#de4f55}.menu-item small{margin-left:auto;color:var(--muted);font-size:12px}.context-menu hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+.menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--text)}.menu-item:hover,.menu-item:focus-visible{background:var(--hover);outline:none}.menu-item.danger{color:var(--sunday)}.menu-item small{margin-left:auto;color:var(--muted);font-size:12px}.context-menu hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
 [data-theme=dark] .context-menu{border-color:#ffffff14}
 /* Repeat sheet, scope chooser, event colours, calendar list */
 .scope-options{display:flex;flex-direction:column;gap:8px}.button.wide{width:100%;justify-content:center;min-height:40px;font-size:13px}.button.primary-choice{background:var(--blue);color:#fff}
@@ -134,8 +134,31 @@
 /* Narrow month cells: the title wins over the time (Apple keeps the name readable; the time truncates first) and the repeat glyph stays out of the grid. */
 .day-event .chip-time{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;max-width:58%}.day-event .chip-title{flex:1 1 auto;min-width:2.2em}.day-event .chip-repeat{display:none}
 
-/* Narrow month cells (default 1180px window): the title keeps the room and the time steps aside, as Apple's month view does; wider cells show "오후 9시 제목" / "9 PM Title". */
-.large .calendar-day{container-type:inline-size}.day-event .chip-time{flex:0 0 auto;max-width:none;overflow:visible}@container (max-width:118px){.day-event .chip-time{display:none}}
+/* Narrow month cells (default 1180px window): the title keeps the room and the time steps aside, as Apple's month view does; wider cells show "9 PM 제목" / "9 PM Title". */
+.large .calendar-day{container-type:inline-size}.day-event .chip-time{flex:0 0 auto;max-width:none;overflow:visible}
+/* The month chips' time, an event's and a task's alike (2026-11-11 owner beside Notion Calendar: 「짧은 시간이 나을거 같아. 노션 처럼 am pm으로 …
+   자간도 좀 줄이고」, then 「시간은 지금보다 진한 회색으로 바꾸라는 게 아니라 지금보다 아주 살짝 볼드하면서(제목만큼 볼드하거나 아주 조금 덜 볼드하게)
+   좀 더 회색이었으면」): 「11:30 AM」 (D.monthClock) at 450 — a half step over the 400 before and under the title's 500 — in a neutral grey, the ink
+   at 66% on the page: never toward the title's near-black (light L* 47 against --secondary's 37, dark 69 against 82) and without --secondary's blue,
+   so the title still reads first by its colour. 66% is the least that keeps 4.5:1 on every ground of a cell, plain, selected, the weekend shade and
+   a hovered day (light 4.9 · 4.7 · 4.6 · 4.5, dark 6.3 · 6.1 · 5.7 · 5.3); a past chip's .6 dims it as before. Proportional digits a little tighter
+   (−.02em, 12px as the chip): 「11:30 AM」 is 47.7px, the longest 「10:44 AM」 50.1px against 56.3px for 「오전 12:01」 (Chromium, 2026-11-11). The time
+   still steps aside at 118px (2026-11-11 review): those 6.2px go to the title in every cell that showed a time, and no cell newly shows one — at
+   112 the cells of 112–118px (1180 with the panel closed: 114.6px) would show 「11:30 AM」 beside a 37–42px title where the whole title stood,
+   the cut title the owner showed (30.png). tests/month-time-1111.test.cjs */
+.day-event.timed .chip-time,.day-task .chip-time{color:color-mix(in srgb,var(--text) 66%,var(--bg));font-weight:450;letter-spacing:-.02em;font-variant-numeric:normal}
+/* Under the pointer (2026-11-11 review): the chip is inside its day, so its --hover lies over the day's (a weekend or selected day keeps its own
+   ground under it), where 66% fell to light 4.1–4.3:1. 70% there keeps 4.5:1 (light 4.7 · 4.7 · 4.9, dark 5.0 or more) and still no darker than
+   --secondary in light; the time answers the pointer a little and stays 66% at rest. */
+.day-event.timed:hover .chip-time,.day-task:hover .chip-time{color:color-mix(in srgb,var(--text) 70%,var(--bg))}
+/* More contrast asked in Windows (2026-11-11 review): the grey above is fixed, so it would stay at 4.9:1 while the @media(prefers-contrast:more)
+   block below darkens --secondary; the time takes that --secondary again, as before the grey (light 9.6:1, dark 12:1). After the hover rule. */
+@media(prefers-contrast:more){.day-event.timed .chip-time,.day-task .chip-time,.day-event.timed:hover .chip-time,.day-task:hover .chip-time{color:var(--secondary)}}
+/* A timed event over several days is a band (calMonthBar takes .timed off): its 「8 AM」 keeps the base --secondary and 500 — the grey falls under
+   4.5:1 on a band of colour (light 3.5–4.2, dark 3.0–4.2) and 500 is the band title's weight — with the chips' tracking and proportional digits
+   (2026-11-11 review: 500, tabular and no tracking read heavier than the chips' times in the same grid). */
+.day-event.month-bar .chip-time{letter-spacing:-.02em;font-variant-numeric:normal}
+@container (max-width:118px){.day-event .chip-time,.day-task .chip-time{display:none}}
 
 /* Calendar list rows: Apple-style coloured check toggles visibility; the name opens the colour/menu. */
 .calendar-row{padding:3px 6px;gap:9px}.calendar-row:hover{background:var(--hover)}.cal-check{width:17px;height:17px;border-radius:5px;border:2px solid var(--cal-color);background:var(--cal-color);color:#fff;display:grid;place-items:center;flex-shrink:0;padding:0}.calendar-row.hidden .cal-check{background:transparent}.cal-name-button{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px;color:var(--text);text-align:left}.calendar-row.hidden .cal-name{color:var(--muted);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--muted) 50%,transparent)}
@@ -429,7 +452,6 @@
 .calendar-grid.rolling .calendar-day{cursor:default}
 .calendar-grid.rolling .day-number{border-radius:12px;cursor:pointer}
 .calendar-grid.rolling .calendar-day:not(.is-today) .day-number:hover{background:var(--hover)}
-.calendar-grid.rolling .day-number.first{width:auto;min-width:24px;padding:0 8px;font-weight:600}
 .calendar-grid.rolling .day-more{align-self:flex-start;font-size:12px;color:var(--secondary);padding:1px 5px;border-radius:4px;min-height:0;height:auto;width:auto}
 .calendar-grid.rolling .day-more:hover,.calendar-grid.rolling .day-tasks:hover{background:var(--hover)}
 .calendar-grid.rolling .day-tasks{align-self:flex-start;padding:1px 5px;border-radius:4px;min-height:0;height:auto;width:auto;text-align:left}
@@ -915,6 +937,8 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 .settings-body .settings-links{padding-top:18px}
 /* An ON switch is blue in dark mode too: the dark track rule (same specificity, later) painted ON and OFF the same grey. */
 [data-theme=dark] .checkbox-field input[type=checkbox]:checked{background:var(--blue)}
+/* A Windows contrast theme (forced colours) takes the switch's ground away and it vanished, on or off (2026-11-13 review): drawn in system colours, its ring an inset shadow so the focus outline stays its own */
+@media(forced-colors:active){:root .checkbox-field input[type=checkbox]{forced-color-adjust:none;background:Canvas;box-shadow:inset 0 0 0 1px ButtonText}:root .checkbox-field input[type=checkbox]::after{background:ButtonText;box-shadow:none}:root .checkbox-field input[type=checkbox]:checked{background:Highlight;box-shadow:none}:root .checkbox-field input[type=checkbox]:checked::after{background:HighlightText}:root .checkbox-field input[type=checkbox]:disabled{box-shadow:inset 0 0 0 1px GrayText}:root .checkbox-field input[type=checkbox]:disabled::after{background:GrayText}}
 /* 2026-10-30 This PC's tasks to an account list (app.js transferListDialog): the count, then why the rest stay, in the sheet's rhythm. */
 .transfer-body .move-summary{display:flex;flex-direction:column;gap:4px;margin:0 0 14px}
 .transfer-body .move-count{font-size:13px;color:var(--text);line-height:1.6}
@@ -1012,8 +1036,6 @@ select optgroup{font-size:12px;font-weight:600;color:var(--muted)}
 .form-input::-webkit-datetime-edit-fields-wrapper{padding:0}
 /* Task editor 반복|목록 row (2026-11-02 review usability-7): the 중요 switch keeps its 18px gap under the row whether the custom-repeat panel between them is shown or hidden. A list that cannot be changed stays one line there — the name ellipsizes (full name and account in the tooltip), no account tag — and is exactly as tall as the 반복 select beside it in the window (41px) and in widgets (36px) because both columns stretch (fix-D review: it wrapped onto 2–3 lines, and a fixed 41px overshot the widget's select). */
 .task-repeat-row{align-items:stretch}.task-repeat-row .task-detail-source{flex:1;min-width:0}.task-repeat-row .task-detail-source .list-name{margin-left:0;color:inherit;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* … and since 2026-11-05 the switch row is spaced as a label (.checkbox-field.field-switch, before r60-apple): -6px here too, these weigh more */
-.task-repeat-row+.checkbox-field,.task-repeat-row+.repeat-panel+.checkbox-field{margin-top:-6px}
 /* r60-D2 */
 /* 2026-11-02 review app-design-14: the account card wraps — row 1 is logo · name/status · 연결 해제 (top-aligned so the button stays the header's trailing action while the status column grows), row 2 the full-width .sync-toggles switch rows (32px each, the app's .checkbox-field switch). `.connected-account>div{flex:1}` (line 9) would otherwise keep the toggles on the first line, so the full-width basis is restated with the child selector. row-gap 0: the 12px flex gap would add to the toggles' 8px margin and float the rows 30px under the status line, detached from their account. */
 .connected-account{flex-wrap:wrap;align-items:flex-start;row-gap:0}
@@ -1084,10 +1106,8 @@ body.widget-body #toast{top:calc(var(--w-margin) + 56px * var(--wz,1));font-size
    for its title in Korean and pushed 일정 추가 under the window buttons in English. From 860 down: 일정 추가 keeps its 32px button without
    the word (as English does from 1040px), 일·주·월 its 28px segments (English shows the D/W/M key letters, the full name stays its label and
    tooltip), the bar's gap 4, the gutter token 16 and the sidebar 200 (from 225) — so the title (calTitleFit: long, short, then the month alone),
-   오늘, the arrows, the panel button and the window buttons stay whole at 720. The first-of-month label stays on one line (it wrapped to two
-   in the 64px cells and pushed the chips out), and so do 「할 일 n개」 and 「+n개」, which end in 「…」 rather than take a second line the
+   오늘, the arrows, the panel button and the window buttons stay whole at 720. 「할 일 n개」 and 「+n개」 stay on one line and end in 「…」 rather than take a second line the
    line budget has no room for. The 650/450 rules below them keep their own values (min-width bounds). */
-.calendar-grid.rolling .day-number.first{white-space:nowrap}
 .calendar-grid.rolling .day-tasks,.calendar-grid.rolling .day-more{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topbar-main h1 .title-text.tiny .title-long{display:none}.topbar-main h1 .title-text.tiny::after{content:attr(data-tiny);display:inline}
 @media(max-width:860px){.topbar .event-add-button .button-label{display:none}.topbar .event-add-button{padding:0;width:32px;justify-content:center}.topbar-main{gap:4px}.view-switch-item{min-width:28px;padding:0 6px}html:not(:lang(ko)) .view-switch-item{font-size:0}html:not(:lang(ko)) .view-switch-item::after{content:attr(data-short);font-size:12px}}
@@ -1281,7 +1301,7 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 .event-detail .event-notes{white-space:pre-wrap;overflow-wrap:anywhere}
 /* Details in the right panel (2026-11-05 owner: 「할 일 목록에 있는 걸 클릭 했을 때 … 우측 탭에 뜨는 게 더 직관적이지 않을까?」), as Microsoft To Do's
    detail pane and Notion Calendar's side panel. A task's: the panel's heading with 닫기, the edit dialog's fields one under another at the
-   panel's width, 메모 growing with its lines, 삭제 at the foot; its row keeps a quiet tint while it is open. An event's card in the day
+   panel's width, 메모 growing with its lines, 「할 일 삭제」 right after it; its row keeps a quiet tint while it is open. An event's card in the day
    panel is the floating card without its sheet — no glass, border, shadow or pop-in — at the panel's width. */
 .task-pane{display:flex;flex-direction:column;flex:1 0 auto}
 .task-pane-head{display:flex;align-items:center;gap:8px;min-height:32px;margin:0 -6px 12px 0}
@@ -1292,19 +1312,42 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 .task-pane-body .field{margin-bottom:14px}
 .task-pane-body textarea.form-input[name=notes]{field-sizing:content;min-height:0;line-height:1.5;max-height:calc(12lh + 22px);resize:none}
 .task-pane-body .repeat-panel{margin:-6px 0 14px}
-.task-pane-foot{display:flex;margin-top:auto;padding-top:8px}
-.task-pane-foot .button{margin-left:-10px}
+/* The panel's one subtask line (2026-11-11 owner: first-timers read the panel after opening a task): 「＋ 하위 할 일 추가」 as words, the
+   dialog's add row in a field box of its own — the + blue and on the values' 13px, the words --secondary (a button's label: 6.6:1 light,
+   7.9:1 dark; --muted would be 4.2:1), a field's space after it, the same 36px whatever the subtasks. The transparent border draws the box
+   in forced colours, as .field-switch's does; focus, press and disabled are the buttons' own. */
+.task-pane-body .pane-step-add{display:flex;align-items:center;gap:9px;width:100%;min-height:36px;margin:0 0 14px;padding:0 9px 0 12px;border:1px solid transparent;border-radius:8px;background:var(--field);color:var(--secondary);font-size:13px;font-weight:450;line-height:19.5px;text-align:left}
+.task-pane-body .pane-step-add:hover{background:linear-gradient(var(--hover),var(--hover)) var(--field)}
+/* 「할 일 삭제」 right after 메모, not at the window's foot (2026-11-12 owner, on the docked panel: the bottom-left 삭제 looked apart from
+   the task, its gap to 메모 growing with the window): the day panel's 「일정 삭제」 — a --field box at the fields' width, the red words
+   centred, no icon — at .pane-step-add's 36px and radius. 18px after 메모 (the field's 14 + 4), a little more than between fields: the
+   last, separate action. --sunday 4.58:1 on --field; in dark C2's red in r60-apple, 4.55:1. No .button, so its padding and hover
+   are not taken; the transparent border draws the box in forced colours. Spare height falls under it (tests/pane-delete-1112). */
+.task-pane-foot{display:block;margin-top:4px}
+.task-pane-foot>.pane-delete{display:block;width:100%;min-height:36px;margin:0;padding:0 12px;border:1px solid transparent;border-radius:8px;background:var(--field);color:var(--sunday);font:inherit;font-size:13px;font-weight:500;line-height:19.5px;text-align:center;cursor:pointer}
+.task-pane-foot>.pane-delete:hover{background:linear-gradient(color-mix(in srgb,currentColor 7%,transparent),color-mix(in srgb,currentColor 7%,transparent)) var(--field)}
+.task-pane-foot>.pane-delete:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.task-pane-body .pane-step-add:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}/* the same ring inside the box as 할 일 삭제 under it (2026-11-13 review: the global 3px ring outside it) */
+/* An account task's 목록 comes after 메모 (no 반복 of Dayboard's: Google, To Do's 「To Do에서 정한 반복」). With no list to go to (a done
+   Google task) it is a grey 「목록 · Google」 line, which had no space under it: the box and the failed save's question sat 4px under it
+   (2026-11-12 recheck). 14 + 4 = 18, as after 메모's field. Under 목록's 「옮길 수 없는 이유」 they stay 14px after its line (10 + 4), 18 from
+   its words: the 4px under them, as before the next field (.move-why rules below; smoke pane-delete-account). */
+.task-pane-body>.task-detail-source{margin-bottom:14px}
+/* 12px under the panel's last box at the window's foot: a task without subtasks opens whole in a 1180×780 window (no scroll, 0px to spare)
+   and a 1324×800 one (20px), 「할 일 삭제」 in view (smoke task-pane-budget). 15px since 2026-11-10, when the 32px text button 삭제 stood
+   there; the 36px box 18px after 메모 is 8px more, and at 15 the panel scrolled 3px at 1180×780 (2026-11-12 measure). */
+.context-pane.task-open{padding-bottom:12px}
 .task-row.pane-open{isolation:isolate}
-/* left: past the arrow in the gutter, on every row so the edge stays put from row to row (2026-11-07 owner: the shade's edge all but touched the arrow) */
-.task-row.pane-open::after{content:"";position:absolute;inset:3px -8px 3px calc(0px - min(24px,var(--gutter)));z-index:-1;border-radius:10px;background:var(--hover);pointer-events:none}
+/* left: past the arrow in the gutter, on every row so the edge stays put from row to row (2026-11-07 owner: the shade's edge all but touched the arrow) — and 2px short of the sidebar's line, which it touched at a 24px gutter, alike in dark (2026-11-13 review); the arrow's press (2px + its width) still inside */
+.task-row.pane-open::after{content:"";position:absolute;inset:3px -8px 3px calc(0px - min(28px,var(--gutter) - 2px));z-index:-1;border-radius:10px;background:var(--hover);pointer-events:none}
 .event-card.docked{position:static;z-index:auto;width:auto;max-height:none;overflow:visible;padding:0 0 14px;border:0;border-radius:0;background:none;backdrop-filter:none;box-shadow:none;animation:none}
 /* at the panel's width its 닫기 stays inside the panel (the floating card's -6px reached past it into a sideways scroll), and a timed
    event's day takes the first line with its start – end under it, both after the clock and as wide as their words, instead of the end
    time alone on a line */
 .event-card.docked .card-head{margin-right:0;height:32px;margin-top:-4px}/* the title closer under the dot·⋯·X row in the day panel (2026-11-06 owner: 「간격이 너무 넓지 않아?」) */
-/* A failed save's question in the task panel's foot (2026-11-05 check), the edit dialog's: its words on their own line at the panel's
-   width, 변경 취소 · 계속 편집 under them at the right; 삭제 steps aside while it shows */
-.task-pane-guard{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;margin-top:auto;padding-top:8px}
+/* A failed save's question in the task panel (2026-11-05 check), the edit dialog's: its words on their own line at the panel's width,
+   변경 취소 · 계속 편집 under them at the right; it takes 「할 일 삭제」's place, 18px after 메모 (2026-11-12; the window's foot before) */
+.task-pane-guard{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;margin-top:4px;padding-top:0}
 .task-pane-guard .guard-text{flex:1 0 100%;color:var(--secondary);font-size:13px;line-height:20px}
 .task-pane-body:has(>.task-pane-guard)>.task-pane-foot{display:none}
 /* One rule per kind (2026-11-05 owner, on the 할 일 편집 screenshot: 「오늘 내일 날짜 없음 폰트 크기가 다른 것과 어울리지 않게 너무 크지 않아? …
@@ -1327,21 +1370,44 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 .move-why:not(:empty){margin:6px 0 14px 13px}
 .task-pane-body .move-why:not(:empty){margin-bottom:10px}
 .widget-body .move-why:not(:empty){margin:6px 0 8px 11px}
-/* · a switch row among labelled fields (중요한 할 일; the event dialog's 하루 종일) is labelled as they are — 12px/600 --secondary, the
-     switch at the end (it was 13px text beside 12px labels) — and spaced as a label: its words the fields' gap under the field above
-     (they were 6px lower, the 32px row centring them) and the next label that gap under them; option sentences (the transfer dialog's,
-     the settings rows) keep their 13px text */
-.checkbox-field.field-switch{margin-top:-6px;font-size:12px;font-weight:600;color:var(--secondary)}
-.task-pane-body .checkbox-field.field-switch,.dialog.wide .checkbox-field.field-switch{margin-bottom:8px}
-.widget-body .checkbox-field.field-switch{margin-bottom:6px}
-/* · the steps are one list: the add line follows the last step with no gap (and 7px under 하위 할 일 when there is none — it was 14px),
-     and every row draws the same rule, from the words to the row's end like a list's separator in Apple's apps: on the input, the date button left the steps' rules 33px shorter than the add line's (2026-11-07 check) */
-.step-editor-list{margin-bottom:-7px}
-.step-edit-row::before{content:"";position:absolute;left:26px;right:0;bottom:0;height:1px;background:var(--line);pointer-events:none}
-.step-edit-row:has(.step-input:focus)::before{background:var(--blue)}
+/* · a switch row among the fields (중요한 할 일; the event dialog's 하루 종일) is a value in a grey box, as a settings switch row is
+     (2026-11-10 owner: 「중요한 할 일 글자 크기와 옆의 on/off 버튼의 크기가 잘 어울리게 맞아?」 — 12px/600 grey beside the 34×20 switch read as
+     a heading): the date field's box (var(--field), 8px corners, 42px, its words 13px in at 13/450 in the text colour, a widget's 38px at 12px),
+     the shared switch at its end, a field's space under it. No hover, no hand: only the switch turns it (app.js, label.checkbox-field) */
+.checkbox-field.field-switch{min-height:42px;margin:0 0 18px;padding:0 12px;border:1px solid transparent;border-radius:8px;background:var(--field);font-size:13px;font-weight:450;line-height:19.5px;color:var(--text)}
+.task-pane-body .checkbox-field.field-switch,.dialog.wide .checkbox-field.field-switch{margin-bottom:14px}
+.widget-body .checkbox-field.field-switch{min-height:38px;margin-bottom:12px;padding:0 10px;font-size:12px}
+/* · the steps are one grouped box, as every other value is a box (2026-11-10 owner: 「하위 할 일 표시를 좀 더 직관적이고 잘 보이면서 유려하고
+     미려한 디자인으로」; iOS grouped lists): the rows and the 「＋ 하위 할 일 추가」 line on var(--field) in the values' 8px corners, the
+     circle and ＋ on the values' text (13px in: their 1px edge and 12px, a widget's 11), a hairline between rows from the words to the box's end and none
+     under the add line, the field's focus ring while a name or the add line is typed in (a circle, date or × keeps its own ring). A row's
+     date and × show over its end on their own fill, and only then does the row's end make room for them (the pointer on it, the keyboard in
+     it: the states that show them), the name ending 2px clear, cut with an ellipsis; at rest a name keeps the row and a date stands at the
+     box's end as the other values' do (2026-11-11 visual review: a dated row kept the ×'s 34px, its name 84px, the date afloat) */
+.step-box{--step-in:13px;--step-bg:var(--field);border-radius:8px;background:var(--step-bg)}
+.widget-body .step-box{--step-in:11px}
+.step-box:has(.step-input:focus-visible){--step-bg:var(--bg);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--blue) 55%,transparent)}
+.step-box .step-edit-row{padding:0 10px 0 var(--step-in)}
+.step-edit-row::before{content:"";position:absolute;left:calc(var(--step-in,0px) + 28px);right:0;bottom:0;height:1px;background:var(--line);pointer-events:none}
+.step-add-row::before{display:none}
+.step-add-row{cursor:text}
 .step-input,.step-input:focus{border-bottom-color:transparent}
+.step-box .step-edit-row>.step-remove,.step-box .step-edit-row>.step-date.empty{position:absolute;top:50%;background:var(--step-bg)}
+.step-box .step-edit-row>.step-remove{right:4px;margin-top:-13px}
+.step-box .step-edit-row>.step-date.empty{right:30px;margin-top:-11px}
+.step-box .step-edit-row>.step-remove:hover,.step-box .step-edit-row>.step-date.empty:hover{background:linear-gradient(var(--hover),var(--hover)) var(--step-bg)}
+.step-box .step-edit-row:is(:hover,:has(:focus-visible)):has(>.step-date:not(.empty)){padding-right:34px}
+.step-box .step-edit-row:not(:has(>.step-date:not(.empty))):is(:hover,:has(:focus-visible))>.step-input{padding-right:46px}
+.step-box .step-input{text-overflow:ellipsis}
+.widget-body .step-box .step-input{font-size:12px}
+/* dark: an open circle in the box in the muted grey, as quiet as the words beside it (the list's light ring stood out on the box) */
+[data-theme=dark] .step-box .step-edit-row:not(.done)>.step-check:not(:hover){border-color:var(--muted)}
 /* · 삭제 at the start of an editor's foot stands on the content edge as in the right panel (its icon sat 11px in) */
 .dialog-footer.split>.button.danger-quiet:first-child{margin-left:-10px}
+/* · the task dialog's buttons 20px under 메모 (its 18px field space and this pull collapse to 8, the foot's 12px padding over them; it was 30),
+     as the right panel's 삭제 came up (2026-11-11 visual review: the 42px 중요한 할 일 box made it scroll at 1324×800 with three subtasks,
+     where the calendar opens it; the smoke's task-pane-budget) */
+body:not(.widget-body) .dialog-body[data-edit-task]>.dialog-footer{margin-top:-10px}
 /* · the event card's 달력 row is a value like the others: its dot on their text, 7px in, and the text colour (it was --secondary on the
      row's edge, unlike the same row's menu when there are several calendars) */
 .event-card .card-cal{padding-left:7px;color:var(--text)}
@@ -1350,9 +1416,10 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 /* The sidebar's list and group names (2026-11-06 owner 「나의 목록에 적힌 할 일 리스트 글자 크기가 좀 작지 않아? 검토해봐줘. 꼭 내 말에 따를 필요는
    없어.」): 14px, as the menu items right above them and the task rows a list opens — at 13px they read as a smaller kind of row (Apple's
    sidebar rows are the size of the rows they open; Windows' body text is 14px). 20px lines keep the text on whole pixels in the 36px and
-   34px rows; the 24px dot, the 12px counts and the 38/59 grid stay. Only the sidebar's: the editor's fixed list name keeps .list-name's 13px. */
-.list-nav .list-name{font-size:14px;line-height:20px}
-.group-row{font-size:14px;line-height:20px}
+   34px rows; the 24px dot, the 12px counts and the 38/59 grid stay. Only the sidebar's: the editor's fixed list name keeps .list-name's 13px.
+   2026-11-10: 22px lines and --side-text with the menu (the text-size block before r60-apple): 15px, then 14px again the same day. */
+.list-nav .list-name{font-size:var(--side-text);line-height:22px}
+.group-row{font-size:var(--side-text);line-height:22px}
 /* A row's second line is one line of words high also when it holds icons alone (2026-11-06 review of batch A): the note mark or the repeat
    arrows by themselves made a 12px line, so a task with only a note stood 7px shorter than one with a date — two-line rows in two heights. */
 .task-meta{min-height:1lh}
@@ -1374,10 +1441,15 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
    keeps the title's box (13px, the same height) with the editor's blue underline in place of a focus ring. While the pointer is on the steps
    the task's own hover buttons stay out: they act on the task, not on the step under the pointer. */
 .task-scroll{margin-left:calc(-1*var(--gutter));padding-left:var(--gutter)}
-.steps-toggle{--w:min(18px,calc(var(--gutter) - 2px));position:absolute;top:13px;left:calc(-2px - var(--w));width:var(--w);height:23px;display:grid;place-items:center;border-radius:6px;color:var(--muted)}
-.steps-toggle:hover{background:var(--hover);color:var(--secondary)}
+/* the arrow (2026-11-10 owner: 「하위 할 일 표시를 좀 더 직관적이고 잘 보이면서」): 14px in --secondary (it was 12px --muted, 4×8px of ink), its press
+   24×28 where the gutter has room and 2px or more clear of the sidebar where it has not (a 24px gutter: 20), level with the circle; the text
+   colour on --hover under the pointer. In a 16px gutter it is the arrow's own 14px and the colour alone answers (2026-11-11 visual review: its
+   shade met the sidebar's edge, squeezed between it and the circle) */
+.steps-toggle{--w:min(24px,calc(var(--gutter) - 4px));position:absolute;top:10.5px;left:calc(-2px - var(--w));width:var(--w);height:28px;display:grid;place-items:center;border-radius:6px;color:var(--secondary)}
+.steps-toggle:hover{background:var(--hover);color:var(--text)}
+@media(max-width:860px){.task-scroll .steps-toggle{--w:min(14px,calc(var(--gutter) - 2px))}.task-scroll .steps-toggle:hover{background:none}}
 .steps-toggle:focus-visible{outline-offset:0}
-.steps-toggle .group-chevron{width:auto}
+.steps-toggle .group-chevron{width:auto;color:inherit}
 .task-step .step-title{flex:1;min-width:0;cursor:text}
 .step-title-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--blue);border-radius:0;background:none;font-size:13px;line-height:1.5;padding:3px 0 2px;color:var(--text)}
 .step-title-input:focus-visible{outline:none}
@@ -1385,7 +1457,16 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 .task-step .step-remove svg{width:16px;height:16px}
 .task-step:hover .step-remove,.task-step:focus-within .step-remove{opacity:1}
 .task-step.editing .step-remove{display:none}
-.task-row:has(>.task-steps:hover)>.row-more:not(:focus-visible),.task-row:has(>.task-steps:hover)>.task-flag:not(.on):not(:focus-visible){opacity:0}
+/* the line 하위 할 일 추가 opens under them (taskMenu, 2026-11-10): a step's row whose empty circle is no button (a press there goes to the
+   field), the rename field's box and blue underline, the hint in the placeholders' grey */
+.step-add-line .step-check{pointer-events:none}
+.step-title-input::placeholder{color:var(--muted)}
+/* 2026-11-11: the line fades in once when it opens (stepAddOpen adds .arriving to the first drawing only; opacity only, no height), and a
+   subtask sent from it flashes as a new task's row does (stepAddSend). Both go with prefers-reduced-motion. */
+.step-add-line.arriving{animation:reveal .14s ease-out}
+.task-step.just-added{animation:flash 1.2s ease-out;border-radius:8px}
+/* the row's + hides with ⋯ and the flag over its subtasks (their × stands under them); the selected row keeps the three (2026-11-11, D2-A) */
+.task-row:not(.pane-open):has(>.task-steps:hover)>.row-more:not(:focus-visible),.task-row:not(.pane-open):has(>.task-steps:hover)>.row-add:not(:focus-visible),.task-row:not(.pane-open):has(>.task-steps:hover)>.task-flag:not(.on):not(:focus-visible){opacity:0}
 @media(max-width:650px){.task-steps{padding-left:26px}}
 /* The event card (2026-11-06 owner D2): a larger title and its rows in quiet groups on --field; a line between rows, from the words on */
 .card-title{font-size:17px;line-height:24px;margin-bottom:0}
@@ -1485,7 +1566,7 @@ body.widget-body .context-menu{zoom:var(--wz,1);max-height:calc((100vh - 16px) /
 .widget-body.locked .widget-head{-webkit-app-region:no-drag}
 /* The day panel's steps (2026-11-08 owner): its rows stand 20px from the panel's edge and the resizer takes the first 6px of that, so the arrow is 14px
    and clear of it, level with the task's 18px circle. A step's circle stands under the task's words, a size down, at the panel's closer spacing. */
-.day-panel .steps-toggle{--w:14px;left:-15px;top:14px;height:18px}
+.day-panel .steps-toggle{--w:14px;left:-15px;top:9px;height:28px}
 .day-panel .task-row.steps-open{row-gap:4px}
 .day-panel .task-steps{padding-left:30px}
 .day-panel .task-step{min-height:28px;gap:8px}
@@ -1663,8 +1744,6 @@ body.cal-stretching,body.cal-stretching *{cursor:ew-resize!important}
 .event-word-form .event-word-before-row>.emoji-choice{position:absolute;right:2px;top:50%;width:28px;height:28px;margin-top:-14px;background:none}
 .event-word-form .event-word-before-row>.emoji-choice:hover{background:var(--hover)}
 .event-word-form .event-word-more{margin-right:-6px}
-/* a mouse action in the shortcut sheet is words, not a key cap (V56) */
-.keys .keys-mouse{font-size:12px;color:var(--secondary)}
 /* the provider's logo by the dialog's 「… 연결」 title (V60) */
 .connect-intro{align-items:flex-start}
 /* VW · the 2026-11-09 visual review of the widgets (tests/widget-visual-1109b.test.cjs). The widget's 위젯 설정 sheet opens at the top of the card as the
@@ -1729,13 +1808,215 @@ body.widget-body .context-menu:not(.time-menu) hr{margin:3px 6px}
 .task-row>.row-more{position:absolute;position-anchor:--flag;right:anchor(left);top:anchor(center);translate:0 -50%;margin-right:4px}
 body:not(.widget-body) .task-row>.row-more{background-color:var(--bg)}
 body:not(.widget-body) .task-row>.row-more:hover,body:not(.widget-body) .task-row.pane-open>.row-more{background-image:linear-gradient(var(--hover),var(--hover))}
+/* The row's + (2026-11-11 owner: 「하위 할 일을 넣으려면 이건 누르면 되겠다 … 바로 찾을 수 있고 직관적이게 … 지금 컨셉에 잘 어울리도록」): ⋯'s
+   size, grey and page ground, on the same flag anchor 32px left of it — 5px from ⋯, + ⋯ flag 28px apart — shown when ⋯ and the flag are,
+   no colour (blue in the list is 「＋ 새로운 할 일」), no pressed look while its line is open. The selected row — the task the right panel
+   edits — shows the three at rest: the panel lists no subtasks now and this + is where they are added (D2-A). A title's first line keeps
+   48px free under + ⋯ (1A; 28 until the 2026-11-11 review, below); later lines keep the full width. A moving row hides it. */
+.row-add{opacity:0;width:23px;height:24px;padding:0;border-radius:7px;color:var(--secondary)}
+.task-row>.row-add{position:absolute;position-anchor:--flag;right:anchor(left);top:anchor(center);translate:0 -50%;margin-right:32px}
+body:not(.widget-body) .task-row>.row-add{background-color:var(--bg)}
+body:not(.widget-body) .task-row>.row-add:hover,body:not(.widget-body) .task-row.pane-open>.row-add{background-image:linear-gradient(var(--hover),var(--hover))}
+.task-row:hover>.row-add,.task-row:focus-within>.row-add,.task-row.pane-open>.row-add,.task-row.pane-open>.row-more,.task-row.pane-open>.task-flag{opacity:1}
+.task-row.moving>.row-add{opacity:0}
+/* a row the keyboard was put on after a mouse press (the row beside a deleted task, goneFocus 2026-11-12): no ⋯, + or unset flag until the pointer comes or a key moves the keyboard — a row's controls show for focus with :focus-visible inside, as a subtask's do */.task-row:not(.pane-open):not(:hover):focus-within:not(:has(:focus-visible))>:is(.row-more,.row-add,.task-flag:not(.on)){opacity:0}
+/* the quiet places a delete by the pointer leaves the keyboard on (app.js focusPending, 2026-11-12): no ring, whatever lit the last one */[data-focus-key="tasks-empty"]:focus,[data-focus-key="day-tasks"]:focus{outline:none}
+.day-panel .row-add,.widget-tasks .row-add{display:none}
+.task-row:has(>.row-add)>.task-text .task-title::before{content:'';float:right;width:48px;height:1lh}
+/* 2026-11-11 review of the row + (tests/row-add-1111 「styles (2026-11-11 review)」): the selected row's + and ⋯ darken on hover by a
+   second --hover layer, as its flag's hover does over the shade (their ground at rest is the shade already). The title's first line keeps
+   48px: + stands 43px from the title's end and stays shown on the selected row, so 28px left that line's last letter under it, read as part
+   of the title. In the task list the title's focus ring goes round the title and + ⋯ flag to the row's edge (flag 38px past the title, the
+   row 1px more), in the global ring's colour: the button's own ring passed under + and was cut by ⋯'s ground — the + flow's last picture,
+   Esc giving the keyboard back to the title. + is drawn as heavy as ⋯ (1.13px strokes read paler than ⋯'s dots). In the selected row the
+   line's underline stops by the flag, clear of the shade's rounded edge. From the panel's line the list's line glows as it arrives, where
+   the caret went (a just-added row's flash; both animations go with reduced motion's global rule). */
+body:not(.widget-body) .task-row.pane-open>.row-add:hover,body:not(.widget-body) .task-row.pane-open>.row-more:hover{background-image:linear-gradient(var(--hover),var(--hover)),linear-gradient(var(--hover),var(--hover))}
+.task-scroll .task-row>.task-text:focus-visible{position:relative;outline-style:none}
+.task-scroll .task-row>.task-text:focus-visible::after{content:'';position:absolute;inset:-6px -39px -6px -6px;border-radius:9px;outline:3px solid;outline-color:inherit;outline-offset:-3px;pointer-events:none}
+.task-row>.row-add svg{stroke-width:2}
+.task-row.pane-open .step-add-line .step-title-input{margin-right:8px}
+.step-add-line.arriving.from-pane{animation:reveal .14s ease-out,flash 1.2s ease-out;border-radius:8px}
+/* the line opened at the list's foot (a task of 15 subtasks, from the panel's line): scrolled to with its row's end, not cut at the input's own edge (2026-11-11 review, smoke 4b-pane-far) */
+.task-scroll .step-add-line .step-title-input{scroll-margin-bottom:16px}
 .day-panel .task-row>.task-flag:not(.on){position:absolute;right:0;background-color:var(--bg)}
 .day-panel .task-row>.task-flag:not(.on):hover{background-image:linear-gradient(var(--hover),var(--hover))}
 /* V18 (2026-11-09 사용자 결정): a subtask's date on its own line, right after its title (12px: the row's 10px gap + 2), not at the far end where the
    eye crossed the row; a date not set keeps its hover icon at the end. The title still shrinks and wraps, the date never does (tests/subtask-date-1109). */
 .tasks-view .task-step .step-title{flex:0 1 auto}
-.tasks-view .task-step .step-date:not(.empty){margin:0 auto 0 2px}
+.tasks-view .task-step .step-date:not(.empty){margin-left:2px;margin-right:auto}
 .tasks-view .task-step .step-date.empty{margin-left:auto}
+/* A subtask whose name takes two lines or more: its circle, date and × stand on the first line, as a task's circle does (2026-11-13 review: the
+   middle of the name). Each sits at the middle of the row's first 32px (28px in the day panel and a widget) — where centring put a one-line row's */
+.task-step{align-items:flex-start;--step-mid:16px}
+.day-panel .task-step,.widget-body .widget-tasks .task-step{--step-mid:14px}
+.task-step>.step-check{margin-top:calc(var(--step-mid) - 8.5px)}
+.day-panel .task-step>.step-check,.widget-body .widget-tasks .task-step>.step-check{margin-top:calc(var(--step-mid) - 7.5px)}
+.task-step>:is(.step-title,.step-title-input){margin-top:calc(var(--step-mid) - 3px - .5lh)}
+.task-step>.step-date{margin-top:calc(var(--step-mid) - 11px)}
+.task-step>.step-remove{margin-top:calc(var(--step-mid) - 13px)}
+/* Every date number, one rule, with a circle or without: its digits' ink in the middle of its box. --disc-ink (D.discInk) takes out the digits' own side bearings and the empty first item stands the baseline --digit-mid (the digits' mid-height) below the centre, rounded to --dp, one device pixel (app.js; a widget's text size is a CSS zoom, --wz, which --dp cannot see): a number with a layer rounds its origin and this height apart and a plain one rounds them together, and only a whole number of device pixels comes out the same both ways. So a number stands on the line of its row and stays put under a hover, a selection or today's circle. tests/today-badge-1110.test.cjs */
+.day-number,.time-date,.date-pop-day,.mini-preview-calendar span{display:flex;justify-content:center;align-items:baseline;padding:0;text-indent:calc(var(--disc-ink,0em)*2);&::before{content:"";height:round(nearest,calc(50% + var(--digit-mid,.354em)),calc(var(--dp,.01px)/var(--wz,1)))}}
+/* A number whose circle is always drawn gets a layer: the circle and its digits take one whole-pixel origin, so a cell's fractional place cannot snap them apart. Only these: on every number it is 40 more layers and another glyph rendering for numbers with no circle; on the grey selection or a hover the glyphs would change under the press. */
+.is-today .day-number,.time-day.is-today .time-date,.date-pop-day.sel,.mini-preview-calendar .active{will-change:transform}
+.calendar-grid.large{--digit-mid:.366em}
+/* The month beside the 1st, outside its circle; a cell that cannot keep 「12월」 4px off its edge shows the number alone, whatever the month. */
+.calendar-grid.rolling .day-month{position:absolute;top:6px;right:calc(50% + 16px);height:24px;line-height:24px;font-size:12px;font-weight:500;color:var(--secondary);white-space:nowrap;pointer-events:none}
+@container (max-width:80.98px){.calendar-grid.rolling .day-month{display:none}}
+.outside .day-month{opacity:.28}
+/* Text size (2026-11-10 owner: 「묘하게 글자 크기가 좀 작아진 거 같아. 좌측 탭의 오늘, 예정, 전체, 중요랑 나의목록에 해당하는 할 일 리스트들, 할 일
+   메인탭의 글자들이…살짝만 더 키워줬으면」, then 「너무 글자 커져서 좀 촌스러워 보이고 정보들을 많이 못 보는거도 싫으니 잘 설정해줘」): the app's
+   scale stays (TEXT_SIZES 기본 1 — 14px task and list names are Microsoft To Do's and Windows' body size); only what the owner named
+   goes one pixel up, in the main window: the sidebar's four tiles 12 → 13 (two steps under the list names was the odd one), the menu,
+   list and group names 14 → 15 together (one step, so the ladder holds: --side-text is used by .main-nav .nav-item, .list-nav
+   .list-name and .group-row above), their counts 12 → 13, and the task screen's titles and 「새로운 할 일」 14 → 15, its subtasks
+   13 → 14 (.tasks-view is the main window's task screen only). Second lines (13), the title (19) and its date, 「나의 목록」, the
+   calendar, the right panel, the detail pane, notes, settings and widgets keep theirs; 크게 · 더 크게 multiply these as the rest.
+   Whole-pixel lines: a task row grows 1px, the 32px subtask rows and the 38/36/34px sidebar rows not at all, a tile 1px.
+   The same day, seen in the app (owner: 「할 일 메인탭 글자 크기는 마음에 들어. 그런데 좌측 패널 할 일 리스트 글자 크기는 갑자기 확 커진거 같아서
+   좀 어색한…"나의 목록" 이거 글자랑 그 아래에 있는 할 일 리스트 크기가 너무 차이나서…할 일 리스트 크기는 이전꺼가 나은거 같기도」): the menu, list
+   and group names go back to 14, one step under the task screen's 15 — a sidebar is its content's size or a step under (macOS: sidebar
+   rows Body 13pt, as the rows they open; Windows: NavigationView items 14px, ControlContentThemeFontSize, the type ramp's Body 14/20;
+   Microsoft To Do 14). 「나의 목록」 stays 12 semibold in the secondary ink: 12 : 14 = 0.857, macOS Subheadline 11 : Body 13 = 0.846, Mac
+   Reminders' 「My Lists」 cap 9px to a list name's 11px; at 12 : 15 = 0.8 the two read too far apart. The counts and tile names stay
+   13 (Reminders draws its counts the size of the names, To Do too), the tile numbers 22. The 200px sidebar of 651–860 CSS px
+   (크게 · 더 크게 in the smaller windows) keeps only its tile names at 12, as its tile numbers step down there: at 13px 「Scheduled」 ran
+   into its tile's right padding (review); the menu's 14 keeps 「Desktop widgets」 on one line there.
+   Test tests/text-size-1110.test.cjs, ui-smoke sidebar-band-one-line. */
+:root{--side-tile-text:13px;--side-text:14px;--side-count-text:13px;--task-text:15px;--step-text:14px}
+@media(min-width:651px) and (max-width:860px){:root{--side-tile-text:12px}}
+.smart-tile>span{font-size:var(--side-tile-text);line-height:19px}
+.list-nav .list-count,.group-row .list-count{font-size:var(--side-count-text);line-height:18px}
+/* Weight, the same day (owner, on the 15px names: 「뭔가 좀 신경 안쓴 그냥 기본 폰트 쓴 촌스러운 ppt 느낌이야」). The font had not changed
+   (Pretendard Variable); the list and group names drew at the app's 450 under the menu's 500, thinner and looser than the rows above
+   them (ink 0.303 against 0.339). They take the menu's 500, so the sidebar's names are one weight; letter-spacing stays 0 (Pretendard
+   needs none). The emoji in a list's circle sat 0.5–1.5px under its centre (Segoe UI Emoji's box): 1px up, in the sidebar only, by
+   layout, not a transform, so it keeps to whole pixels. Test tests/text-size-1110.test.cjs. */
+.sidebar .list-nav .list-name,.sidebar .group-row{font-weight:500}
+.sidebar .list-dot .list-emoji{position:relative;top:-1px}
+/* 「나의 목록」 heads the lists under it, so it stands nearer them than the tiles above (Gestalt proximity; Mac Reminders' picture: 29px
+   from the tiles to 「My Lists」, 11px from it to the first list's icon). It stood half-way — ink 23.5px under the tiles and 22px over the first
+   group's name (1240×820, readme sample) — so its row keeps no margin under it and takes 29px over it, twice and no more (the sidebar
+   already scrolls at 1180×780). The tiles' 12px margin meets it and collapses.
+   2026-11-12 (owner, on its crop: the space under 「나의 목록」 read apart from the rows' own): its buttons were 26px with 20px icons, larger
+   than every other heading's 16 (.context-heading), so the first count sat close under them, and its + stood 4px left of the rows' ⋯. Now
+   24px buttons with 16px icons, + on the ⋯'s axis (3 + 24/2 = .list-more's 2 + 26/2): from the word's ink to the first circle 13px of white,
+   as between the circles; to the first name 19 (names 25 apart), from the icons to the first count 19 (counts 28 apart); 35 above (1180×780,
+   1x; was 14/13, 20/25, 18/28, 36). Tests tests/text-size-1110.test.cjs (the spaces above and below, the buttons), ui-smoke
+   sidebar-head-near-lists and sidebar-head-on-rhythm (the ink, in tests/ui-smoke-head-keys-1112.cjs). */
+.sidebar-section-head{margin-top:29px;margin-bottom:0;margin-right:3px}
+.sidebar-section-head .icon-button{width:24px;height:24px}
+.sidebar-section-head .icon-button svg{width:16px;height:16px}
+.tasks-view .task-title,.tasks-view .quick-input{font-size:var(--task-text);line-height:22px}
+.tasks-view .task-steps .step-title,.tasks-view .task-steps .step-title-input{font-size:var(--step-text);line-height:21px}
+/* Short dialogs (2026-11-10 owner, on the repeating-event delete chooser: 「이거 팝업창 가로로 너무 불필요하게 길지 않아?」 → 「줄여줘」): a title, a line or
+   two and buttons only — 이 일정만/이후/모두, 삭제할까요?, 예·아니오 — open with modal(…, {compact:true}) at --dialog-compact, nearer a macOS alert
+   (about 260–280pt) or an iPhone one (270pt) with this app's 24px insets. 330, not 320: the widest pair of buttons, English 「Keep both」
+   「Remove from original list」 (옮긴 결과 확인), needs 276px inside and 320 leaves 270 (measured 2026-11-10, 100% and 125%). Forms, lists
+   and settings keep 440px (wide 530px). Only the width changes: the insets, corners, shadow and type are the sheet's. The title wraps to
+   two lines, never …, and breaks right after the quoted name: modal() makes the words after the last 」 (English ”) one .title-tail — an
+   inline-block, so it goes to the next line whole and wraps inside itself only when wider than the dialog (a widget) — and keeps the name's
+   last letter with its quote (.title-glue), so 」 never starts a line (2026-11-10 check at 330px: 「…」 할 / 일을 삭제할까요?, 」 alone). The
+   line under it is balanced (text-wrap:pretty: no one-word last line in English, same height, measured). A 이 일정만/이후/모두 label wraps
+   in its button when a widget is narrower than it (tests/compact-dialog-1110). */
+:root{--dialog-compact:330px}
+.dialog.compact{width:var(--dialog-compact)}
+.dialog.compact .dialog-header h2{overflow-wrap:anywhere;text-wrap:pretty}
+.dialog.compact .dialog-header h2 .title-tail{display:inline-block;max-width:100%}
+.dialog.compact .dialog-header h2 .title-glue{white-space:nowrap}
+.dialog.compact .dialog-body p{text-wrap:pretty}
+.scope-options .button{white-space:normal;text-wrap:balance;text-align:center}
+/* Tasks in the calendar (2026-11-11 owner: 「지금은 달력 메인탭에서 할 일이 그냥 "할 일 n개" 이렇게만 보이는 데, 할 일 내용도 표기해주는 게 스케줄
+   인식하기에 좋지 않을까?」; calendar.js calTaskChip, 설정 「달력에 할 일」 = 제목). A task due that day is a chip of its own: a hollow circle in its list's
+   colour where an event chip has its bar, so a task never reads as an event; its time and title in the timed event chip's inks and on its
+   20.2px line, so calMonthLimit's 22.2px rows hold either. In the week a task with no time is a chip in the all-day row (22px, as the bars),
+   a timed one a row one text line tall at its time, tinted with its list's colour as an event block is but with neither the block's bar nor
+   its length — a task has no duration. Tokens only, 12px type, light and dark; tests/calendar-tasks-1111.test.cjs. */
+/* the ring is an inset shadow, not a border: Chromium draws a 1.5px border 1px wide at 100% (it snaps borders to device pixels; measured in the
+   smoke). A contrast theme drops shadows, so there it is a border in the system ink. */
+.task-ring{display:block;flex:none;width:9px;height:9px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--task-color,var(--blue))}
+@media(forced-colors:active){.task-ring,.allday-tasks.ringed::before{border:1px solid CanvasText}}
+.day-task{display:flex;align-items:center;gap:5px;min-width:0;line-height:1.35;padding:2px 5px 2px 4px;border-radius:4px;font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden;color:var(--text)}
+.day-task:hover{background:var(--hover)}
+.day-task .chip-time{flex:0 0 auto}
+.day-task .chip-title{flex:1 1 auto;min-width:2.2em;font-weight:500;color:color-mix(in srgb,var(--text) 88%,var(--secondary))}
+.allday-task{position:relative;z-index:1;margin:0 2px;height:22px;display:flex;align-items:center;gap:5px;padding:0 5px;min-width:0;border-radius:5px;font-size:12px;font-weight:500;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden}
+.allday-task:hover{background:var(--hover)}
+.allday-task .chip-title,.time-task .chip-title{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.time-task{position:absolute;z-index:1;top:min(calc(var(--top) * var(--hour) + 1px),calc(24 * var(--hour) - 19px));height:18px;left:calc((100% - 8px) * var(--col) / var(--cols) + 1px);width:calc((100% - 8px) * var(--span) / var(--cols) - 2px);box-sizing:border-box;display:flex;align-items:center;gap:5px;padding:0 6px 0 5px;border-radius:5px;background:color-mix(in srgb,var(--task-color,var(--blue)) 10%,var(--bg));box-shadow:0 0 0 1px var(--bg);font-size:12px;line-height:16px;font-weight:500;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden}
+.time-task:hover{background:color-mix(in srgb,var(--task-color,var(--blue)) 16%,var(--bg))}
+[data-theme=dark] .time-task{background:color-mix(in srgb,var(--task-color,var(--blue)) 18%,var(--bg))}
+[data-theme=dark] .time-task:hover{background:color-mix(in srgb,var(--task-color,var(--blue)) 26%,var(--bg))}
+.allday-task:focus-visible,.time-task:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+/* 「+n개」's list scrolls with no side padding: its ring starts at the event bars' left edge and lets the title start where theirs does (2026-11-11
+   review: a ring 3px further left was cut to 「ↄ」) */
+.event-row>.task-ring{margin:6px -6px 0 0}
+/* Where tasks are titled the month's events keep their 3px bar centred in the ring's 9px place, so one cell's times and titles start on one
+   column, as Apple Calendar's dot and circle (2026-11-11 review: 6px apart); an event title gives those 6px, the count way keeps its chips. */
+.calendar-grid.task-titles .day-event.timed .chip-bar{margin:0 3px}
+/* A month chip is a span: without a rule of its own its keyboard ring was the OS accent (orange on this PC). The app's blue, as the week's
+   blocks and bars, inside the chip so the cell does not cut it (2026-11-11 review). */
+.calendar-grid .day-event:focus-visible,.calendar-grid .day-task:focus-visible{outline:2px solid var(--blue);outline-offset:-1px}
+/* The week's fold line where tasks are titled leads with their ring, as the chips beside it (2026-11-11 review); the count way keeps its dot. */
+.allday-tasks.ringed::before{width:9px;height:9px;background:none;box-shadow:inset 0 0 0 1.5px var(--blue);margin:0 5px 0 0;vertical-align:-1px}
+/* The hours' task groups (calendar.js calTaskCluster, 2026-11-11 recheck): rows whose times run into each other share one place of the layout,
+   each at its own time (--dy hours below the first) with its share of the width (--k of --n), while each title keeps CAL_TASK_ROOM px; in less
+   calTasksFit folds the group (.folded) into its one 「할 일 n개」 row at the first time, in the all-day fold's grey. The place itself takes no
+   press, so the column under its gaps still starts a new event. Near midnight the place rises so its last row stays in the day. */
+.time-cluster{position:absolute;z-index:1;top:min(calc(var(--top) * var(--hour) + 1px),calc((24 - var(--reach)) * var(--hour) - 19px));left:calc((100% - 8px) * var(--col) / var(--cols) + 1px);width:calc((100% - 8px) * var(--span) / var(--cols));height:calc(18px + var(--reach) * var(--hour));pointer-events:none}
+.time-cluster>.time-task{top:calc(var(--dy) * var(--hour));left:calc(100% * var(--k) / var(--n));width:calc(100% / var(--n) - 2px);pointer-events:auto}
+.time-cluster>.time-tasks{display:none;top:0;left:0;width:calc(100% - 2px)}
+.time-cluster.folded>.time-task{display:none}
+.time-cluster.folded>.time-tasks{display:flex}
+.time-tasks .chip-title{color:var(--secondary)}
+/* The dots right under the middle of their number's circle (2026-11-11 owner, the 할 일 panel's small calendar: 「오늘을 나타내는 빨간 동그라미 중간에 아래쪽
+   파란 동그라미가 와야 하는 거 아닐까?」). Both were centred on one x, but a box is drawn from its edges snapped to whole device pixels: the 25px circle
+   (odd) had its middle on a pixel's middle and the dots (4px, 2px apart, always an even run) theirs on the line between two pixels, 0.5px to the left;
+   at 125% or 크게 the sizes came out fractional and snapped each their own way (up to 0.8px). Circle, dots and gap are whole even numbers of device
+   pixels here (--dp; --wz for a widget's zoom, as the date numbers' ::before), so both middles fall on one line at any scale. The circle 24px, not
+   26: the 33px cell keeps 24 + 3 + 5 and its rows do not grow. The 1/100 device pixel on top: a size like 24.32px is kept a hair short of its even
+   count (layout truncates to 1/64 px) and then snaps to an odd one at some places (seen at 156%). Smoke mini-calendar-dots measures the drawn pixels.
+   A size halfway between two even counts (an odd count: a 4px dot at 125% is 5 device pixels) goes the way a 64th of the unit sends it, not the way
+   floating point happens to (2026-11-11 recheck: that dot came out 3.2px only because 4 / 1.6 is stored as 2.4999…): the dots down, the lighter of
+   the two; the circle up, toward its 25px of before, and the gap up, the dots kept apart — as they came out at 112.5%, 125% and 150%. The cost of
+   an even circle: at 100% the 9px ink of its 12px digits stands half a device pixel above the middle (odd circle, dots and gap all round would
+   centre both, with other dot sizes — the owner's choice, 작업 히스토리 2026-11-11). */
+.context-calendar,.widget-calendar-content{--even-px:calc(2 * var(--dp,.01px) / var(--wz,1))}
+.context-calendar .day-number{width:calc(round(nearest,24px + var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200);height:calc(round(nearest,24px + var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200)}
+.widget-calendar-content .day-number{width:calc(round(nearest,22px + var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200);height:calc(round(nearest,22px + var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200)}
+.calendar-grid .day-dots{gap:calc(round(nearest,2px + var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200)}
+.calendar-grid .day-dots i{width:calc(round(nearest,4px - var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200);height:calc(round(nearest,4px - var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200)}
+/* A subtask's time and alert (2026-11-11 owner: 「신간 알림 둘 다 넣어줘 … 너무 난잡하고 복잡하지 않게」): its chip reads 「내일 오후 3:00」 with a small
+   bell after it, in the chip's own 12px and colour as a task row's bell is in its meta; the date popover's 알림 row under 시간 takes the time
+   field's look and its list the time list's, as wide as its words. */
+.step-date.alerted{grid-auto-flow:column;gap:3px}
+.date-pop .date-pop-alert-value{width:148px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}/* the time field, its gap and the switch above it: one column */
+.date-pop-times.date-pop-alerts{width:max-content;min-width:148px;max-height:none}
+.date-pop-alerts .date-pop-time-row{gap:12px;white-space:nowrap}
+.date-pop-alerts .date-pop-time-row.more{color:var(--blue)}
+/* 2026-11-11 review: where the subtask box is narrow — a widget's dialog (the right panel's too until its list went, later that day) — a chip with a time (「내일 오후 6:00」 and its
+   bell, about 100px) left the name two words, fewer under the pointer; there it goes under the name, at the name's x, as Apple Reminders writes a
+   subtask's date under its title. A date alone stays at the box's end, and a wide box (the task dialog) keeps one line. The month 날짜와 시간
+   지정… opens is said to be the alert's (datePop heading). */
+.step-editor>.step-box{container:step-box/inline-size}
+@container step-box (max-width:360px){
+.step-box .step-edit-row.timed{flex-wrap:wrap;row-gap:0;padding-bottom:5px}
+.step-box .step-edit-row.timed>.step-input{flex-basis:calc(100% - 26px);padding-bottom:1px}
+.step-box .step-edit-row.timed>.step-date{margin:-3px 0 0 22px}
+.step-box .step-edit-row.timed>.step-remove{top:14px}
+.step-box .step-edit-row.timed>.step-grip{bottom:auto;height:30px}
+}
+.date-pop-label{padding:2px 6px 8px;font-weight:600;color:var(--secondary)}
+/* 2026-11-11 recheck: a tasks widget's list, as the narrow subtask box above — at the widget's narrowest (280px) a chip with a time (about
+   100px with its bell) and the room the × keeps left the name 22px, a letter a line. While the list is 360px or narrower a chip with a time
+   goes under the name, its words under the name's; the × stays on the name's line (order). A date alone stays at the row's end. */
+.widget-body .widget-tasks .task-steps{container:widget-steps/inline-size}
+@container widget-steps (max-width:360px){
+.widget-body .widget-tasks .task-step.timed{flex-wrap:wrap;row-gap:0;padding-bottom:4px}
+.widget-body .widget-tasks .task-step.timed>:is(.step-title,.step-title-input){flex-basis:calc(100% - 57px)}
+.widget-body .widget-tasks .task-step.timed>.step-remove{order:1}
+.widget-body .widget-tasks .task-step.timed>.step-date{order:2;margin:-2px 0 0 17px}
+}
 /* r60-apple — one surface rule (2026-11-02 owner: Apple surfaces — 「음영있는 pill 안에 흰색을 넣는건 좀 애플 스타일이 아닌거 같아. 전반적으로 다시
    봐줘. 애플 스타일에 맞춰줘.」, after 「설정창 … 투톤 같아서 좀 촌스럽고 난잡해보이던데」), as macOS System Settings · Calendar · Reminders:
    no control stands on more than two layers. Layer 1 is a surface (window --bg, sheet --sheet, popover --glass, note paper). Layer 2 is
@@ -1841,9 +2122,10 @@ body:not(.widget-body) .quick-add .quick-input:placeholder-shown+.quick-submit{v
 /* Shortcut keys as key caps again, one rounded cap per key (2026-11-06 owner: 「단축키는 적당한 곡률의 박스를 넣는 게 구별이 좋지 않을까?」 — over 1.2.7 C1's menu text) */
 .keys-or{padding:0 2px}
 /* C2 a destructive confirm is a red label on the grey push button (light --sunday 4.58:1 on --field; dark #ff6b6b 4.55:1, where
-   --sunday's #ff6a5c gives 4.49) — it replaces the solid #e64d52 fill, so no tone is added */
+   --sunday's #ff6a5c gives 4.49) — it replaces the solid #e64d52 fill, so no tone is added. The panels' delete boxes (「할 일 삭제」,
+   「일정 삭제」) and a menu's 삭제 take the same red (2026-11-12: 「일정 삭제」 was --sunday's 4.49 in dark, a menu's #de4f55 3.9:1) */
 .button.danger{background:var(--field);color:var(--sunday)}
-[data-theme=dark] .button.danger{color:#ff6b6b}
+[data-theme=dark] .button.danger,[data-theme=dark] .task-pane-foot>.pane-delete,[data-theme=dark] .card-delete-group>.card-delete,[data-theme=dark] .menu-item.danger{color:#ff6b6b}
 /* C3 「모든 이모지」 is a text action beside its field (as 「새 그룹 만들기」 below it), not a second grey box */
 .emoji-custom .button.emoji-more{background:none;color:var(--blue);padding-left:8px;padding-right:8px}
 .emoji-custom .button.emoji-more:hover{background:var(--hover)}

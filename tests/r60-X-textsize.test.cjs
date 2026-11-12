@@ -165,7 +165,7 @@ test('the two selects: 글자 크기 in the sheet\'s first group and as the 위�
   assert.equal(pick.className, 'form-input', 'the neighbours\' select');
   assert.equal([...pick.querySelectorAll('option')].map(o => `${o.value}:${o.textContent}`).join(), 'default:기본,large:크게,larger:더 크게');
   const sheet = appLine('function openSettings(');
-  assert.ok(sheet.includes("field(tr('시간 표시'),clock),field(tr('글자 크기'),size))"), 'the first group: 언어 · 화면 모드 · 시간 표시 · 글자 크기');
+  assert.ok(sheet.includes("field(tr('시간 표시'),clock),field(tr('글자 크기'),size)),"), 'the first group: 언어 · 화면 모드 · 시간 표시 · 글자 크기 (달력에 할 일 went to the second on 2026-11-11)');
   const tab = appLine('function widgetsView(');
   assert.ok(tab.includes("glassControl(),h('div',{class:'appearance-row'},h('span',{},tr('글자 크기')),textSizeSelect('widgetTextSize',tr('위젯 글자 크기'))))"), 'the third 44px row of the appearance card');
   assert.ok(tab.includes("'--wz':String(D.textScale(state.settings.widgetTextSize))"), 'the gallery previews take the widgets\' factor');

@@ -22,6 +22,7 @@ Write it down, then tick it off when it's done.
 - Set a date and it sorts itself into Today or Scheduled. Flag it to send it to Flagged
 - Sort tasks into lists and groups, and break big ones into subtasks
 - Add dates, reminders and repeats
+- Tasks with a date show on the calendar too, right alongside your events
 
 <p align="center"><img src="images/en/clips/tasks.webp" width="720" alt="Adding a task, opening its subtasks, then clicking the circle to finish it"></p>
 

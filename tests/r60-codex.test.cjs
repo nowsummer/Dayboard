@@ -53,7 +53,10 @@ test('I2: 적용 and 「위젯 모양 설정…」 share one save(); the link op
   const end = app.indexOf('\nfunction ', start + 10);
   const fn = app.slice(start, end);
   assert.equal(fn.split('const save=async()=>{').length - 1, 1, 'one save()');
-  assert.equal(fn.split("run('widget:update'").length - 1, 1, 'widget:update is written in one place');
+  // The 위치와 크기 고정 row saves itself the moment it is ticked (2026-11-11 owner, tests/widget-home-1111.test.cjs); all else goes through save().
+  const rest = fn.replace(/const lock=h\('input',\{[^]*?\}\}\);/, '');
+  assert.ok(rest.length < fn.length, 'the lock row is found');
+  assert.equal(rest.split("run('widget:update'").length - 1, 1, 'widget:update is written in one place');
   assert.ok(fn.includes('try{await save();closeModal();}catch{release();}'), '적용 uses save()');
   const link = fn.slice(fn.indexOf("btn(tr('위젯 모양 설정…'),async e=>{"));
   const saved = link.indexOf('await save();');

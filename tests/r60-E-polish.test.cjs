@@ -82,8 +82,11 @@ test('sidebar: the 450px icon-only layout keeps its 40px nav rows and 14px neste
   assert.equal(value('body:not(.widget-body) .main-nav .nav-item', 'line-height'), null, 'only under 450px');
 });
 
+// A size given as a token of :root (the 2026-11-10 text-size block, tests/text-size-1110.test.cjs): its value.
+const token = v => { const m = /^var\((--[\w-]+)\)$/.exec(String(v)); return m ? value(':root', m[1]) : v; };
+
 test('type ladder: whole-pixel nav size, 17px card title, 19px empty title, 13px toast, aligned note heads', () => {
-  assert.equal(value('.main-nav .nav-item', 'font-size'), '14px');
+  assert.equal(token(value('.main-nav .nav-item', 'font-size')), '14px', '14 → 15 → 14 with the list names (2026-11-10)');
   assert.equal(value('.main-nav .nav-item', 'line-height'), '22px');
   const p = box(value('.main-nav .nav-item', 'padding'));
   assert.equal(p.top + p.bottom + 22, 38, 'nav row stays 38px');
@@ -124,19 +127,23 @@ test('prefers-contrast:more wins over the token rules in light and dark and make
 // 2026-11-06 owner 「나의 목록에 적힌 할 일 리스트 글자 크기가 좀 작지 않아? 검토해봐줘. 꼭 내 말에 따를 필요는 없어.」: a list's and a group's name
 // in the sidebar are 14px like the menu items above them and the task rows they open (13px read as a smaller kind of row), on 20px lines
 // (whole pixels in the 36px and 34px rows); the counts stay 12px, the dot and the 38/59 grid stay; the editor's fixed list name is not one.
-test('sidebar list and group names: 14px on 20px lines like the menu, counts 12px, before r60-apple; the editor\'s list name untouched', () => {
-  assert.equal(value('.main-nav .nav-item', 'font-size'), '14px');
-  assert.equal(value('.list-nav .list-name', 'font-size'), '14px');
-  assert.equal(value('.list-nav .list-name', 'line-height'), '20px');
-  assert.equal(value('.group-row', 'font-size'), '14px');
-  assert.equal(value('.group-row', 'line-height'), '20px');
-  assert.equal(value('.list-count', 'font-size'), '12px', 'counts as they were');
+// 2026-11-10 owner (「…나의목록에 해당하는 할 일 리스트들…살짝만 더 키워줬으면」): one step up with the menu, 15px on 22px lines, the sidebar's
+// counts 13px (tests/text-size-1110.test.cjs reads the whole cascade). The same day's second look (「좌측 패널 할 일 리스트 글자 크기는 갑자기 확
+// 커진거 같아서…이전꺼가 나은거 같기도」): the names back to 14px, one step under the task screen's 15; the 22px lines and 13px counts stay.
+test('sidebar list and group names: 14px on 22px lines like the menu, sidebar counts 13px, before r60-apple; the editor\'s list name untouched', () => {
+  assert.equal(token(value('.main-nav .nav-item', 'font-size')), '14px');
+  assert.equal(token(value('.list-nav .list-name', 'font-size')), '14px');
+  assert.equal(value('.list-nav .list-name', 'line-height'), '22px');
+  assert.equal(token(value('.group-row', 'font-size')), '14px');
+  assert.equal(value('.group-row', 'line-height'), '22px');
+  assert.equal(token(value('.list-nav .list-count', 'font-size')), '13px', 'the sidebar\'s counts');
+  assert.equal(value('.list-count', 'font-size'), '12px', 'the bare class (예정\'s heads) as it was');
   assert.equal(box(value('.list-nav', 'padding')).left, 10, 'names still at 59');
   assert.equal(value('.list-dot', 'width'), '24px');
-  for (const [height, line] of [[px(value('.list-nav', 'min-height')), 20], [px(value('.group-row', 'min-height')), 20]]) assert.equal(Number.isInteger((height - line) / 2), true, `${height}px row, ${line}px line: whole pixels`);
+  for (const [height, line] of [[px(value('.list-nav', 'min-height')), 22], [px(value('.group-row', 'min-height')), 22]]) assert.equal(Number.isInteger((height - line) / 2), true, `${height}px row, ${line}px line: whole pixels`);
   assert.equal(value('.list-name', 'font-size'), '13px', 'the bare class (the editor\'s fixed list beside 반복) keeps its size');
   const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'styles.css'), 'utf8');
-  const at = css.indexOf('\n.list-nav .list-name{font-size:14px;line-height:20px}');
+  const at = css.indexOf('\n.list-nav .list-name{font-size:var(--side-text);line-height:22px}');
   assert.equal(at > 0 && at < css.indexOf('/* r60-apple'), true, 'in the block before r60-apple');
 });
 

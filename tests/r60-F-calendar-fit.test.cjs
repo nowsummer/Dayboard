@@ -21,6 +21,7 @@ function calendar(view = 'month', extra = {}) {
   h.context.view = 'calendar';
   h.context.state.settings.calendarView = view;
   h.context.state.settings.timeFormat = '12h';
+  h.context.state.settings.calendarTasks = 'count'; // the line budget below is the count way's 「할 일 n개」 line (2026-11-11: the tasks by their titles, the default, are tests/calendar-tasks-1111)
   h.loadApp('const longDateFormats=', 'const koreanDate=', 'function byEventOrder(', 'function monthGrid(', 'const timeFormat=', 'function fmtTime(', 'const isRecurring=', 'function timeLabel(');
   h.loadCalendar();
   return h;
@@ -318,11 +319,12 @@ test('one Sunday red, 4.5:1 on the weekend shade in both themes; the small calen
 
 test('a day\'s dots stand clear of its circle, and a small calendar answers the mouse with the circle alone (2026-11-07 owner: 「빨간색 원 아래 … 겹칠 듯 붙어」)', () => {
   assert.equal(lastValue('.day-dots', 'margin-top'), '3px');
-  assert.equal(lastValue('.calendar-day', 'min-height'), '33px', 'the 25px circle, 3px, 5px of dots');
+  assert.equal(lastValue('.calendar-day', 'min-height'), '33px', 'the circle (25px, 24 since 2026-11-11: tests/mini-dots-1111), 3px, 5px of dots');
   // the widget since 2026-11-09 (사용자 결정 V72): a 22px circle with 3px of the cell above it, 1px to 4px of dots — 3 + 22 + 1 + 4 (+ 4) in the same 34px cell
   assert.equal(lastValue('.widget-calendar-content .calendar-day', 'padding-top'), '3px');
   assert.equal(lastValue('.widget-calendar-content .day-dots', 'margin-top'), '1px');
-  assert.equal(lastValue('.widget-calendar-content .day-number', 'width'), '22px');
+  // 22px, in whole even device pixels since 2026-11-11 so the dots fall under its middle (tests/mini-dots-1111)
+  assert.equal(lastValue('.widget-calendar-content .day-number', 'width'), 'calc(round(nearest,22px + var(--even-px) / 64,var(--even-px)) + var(--even-px) / 200)');
   assert.equal(lastValue('.widget-calendar-content .calendar-day', 'min-height'), '34px', '3px, the 22px circle, 1px, 4px of dots: no taller than before, so the agenda keeps its rows');
   assert.equal(lastValue('.calendar-grid:not(.large) .calendar-day:hover', 'background'), 'none', 'no square around a circle');
   assert.equal(lastValue('.calendar-grid:not(.large) .calendar-day:not(.is-today):hover .day-number', 'background'), 'var(--hover)');

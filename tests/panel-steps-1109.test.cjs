@@ -15,7 +15,7 @@ const PANE = ['let taskPane=null;', 'const taskPaneView=', 'const taskPaneFits='
   'function taskPaneDrop(', 'async function taskPaneClose(', 'async function taskPaneLeave(', 'function taskPaneGuard(', 'function taskPaneDiscard(', 'function taskPaneEnd(', 'function taskPaneMark(', 'function keepAcross(', 'function contextPane('];
 const steps = () => [{ id: 'a', title: '우유', completed: false }, { id: 'b', title: '계란', completed: true }, { id: 'c', title: '빵', completed: false }];
 
-// ---------------- T1: the editor's step list ----------------
+// ---------------- T1: the editor's step list (since 2026-11-11 the dialog's only: the docked panel lists no subtasks) ----------------
 function editorHarness() {
   const h = harness({ parseQuick: v => ({ title: v }), toast() {}, taskDragEnd() {}, calEnter: action => ({ onkeydown: e => { if (e.key === 'Enter') action(e.target); }, oncompositionend() {} }) });
   h.loadApp('const plainSteps=', 'function stepDateButton(', 'let dragStep=', 'function stepEditor(');
@@ -40,7 +40,7 @@ test('each step row has a grip before its circle; a press on the grip makes the 
   assert.equal(h.app.querySelector('.step-add-row .step-grip'), null, 'the add line has no grip');
 });
 
-test('Alt+↓ and Alt+↑ move the step the keyboard is in, the keyboard and caret going with it; the ends stay; the panel is told (onEdit) and the order is the value', () => {
+test('Alt+↓ and Alt+↑ move the step the keyboard is in, the keyboard and caret going with it; the ends stay; the editor is told (onEdit) and the order is the value (the dialog saves it)', () => {
   const { h, editor, rows, alt, titles } = editorHarness();
   let edits = 0; editor.onEdit = () => edits++;
   const first = rows()[0].querySelector('.step-input'); first.focus(); first.selectionStart = first.selectionEnd = 1;
@@ -52,7 +52,7 @@ test('Alt+↓ and Alt+↑ move the step the keyboard is in, the keyboard and car
   assert.equal([titles(), edits].join('|'), '계란,빵,우유|2');
   alt(h.document.activeElement, 'ArrowUp');
   assert.equal([titles(), h.document.activeElement === rows()[1].querySelector('.step-input')].join('|'), '계란,우유,빵|true', 'up one');
-  assert.equal(editor.value().map(s => s.title).join(), '계란,우유,빵', 'the order is what the panel saves (rebaseSteps lays it on the stored steps)');
+  assert.equal(editor.value().map(s => s.title).join(), '계란,우유,빵', 'the order is what the dialog\'s 저장 sends (rebaseSteps lays it on the stored steps)');
   assert.equal(editor.changed(), true);
   const plain = new h.context.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }); h.document.activeElement.dispatchEvent(plain);
   assert.equal(plain.defaultPrevented, false, 'a bare arrow is the field\'s own');
@@ -193,7 +193,7 @@ test('the title still opens its task with the keyboard in the panel; without a p
   h.row('t1').querySelector('.task-step .step-check').click(); await h.tick(); await h.flush();
   assert.equal([h.paneTask(), h.shaded()].join('|'), '|', 'no panel open: a tick opens none');
   const src = appLine('function taskRow(');
-  assert.ok(src.includes("if(!isWidget&&!compact){const claim=e=>{if(!taskPane||taskPane.id===t.id||!taskPaneFits()||(e.type!=='contextmenu'&&e.target?.closest?.('.task-text'))||(e.type==='keydown'&&e.key!=='Delete'))return;setTimeout(()=>{if(taskPane&&taskPane.id!==t.id&&taskPaneFits())taskPaneOpen(t,true);},0);};for(const type of ['click','contextmenu','dragstart','keydown'])row.addEventListener(type,claim,true);}"), 'the main list only, the title left to itself; the panel moves a task later (the control and a drag go first)');
+  assert.ok(src.includes("if(!isWidget&&!compact){const claim=e=>{if(!taskPane||taskPane.id===t.id||!taskPaneFits()||e.target?.closest?.('.step-add-line')||(e.type==='dragstart'&&document.activeElement?.closest?.('.step-add-line'))/* typing a step under it is not editing it */||(e.type!=='contextmenu'&&e.target?.closest?.('.task-text'))||(e.type==='keydown'&&e.key!=='Delete'))return;setTimeout(()=>{if(taskPane&&taskPane.id!==t.id&&taskPaneFits())taskPaneOpen(t,true);},0);};for(const type of ['click','contextmenu','dragstart','keydown'])row.addEventListener(type,claim,true);}"), 'the main list only, the title and the line that adds a subtask (2026-11-10) left to themselves; the panel moves a task later (the control and a drag go first)');
   assert.ok(appLine('async function taskPaneOpen(').startsWith('async function taskPaneOpen(t,quiet=false){'), 'quiet: the keyboard stays where the press put it');
 });
 
@@ -204,7 +204,8 @@ test('the title still opens its task with the keyboard in the panel; without a p
 test('B\'s ⋯ and a right click on B (its title too) keep their menu open while the panel moves to B; Delete on B\'s title leaves the panel on A', async () => {
   const { dispatchNative } = require('./r50-F-dom.cjs');
   const h = screenHarness();
-  const closesMenus = "if(!(menuRoot&&menuRoot.classList.contains('card-menu')&&calCard))closeMenu();";
+  // every one but an event card's and one a press's click opened while a subtask's name was typed (data-kept, 2026-11-11: tests/subtask-add-1110)
+  const closesMenus = "if(!(menuRoot&&(menuRoot.classList.contains('card-menu')&&calCard||menuRoot.dataset.kept)))closeMenu();";
   assert.ok(appLine('function render(){').includes(closesMenus), 'render() closes an open menu');
   h.eval(`const drawScreen = render; render = () => { ${closesMenus} drawScreen(); };
     closeMenu = () => { if (!menuRoot) return; menuRoot.remove(); menuRoot = null; };

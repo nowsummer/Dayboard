@@ -29,7 +29,8 @@ const ignored = [
   /^\/(?!main\.cjs$|preload\.cjs$|package\.json$|assets(?:\/|$)|lib(?:\/|$)|renderer(?:\/|$)|node_modules(?:\/|$)|tests(?:\/|$))/,
   /^\/assets\/[^/]+\.svg$/,
   /^\/assets\/google-oauth\.example\.json$/,
-  /^\/tests\/(?!desktop-smoke\.cjs$|ui-smoke\.cjs$)/,
+  // ui-smoke.cjs requires its helpers ui-smoke-<name>.cjs (2026-11-12: left out, the bundle smoke stopped at once)
+  /^\/tests\/(?!desktop-smoke\.cjs$|ui-smoke(?:-[a-z0-9-]+)?\.cjs$)/,
   /(?:^|\/)\.env(?:\.[^/]*)?$/,
   /(?:^|\/)(?:\.git|\.cache|\.npm|\.test-data)(?:\/|$)/,
   /(?:^|\/)(?:state|secrets|credentials|tokens|smoke-report)\.json$/,
@@ -120,6 +121,8 @@ function verifyBundle(directory) {
     'assets/icon.png', 'assets/toast.png', 'assets/icon.ico', 'tests/desktop-smoke.cjs', 'tests/ui-smoke.cjs']) {
     assertRegularFile(path.join(appDir, relative));
   }
+  // every local file the smoke script requires is in the bundle too (tests/package-smoke-helpers-1112.test.cjs)
+  for (const m of fs.readFileSync(path.join(appDir, 'tests', 'ui-smoke.cjs'), 'utf8').matchAll(/require\('\.\/([^']+)'\)/g)) assertRegularFile(path.join(appDir, 'tests', m[1]));
   assertRegularFile(executable);
   assertRegularFile(path.join(directory, 'resources', 'app-update.yml'));
   const packaged = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));

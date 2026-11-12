@@ -52,6 +52,12 @@ contextBridge.exposeInMainWorld('dayboard', Object.freeze({
     ipcRenderer.on('dayboard:open-day', listener);
     return () => ipcRenderer.removeListener('dayboard:open-day', listener);
   },
+  // A Windows notification of a subtask's alert was clicked (2026-11-11): its task opens with its subtasks in view.
+  onOpenTask(callback) {
+    const listener = (_event, taskId, stepId) => { if (typeof callback === 'function' && typeof taskId === 'string') callback(taskId, typeof stepId === 'string' ? stepId : ''); };
+    ipcRenderer.on('dayboard:open-task', listener);
+    return () => ipcRenderer.removeListener('dayboard:open-task', listener);
+  },
   // 「위젯 모양 설정…」 in a widget's settings sheet (2026-11-02 review usability-2): the main window opens on the widgets tab. Only that
   // view is passed on. No TypeError here: preload strings have no tr() and the one caller (app.js) always passes a function.
   onOpenView(callback) {

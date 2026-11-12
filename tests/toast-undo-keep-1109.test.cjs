@@ -14,7 +14,7 @@ function undoHarness() {
     calCard: null, calSeries: () => false, closeCard() {}, isLocalEvent: () => true, scopeChooser() {}, confirmDelete() {}, calendarOf: () => null,
   });
   h.loadApp('function hideToast(', 'function toast(', 'let undoBusy=', 'function undoToast(', 'async function beforeUndo(', 'function staleUndo(', 'const plainSteps=', 'const listBy=', 'const providerName=', 'const shortTitle=',
-    'function deleteLocalTask(', 'function deleteEventFlow(', "document.addEventListener('keydown',e=>{if(calendarKey(e))return;");
+    'function goneFocus(', 'function backFocus(', 'function deleteLocalTask(', 'function deleteEventFlow(', "document.addEventListener('keydown',e=>{if(calendarKey(e))return;");
   h.context.state.lists = [{ id: 'L', provider: 'local', name: '이 PC' }];
   h.context.state.tasks = [{ id: 't1', listId: 'L', title: '장보기' }];
   h.context.state.events = [{ id: 'e1', calendarId: 'c', title: '점심', start: '2026-11-09T03:00:00.000Z', end: '2026-11-09T04:00:00.000Z', allDay: false }];

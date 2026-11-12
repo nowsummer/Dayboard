@@ -44,12 +44,15 @@ function occurrences({ events }) {
 }
 const allDay = ({ events }, title) => events.find(e => e.allDay && e.title === title);
 const spanDays = e => { const days = []; for (let k = e.start; k < e.end; k = D.dayOffset(k, 1)) days.push(k); return days; };
-const hasTaskLine = (s, key) => s.tasks.some(t => t.dueDate === key && !t.completed);
-// A day's lines in the month: its timed events, its all-day events and bars, and one line for its open tasks. The month holds three
-// in the film's and the pictures' windows (renderer/calendar.js calMonthLimit; readme-demo.cjs stops if a cell folds).
+const openTasksOn = (s, key) => s.tasks.filter(t => t.dueDate === key && !t.completed).length;
+const hasTaskLine = (s, key) => openTasksOn(s, key) > 0;
+// A day's lines in the month: its timed events, its all-day events and bars, and a chip for each open task (settings.calendarTasks
+// 'title', the default since 1.2.11; before, one 「할 일 n개」 line held them all — the 1.2.10 sample folded tomorrow into 「+3개」 with
+// the chips). The month holds three in the film's and the pictures' windows (renderer/calendar.js calMonthLimit; readme-demo.cjs stops if
+// more than two cells fold).
 function linesOn(s, key, occ = occurrences(s)) {
   const timed = occ.filter(o => o.day === key).length, wide = s.events.filter(e => e.allDay && e.start <= key && key < e.end).length;
-  return timed + wide + (hasTaskLine(s, key) ? 1 : 0);
+  return timed + wide + openTasksOn(s, key);
 }
 const colourOf = e => sample.COLOURS.calendars[Object.keys(sample.CALENDAR_IDS).find(key => sample.CALENDAR_IDS[key] === e.calendarId)];
 const clean = s => s.toLowerCase().replace(/^[-•\d.\s]+/, '').replace(/[「」"“”.,:]/g, '').trim();
@@ -103,7 +106,10 @@ for (const lang of ['ko', 'en']) {
   // 너무 없어도 이상한데 지금은 좀 과한 거 같아」): most days of one line, some of two, many empty, so what the film points at stands out.
   test(`the sample's month looks lived in, and folds nowhere (${lang})`, async () => {
     for (const [mode, options] of [['pictures', {}], ['film', { demo: true }]]) {
-      const s = await record(lang, options), occ = occurrences(s), lines = new Map(GRID.map(key => [key, linesOn(s, key, occ)]));
+      const s = await record(lang, options), occ = occurrences(s), all = new Map(GRID.map(key => [key, linesOn(s, key, occ)]));
+      // Today alone folds: the board's five tasks beside its two events (the tasks scene and the widgets need them on today).
+      assert.ok(all.get(s.today) > 3, `${mode}: today holds the board's tasks`);
+      const lines = new Map([...all].filter(([key]) => key !== s.today));
       for (const [key, count] of lines) assert.ok(count <= 3, `${mode}: ${count} lines on ${key} fold into 「+n개」`);
       assert.deepEqual([...new Set(lines.values())].sort(), [0, 1, 2, 3], `${mode}: days of none to three lines`);
       const count = n => [...lines.values()].filter(v => v === n).length;

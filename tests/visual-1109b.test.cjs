@@ -195,8 +195,10 @@ test('V48: the event-word form keeps one right edge', () => {
   assert.equal(before(sel) && before(sel + ':hover'), true);
 });
 
-// V56: a mouse action in the shortcut sheet is words, not a key cap.
-test('V56: 더블클릭 is not drawn as a key', () => {
+// V56: a mouse action in the shortcut sheet is one key cap holding its words, drawn as every key is (2026-11-12 owner: 「다른건 키보드 느낌인데
+// 더블클릭은 그냥 적혀 있어서 이상해. 다른 것과 마찬가지로 만들어줘.」 — over 2026-11-09's plain words). The smoke compares the drawn caps
+// (shortcuts-mouse-cap: light and dark, 1180 and 900, English 「Double-click」 on one line).
+test('V56: 더블클릭 is a key cap like the keys beside it', () => {
   const made = [];
   const h = (tag, attrs, ...kids) => { const n = { tag, cls: attrs?.class || '', kids: kids.flat(Infinity) }; made.push(n); return n; };
   const ctx = vm.createContext({ tr: s => s, h, view: 'tasks' });
@@ -205,8 +207,12 @@ test('V56: 더블클릭 is not drawn as a key', () => {
   const fold = rows.find(([label]) => label === '하위 할 일 펼치기·접기');
   ctx.__keys(fold[1]);
   const holder = made.find(n => n.kids.includes('더블클릭'));
-  assert.equal(holder ? holder.tag + '.' + holder.cls : '', 'span.keys-mouse');
-  assert.equal(value('.keys .keys-mouse', 'color'), 'var(--secondary)');
+  assert.equal(holder ? holder.tag + '.' + holder.cls : '', 'kbd.keys-mouse', 'one cap, its words inside');
+  assert.equal(holder.kids.length, 1, 'the words alone: no icon beside them');
+  // No rule names the mouse cap: a rule of its own (the old .keys .keys-mouse, 0-2-0) outranks .keys kbd (0-1-1) and draws it apart.
+  assert.equal(rules.filter(r => r.sels.some(s => s.includes('keys-mouse'))).length, 0);
+  assert.equal(value('.keys kbd', 'height'), '22px');
+  assert.equal(value('.keys kbd', 'background'), 'var(--field)');
 });
 
 // V60: the logo stands by the dialog's 「… 연결」 title, not by the middle of title and two lines.

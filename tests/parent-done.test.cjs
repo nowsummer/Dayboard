@@ -41,7 +41,8 @@ function mainHarness(t, over = null) {
   const context = {
     store, tr, publicRecord, todayKey: () => localKey(new Date().toISOString()),
     text: V.text, rawText: V.rawText, noteText: V.noteText, dateOnly: V.dateOnly, reminderAt: V.reminderAt, boolean: V.boolean, taskSteps: V.taskSteps, identifier: V.identifier,
-    setRepeat: T.setRepeat, setDueTime: T.setDueTime, followDue: T.followDue, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
+    setRepeat: T.setRepeat, setDueTime: T.setDueTime, followDue: T.followDue, localRepeat: T.localRepeat, cloudUndo: T.cloudUndo, placeInOrder: T.placeInOrder, settleAnswer: T.settleAnswer, rolledSeries: T.rolledSeries, rolledBackSteps: T.rolledBackSteps, pastStepAlerts: require('../lib/alerts.cjs').pastStepAlerts, wantedSteps: T.wantedSteps, stepsDone: T.stepsDone,
+    passedStepAlerts: require('../lib/alerts.cjs').passedStepAlerts, pruneFired: require('../lib/alerts.cjs').pruneFired, // a subtask's alert To Do's roll moved into the past (2026-11-11 review)
     lookup(collection, id) { const item = store.peek(collection, V.identifier(id)); if (!item) throw new Error('항목이 없거나 이미 삭제되었습니다.'); return item; },
     commit: fn => store.mutate(fn),
     sync: over ? over.sync : { async mutateTask() { throw new Error('no account list in this test'); } },
@@ -217,6 +218,25 @@ test('To Do roll: unticking the completed copy\'s row reopens the series and lea
   await m.command('task:update', { id: copy.id, completed: false });
   assert.deepEqual(writesOf(r.fake, from), [`PATCH ${open.remoteId}`, `DELETE ${copy.remoteId}`], 'reopened by hand: no step is written (the rule: reopening leaves them)');
   assert.equal([m.task(open.id).completed, m.task(open.id).dueDate, storeView(m.task(open.id).steps), todoView(r.fake.tasks.get(open.remoteId).checklistItems)].join('|'), 'false|2026-10-27|스트레칭:false 달리기:false 샤워:false|스트레칭:false 달리기:false 샤워:false', 'store and To Do agree');
+});
+
+// 2026-11-13 pre-release review: unticking the copy reopened the series on the done day but left its dated subtasks on the next occurrence's, so
+// this occurrence's subtask alerts never rang (the row's 되돌리기 sends the old dates; the copy's path sent none — lib/tasks.cjs rolledBackSteps).
+test('To Do roll: unticking the completed copy brings the dated subtasks back to the done day with the series', async t => {
+  const r = todo.rig(t, { mode: 'roll' });
+  const m = mainHarness(t, r);
+  const when = s => [s.dueDate || '', s.dueTime || '', s.alert ?? ''].join('/');
+  const dated = threeSteps().map((s, i) => (i === 0 ? { ...s, dueDate: '2026-10-27', dueTime: '09:00', alert: 0 } : i === 1 ? { ...s, dueDate: '2026-10-29' } : s));
+  const open = await todo.mainAdd(r, { title: '운동', dueDate: '2026-10-27', rrule: 'FREQ=DAILY', steps: dated });
+  await r.sync.sync();
+  await m.command('task:update', { id: open.id, completed: true });
+  await r.sync.sync();
+  assert.equal([m.task(open.id).dueDate, m.task(open.id).steps.map(when).join()].join('|'), '2026-10-28|2026-10-28/09:00/0,2026-10-30//,//', 'moved on a day with the series');
+  const copy = m.store.get().tasks.find(x => x.listId === todo.list.id && x.id !== open.id);
+  await m.command('task:update', { id: copy.id, completed: false });
+  assert.equal([m.task(open.id).completed, m.task(open.id).dueDate, m.task(open.id).steps.map(when).join()].join('|'), 'false|2026-10-27|2026-10-27/09:00/0,2026-10-29//,//', 'back on the done day, their times and alerts with them');
+  await r.sync.sync();
+  assert.equal(m.task(open.id).steps.map(when).join(), '2026-10-27/09:00/0,2026-10-29//,//', 'the next read keeps them');
 });
 
 // Argon review of batches G·H (2026-11-09, r1c G1): every step ticked BEFORE the completion — nothing to write ahead of the status PATCH — left

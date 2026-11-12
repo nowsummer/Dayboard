@@ -111,7 +111,11 @@ test('V3/V34: the row\'s ⋯ (and the day panel\'s unset flag) take no room at r
   assert.equal(value('body:not(.widget-body) .task-row>.row-more', 'background-color'), 'var(--bg)', 'it covers the title\'s end it lies on');
   const flag = '.day-panel .task-row>.task-flag:not(.on)';
   assert.equal([value(flag, 'position'), value(flag, 'right')].join('|'), 'absolute|0');
-  for (const sel of ['.task-row', '.task-row>.task-flag', more, flag]) assert.equal(before(sel), true, sel);
+  // the row's + (2026-11-11): on the same anchor, 32px further left (5px from ⋯), on the page's ground as ⋯ is, so it too takes no room
+  const plus = '.task-row>.row-add';
+  assert.equal([value(plus, 'position'), value(plus, 'position-anchor'), value(plus, 'right'), value(plus, 'top'), value(plus, 'margin-right')].join('|'), 'absolute|--flag|anchor(left)|anchor(center)|32px');
+  assert.equal(value('body:not(.widget-body) .task-row>.row-add', 'background-color'), 'var(--bg)');
+  for (const sel of ['.task-row', '.task-row>.task-flag', more, flag, plus]) assert.equal(before(sel), true, sel);
 });
 
 // V23: the colour square's handle (8px, a 3px ring) stays inside the square at its corners, so it never meets the popover's edge.

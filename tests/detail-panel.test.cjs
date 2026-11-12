@@ -22,6 +22,7 @@ function paneHarness(extra = {}) {
     notesTrash: false, activeNote: null, deleteActiveNote() {}, goToday() {}, shiftMonth() {}, openShortcuts() {}, toastAction: null, toastRedo: null,
     openNoteFind: () => false, newNote() {}, addEvent() {}, isTaskView: v => !['calendar', 'notes', 'widgets'].includes(v), goto() {}, calTop: null,
     ctxDrawer: false, ctxNarrowQuery: { matches: false }, composing: false, pendingFocus: null, nearRow: () => null,
+    stepAdd: null, // the list's add line (app.js 'const stepFold=' line): the panel's 삭제 reads it since the 2026-11-11 review (R2)
     deleteTaskFlow: t => deletes.push(t.id), moveToList: (t, l) => { moves.push(t.id + '>' + l.id); return Promise.resolve(); },
     monthHead: () => null, monthGrid: () => null, dayEventsHeading: () => '오늘', agenda: () => null, sideNotePick: () => 'off', sideNote: () => null, ctxPanelWidth: () => null,
     flushNoteDrafts: async () => {},
@@ -33,7 +34,7 @@ function paneHarness(extra = {}) {
   h.loadApp('let restoreFocus=null;', 'const formSnapshot=', 'function sheetScroll(', 'function modal(', 'function dismissModal(', { prefix: 'function askCloseModal(', optional: true }, 'const field=', 'const input=', 'function actionFooter(',
     "document.addEventListener('keydown',e=>{if(calendarKey(e))return;", 'const providerName=', 'const listBy=', 'function listColor(', 'function listVisual(', ...LABELS, 'function parseQuick(',
     'const moveTargets=', 'function submitGuard(', 'const movableList=', 'const moveDestinations=', 'const canOffer=', 'const movingIds=', 'const taskMoving=', 'const transferWaitingOf=', 'const accountKey=', 'const accountLabel=', 'function byAccount(',
-    'const plainSteps=', 'function stepDateButton(', 'function parseQuick(', 'function stepEditor(', 'function clockField(', 'function dateFace(', 'function editTask(', ...PANE, 'async function flushAll(');
+    'const flagHold=', 'const plainSteps=', 'function stepDateButton(', 'function parseQuick(', 'function stepEditor(', 'function clockField(', 'function dateFace(', 'function editTask(', ...PANE, 'async function flushAll(');
   const c = h.context;
   c.repeatPicker = () => { const f = h.eval('field')('반복', h.document.createElement('select')); const node = h.document.createElement('div'); node.append(f); return { node, value: () => '' }; };
   c.state.lists = [{ id: 'l1', name: '장보기', provider: 'local' }, { id: 'l2', name: '집안일', provider: 'local' }];
@@ -61,7 +62,7 @@ function paneHarness(extra = {}) {
 }
 const task = extra => ({ id: 't1', listId: 'l1', title: '치과', notes: '', dueDate: '', steps: [], completed: false, important: false, createdAt: '2026-11-01T00:00:00.000Z', ...extra });
 
-test('a title opens its task in the right panel, in place of the calendar; no 저장 — 삭제 at the foot, 닫기 at the top; the row is marked', async () => {
+test('a title opens its task in the right panel, in place of the calendar; no 저장 — 「할 일 삭제」 after 메모, 닫기 at the top; the row is marked', async () => {
   const h = paneHarness();
   h.context.state.tasks = [task(), task({ id: 't2', title: '세탁' })];
   h.context.render();
@@ -73,7 +74,13 @@ test('a title opens its task in the right panel, in place of the calendar; no �
   assert.equal(h.pane().querySelector('.task-pane-head h3').textContent, '세부 정보');
   assert.equal(h.pane().querySelector('.task-pane-head .icon-button').getAttribute('aria-label'), '닫기');
   assert.equal([...h.pane().querySelectorAll('button')].map(b => b.textContent).filter(t => t === '저장').length, 0, 'no 저장');
-  assert.equal(h.pane().querySelector('.task-pane-foot button').textContent, '삭제');
+  // 2026-11-12: the event card's 「일정 삭제」 words, no icon (tests/pane-delete-1112.test.cjs)
+  assert.equal(h.pane().querySelector('.task-pane-foot button').textContent, '할 일 삭제');
+  assert.equal(h.pane().querySelector('.task-pane-foot button').className, 'pane-delete');
+  assert.equal(h.pane().querySelectorAll('.task-pane-foot svg').length, 0, 'no icon');
+  const kids = [...h.pane().querySelector('form').children];
+  assert.equal(kids.at(-1).className, 'task-pane-foot', 'the last of the form');
+  assert.equal(kids.at(-2).querySelector('[name=notes]') !== null, true, 'right after 메모');
   assert.equal(h.pane().querySelector('form').getAttribute('data-edit-task'), 't1');
   assert.equal(h.field('title').value, '치과');
   assert.equal(h.document.activeElement === h.field('title'), true, 'the keyboard in its title');
@@ -154,21 +161,20 @@ test('another title switches once the typing is saved; Esc and 닫기 save, give
   assert.equal([h.app.querySelector('.task-pane') !== null, h.field('title').value].join('|'), 'true|치과 다시');
 });
 
-test('a line typed under the steps becomes one step, sent once; 삭제 of this PC\'s task lets the panel go first; quitting saves the typing', async () => {
+// 2026-11-11 (the panel without its subtask list): the panel holds no step editor — its one line under the title opens the list's add line —
+// so none of its saves names the steps; a change of a field goes alone, never twice.
+test('the panel has no step editor, one add line under its title; its saves carry no steps; 삭제 of this PC\'s task lets the panel go first; quitting saves the typing', async () => {
   const h = paneHarness();
-  h.context.state.tasks = [task()];
+  h.context.state.tasks = [task({ steps: [{ id: 's1', title: '보험증', completed: false }] })];
   h.context.render();
   await h.open('t1');
-  const add = h.pane().querySelector('.step-add-row .step-input'); add.focus(); h.type(add, '보험증');
-  await h.flush();
-  assert.equal(h.sent().length, 0, 'not while it is typed');
-  h.leave(add); await h.flush();
-  assert.equal(h.sent().length, 1);
-  const steps = JSON.parse(h.sent()[0]).steps;
-  assert.equal(steps.map(s => s.title + ':' + s.completed).join(), '보험증:false');
-  assert.equal(h.context.state.tasks[0].steps.length, 1);
+  assert.equal([h.pane().querySelectorAll('.step-editor,.step-box,.step-input').length, h.pane().querySelectorAll('button.pane-step-add[type=button]').length, h.pane().querySelector('.pane-step-add')?.textContent].join('|'), '0|1|하위 할 일 추가');
+  const title = h.field('title'); title.focus(); h.type(title, '치과 예약');
+  h.leave(title); await h.flush();
+  assert.equal(h.sent().join(), JSON.stringify({ id: 't1', title: '치과 예약' }), 'the title alone, no steps or stepsBase');
   h.field('notes').dispatchEvent(new h.context.Event('change', { bubbles: true })); await h.flush();
   assert.equal(h.sent().length, 1, 'never twice');
+  assert.equal(JSON.stringify(h.context.state.tasks[0].steps), JSON.stringify([{ id: 's1', title: '보험증', completed: false }]), 'the stored steps untouched');
   // quitting (main's flush) with the notes still being typed
   const notes = h.field('notes'); notes.focus(); h.type(notes, '오전');
   await h.eval('flushAll')('all');
@@ -207,8 +213,10 @@ test('the task gone or another list shown lets the panel go; the editor and the 
   h.context.view = 'l1'; h.context.render(); await h.tick();
   assert.equal(h.app.querySelector('.task-pane'), null, 'another list');
   const app = read('renderer/app.js');
-  assert.ok(app.includes("onclick:()=>{if(!taskMoving(t.id))openTask(t);}"), 'the row\'s title opens through openTask');
-  assert.ok(app.includes("onClick:free(()=>openTask(t))"), 'and the menu\'s 편집');
+  // beside the list (2026-11-11): a subtask's line and the menu's 편집 show the task's row first, then the panel (goToTaskRow), the dialog where it cannot be
+  assert.ok(app.includes("if(!taskMoving(t.id))goToTaskRow(t,{unfold:true}).catch(()=>{});}"), 'a subtask\'s line opens its task\'s row, unfolded');
+  assert.ok(app.includes("onClick:free(()=>{/* beside the list (the right panel's day tasks): its row, then the panel (2026-11-11) */if(compact===true)goToTaskRow(t).catch(()=>{});else openTask(t);})"), 'and the menu\'s 편집');
+  assert.ok(app.includes("function openTask(t){if(taskPaneFits())taskPaneOpen(t);else editTask(t);}"), 'a title in the list opens through openTask');
   assert.ok(app.includes("keepAcross(()=>$('#app').replaceChildren(topbar(),"), 'render keeps the panels\' nodes');
   const css = read('renderer/styles.css'), apple = css.indexOf('/* r60-apple');
   for (const rule of ['.task-pane-body .form-columns{flex-direction:column;align-items:stretch;gap:0}', '.task-row.pane-open::after{', '.event-card.docked{position:static;'])
@@ -314,26 +322,32 @@ test('a list reached with the arrow keys is not chosen by Esc, a quit or a dialo
   assert.equal(h.moves.join(), 't1>l2', 'Enter still chooses it');
 });
 
-test('a step removed with × or added with Enter goes out 0.4 s later, the keyboard staying in the empty line; 삭제 saves the typing first', async () => {
+// The dialog keeps its subtask box (2026-11-11: the panel's went): × and Enter change it in place, the keyboard staying in the empty line,
+// and 저장 sends the steps with those it opened on. The panel's 삭제 still saves the typing first.
+test('the dialog: a step removed with × or added with Enter, the keyboard staying in the empty line, 저장 sends them; the panel\'s 삭제 saves the typing first', async () => {
   const h = paneHarness();
   h.context.state.tasks = [task({ steps: [{ id: 's1', title: '보험증', completed: false }, { id: 's2', title: '신분증', completed: false }] })];
   h.context.render();
-  await h.open('t1');
-  h.pane().querySelector('.step-remove').click(); await h.flush();
-  const add = () => h.pane().querySelector('.step-add-row .step-input');
-  assert.equal([h.document.activeElement === add(), JSON.parse(h.sent().at(-1) || '{}').steps?.map(s => s.title).join()].join('|'), 'true|신분증', '×: sent with the keyboard in the empty line');
+  h.eval('editTask')(h.context.state.tasks[0]); await h.tick();
+  const add = () => h.modalRoot.querySelector('.step-add-row .step-input');
+  h.modalRoot.querySelector('.step-remove').click(); await h.flush();
+  assert.equal([h.document.activeElement === add(), h.sent().length].join('|'), 'true|0', '×: the keyboard in the empty line, nothing sent before 저장');
   h.type(add(), '예약 확인'); h.key(add(), 'Enter'); await h.flush();
-  assert.equal([add().value, JSON.parse(h.sent().at(-1)).steps.map(s => s.title).join(), h.sent().length].join('|'), '|신분증,예약 확인|2', 'Enter: added and sent');
+  assert.equal([add().value, h.modalRoot.querySelectorAll('.step-editor-list .step-input').length].join('|'), '|2', 'Enter: added, the line empty');
+  const form = h.modalRoot.querySelector('form'); form.requestSubmit(form.querySelector('button[type=submit]')); await h.tick(10);
+  const saved = JSON.parse(h.sent().at(-1));
+  assert.equal([saved.steps.map(s => s.title).join(), saved.stepsBase.map(s => s.title).join()].join(' / '), '신분증,예약 확인 / 보험증,신분증', '저장: the steps and those it opened on');
   assert.equal(h.context.state.tasks[0].steps.length, 2, 'stored');
+  await h.open('t1');
   const notes = h.field('notes'); notes.focus(); h.type(notes, '마지막 메모');
   h.pane().querySelector('.task-pane-foot button').click(); await h.tick(); await h.tick();
   assert.equal([h.sent().at(-1), h.deletes.join()].join('|'), JSON.stringify({ id: 't1', notes: '마지막 메모' }) + '|t1', 'saved, then deleted: 되돌리기 brings the note back');
 });
 
-// The steps listed under their task (2026-11-06) change from the row while the panel is open beside it: the panel sends the steps it opened
-// on (stepsBase) with its own, and main lays only the panel's change onto the stored steps (lib/tasks.cjs wantedSteps) — the panel's whole
-// list undid a tick made from the row while a step's title was being typed in it. The dialog sends its own opening steps the same way.
-test('the panel and the dialog send the steps they opened on: a step ticked from its row while the panel held a rename stays ticked', async () => {
+// The steps listed under their task (2026-11-06) change from the row while the panel is open beside it. Since 2026-11-11 the panel sends
+// no steps at all (it lists none): a tick from the row while the panel holds unsent words lands, and so do the words. The dialog sends
+// the steps it opened on (stepsBase) with its own, and main lays only its change onto the stored steps (lib/tasks.cjs wantedSteps).
+test('the panel sends no steps: a step ticked from its row while the panel held a note stays ticked; the dialog sends the steps it opened on', async () => {
   const T = require('../lib/tasks.cjs');
   const h = paneHarness();
   const c = h.context;
@@ -347,20 +361,24 @@ test('the panel and the dialog send the steps they opened on: a step ticked from
   };
   c.render();
   await h.open('t1');
-  const rename = h.pane().querySelectorAll('.step-editor-list .step-input')[1]; rename.focus(); h.type(rename, '여권');
+  const paneForm = h.pane().querySelector('form');
+  await c.run('task:update', { id: 't1', step: { id: 's2', completed: true } }); await h.flush();
+  await c.run('task:update', { id: 't1', step: { id: 's2', completed: false } }); await h.flush();
+  assert.equal(h.pane().querySelector('form') === paneForm, true, 'a tick in the list rebuilds nothing in the panel (its view has no steps)');
+  const notes = h.field('notes'); notes.focus(); h.type(notes, '여권 챙기기');
   await c.run('task:update', { id: 't1', step: { id: 's1', completed: true } }); // the row's circle, meanwhile
-  h.leave(rename); await h.flush();
-  const sent = JSON.parse(h.sent().at(-1));
-  assert.equal([sent.steps.map(s => s.title + ':' + s.completed).join(), sent.stepsBase.map(s => s.title + ':' + s.completed).join()].join(' / '), '보험증:false,여권:false / 보험증:false,신분증:false');
-  assert.equal(c.state.tasks[0].steps.map(s => s.title + ':' + s.completed).join(), '보험증:true,여권:false', 'the row\'s tick stays, the panel\'s rename goes');
-  assert.equal(h.pane().querySelectorAll('.step-edit-row.done').length, 1, 'the panel shows the tick once its own write is through');
+  await c.run('task:update', { id: 't1', step: { id: 's3', title: '여권', completed: false, insert: 100 } }); // and the list's add line
+  h.leave(notes); await h.flush();
+  assert.equal(h.sent().at(-1), JSON.stringify({ id: 't1', notes: '여권 챙기기' }), 'the note alone: no steps, no stepsBase');
+  assert.equal(c.state.tasks[0].steps.map(s => s.title + ':' + s.completed).join(), '보험증:true,신분증:false,여권:false', 'the row\'s tick and the line\'s step stay');
+  await c.run('task:update', { id: 't1', step: { id: 's3', remove: true } });
   // the dialog (the panel closed): its 저장 sends the steps it opened on as well
   await h.eval('taskPaneClose')('x'); await h.flush();
   h.eval('editTask')(c.state.tasks[0]); await h.tick();
   h.modalRoot.querySelector('.step-editor-list .step-check').click();
   const form = h.modalRoot.querySelector('form'); form.requestSubmit(form.querySelector('button[type=submit]')); await h.tick(10);
   const saved = JSON.parse(h.sent().at(-1));
-  assert.equal([saved.steps.map(s => s.title + ':' + s.completed).join(), saved.stepsBase.map(s => s.title + ':' + s.completed).join()].join(' / '), '보험증:false,여권:false / 보험증:true,여권:false');
+  assert.equal([saved.steps.map(s => s.title + ':' + s.completed).join(), saved.stepsBase.map(s => s.title + ':' + s.completed).join()].join(' / '), '보험증:false,신분증:false / 보험증:true,신분증:false');
 });
 
 // The date popover is a dialog on <body>, outside #modal-root and the panel (2026-11-05 check): / and Shift+/ from it folded the panel
@@ -517,4 +535,36 @@ test('the panel title wraps: a one-row textarea; Enter saves without a line brea
   assert.equal([shift.defaultPrevented, h.sent().length].join('|'), 'true|0', 'Shift+Enter: no break, nothing sent');
   const enter = h.key(h.field('title'), 'Enter'); await h.flush();
   assert.equal([enter.defaultPrevented, h.sent().join()].join('|'), 'true|' + JSON.stringify({ id: 't1', title: '산업기술 보호 입법 개선 정책 토론회' }), 'Enter: saved there and then');
+});
+
+// 2026-11-10 owner: 「처음쓰는 사람은 하위 할 일이라는 기능이 있는지 잘 모를꺼 같고, 안다고 쳐도 어디에 있는지 잘 모를꺼 같은데」 — the subtasks right
+// under the title (To Do's order: a subtask is typed next to its task's name), in the dialog (the panel: its add line there); an account list without
+// a repeat keeps 목록 after 메모. A done circle takes its list's colour as in the list, and the list chosen in the editor at once.
+// They differ on purpose since 2026-11-11 (the owner chose the panel without its subtask list): the panel has one 「＋ 하위 할 일 추가」
+// line where the dialog has its subtask box, both under 제목; the rest in the same order.
+test('the editor\'s fields in order — 제목, 하위 할 일 (the panel: its one add line), 날짜·알림, 반복·목록, 중요한 할 일, 메모; a done circle in its list\'s colour, following the list chosen', async () => {
+  const h = paneHarness();
+  const c = h.context;
+  c.state.lists[0].color = '#a2845e';
+  c.state.lists.push({ id: 'g1', name: '구글', provider: 'google', accountId: 'a1' });
+  c.state.tasks = [task({ steps: [{ id: 's1', title: '우유', completed: true }, { id: 's2', title: '계란', completed: false }] }), task({ id: 't2', listId: 'g1', title: '구글 할 일' })];
+  c.render();
+  const order = root => [...root.querySelector('form').children].map(n => n.classList.contains('step-editor') ? '하위 할 일' : n.classList.contains('pane-step-add') ? '＋ ' + n.textContent : n.classList.contains('field-switch') ? '중요' : n.classList.contains('task-date-row') ? '날짜·알림'
+    : n.classList.contains('task-repeat-row') ? '반복·목록' : n.classList.contains('task-detail-source') ? '목록' : n.tagName === 'FOOTER' ? 'foot' : n.querySelector(':scope>span')?.textContent || n.querySelector(':scope>.field>span')?.textContent || '').filter(Boolean).join(' · ');
+  await h.open('t1');
+  assert.equal(order(h.pane()), '제목 · ＋ 하위 할 일 추가 · 날짜·알림 · 반복·목록 · 중요 · 메모 · foot', 'the panel: one add line, no subtask box');
+  await h.eval(`taskPaneClose('x')`); await h.flush();
+  h.eval('editTask')(c.state.tasks.find(t => t.id === 't1')); await h.tick();
+  const dialog = h.modalRoot.querySelector('.dialog');
+  assert.equal(order(dialog), '제목 · 하위 할 일 · 날짜·알림 · 반복·목록 · 중요 · 메모 · foot', 'the dialog');
+  const editor = dialog.querySelector('.step-editor');
+  assert.equal([editor.querySelector(':scope>span').textContent, editor.querySelector(':scope>.step-box>.step-editor-list') !== null, editor.querySelector(':scope>.step-box>.step-add-row') !== null].join('|'), '하위 할 일|true|true', 'the rows and the add line in one box');
+  assert.equal(editor.style.getPropertyValue('--task-color'), '#a2845e', 'a done circle in its list\'s colour');
+  const select = dialog.querySelector('select[name=listId]');
+  select.value = 'l2'; select.dispatchEvent(new c.Event('change', { bubbles: true }));
+  assert.equal(editor.style.getPropertyValue('--task-color'), h.eval('listColor')(c.state.lists[1]), 'the list chosen colours it at once');
+  h.eval('closeModal(true)'); await h.tick();
+  h.eval('editTask')(c.state.tasks.find(t => t.id === 't2')); await h.tick();
+  assert.equal(order(h.modalRoot.querySelector('.dialog')), '제목 · 하위 할 일 · 날짜·알림 · 중요 · 메모 · 목록 · foot', 'an account list with no repeat: 목록 after 메모, as before');
+  h.eval('closeModal(true)');
 });

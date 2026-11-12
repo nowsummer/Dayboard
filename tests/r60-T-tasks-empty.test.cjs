@@ -34,7 +34,7 @@ function harness({ view, search = '', items = [], done = [], showDone = false })
     h, tr, view, search, showDone, isWidget: false, state: { accounts: [{ id: 'a' }], tasks: [] },
     smart: { today: { name: '오늘' }, planned: { name: '예정' }, all: { name: '전체' }, important: { name: '중요' } },
     smartColor: () => '#3478f6', listColor: () => '#3478f6', listVisual: l => ({ title: l.name }),
-    listBy: id => LISTS.find(l => l.id === id), tasksFor: (v, isDone) => isDone ? done : items,
+    listBy: id => LISTS.find(l => l.id === id), tasksFor: (v, isDone) => isDone ? done : items, rowHoldsSettle() {}, // no row held (2026-11-11 rowHolds)
     icon: name => h('i', { class: 'icon-' + name }), btn: (label, fn, cls) => h('button', { class: cls || 'button' }, label),
     openAccounts() {}, render() {}, taskDropEnd: box => box, taskDragStart: row => row, // a completed row drags to the sidebar too (2026-11-04)
     renderTaskList: list => list.map(t => h('div', { class: 'task-row' }, t.title)),

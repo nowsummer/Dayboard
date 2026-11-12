@@ -6,7 +6,7 @@ const { harness } = require('./r50-F-harness.cjs');
 
 const today = require('../renderer/domain.js').dateKey();
 const setup = () => {
-  const h = harness({ lingering: new Set(), flagHold: new Map(), taskSortOf: () => 'due' });
+  const h = harness({ lingering: new Set(), flagHold: new Map(), rowHolds: new Map(), rowHeld: t => t, taskSortOf: () => 'due' }); // no row held (2026-11-11 rowHolds)
   h.loadApp('const inAll=', 'function tasksFor(');
   Object.assign(h.context.state, { settings: { notInAll: ['work'] }, lists: [{ id: 'home', name: '집' }, { id: 'work', name: '회사' }],
     tasks: [{ id: 'a', title: '우유', listId: 'home' }, { id: 'b', title: '보고서', listId: 'work', dueDate: today }] });

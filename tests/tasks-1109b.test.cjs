@@ -7,7 +7,7 @@ const { harness } = require('./r50-F-harness.cjs');
 
 test('F71: folding another task keeps the fold of a task in a hidden list; a deleted one still drops out', async () => {
   const h = harness();
-  h.loadApp('function foldSteps(');
+  h.loadApp('const stepFold=', 'function foldSteps('); // foldSteps drops a subtask's on-its-way mark (stepOpening, defined with stepFold) since the 2026-11-11 recheck
   const sent = [];
   h.context.run = (name, payload) => { sent.push(JSON.stringify(payload.foldedSteps)); return Promise.resolve({}); };
   // as D.visibleState leaves it: the hidden list's tasks are out of state.tasks, its list out of state.lists (in allLists)
@@ -29,7 +29,7 @@ test('F74: 되돌리기 after 완료 비우기 puts each task back in its 직접
   let undo = null, next = 1;
   const settings = [];
   const h = harness({ isWidget: false, listBy: id => lists[id] || null, plainSteps: s => s, staleUndo: () => new Error('stale'),
-    undoToast: (text, label, u) => { undo = u; }, confirmDelete() {} });
+    undoToast: (text, label, u) => { undo = u; }, confirmDelete() {}, goneFocus: () => ({ done() {}, back() {} }) });
   h.context.state.tasks = [
     { id: 'x', listId: 'l1', title: 'X', completed: false }, { id: 'a', listId: 'l1', title: 'A', completed: true },
     { id: 'y', listId: 'l1', title: 'Y', completed: false }, { id: 'b', listId: 'l2', title: 'B', completed: true },
