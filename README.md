@@ -6,8 +6,8 @@
 
 # Dayboard
 
-**Your tasks and calendar on one board, at a glance. For Windows.**<br>
-A clean, Mac- and iPhone-style look for everything on your plate today.
+**Tasks, calendar and notes, at a glance**<br>
+Type “Dentist Friday 3 PM, Main Street” into the calendar, and the date, time and location go where they belong.
 
 [**Download for Windows**](https://github.com/nowsummer/Dayboard/releases/latest)
 
@@ -17,7 +17,7 @@ A clean, Mac- and iPhone-style look for everything on your plate today.
 
 ## Tasks: nothing slips through
 
-Write it down, then tick it off when it's done.
+Write it down, then tick it off when it's done. Type “Submit the report tomorrow at 3 PM” into New task. It's due tomorrow, with a reminder at 3 PM.
 
 - Give a task a due date and it shows up in Today or Scheduled on the left
 - Flag the important ones to gather them in Flagged
@@ -30,7 +30,7 @@ Write it down, then tick it off when it's done.
 
 ## Calendar: just type what's on your mind
 
-No hunting for the day, picking a time or filling in the place. Click New event, type it in one line, and Dayboard works out the date, time and title, then puts it on your calendar. Add the place after a comma.
+No hunting for the day, picking a time or filling in the location. Click New event, type it in one line, and Dayboard works out the date, time and title, then puts it on your calendar. Add the location after a comma.
 
 `Oct 6, 2–3pm, Economics exam, Main Hall`<br>
 → Oct 6, 2:00–3:00 PM · Economics exam · Main Hall
@@ -68,6 +68,8 @@ Pick Desktop widgets on the left to put your tasks, calendar and notes on your d
 ## Accounts
 
 Click the person button at the bottom left and add a Microsoft or Google account to keep your tasks and calendars in sync with your phone and other PCs, and your notes between PCs. iCloud connects calendars only. Or use it on this PC alone, no account needed.
+
+If the connection drops, you can keep adding and editing tasks and events in your connected accounts. Dayboard keeps the changes on your PC and sends them once you're back online.
 
 ## Download
 

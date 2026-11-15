@@ -22,6 +22,7 @@ function calendar(view = 'month', { tasks = [], events = [], mode, timeFormat = 
     eventsBetween: () => events, goToday() {}, addEvent() { log.added++; }, dayDots: () => [], shortTitle: x => x, calendarMenu() {}, eventColor: () => '#3478f6',
     isLocalEvent: () => true, canEditEvent: () => true, writableCalendars: () => [], stepsFolded: () => false, taskMoving: () => false, showEvent() {}, eventMenu() {}, deleteEventFlow() {},
     openTask(t) { log.opened.push(t.id); log.stored.push(h.context.state.tasks.includes(t)); }, stepTask: id => h.context.state.tasks.find(t => t.id === id),
+    markPast: n => n, pastSweep() {}, // about tasks: the clock leaves the events as drawn (2026-11-13 past events)
   });
   h.context.eventChip = e => { const n = h.document.createElement('span'); n.className = 'day-event'; n.setAttribute('tabindex', '0'); n.textContent = e.title; return n; };
   h.context.view = 'calendar';
@@ -109,8 +110,8 @@ test('month: a task is a chip of its own — the circle in its list colour, its 
     { id: 'later', listId: 'work', dueDate: D.dayOffset(day, 5), title: '다음 주 일', steps: [{ id: 'x', title: '오늘 단계', dueDate: day, completed: false }] }];
   const { h } = calendar('month', { tasks, events });
   const grid = month(h, 4);
-  // the month's short time since 2026-11-11 (「3 PM」, tests/month-time-1111.test.cjs); the tooltip below keeps 「오후 3:00」
-  assert.deepEqual(lines(grid, day), ['회의', '3 PM메일 보내기', '보고서', '다음 주 일'], 'the 9:00 event, the 15:00 task, then the tasks with no time (one there for its subtask of the day)');
+  // the month's short time since 2026-11-11 (「3pm」 since 2026-11-14, tests/month-time-1111.test.cjs); the tooltip below keeps 「오후 3:00」
+  assert.deepEqual(lines(grid, day), ['회의', '3pm메일 보내기', '보고서', '다음 주 일'], 'the 9:00 event, the 15:00 task, then the tasks with no time (one there for its subtask of the day)');
   assert.equal(grid.querySelectorAll('.day-tasks').length, 0, 'no 「할 일 n개」 line');
   const chip = cell(grid, day).querySelector('.day-task[data-todo-id="mail"]');
   assert.equal(chip.children.map(n => n.tagName + '.' + n.className).join(' '), 'I.task-ring SPAN.chip-time SPAN.chip-title', 'the circle where an event has its bar, then the time and the title');
@@ -151,7 +152,7 @@ test('month: one line budget for every chip — the bars and 「+n개」 count, 
   assert.deepEqual(lines(grid, c), ['일정 1', '+3개'], 'the meeting stays, the tasks with no time fold first (2026-11-11 owner 「회의 먼저」)');
   for (const n of grid.querySelectorAll('.calendar-day')) assert.ok(n.querySelector('.day-items').children.length <= 2, `${n.dataset.day}: at most the limit`);
   grid = month(h, 6);
-  assert.deepEqual(lines(grid, b), ['일정 1', '일정 2', '일정 3', '6 PM할 일 1', '7 PM할 일 2'], 'everything fits: the events, then the evening tasks by time (the month\'s short time, 2026-11-11)');
+  assert.deepEqual(lines(grid, b), ['일정 1', '일정 2', '일정 3', '6pm할 일 1', '7pm할 일 2'], 'everything fits: the events, then the evening tasks by time (the month\'s short time, 2026-11-11)');
   assert.deepEqual(lines(grid, c), ['일정 1', '할 일 1', '할 일 2', '할 일 3'], 'the timed event before the tasks with no time');
   grid = month(h, 1);
   assert.deepEqual(lines(grid, a), ['+2개'], 'one line: the count');
@@ -402,7 +403,7 @@ test('a subtask dated a day brings its task to that day once, with no time; the 
   const { h, log } = calendar('month', { tasks });
   const grid = month(h, 4);
   assert.deepEqual(lines(grid, day), ['보고서', '이사'], 'the tasks by their titles, no subtask chips');
-  assert.deepEqual(lines(grid, due), ['3 PM보고서'], 'the month\'s short time (2026-11-11)');
+  assert.deepEqual(lines(grid, due), ['3pm보고서'], 'the month\'s short time (2026-11-11)');
   const chip = cell(grid, day).querySelector('.day-task[data-todo-id="rep"]');
   assert.equal(chip.querySelector('.chip-time'), null, 'no time on the subtask\'s day');
   assert.equal(chip.getAttribute('title'), '보고서 · 업무 · 하위 할 일 2개 「초안, 표」', 'two subtasks counted (recheck 2026-11-11: the English said one)');

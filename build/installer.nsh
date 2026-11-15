@@ -9,6 +9,10 @@
 ; - A manual install or uninstall asks a running Dayboard to quit the normal way first (DB_ASK_QUIT): it saves note drafts
 ;   and open event cards and asks about anything it cannot save. It is closed by force only when the user chooses Ignore
 ;   (Codex review 2026-10-26: Stop-Process without -Force is still a kill, so a repeating event's unsaved card was lost).
+; - The Microsoft Store copy (lib/edition.cjs) is the same Dayboard.exe under ...\WindowsApps\, with its own data folder, and the
+;   Store updates it. It is left running (2026-11-13, the owner chose not to ask GitHub users to remove this copy first): closed
+;   here by name, it would lose what it had not saved to an install it has nothing to do with. A PC without PowerShell still goes
+;   by name only (tasklist/taskkill cannot see the path).
 !include WordFunc.nsh
 
 !macro customInit
@@ -33,7 +37,7 @@
 ; $R0 = 0 when another process named like the program runs in this session.
 !macro DB_FIND_APP
   ${if} $IsPowerShellAvailable == 0
-    nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "$$s = (Get-Process -Id $$PID).SessionId; if (@(Get-CimInstance -ClassName Win32_Process | ? { $$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ProcessId -ne $R2 -and $$_.SessionId -eq $$s }).Count -gt 0) { exit 0 } else { exit 1 }"`
+    nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "$$s = (Get-Process -Id $$PID).SessionId; if (@(Get-CimInstance -ClassName Win32_Process | ? { $$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ProcessId -ne $R2 -and $$_.SessionId -eq $$s -and $$_.ExecutablePath -notlike '*\WindowsApps\*' }).Count -gt 0) { exit 0 } else { exit 1 }"`
   ${else}
     nsExec::Exec `"$CmdPath" /C tasklist /FI "USERNAME eq %USERNAME%" /FI "IMAGENAME eq ${APP_EXECUTABLE_FILENAME}" /FI "PID ne $R2" /FO CSV /NH | "$SYSDIR\findstr.exe" /B /I /C:"\"${APP_EXECUTABLE_FILENAME}\""`
   ${endIf}
@@ -44,9 +48,9 @@
 !macro DB_STOP_APP FORCE
   ${if} $IsPowerShellAvailable == 0
     ${if} ${FORCE} == 1
-      nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "$$s = (Get-Process -Id $$PID).SessionId; Get-CimInstance -ClassName Win32_Process | ? { $$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ProcessId -ne $R2 -and $$_.SessionId -eq $$s } | % { Stop-Process -Id $$_.ProcessId -Force -ErrorAction SilentlyContinue }"`
+      nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "$$s = (Get-Process -Id $$PID).SessionId; Get-CimInstance -ClassName Win32_Process | ? { $$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ProcessId -ne $R2 -and $$_.SessionId -eq $$s -and $$_.ExecutablePath -notlike '*\WindowsApps\*' } | % { Stop-Process -Id $$_.ProcessId -Force -ErrorAction SilentlyContinue }"`
     ${else}
-      nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "$$s = (Get-Process -Id $$PID).SessionId; Get-CimInstance -ClassName Win32_Process | ? { $$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ProcessId -ne $R2 -and $$_.SessionId -eq $$s } | % { Stop-Process -Id $$_.ProcessId -ErrorAction SilentlyContinue }"`
+      nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "$$s = (Get-Process -Id $$PID).SessionId; Get-CimInstance -ClassName Win32_Process | ? { $$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ProcessId -ne $R2 -and $$_.SessionId -eq $$s -and $$_.ExecutablePath -notlike '*\WindowsApps\*' } | % { Stop-Process -Id $$_.ProcessId -ErrorAction SilentlyContinue }"`
     ${endIf}
   ${else}
     ${if} ${FORCE} == 1
@@ -64,7 +68,7 @@
 ; processes carry --type= and are skipped. An older Dayboard ignores the request; the question below then says what to do.
 !macro DB_ASK_QUIT
   ${if} $IsPowerShellAvailable == 0
-    nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "$$s = (Get-Process -Id $$PID).SessionId; $$all = @(Get-CimInstance -ClassName Win32_Process | ? { $$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ProcessId -ne $R2 -and $$_.SessionId -eq $$s }); $$p = $$all | ? { $$_.ExecutablePath -and $$_.CommandLine -notmatch '--type=' } | Select-Object -First 1; if ($$p) { Start-Process -FilePath $$p.ExecutablePath -ArgumentList '--quit-for-install'; Wait-Process -Id ($$all | % { $$_.ProcessId }) -Timeout 20 -ErrorAction SilentlyContinue }"`
+    nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "$$s = (Get-Process -Id $$PID).SessionId; $$all = @(Get-CimInstance -ClassName Win32_Process | ? { $$_.Name -eq '${APP_EXECUTABLE_FILENAME}' -and $$_.ProcessId -ne $R2 -and $$_.SessionId -eq $$s -and $$_.ExecutablePath -notlike '*\WindowsApps\*' }); $$p = $$all | ? { $$_.ExecutablePath -and $$_.CommandLine -notmatch '--type=' } | Select-Object -First 1; if ($$p) { Start-Process -FilePath $$p.ExecutablePath -ArgumentList '--quit-for-install'; Wait-Process -Id ($$all | % { $$_.ProcessId }) -Timeout 20 -ErrorAction SilentlyContinue }"`
     Pop $R3
   ${endIf}
 !macroend
@@ -89,7 +93,11 @@
       IntOp $R1 $R1 + 1
       !insertmacro DB_FIND_APP
       ${if} $R0 == 0
-        DetailPrint "$(appClosing)"
+        ${if} $LANGUAGE == 1042
+          DetailPrint "실행 중인 Dayboard를 닫고 있어요…"
+        ${else}
+          DetailPrint "Closing Dayboard…"
+        ${endIf}
         !insertmacro DB_STOP_APP 0
         Sleep 1500
         !insertmacro DB_FIND_APP
@@ -100,7 +108,11 @@
         ${endIf}
         ${if} $R0 == 0
           ${if} $R1 > 2
-            MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(appCannotBeClosed)" /SD IDCANCEL IDRETRY db_check_app
+            ${if} $LANGUAGE == 1042
+              MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Dayboard를 닫지 못했어요.$\r$\n$\r$\n알림 영역의 Dayboard 아이콘을 오른쪽 클릭해 「Dayboard 종료」를 누른 뒤 「다시 시도」를 누르세요." /SD IDCANCEL IDRETRY db_check_app
+            ${else}
+              MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Dayboard could not be closed.$\r$\n$\r$\nRight-click the Dayboard icon in the notification area, choose Quit Dayboard, then choose Retry." /SD IDCANCEL IDRETRY db_check_app
+            ${endIf}
             Quit
           ${endIf}
           Goto db_check_app
@@ -111,7 +123,11 @@
     db_ask_app:
       !insertmacro DB_FIND_APP
       ${if} $R0 == 0
-        DetailPrint "$(appClosing)"
+        ${if} $LANGUAGE == 1042
+          DetailPrint "실행 중인 Dayboard를 닫고 있어요…"
+        ${else}
+          DetailPrint "Closing Dayboard…"
+        ${endIf}
         !insertmacro DB_ASK_QUIT
         Sleep 500
         !insertmacro DB_FIND_APP

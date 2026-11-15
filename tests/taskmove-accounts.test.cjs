@@ -1097,7 +1097,7 @@ test('E1 a push to an account whose 할 일 was turned on again keeps its record
   same([listed(h, ML), moveList(h)], [false, [['p-made', 'made'], ['p-gone', 'made']]], 'on, not read yet: still out of sight, not gone');
   h.svc.lists.delete(MX.remoteId); // deleted on the phone, with the copy made there: acc-m2 keeps its Tasks list and syncs
   h.svc.fail(/^GET \/v1\.0\/me\/todo\/lists$/, 'down'); // the sync that would read acc-m fails (offline)
-  same((await outcomeOf(() => h.seeded())).outcome, 'threw');
+  same((await outcomeOf(() => h.seeded())).offline?.join(','), 'microsoft', 'the read failed: a 503 is an outage, answered as offline rather than thrown (2026-11-13 review)');
   same([listed(h, ML), listed(h, MX)], [false, false]);
   restart(h);
   same(moveList(h), [['p-made', 'made']], 'a failed sync read nothing: still out of sight; a list really gone is gone');
@@ -1132,7 +1132,7 @@ test('E1 moves from an account whose 할 일 was turned on again keep their reco
   restart(h); // Dayboard closed before the sync that reads acc-g again
   same([listed(h, GL), records()], [false, all], 'on, not read yet: still out of sight, not gone');
   h.svc.fail(/^GET \/tasks\/v1\/users\/@me\/lists$/, 'down'); // that sync fails (offline)
-  same((await outcomeOf(() => h.seeded())).outcome, 'threw');
+  same((await outcomeOf(() => h.seeded())).offline?.join(','), 'google', 'the read failed: a 503 is an outage, answered as offline rather than thrown (2026-11-13 review)');
   restart(h);
   same([listed(h, GL), records()], [false, all], 'a failed sync read nothing');
   const at = h.svc.calls.length;

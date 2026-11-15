@@ -21,7 +21,8 @@ const V = require('../lib/validate.cjs');
 const S = require('../lib/series.cjs');
 const D = require('../renderer/domain.js');
 const { tr } = require('../lib/i18n.cjs');
-const { createStore, initialState, validateState } = require('../lib/store.cjs');
+const { createStore, initialState, validateState, publicRecord } = require('../lib/store.cjs');
+const O = require('../lib/outbox.cjs');
 const { seriesKey, createSync } = require('../lib/sync.cjs');
 const { createCalendarHistory } = require('../lib/calhistory.cjs');
 const { googleCalendar, occurrenceAt } = require('./r50-c-google-fake.cjs');
@@ -338,7 +339,16 @@ function mainEvents(t, provider) {
   const context = {
     store, tr, randomUUID: () => crypto.randomUUID(), ...V, ...S, ...D, seriesKey, path, __dirname: project,
     commit: fn => store.mutate(fn),
-    sync: { mutateEvent: (kind, event, calendar, options) => provider.mutateEvent(kind, event, calendar, options) },
+    sync: { mutateEvent: (kind, event, calendar, options) => provider.mutateEvent(kind, event, calendar, options),
+      // An event or one occurrence goes by writeEvent since offline stage 1 for events (2026-11-13): the real held path without the queue —
+      // kept here (lib/outbox.cjs holdEventUpdate), sent over what the service had (beginSend), its answer settled (finishSend).
+      async writeEvent(kind, event, calendar, { previous } = {}) {
+        const now = new Date().toISOString(); let job = null;
+        store.mutate(state => { O.holdEventUpdate(state, { event, previous, calendar, now, direct: true }); job = O.beginSend(state, { kind: 'event', id: event.id }, 'attempt', now, { force: true }); });
+        if (job) { const answer = await provider.mutateEvent('update', job.desired, calendar, { scope: 'one', previous: job.previous }); store.mutate(state => O.finishSend(state, job, answer, { now })); }
+        return { event: store.get().events.find(item => item.id === event.id) };
+      } },
+    eventIdFor: O.eventIdFor, publicRecord,
     mainWindow: null, Notification: { isSupported: () => false }, showMain() {},
   };
   vm.createContext(context);
@@ -660,7 +670,7 @@ test('widget dialog: a note cut at 20,000 characters is read-only and says why; 
 
 // ---------------- The search (renderer/calendar.js) ----------------
 test('search: notes are searched, and a hit found by them shows its matching line under the title', () => {
-  const h = harness({ isLocalEvent: e => e.provider === 'local', calendarKey: () => false, timeLabel: () => '오전 10:00', eventColor: () => 'var(--blue)', eventMenu() {} });
+  const h = harness({ isLocalEvent: e => e.provider === 'local', calendarKey: () => false, timeLabel: () => '오전 10:00', eventColor: () => 'var(--blue)', eventMenu() {}, markPast: n => n });
   h.load(read('renderer/notefind.js'), 'renderer/notefind.js');
   h.loadCalendar();
   const today = D.dateKey();

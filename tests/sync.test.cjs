@@ -134,7 +134,8 @@ test('Google edits patch only selected fields and local importance needs no remo
 });
 
 test('ambiguous network failure does not falsely claim the remote change was rolled back', async () => {
-  await assert.rejects(jsonRequest('https://example.invalid', { method: 'POST' }, async () => { throw new Error('connection lost after send'); }), /동기화하여 반영 여부/);
+  // The words since 2026-11-13: 「…연결되면 동기화한 뒤 다시 해 주세요.」 — sync first, then redo (lib/providers/common.cjs).
+  await assert.rejects(jsonRequest('https://example.invalid', { method: 'POST' }, async () => { throw new Error('connection lost after send'); }), /동기화한 뒤 다시/);
 });
 
 test('Google fully paginates tasks including hidden completions and calendar instances', async () => {
@@ -398,7 +399,9 @@ test('a 401 on a Google account is not an app password', async t => {
   const { store, sync } = setup(t, () => ({ identity: async () => ({ remoteUserId: 'g', name: 'g@example.com' }), snapshot: async () => { throw Object.assign(new Error('로그인이 만료되었습니다. (HTTP 401)'), { status: 401 }); } }), 'google');
   await sync.connect({ provider: 'google' }).catch(() => {});
   const account = store.publicState().accounts[0];
-  assert.equal([account?.authFailed ?? 'none', account?.error].join('|'), 'none|로그인이 만료되었습니다. (HTTP 401)');
+  // Its own words, not Apple's. Since 2026-11-13 (offline spec S0.4/S0.8) a 401 that stays after the renewal is a sign-in to renew:
+  // authFailed, which on a Google account is 「다시 로그인」 (renderer accountNotice), never 「새 앱 암호 넣기」.
+  assert.equal([account?.authFailed ?? 'none', account?.error].join('|'), 'true|로그인이 만료되었습니다. (HTTP 401)');
 });
 
 test('iCloud snapshot skips one unreadable event and reports it as a warning instead of failing the account', async () => {

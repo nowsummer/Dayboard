@@ -99,3 +99,11 @@ const formalIn = source => [...extract.keysIn(source)].filter(key => /니다[.!?
 test('app.js and calendar.js: no tr() sentence ends in 합니다체', () => {
   for (const file of ['renderer/app.js', 'renderer/calendar.js']) assert.equal(formalIn(fs.readFileSync(path.join(root, file), 'utf8')).join(' | '), '', file);
 });
+
+// Labels say the words their values and their neighbours say (2026-11-13 review of the Store listing's English pictures: 「Starts」 above
+// 「End」 on the new event card, 「Reminder」 over 「No alert」 in the task panel).
+test('paired labels in English: Start and End like Start date and End date, Alert like No alert', () => {
+  const en = shared.EN;
+  assert.equal([en['시작'], en['종료'], en['시작 날짜'], en['종료 날짜']].join('|'), 'Start|End|Start date|End date');
+  assert.equal([en['알림'], en['알림 없음']].join('|'), 'Alert|No alert');
+});

@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { ipcMain } = require('electron');
 
-module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, output, runBackup, pointer }) {
+module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, output, runBackup, pointer, hooks }) {
   const checks = [];
   const settle = win => win.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 60)))');
   // Renderer exceptions lose their stack across executeJavaScript; keep the first frames in the message.
@@ -39,6 +39,26 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   // The sidebar's lists scrolling alone, the filled flag, a widget's subtask lines (2026-11-13): DAYBOARD_SMOKE_ONLY=sidebar-lists; the whole smoke runs it after spacing.
   if (process.env.DAYBOARD_SMOKE_ONLY === 'sidebar-lists') return require('./ui-smoke-sidebar-lists-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm });
   if (process.env.DAYBOARD_SMOKE_ONLY === 'spacing') return require('./ui-smoke-spacing-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm });
+  // An answer with no list keeps this PC's copy; the card's error with the account's own last sync (2026-11-13): DAYBOARD_SMOKE_ONLY=account-error; the whole smoke runs it after widget-task-drag.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'account-error') return require('./ui-smoke-account-error-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm });
+  // Changes kept on this PC while Outlook is down, by real input over a fake Graph, a restart, then sent (2026-11-13 offline stage 1): DAYBOARD_SMOKE_ONLY=offline; the whole smoke runs it after account-error.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'offline') return require('./ui-smoke-offline-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm, hooks });
+  // Events kept on this PC while Outlook is down, by real input in the event card over a fake Graph calendar, a restart, then sent (2026-11-13 offline stage 1 for events): DAYBOARD_SMOKE_ONLY=offline-events; the whole smoke runs it after offline.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'offline-events') return require('./ui-smoke-offline-events-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm, hooks });
+  // A task widget's first row folds by a double click, the OS hit test over an attached widget, its head dragged through main (2026-11-13): DAYBOARD_SMOKE_ONLY=widget-fold; the whole smoke runs it after sidebar-lists.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'widget-fold') return require('./ui-smoke-widget-fold-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm, pointer });
+  // A task's date in --due-ink and its subtasks' a step lighter, in the app and a tasks widget (2026-11-14 owner, E안): DAYBOARD_SMOKE_ONLY=date-ink; the whole smoke runs it after widget-fold
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'date-ink') return require('./ui-smoke-date-ink-1114.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm });
+  // A task widget of one list reorders its rows by a drag, as the app's list does (2026-11-14 owner): DAYBOARD_SMOKE_ONLY=widget-task-drag; the whole smoke runs it after date-ink
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'widget-task-drag') return require('./ui-smoke-widget-task-drag-1114.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm });
+  // The month on the 1st at the cell's left (2026-11-13 variant C): DAYBOARD_SMOKE_ONLY=first-month; the whole smoke runs it right after calendar-month-fit.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'first-month') return require('./ui-smoke-first-month-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm });
+  // No Windows tooltip, the innermost hint only (2026-11-13): DAYBOARD_SMOKE_ONLY=tooltip; the whole smoke runs it right after first-month.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'tooltip') return require('./ui-smoke-tooltip-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm });
+  // An ended event greyed by colour on every surface, flipped the moment it ends, the calendar widget folding ended events first (2026-11-13): DAYBOARD_SMOKE_ONLY=past; the whole smoke runs it right after tooltip.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'past') return require('./ui-smoke-past-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm });
+  // 자주 쓰는 일정's editor (2026-11-13: 색 in the first group, S1 pop-ups, 더 보기 gone once opened): DAYBOARD_SMOKE_ONLY=event-word; the whole smoke runs it at the end of event-shortcuts.
+  if (process.env.DAYBOARD_SMOKE_ONLY === 'event-word') return require('./ui-smoke-event-word-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm });
 
   // Main screens render real content and no view throws while switching.
   for (const [label, selector, marker, file] of [
@@ -211,6 +231,22 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   // r60 C: 「버전 1.2.6 · 최신」 / 「· 확인 중…」 may follow, and the card shows only for news (updateNews), not for every updater (2026-11-02 r60 carry-over C-2)
   expect(appVersion && updateInfo.version.startsWith(`버전 ${appVersion}`) && updateInfo.block === updateInfo.news && !updateInfo.history.includes('업데이트 기록'), `설정의 버전·업데이트 ${JSON.stringify({ appVersion, hasUpdater, updateInfo })}`);
   checks.push('settings-version-update-block');
+
+  // The Store copy (DAYBOARD_STORE_EDITION=1 stands in for the package in a development run): the version line says who updates it, startup goes to
+  // Windows settings, and the sheet has no updater controls and no startup checkbox.
+  if ((await invoke('state:get')).app?.store) {
+    const storeSheet = await run(mainWindow, `
+      document.querySelector('.sidebar-bottom .sidebar-tools .icon-button:last-child').click();
+      await new Promise(resolve => setTimeout(resolve, 60));
+      const dialog = document.querySelector('#modal-root .dialog');
+      return { version: dialog?.querySelector('.settings-brand small')?.textContent || '', check: Boolean(dialog?.querySelector('#settings-check')), block: Boolean(dialog?.querySelector('#update-block')),
+        startup: [...(dialog?.querySelectorAll('.field') || [])].some(node => node.textContent.includes('Windows 시작 시 실행') && node.textContent.includes('시작 앱 설정 열기')),
+        boxes: [...(dialog?.querySelectorAll('.checkbox-field') || [])].filter(node => /Windows 시작 시 실행|새 버전 자동 확인/.test(node.textContent)).length };`);
+    await shot(mainWindow, 'settings-store');
+    await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true;`);
+    expect(storeSheet.version.includes('Microsoft Store가 업데이트해요') && !storeSheet.check && !storeSheet.block && storeSheet.startup && storeSheet.boxes === 0, `Store 판 설정 ${JSON.stringify(storeSheet)}`);
+    checks.push('settings-store-edition');
+  }
 
   // The toast's 되돌리기 is really clickable (the toast used to be pointer-events:none) and Ctrl+Z runs it exactly once.
   const undo = await run(mainWindow, `
@@ -589,8 +625,8 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => requestAnimationFrame(resolve));
     const all = [...document.querySelectorAll('.calendar-grid.large .day-event')].filter(node => node.textContent.includes('스모크 반복'));
     return { count: all.length, time: all[0]?.querySelector('.chip-time')?.textContent || '', color: all[0]?.style.getPropertyValue('--cal-color'), repeat: all.filter(node => node.querySelector('.chip-repeat')).length, timed: all.filter(node => node.classList.contains('timed')).length };`);
-  // the month's short time since 2026-11-11 (「12 PM」, owner beside Notion Calendar; tests/month-time-1111.test.cjs), 24 hours 「12:00」
-  expect(chips.count === visible && chips.repeat === visible && chips.timed === visible && chips.color === '#34c759' && chips.time === '12 PM', `반복 일정 격자 표시 ${JSON.stringify(chips)} (expected ${visible})`);
+  // the month's short time since 2026-11-11 (「12pm」 since 2026-11-14 V3, owner beside Notion Calendar; tests/month-time-1111.test.cjs), 24 hours 「12:00」
+  expect(chips.count === visible && chips.repeat === visible && chips.timed === visible && chips.color === '#34c759' && chips.time === '12pm', `반복 일정 격자 표시 ${JSON.stringify(chips)} (expected ${visible})`);
   await invoke('settings:update', { timeFormat: '24h' });
   const clock24 = await run(mainWindow, `return [...document.querySelectorAll('.calendar-grid.large .day-event')].find(node => node.textContent.includes('스모크 반복'))?.querySelector('.chip-time')?.textContent || '';`);
   expect(clock24 === '12:00', `24시간 표시 "${clock24}"`);
@@ -823,7 +859,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => setTimeout(resolve, 200));
     const toastNode = document.getElementById('toast');
     const action = toastNode.querySelector('.toast-action');
-    const result = { text: toastNode.textContent, action: action?.textContent || '', ctrlZ: action?.title || '' };
+    const result = { text: toastNode.textContent, action: action?.textContent || '', ctrlZ: action?.dataset.tip || '' };
     action?.click();
     await new Promise(resolve => setTimeout(resolve, 200));
     return result;`);
@@ -833,7 +869,8 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   checks.push('event-save-shows-where');
 
   // Calendar keyboard: a day keeps focus through its redraw, arrows move the selection, Ctrl+→ / Ctrl+T move the month and
-  // come back, the tooltips show the shortcuts, and Delete on a chip asks with the event's name.
+  // come back, ← → step the period right after a click on ‹ › (the keyboard stays on the button) and J K C do nothing (2026-11-13 owner: one
+  // key per action, no single letters the sheet does not show), the tooltips show the shortcuts, and Delete on a chip asks with the event's name.
   const keyEvent = await invoke('event:add', { title: '스모크 삭제키', calendarId: 'local-calendar', start: localIso(today, 9), end: localIso(today, 10), allDay: false, location: '' });
   const keys = await run(mainWindow, `
     const D = window.DayboardDates; const today = D.dateKey(); const tomorrow = D.dayOffset(today, 1);
@@ -859,8 +896,18 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.querySelector('[data-focus-key="month-next"]').click(); await new Promise(resolve => setTimeout(resolve, 40));
     document.querySelector('[data-focus-key="month-next"]').click(); ${ROLLED}
     result.twice = document.querySelector('.calendar-grid.large .calendar-day').dataset.day === D.monthStart(ahead);
+    const nextButton = document.querySelector('[data-focus-key="month-next"]'); nextButton.focus(); nextButton.click(); await new Promise(resolve => setTimeout(resolve, 40)); ${ROLLED}
+    const clicked = title();
+    result.onButton = document.activeElement?.dataset.focusKey === 'month-next';
+    await press(document.activeElement || document.body, { key: 'ArrowRight', code: 'ArrowRight' }); ${ROLLED}
+    result.arrowAfterClick = title() !== clicked;
+    await press(document.activeElement || document.body, { key: 'ArrowLeft', code: 'ArrowLeft' }); ${ROLLED}
+    result.arrowBack = title() === clicked;
+    for (const [key, code] of [['j', 'KeyJ'], ['k', 'KeyK'], ['c', 'KeyC']]) await press(document.activeElement || document.body, { key, code });
+    ${ROLLED}
+    result.lettersIdle = title() === clicked && !document.querySelector('.event-card');
     document.querySelector('[data-focus-key="month-today"]').click(); await new Promise(resolve => setTimeout(resolve, 30)); ${ROLLED}
-    result.tips = [...document.querySelectorAll('.topbar [data-focus-key]')].map(node => node.title);
+    result.tips = [...document.querySelectorAll('.topbar [data-focus-key]')].map(node => node.dataset.tip || ''); // the hint lives in data-tip (2026-11-13: no title on the page)
     const chip = [...document.querySelectorAll('.calendar-grid.large .day-event')].find(node => node.textContent.includes('스모크 삭제키'));
     chip.focus();
     await press(chip, { key: 'Delete', code: 'Delete' });
@@ -872,7 +919,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     await new Promise(resolve => setTimeout(resolve, 250));
     result.undone = [...document.querySelectorAll('.calendar-grid.large .day-event')].some(node => node.textContent.includes('스모크 삭제키'));
     return result;`);
-  expect(keys.kept && keys.arrow && keys.nextMonth && keys.glides && keys.back && keys.twice && !keys.dialog && /일정을 삭제했어요/.test(keys.toast) && keys.gone && keys.undone && ['이전 달 (J)', '다음 달 (K)', '오늘 (T)', '일정 추가 (C)', '월간 보기 (M)', '오른쪽 패널 숨기기 (/)'].every(tip => keys.tips.includes(tip)), `달력 키보드 ${JSON.stringify(keys)}`);
+  expect(keys.kept && keys.arrow && keys.nextMonth && keys.glides && keys.back && keys.twice && !keys.dialog && /일정을 삭제했어요/.test(keys.toast) && keys.gone && keys.undone && keys.onButton && keys.arrowAfterClick && keys.arrowBack && keys.lettersIdle && ['이전 달 (←)', '다음 달 (→)', '오늘 (T)', '일정 추가 (Ctrl+N)', '월간 보기 (M)', '오른쪽 패널 숨기기 (/)'].every(tip => keys.tips.includes(tip)), `달력 키보드 ${JSON.stringify(keys)}`);
   state = await invoke('state:get');
   const restored = state.events.filter(item => item.title === '스모크 삭제키');
   expect(restored.length === 1 && restored[0].start === keyEvent.start && restored[0].end === keyEvent.end && !state.events.some(item => item.id === keyEvent.id), 'Delete 뒤 실행 취소로 일정 되돌림');
@@ -1077,6 +1124,10 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     result.count = document.querySelector('.note-find-count').textContent;
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(40);
     result.second = document.querySelector('.note-find-count').textContent;
+    // Shift+Enter is the previous match, round the start (2026-11-13: the sheet's 다음·이전 찾기 row is gone, the bar keeps its keys); two Enters back to 2/3
+    const findKey = async shiftKey => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey, bubbles: true, cancelable: true })); await wait(40); return document.querySelector('.note-find-count').textContent; };
+    result.back = await findKey(true); result.round = await findKey(true);
+    await findKey(false); await findKey(false);
     const body = document.querySelector('.note-body');
     const mark = document.querySelector('.note-highlights mark.current'); const box = body.getBoundingClientRect(), m = mark.getBoundingClientRect();
     result.inside = m.left >= box.left - 1 && m.right <= box.right + 1;
@@ -1093,7 +1144,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.querySelector('.note-find-input')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await wait(40);
     search.value = ''; search.dispatchEvent(new Event('input', { bubbles: true })); await wait(60);
     return result;`);
-  expect(found.bar && found.focused && found.marks === 3 && found.count === '1/3' && found.second === '2/3' && found.inside && found.closed && found.selected === '사과' && found.at === 12 && found.placeholder === '메모 검색' && found.listMark === '귤' && found.fromSearch === '귤', `메모 찾기 ${JSON.stringify(found)}`);
+  expect(found.bar && found.focused && found.marks === 3 && found.count === '1/3' && found.second === '2/3' && found.back === '1/3' && found.round === '3/3' && found.inside && found.closed && found.selected === '사과' && found.at === 12 && found.placeholder === '메모 검색' && found.listMark === '귤' && found.fromSearch === '귤', `메모 찾기 ${JSON.stringify(found)}`);
   await invoke('settings:update', { noteListStyle: 'compact' });
   const compact = await run(mainWindow, `await new Promise(resolve => setTimeout(resolve, 80)); const card = [...document.querySelectorAll('.note-card')].find(node => node.textContent.includes('스모크 찾기')); return { compact: Boolean(card?.classList.contains('compact')), line: card?.querySelector('.note-card-line')?.textContent || '', height: Math.round(card?.getBoundingClientRect().height || 0) };`);
   await shot(mainWindow, 'notes-compact');
@@ -1189,6 +1240,8 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.querySelector('.main-nav .nav-item:nth-child(2)').click(); await wait(100);
     const result = {};
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', bubbles: true, cancelable: true })); await wait(120);
+    result.cIdle = !document.querySelector('.event-card'); // C is gone (2026-11-13 owner); Ctrl+N is the new event
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true, cancelable: true })); await wait(120);
     const title = document.querySelector('.event-card textarea.card-title'); result.card = Boolean(title);
     if (title) { title.value = '스모크 카드 유지'; title.dispatchEvent(new Event('input', { bubbles: true })); }
     const search = document.querySelector('.search input'); search.focus(); search.value = '아침 회의'; search.dispatchEvent(new Event('input', { bubbles: true })); await wait(150);
@@ -1211,7 +1264,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     return result;`);
   await invoke('event:delete', { id: standup.id, scope: 'all' });
   state = await invoke('state:get');
-  expect(searchKeys.card && searchKeys.rows === 150 && /^\d[\d,]*개 더 보기$/.test(searchKeys.more) && searchKeys.rowsAfter === 300 && searchKeys.focusRow && searchKeys.viewKept && searchKeys.cleared && searchKeys.cardKept === '스모크 카드 유지' && searchKeys.closed && !state.events.some(event => event.title === '스모크 카드 유지'), `검색 중 Esc·단축키·더 보기 ${JSON.stringify(searchKeys)}`);
+  expect(searchKeys.cIdle && searchKeys.card && searchKeys.rows === 150 && /^\d[\d,]*개 더 보기$/.test(searchKeys.more) && searchKeys.rowsAfter === 300 && searchKeys.focusRow && searchKeys.viewKept && searchKeys.cleared && searchKeys.cardKept === '스모크 카드 유지' && searchKeys.closed && !state.events.some(event => event.title === '스모크 카드 유지'), `검색 중 Esc·단축키·더 보기 ${JSON.stringify(searchKeys)}`);
   checks.push('review5-series-undo-find-search');
 
   // Review round 6 (2026-10-21): a colour picked on a series card while a repeat change waits goes with it to the scope
@@ -1424,7 +1477,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.activeElement?.blur?.();
     key('KeyZ', false); await wait(300);
     result.undone = toastText(); result.afterUndo = done();
-    result.title = document.querySelector('#toast .toast-action')?.title || '';
+    result.title = document.querySelector('#toast .toast-action')?.dataset.tip || '';
     key('KeyZ', true); await wait(300);
     result.redone = toastText(); result.afterRedo = done();
     key('KeyZ', false); await wait(300);
@@ -1481,7 +1534,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       const result = { toggles: toggles.map(item => item.textContent.trim()).join(','), notes: toggles.find(item => item.textContent.trim() === '메모')?.querySelector('input')?.checked, notice: node?.querySelector('.account-notice')?.textContent || '' };
       closeModal(true); return result;
     };
-    const footer = () => { const node = document.getElementById('note-save-status'); return node ? node.textContent + (node.title ? ' [' + node.title + ']' : '') : '(no note open)'; };
+    const footer = () => { const node = document.getElementById('note-save-status'); return node ? node.textContent + (node.dataset.tip ? ' [' + node.dataset.tip + ']' : '') : '(no note open)'; };
     try {
       const result = {};
       state = { ...state, accounts: [...state.accounts, { ...google, notesAccess: false }], settings: { ...state.settings, notesAccountId: null, notesAutoDone: false }, noteSync: { accountId: null, busy: false, pending: false, lastSync: null, error: null } };
@@ -1821,7 +1874,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
     const cleared = input.value === '' && document.activeElement === input;
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-    return { tomorrow, hint, toastText, action: action?.textContent || '', actionTitle: action?.getAttribute('title') || '', shownHere, keptAfterCtrlZ, planned, shownThere, timeHint, cleared, left: document.activeElement !== input };`);
+    return { tomorrow, hint, toastText, action: action?.textContent || '', actionTitle: action?.getAttribute('data-tip') || '', shownHere, keptAfterCtrlZ, planned, shownThere, timeHint, cleared, left: document.activeElement !== input };`);
   expect(/「스모크 치과」 · 내일 날짜로 추가/.test(quickDated.hint) && !quickDated.shownHere && /「스모크 치과」 할 일을 내일 날짜로 추가했어요/.test(quickDated.toastText) && quickDated.action === '보기' && !quickDated.actionTitle && quickDated.keptAfterCtrlZ && quickDated.planned === '예정' && quickDated.shownThere, `빠른 추가 미래 날짜 안내 ${JSON.stringify(quickDated)}`);
   expect(/「스모크 알림」 · 내일 .*(?:3|15):00 알림으로 추가/.test(quickDated.timeHint), `빠른 추가 시각 → 알림 안내 ${JSON.stringify(quickDated.timeHint)}`);
   expect(quickDated.cleared && quickDated.left, `빠른 추가 Esc ${JSON.stringify(quickDated)}`);
@@ -1972,7 +2025,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const dueSaved = (await invoke('state:get')).tasks.find(task => task.id === dueTask.id);
   const dueReminder = dueSaved && new Date(dueSaved.reminderAt);
   expect(timeUi.hiddenFirst && timeUi.shown && /오후 2:30$/.test(timeUi.faceWords) && timeUi.popGone && timeUi.dialogStays && timeUi.choices === '알림 없음,정각에,5분 전,30분 전,1시간 전,1일 전,날짜와 시간 지정…' && timeUi.alertWords === '30분 전'
-    && dueSaved?.dueTime === '14:30' && dueReminder.getHours() === 14 && dueReminder.getMinutes() === 0 && /오후 2:30$/.test(timeUi.due) && timeUi.dueColor === 'rgb(184, 114, 26)' && timeUi.bell === '30분 전' && timeUi.bellDim, `할 일 시간 ${JSON.stringify({ timeUi, dueSaved })}`);
+    && dueSaved?.dueTime === '14:30' && dueReminder.getHours() === 14 && dueReminder.getMinutes() === 0 && /오후 2:30$/.test(timeUi.due) && timeUi.dueColor === 'rgb(163, 95, 15)' /* --due-ink, light (2026-11-14 E안) */ && timeUi.bell === '30분 전' && timeUi.bellDim, `할 일 시간 ${JSON.stringify({ timeUi, dueSaved })}`);
   // Codex fifth review F2, U1: a time typed and 저장 pressed at once, a real press: the popover closes on it, and the time still goes.
   const pressAt = await run(mainWindow, `
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -2028,6 +2081,9 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const clearLevel = (await invoke('state:get')).settings.glassLevel;
     await invoke('settings:update', { glassLevel: 0.5 });
     expect(flipped.join() === '불투명,투명' && clearLevel === 0, `유리 효과 슬라이더: 오른쪽이 투명 ${JSON.stringify(flipped)} ${clearLevel}`);
+    // The appearance card's three labels, two values and the slider's two end words are 14px in the drawn app (2026-11-13; tests/account-add-widget-tab-1113.test.cjs)
+    const cardText = await run(mainWindow, `return [...document.querySelectorAll('.widget-appearance .appearance-row>span, .widget-appearance .appearance-row>select, .widget-appearance .glass-slider>span')].map(node => getComputedStyle(node).fontSize + '/' + node.textContent.trim());`);
+    expect(cardText.length === 7 && cardText.every(text => text.startsWith('14px/') && text.length > 5), `위젯 탭 모양 카드 글자 14px ${JSON.stringify(cardText)}`);
     await shot(mainWindow, 'view-widgets-glass');
     checks.push('widget-glass-level');
     // Widget theme is a separate preference. OS dark does not override app/light widgets.
@@ -2216,7 +2272,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
         const result = { before: rows(), label: moreButton()?.textContent || '' };
         moreButton()?.click();
         await new Promise(resolve => setTimeout(resolve, 40));
-        result.after = rows(); result.moreLeft = Boolean(moreButton());
+        result.after = rows(); result.moreLeft = Boolean(moreButton()); result.upcoming = document.querySelectorAll('.widget-agenda .event-row:not(.past)').length;
         const add = document.querySelector('.widget-agenda-title .agenda-add');
         result.add = add?.getAttribute('aria-label') || '';
         result.hiddenUntilHover = add ? getComputedStyle(add).opacity === '0' : false;
@@ -2229,7 +2285,8 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
         return result;`);
       await shot(win, 'widget-calendar-more');
       // Whole rows only (2026-10-27 review): the card shows as many full rows as fit (at most 3) and 더 보기 opens the rest.
-      expect(more.before >= 1 && more.before <= 3 && /^\+\d+개 더 보기$/.test(more.label) && more.after >= 4 && !more.moreLeft && more.add === '일정 추가' && more.dialog === '일정 추가' && more.start.startsWith(today), `달력 위젯 더 보기·일정 추가 ${JSON.stringify(more)}`);
+      // Ended events give way first (4881a54, D.agendaGiveWay): run in the evening, when every event of the day has ended, none may be left above 더 보기.
+      expect((more.before >= 1 || !more.upcoming) && more.before <= 3 && /^\+\d+개 더 보기$/.test(more.label) && more.after >= 4 && !more.moreLeft && more.add === '일정 추가' && more.dialog === '일정 추가' && more.start.startsWith(today), `달력 위젯 더 보기·일정 추가 ${JSON.stringify(more)}`);
       // Agenda fit at other card heights (2026-10-27 re-review): with five events the agenda shows as many whole rows as fit and
       // 「+n개 더 보기」 — never hidden in a band of heights in between (one fitting pass left the 더 보기 button no room).
       const wasContent = win.getContentSize();
@@ -2558,7 +2615,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise(resolve => setTimeout(resolve, 40));
     const heading = day => { selectedDate = day; render(); return document.querySelector('.context-heading h3')?.textContent; };
     return { labels, tomorrow: heading(D.dayOffset(D.dateKey(), 1)), yesterday: heading(D.dayOffset(D.dateKey(), -1)), other: heading(D.dayOffset(D.dateKey(), 5)), today: heading(D.dateKey()) };`);
-  expect(englishBits.labels.slice(0, 7).join('|') === 'Title|Subtasks|Date|Reminder|Repeat|List|Notes' /* 반복 and 하위 할 일 since 1.1.3; 반복|목록 share a row since 2026-11-02 (review usability-7); 하위 할 일 under 제목 since 2026-11-10 */ && englishBits.tomorrow === 'Tomorrow’s events' && englishBits.yesterday === 'Yesterday’s events' && /^Events on [A-Z]/.test(englishBits.other) && englishBits.today === 'Today’s events', `영어 편집기 라벨·일정 제목 ${JSON.stringify(englishBits)}`);
+  expect(englishBits.labels.slice(0, 7).join('|') === 'Title|Subtasks|Date|Alert|Repeat|List|Notes' /* 반복 and 하위 할 일 since 1.1.3; 반복|목록 share a row since 2026-11-02 (review usability-7); 하위 할 일 under 제목 since 2026-11-10 */ && englishBits.tomorrow === 'Tomorrow’s events' && englishBits.yesterday === 'Yesterday’s events' && /^Events on [A-Z]/.test(englishBits.other) && englishBits.today === 'Today’s events', `영어 편집기 라벨·일정 제목 ${JSON.stringify(englishBits)}`);
   await run(mainWindow, `editTask(state.tasks.find(task => task.title === '스모크 지난 날짜')); await new Promise(resolve => setTimeout(resolve, 40)); return true;`);
   await shot(mainWindow, 'task-editor-english');
   await run(mainWindow, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true;`);
@@ -2658,11 +2715,12 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     from.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: data }));
     await new Promise(resolve => setTimeout(resolve, 250));
     result.dragged = titles(); result.mode = state.settings.taskSort[${JSON.stringify(sortList.id)}];
-    // Below the last row: to the end.
+    // Below the last row: to the end — the list's room under it, where the pointer is (2026-11-14: the end takes only a drop under the last row).
     const list = document.querySelector('.task-list'); const first = row('다 할 일'); const end = new DataTransfer();
     first.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: end }));
-    list.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: end }));
-    list.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: end }));
+    const listBox = list.getBoundingClientRect(); const under = { bubbles: true, cancelable: true, dataTransfer: end, clientX: listBox.left + 40, clientY: listBox.bottom - 8 };
+    list.dispatchEvent(new DragEvent('dragover', under));
+    list.dispatchEvent(new DragEvent('drop', under));
     first.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: end }));
     await new Promise(resolve => setTimeout(resolve, 250));
     result.toEnd = titles();
@@ -3433,7 +3491,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await invoke('settings:update', { language: 'en' });
   const english113 = await run(mainWindow, `
     goto('calendar'); await new Promise(resolve => requestAnimationFrame(resolve));
-    const title = document.querySelector('.topbar-main h1 .title-button')?.title;
+    const title = document.querySelector('.topbar-main h1 .title-button')?.dataset.tip;
     return { title, minutes: alertLabel(10, false), hour: alertLabel(60, false), day: alertLabel(900, true), onDay: alertLabel(-540, true), week: alertLabel(10080, false) };`);
   // Weeks across two months (and a year) have the longest titles; today's week alone passed while those slid under (recheck).
   const narrowBounds = mainWindow.getBounds();
@@ -3579,6 +3637,13 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     expect(fitSizes.every(s => s.cells === 42 && !s.clipped.length && s.numbers.join() === '24' && s.busy && s.busy.length >= 2 && s.busy.length <= s.limit) && fitWeek.blocks === 3 && !fitWeek.bad.length && fitStale.length === 7 && fitStale.every(s => s.blocks === 5 && !s.bad.length) && new Set(fitStale.map(s => s.calHour)).size >= 4, `월 칸 줄 맞춤·주간 블록 줄 ${JSON.stringify({ fitSizes, fitWeek, fitStale })}`);
   }
   checks.push('calendar-month-fit');
+  // The month on the 1st (2026-11-13 owner, variant C): 「11월」 at the cell's left on the chips' 9px lead column, bold in the number's ink, the same
+  // under today's circle, a hover and a selection; hidden in cells under 94px, where 「10월」 would come within 3px of the circle box
+  checks.push(...await require('./ui-smoke-first-month-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm }));
+  // No Windows tooltip anywhere (2026-11-13 owner): over a chip in a month cell only its words in the rounded tip, no title from it up to <html>
+  checks.push(...await require('./ui-smoke-tooltip-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm }));
+  // Past events (2026-11-13 owner: 「예, 먼저 접기」): an ended event greyed by colour everywhere it is drawn, 4.5:1, flipped live; the widget folds it first
+  checks.push(...await require('./ui-smoke-past-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm }));
 
   // D07: a note that fails to save on this PC says 저장 실패 with 다시 시도, and keeps saying it through a redraw; the retry sends the
   // same text by the same path without more typing, and the text stays as typed. 다시 시도 is read as drawn (its boxes), not by its
@@ -3659,7 +3724,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
         const rows = cals.map(c => { const row = panel && [...panel.querySelectorAll('.calendar-row')].find(node => node.querySelector('.cal-name')?.textContent === c.name); const name = row?.querySelector('.cal-name'), button = row?.querySelector('.cal-name-button'), mark = row?.querySelector('.cal-provider');
           const shown = Boolean(mark) && box(mark).top >= box(button).top && box(mark).bottom <= box(button).bottom && box(mark).right <= box(button).right + 0.5;
           return name ? { room: name.clientWidth, cut: name.scrollWidth > name.clientWidth, badge: [...row.querySelectorAll('.cal-badge')].map(node => node.textContent).join(), mark: shown ? mark.getAttribute('aria-label') : '',
-            label: mark && mark.getAttribute('role') === 'img' ? mark.getAttribute('aria-label') : null, word: Boolean(row.querySelector('.cal-name-button small')), title: button.title } : null; });
+            label: mark && mark.getAttribute('role') === 'img' ? mark.getAttribute('aria-label') : null, word: Boolean(row.querySelector('.cal-name-button small')), title: button.getAttribute('title') ?? button.getAttribute('data-tip') ?? '' } : null; });
         return { width: innerWidth, docked: Boolean(panel) && !panel.classList.contains('drawer'), panel: panel ? Math.round(box(panel).width) : 0, gap: panel ? Math.round(box(panel).left - box(main).right) : 0, day: day ? Math.round(box(day).width * 10) / 10 : 0,
           title: title ? Math.round(box(title).width) : 0, lines: title ? new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size : 0, more: panel ? [...panel.querySelectorAll('.row-more')].filter(node => node.offsetParent).length : -1, rows };
       };
@@ -4135,7 +4200,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       under.push({ gap: Math.round(m.top - r.bottom), above: m.bottom <= r.top, side: Math.round(m.right - r.right), tall: Math.round(m.height) }); closeMenu(); await wait(30); }
     card().querySelector('[data-card-focus="date-end"]').click(); await wait(60);
     const pop = document.querySelector('.date-pop'); const box = pop?.getBoundingClientRect(), at = card().querySelector('[data-card-focus="date-end"]').getBoundingClientRect();
-    const out = { under, pop: Boolean(pop), round: pop ? parseFloat(getComputedStyle(pop).borderRadius) : 0, links: [...(pop?.querySelectorAll('.date-pop-link') || [])].map(n => n.textContent), native: document.querySelectorAll('.event-card input[type=date]').length, near: pop ? Math.round(box.top - at.bottom) : null };
+    const out = { under, pop: Boolean(pop), round: pop ? parseFloat(getComputedStyle(pop).borderRadius) : 0, links: [...(pop?.querySelectorAll('.date-pop-link') || [])].map(n => n.textContent), native: document.querySelectorAll('.event-card input[type=date]').length, near: pop ? Math.round(box.top - at.bottom) : null, nearAbove: pop ? Math.round(at.top - box.bottom) : null };
     document.querySelector('.topbar').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); document.querySelector('.topbar').dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); await wait(40);
     out.besideClosesMonthOnly = !document.querySelector('.date-pop') && Boolean(card());
     card().querySelector('[data-card-focus="date-end"]').click(); await wait(60);
@@ -4160,7 +4225,9 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   const dockedPops = await cardPops();
   await shot(mainWindow, 'calendar-detail-panel-pops');
   await run(mainWindow, `closeCard(false); await new Promise(resolve => setTimeout(resolve, 80)); return true;`);
-  const popOk = p => p.under.every(u => (u.above || (u.gap >= 0 && u.gap <= 8)) && Math.abs(u.side) <= 1 && u.tall <= 282) && p.pop && p.round >= 10 && p.links.join() === '오늘' && p.native === 0 && p.near >= 0 && p.near <= 8 && p.besideClosesMonthOnly && p.picked && p.wordsNothing && p.stillUp === 'true|none|0|1' && p.colours && p.clickAway && p.escAway;
+  // The month pops under its date, or right above it when the card stands low in the window (datePop place(): a card on a later week of the
+  // month — on the 15th the smoke's new event opened on the third row and its 종료 month went above).
+  const popOk = p => p.under.every(u => (u.above || (u.gap >= 0 && u.gap <= 8)) && Math.abs(u.side) <= 1 && u.tall <= 282) && p.pop && p.round >= 10 && p.links.join() === '오늘' && p.native === 0 && ((p.near >= 0 && p.near <= 8) || (p.nearAbove >= 0 && p.nearAbove <= 8)) && p.besideClosesMonthOnly && p.picked && p.wordsNothing && p.stillUp === 'true|none|0|1' && p.colours && p.clickAway && p.escAway;
   expect(popOk(floatingPops) && popOk(dockedPops), `일정 카드 팝업 ${JSON.stringify({ floatingPops, dockedPops })}`);
   checks.push('event-card-popovers');
   const goKey = await run(mainWindow, `document.activeElement?.blur(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', code: 'KeyG', bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 80)); const open = Boolean(document.querySelector('#modal-root .go-date')); closeModal(); await new Promise(resolve => setTimeout(resolve, 60)); return open;`);
@@ -4193,7 +4260,9 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   await shot(mainWindow, 'subtask-date-row');
   const stepDatesTick = await run(mainWindow, `
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms)); const id = ${JSON.stringify(dated.id)}; const task = () => state.tasks.find(t => t.id === id);
-    goto('calendar'); await wait(150); document.querySelector('.day-step .task-check').click(); await wait(250);
+    goto('calendar'); await wait(150); document.querySelector('.day-step .task-check').click();
+    // the tick goes through run() and comes back with the broadcast: waited for (3 s at most), not a fixed 250 ms that a busy PC overran
+    for (let i = 0; i < 30 && !(task().steps[0].completed === true && !document.querySelector('.day-step')); i++) await wait(100);
     return { ticked: task().steps[0].completed === true, gone: !document.querySelector('.day-step') };`);
   await invoke('task:delete', { id: dated.id });
   expect(stepDates.empty === 2 && stepDates.month && stepDates.saved && stepDates.word === '오늘' && stepDates.inToday && stepDates.count && stepDates.day === '스모크 초안' && stepDates.parent === '스모크 보고서' && stepDatesTick.ticked && stepDatesTick.gone, `하위 할 일 날짜 ${JSON.stringify({ stepDates, stepDatesTick })}`);
@@ -4282,13 +4351,13 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       const lead = n => { const t = time(n); const at = shows(t) ? t : n?.querySelector('.chip-title'); return at ? at.getBoundingClientRect().left : NaN; };
       const stepChip = cellOf(${JSON.stringify(stepDay)}).querySelector('.day-task');
       return { limit: calMonthLimit(), chipDay: lines(${JSON.stringify(chipDay)}), crowdDay: lines(${JSON.stringify(crowdDay)}), foldDay: lines(${JSON.stringify(foldDay)}), stepDay: lines(${JSON.stringify(stepDay)}),
-        stepTip: stepChip?.getAttribute('title') || '', textCol: Math.round(Math.abs(lead(chip) - lead(event)) * 10) / 10, board: [...document.querySelectorAll('.calendar-grid.large')].every(n => n.classList.contains('task-titles')),
+        stepTip: stepChip?.getAttribute('data-tip') || '', textCol: Math.round(Math.abs(lead(chip) - lead(event)) * 10) / 10, board: [...document.querySelectorAll('.calendar-grid.large')].every(n => n.classList.contains('task-titles')),
         chipH: chip ? Math.round(box(chip).height * 10) / 10 : null, eventH: event ? Math.round(box(event).height * 10) / 10 : null,
         ring: ring ? [Math.round(box(ring).width), Math.round(box(ring).height), getComputedStyle(ring).boxShadow === listInk + ' 0px 0px 0px 1.5px inset', getComputedStyle(ring).backgroundColor].join('|') : null,
         timeShown: [shows(time(chip)), shows(time(event))].join('|'), sameInk: Boolean(time(chip) && time(event)) && getComputedStyle(time(chip)).color === getComputedStyle(time(event)).color && getComputedStyle(time(chip)).fontWeight === getComputedStyle(time(event)).fontWeight,
         titleSize: chip ? getComputedStyle(chip.querySelector('.chip-title')).fontSize : null,
         clipped: [...document.querySelectorAll('.calendar-grid.large .calendar-day')].filter(n => n.scrollHeight > n.clientHeight + 1).map(n => n.dataset.day),
-        countLines: document.querySelectorAll('.calendar-grid.large .day-tasks').length, tip: chip?.getAttribute('title') || '',
+        countLines: document.querySelectorAll('.calendar-grid.large .day-tasks').length, tip: chip?.getAttribute('data-tip') || '',
         stray: [...document.querySelectorAll('.calendar-grid.large .day-task')].filter(n => n.tabIndex === 0 && !n.closest('.calendar-day.is-selected')).length, own: cellOf(${JSON.stringify(chipDay)}).querySelectorAll('.day-task[tabindex="0"]').length };`);
     const timeNow = () => run(mainWindow, `
       const col = document.querySelector('.time-col[data-day="${chipDay}"]'), row = col?.querySelector('.time-task[data-todo-id="${mailId}"]');
@@ -4300,7 +4369,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       const shown = n => n.getClientRects().length > 0, groupRows = group ? [...group.querySelectorAll('.time-task')].filter(shown) : [];
       // the label whole to the subpixel, by a copy of it at its own width beside it (whole pixels passed 「할 일 3개」 drawn 「할 일 3…」 at 900, recheck 2026-11-11)
       const whole = t => { const c = t.cloneNode(true); c.style.cssText = 'position:absolute;visibility:hidden;width:max-content;white-space:nowrap'; t.parentNode.append(c); const need = c.getBoundingClientRect().width; c.remove(); return need <= t.getBoundingClientRect().width + 0.01; };
-      return { mode: calMode(), days: days.length, two: two ? [two.getAttribute('aria-label'), Math.round(two.getBoundingClientRect().height), two.title, groupRows.length, whole(two.lastElementChild), group.classList.contains('folded'), Math.floor(group.clientWidth / 3 - 27) < CAL_TASK_ROOM].join('|') : null,
+      return { mode: calMode(), days: days.length, two: two ? [two.getAttribute('aria-label'), Math.round(two.getBoundingClientRect().height), two.dataset.tip || '', groupRows.length, whole(two.lastElementChild), group.classList.contains('folded'), Math.floor(group.clientWidth / 3 - 27) < CAL_TASK_ROOM].join('|') : null,
         foldRing: before ? [before.width, before.height, /inset/.test(before.boxShadow) && /1\\.5px/.test(before.boxShadow), fold.classList.contains('ringed')].join('|') : null, stepCol: days.indexOf(${JSON.stringify(stepDay)}) + 1, foldCol: days.indexOf(${JSON.stringify(foldDay)}) + 1, row: row ? { h: Math.round(row.getBoundingClientRect().height), off: Math.round(row.getBoundingClientRect().top - col.getBoundingClientRect().top - 15 * calHour), text: row.textContent, oneLine: row.querySelector('.chip-title').scrollHeight <= row.querySelector('.chip-title').clientHeight + 1, block: row.classList.contains('time-event') } : null,
         chips, folded, col: days.indexOf(${JSON.stringify(chipDay)}) + 1, crowdCol: days.indexOf(${JSON.stringify(crowdDay)}) + 1, events: col ? col.querySelectorAll('.time-event').length : 0 };`);
     const out = {};
@@ -4440,11 +4509,11 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     for (const t of madeTasks) await invoke('task:delete', { id: t.id });
     await run(mainWindow, `closeCard(false); setCalMode('month'); calRollReset(); goToday(); render(); return true;`);
     // 「회의 먼저」 (2026-11-11 owner): the 9:00 event, the 15:00 task, then the task with no time
-    const m = out.month, chipLines = ['9 AM스모크 칩 회의', '3 PM스모크 칩 메일', '스모크 칩 보고서']; // the month's short time (2026-11-11)
+    const m = out.month, chipLines = ['9am스모크 칩 회의', '3pm스모크 칩 메일', '스모크 칩 보고서']; // the month's short time (2026-11-11), lower case since 2026-11-14 (V3)
     const monthOk = mm => mm.limit === 3 && mm.chipDay.join('|') === chipLines.join('|') && mm.crowdDay.join('|') === '스모크 칩 워크숍|스모크 칩 많음 1|+4개' && Math.abs(mm.chipH - mm.eventH) <= 0.5
       && mm.ring === '9|9|true|rgba(0, 0, 0, 0)' && mm.sameInk && mm.titleSize === '12px' && !mm.clipped.length && mm.countLines === 0 && mm.timeShown.split('|')[0] === mm.timeShown.split('|')[1]
       && mm.stray === 0 && mm.own === 2 // one Tab stop in the grid: the selected day's chips take Tab, the others' the arrows
-      && mm.board && mm.textCol <= 1 && mm.foldDay.join('|') === '11 AM스모크 칩 같은 시각 1|11 AM스모크 칩 같은 시각 2|11:10 AM스모크 칩 같은 시각 3' // review 2026-11-11: one text column; the month lists by time
+      && mm.board && mm.textCol <= 1 && mm.foldDay.join('|') === '11am스모크 칩 같은 시각 1|11am스모크 칩 같은 시각 2|11:10am스모크 칩 같은 시각 3' // review 2026-11-11: one text column; the month lists by time
       && mm.stepDay.join('|') === '스모크 칩 메일' && mm.stepTip === '스모크 칩 메일 · 내 할 일 · 하위 할 일 「스모크 칩 검토」'; // and a subtask's day holds its task
     const weekOk = w => w.mode === 'week' && w.days === 7 && w.row && w.row.h === 18 && Math.abs(w.row.off - 1) <= 1 && w.row.text === '스모크 칩 메일' && w.row.oneLine && !w.row.block && w.events === 1
       && w.chips.join() === `스모크 칩 보고서@${w.col},스모크 칩 메일@${w.stepCol}` && w.folded.join() === `할 일 5개@${w.crowdCol}`
@@ -4462,7 +4531,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       && out.column.shipped.event !== null && Math.abs(out.column.shipped.event - out.column.shipped.task) <= 1 // the pictures for the owner: the cell's event and task on one column as shipped
       && monthOk(out.monthDark) && weekOk(out.weekDark) && out.weekTint !== out.weekTintLight
       && monthOk(out.narrowDark) && monthOk(out.narrow) && out.narrowOpens.drawer && out.narrowOpens.sheet?.task && weekOk(out.narrowWeek)
-      && out.count.chipDay.join('|') === '9 AM스모크 칩 회의|할 일 2개' && out.count.countLines >= 1 && !out.countWeek.row && !out.countWeek.chips.length
+      && out.count.chipDay.join('|') === '9am스모크 칩 회의|할 일 2개' && out.count.countLines >= 1 && !out.countWeek.row && !out.countWeek.chips.length
       && out.sheetRow.row && out.sheetRow.value === 'title' && out.sheetRow.options === '제목,개수' && out.sheetRow.group === 1 && out.sheetRow.after === '할 일 화면 메모', // the second card, after 할 일 화면 메모 (2026-11-11 owner)
     `달력 할 일 칩 ${JSON.stringify(out)}`);
   }
@@ -4606,11 +4675,13 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
     const seen = place => [...new Set(runs.filter(r => r.place === place).flatMap(r => String(r.counts).split(',')))].sort().join();
     const todays = place => [...new Set(runs.filter(r => r.place === place && !r.theme).map(r => r.todayDots))].sort().join();
     const otherCounts = place => [...new Set(others.filter(o => o.place === place).map(o => o.dots))].sort().join();
+    // The zoom steps against the window's own pixel ratio at 100% (2026-11-15: on a 225% display 1.25 came as 2.8125 — the screen's scale, not a fault).
+    const base = runs.find(r => r.place === 'panel' && r.size === 'default' && r.scale === 1)?.dpr || 1;
     expect(runs.length === 40 && !bad.length && seen('panel') === '1,2,3' && seen('widget') === '1,2,3' && ['panel', 'widget'].every(p => todays(p) === '1,2,3') /* today one dot (the demo's task dot), two, three */
-      && runs.some(r => r.scale === 1.25 && r.dpr === 1.25) && runs.some(r => r.size === 'large' && r.scale === 1.25 && r.place === 'panel' && Math.abs(r.dpr - 1.40625) < 0.001)
-      && runs.some(r => r.size === 'larger' && r.scale === 1.25 && r.place === 'panel' && Math.abs(r.dpr - 1.5625) < 0.001)
+      && runs.some(r => r.scale === 1.25 && Math.abs(r.dpr - 1.25 * base) < 0.001) && runs.some(r => r.size === 'large' && r.scale === 1.25 && r.place === 'panel' && Math.abs(r.dpr - 1.40625 * base) < 0.001)
+      && runs.some(r => r.size === 'larger' && r.scale === 1.25 && r.place === 'panel' && Math.abs(r.dpr - 1.5625 * base) < 0.001)
       && others.filter(o => o.place === 'panel').length >= 20 && others.filter(o => o.place === 'widget').length >= 20 && otherCounts('panel') === '1,2,3' && otherCounts('widget') === '1,2,3' && !badOthers.length && back,
-    '작은 달력 점이 오늘 원 가운데 ' + JSON.stringify({ bad: bad.slice(0, 4), badOthers: badOthers.slice(0, 4), panel: seen('panel'), widget: seen('widget'), today: [todays('panel'), todays('widget')], runs: runs.length, others: others.length, aside: aside.length, back }));
+    '작은 달력 점이 오늘 원 가운데 ' + JSON.stringify({ bad: bad.slice(0, 4), badOthers: badOthers.slice(0, 4), panel: seen('panel'), widget: seen('widget'), today: [todays('panel'), todays('widget')], runs: runs.length, others: others.length, aside: aside.length, back, base }));
   }
   checks.push('mini-calendar-dots');
   const deleteRow = await invoke('event:add', { calendarId: (await invoke('state:get')).calendars.find(c => c.provider === 'local').id, title: '스모크 삭제 줄', start: new Date().toISOString().slice(0, 10), end: new Date(Date.now() + 86400000).toISOString().slice(0, 10), allDay: true });
@@ -4768,6 +4839,8 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   expect(openSheet.examples === 3 && openForm.word === '점심' && /🍽️ 김민수 · .*11:30.*12:30/.test(openForm.preview) && openForm.moreHidden && openForm.small === 0 && openForm.dateWord === 'true,false,true' && openForm.alerts === '12,false', `자주 쓰는 일정 시트 ${JSON.stringify({ openSheet, openForm })}`);
   expect(madeOne.moreOpen && madeOne.emojis && madeOne.small === 0 && madeOne.saved === '점심:🍽️:11:30:12:30' && madeOne.rows === 1, `자주 쓰는 일정 저장 ${JSON.stringify(madeOne)}`);
   expect(typedCard.hint === '저장하면 🍽️ 민수' && typedCard.keep === 1 && typedCard.allDay === false && /11:30.*\|.*12:30/.test(typedCard.times) && savedCard.after === 0 && savedCard.backAllDay === true && savedCard.title === '🍽️ 민수' && savedCard.allDay === false && savedCard.at === '11,30,12,30', `자주 쓰는 일정 카드 ${JSON.stringify({ typedCard, savedCard })}`);
+  // the editor's look (2026-11-13): 색 in the first group, S1 pop-ups, 더 보기 gone once opened, 달력 색 following 달력 — light, dark, en, 더 크게
+  await require('./ui-smoke-event-word-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm });
   checks.push('event-shortcuts');
   // 2026-11-11 owner: 「자주 쓰는 일정에 저녁을 19시~20시로 설정해뒀을 때 새 일정 창에 저녁 치면 하루종일 on/off 토글이 off로 바뀌어야 하는데 안 바뀌어」
   // — the form follows the line (calendar.js calFollowLine). Real keys into a new card on the month: each syllable a char event as the IME hands
@@ -5083,7 +5156,9 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       && wSheet.previewed === 0.1 && wSheet.width >= wSheet.rowWidth - 120 && !wSheet.saveAsked && glassSaved === 0.1 && sheetGone, `위젯 설정의 유리 효과 슬라이더 ${JSON.stringify({ wSheet, glassSaved, sheetGone })}`);
     await invoke('widget:close', { id: gWidget.id });
     // W3 the calendar widget: the day's tasks after its events, folded into 「+n개 더 보기」 when they do not fit; the today circle clear of the dots
-    const gCalEvent = await invoke('event:add', { title: '스모크 G 회의', calendarId: 'local-calendar', start: gIso(gToday, 10), end: gIso(gToday, 11), allDay: false, location: '' });
+    // 10:00 to 23:59: upcoming or under way at any hour of a run, never ended, so taskInk below always has a row to compare with (2026-11-14
+    // review C1: 10~11 left none after 11:00 and the check passed on null)
+    const gCalEvent = await invoke('event:add', { title: '스모크 G 회의', calendarId: 'local-calendar', start: gIso(gToday, 10), end: new Date(`${gToday}T23:59:00`).toISOString(), allDay: false, location: '' });
     // the day above today has dots too, so the circle's distance from them is measured (2026-11-09 review: the first pictures had none there)
     const gAbove = await invoke('event:add', { title: '스모크 G 윗줄', calendarId: 'local-calendar', start: DG.dayOffset(gToday, -7), end: DG.dayOffset(gToday, -6), allDay: true, location: '' });
     const gCal = await invoke('widget:open', { type: 'calendar' }); const cWin = widgetWindows.get(gCal.id); await gPause(900); await settle(cWin);
@@ -5092,7 +5167,8 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       const cells = [...document.querySelectorAll('.widget-calendar-content .calendar-day')]; const i = cells.indexOf(cell); const aboveDots = i >= 7 ? cells[i - 7].querySelector('.day-dots') : null;
       return { circle: +box(num).w.toFixed(1), gapBelow: +(box(dots).y - box(num).b).toFixed(1), gapAbove: aboveDots ? +(box(num).y - box(aboveDots).b).toFixed(1) : null, hidden: document.querySelector('.widget-agenda').hidden,
         events: [...document.querySelectorAll('.widget-agenda .event-row .event-title')].map(n => n.textContent).join(), tasks: [...document.querySelectorAll('.widget-agenda-tasks .task-title')].map(n => n.textContent).join(), more: document.querySelector('.widget-agenda .text-button')?.textContent || '',
-        taskInk: document.querySelector('.widget-agenda-tasks .task-title') ? getComputedStyle(document.querySelector('.widget-agenda-tasks .task-title')).color === getComputedStyle(document.querySelector('.widget-agenda .event-row strong')).color : null, rowBottom: Math.max(0, ...[...document.querySelectorAll('.widget-agenda .event-row,.widget-agenda .task-row,.widget-agenda .text-button')].map(n => box(n).b)), limit: box(document.querySelector('.widget-calendar-content')).b };`;
+        /* a task's title in the ink of an event not yet ended (「스모크 G 회의」 runs to 23:59): an ended event's row is --w-secondary (2026-11-13 past events) */
+        taskInk: document.querySelector('.widget-agenda-tasks .task-title') && document.querySelector('.widget-agenda .event-row:not(.past) strong') ? getComputedStyle(document.querySelector('.widget-agenda-tasks .task-title')).color === getComputedStyle(document.querySelector('.widget-agenda .event-row:not(.past) strong')).color : null, rowBottom: Math.max(0, ...[...document.querySelectorAll('.widget-agenda .event-row,.widget-agenda .task-row,.widget-agenda .text-button')].map(n => box(n).b)), limit: box(document.querySelector('.widget-calendar-content')).b };`;
     const calSmall = await run(cWin, CAL);
     await shot(cWin, 'widget-calendar-day-tasks');
     const calCellRect = () => run(cWin, `const r = document.querySelector('.widget-calendar-content .calendar-day.is-today').getBoundingClientRect(); return { x: Math.max(0, r.left - 24), y: Math.max(0, r.top - 44), width: r.width + 48, height: r.height + 56 };`);
@@ -5495,7 +5571,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       document.dispatchEvent(new KeyboardEvent('keydown', { key: '2', code: 'Digit2', ctrlKey: true, bubbles: true, cancelable: true })); ${hWait(900)}
       out.keyBack = shown() && selectedDate === today && view === 'calendar';
       calendarStep(-2); ${hWait(900)} out.awayAgain = !shown();
-      const nav = document.querySelector('.main-nav .nav-item:nth-child(2)'); out.tip = nav.title; nav.click(); ${hWait(900)}
+      const nav = document.querySelector('.main-nav .nav-item:nth-child(2)'); out.tip = nav.dataset.tip || ''; nav.click(); ${hWait(900)}
       out.clickBack = shown() && selectedDate === today && view === 'calendar';
       return out;`);
     expect(again.away && again.keyBack && again.awayAgain && again.clickBack && again.tip === '오늘로 이동 (Ctrl+2)', `달력 다시 누르면 오늘 ${JSON.stringify(again)}`);
@@ -5508,10 +5584,10 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
       const r = n => { const b = n?.getBoundingClientRect(); return b ? [Math.round(b.left), Math.round(b.width), Math.round(b.height)] : null; };
       const toggle = () => document.querySelector('.topbar-brand>.sidebar-toggle');
       const kids = () => [...document.querySelector('.topbar-brand').children].map(n => n.tagName === 'IMG' ? 'mark' : n.classList.contains('brand-name') ? 'word' : n.classList.contains('sidebar-toggle') ? 'toggle' : n.tagName).join(' ');
-      out.order = kids(); out.tip = toggle().title; out.toggleBox = r(toggle()); out.mark = r(document.querySelector('.topbar-brand>img')); out.brandRight = Math.round(document.querySelector('.topbar-brand').getBoundingClientRect().right);
+      out.order = kids(); out.tip = toggle().dataset.tip || ''; out.toggleBox = r(toggle()); out.mark = r(document.querySelector('.topbar-brand>img')); out.brandRight = Math.round(document.querySelector('.topbar-brand').getBoundingClientRect().right);
       out.openSidebar = r(document.querySelector('.sidebar')); out.openTitle = r(document.querySelector('.topbar-main h1')); out.openGone = ${sideGone};
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', bubbles: true, cancelable: true })); ${hWait(300)}
-      out.closed = { cls: document.querySelector('#app').classList.contains('sidebar-closed'), gone: ${sideGone}, title: r(document.querySelector('.topbar-main h1')), brand: r(document.querySelector('.topbar-brand')), toggle: r(toggle()), mark: r(document.querySelector('.topbar-brand>img')), order: kids(), tip: toggle().title, setting: state.settings.sidebar, main: r(document.querySelector('.main-content')) };
+      out.closed = { cls: document.querySelector('#app').classList.contains('sidebar-closed'), gone: ${sideGone}, title: r(document.querySelector('.topbar-main h1')), brand: r(document.querySelector('.topbar-brand')), toggle: r(toggle()), mark: r(document.querySelector('.topbar-brand>img')), order: kids(), tip: toggle().dataset.tip || '', setting: state.settings.sidebar, main: r(document.querySelector('.main-content')) };
       return out;`);
     await shot(mainWindow, 'sidebar-collapsed');
     await darkShot('sidebar-collapsed-dark');
@@ -5638,7 +5714,7 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
         const chips = [...document.querySelectorAll('.calendar-day[data-day="${tomorrow}"] .day-task[data-todo-id="${stTask.id}"]')];
         const at930 = document.querySelector('.time-col[data-day="${tomorrow}"] .time-task[data-todo-id="${stTask.id}"][data-focus-key*="~09:30"]');
         const row = document.querySelector('.time-col[data-day="${tomorrow}"] .time-task[data-todo-id="${stTask.id}"][data-focus-key*="~' + want + '"]');
-        return { month: chips.length === 1 ? [chips[0].querySelector('.chip-time')?.textContent || '', chips[0].title.includes('초안 보내기 ') && chips[0].title.includes('아주 긴')].join('|') : 'chips ' + chips.length, nine: Boolean(at930), week: row ? [row.title.includes('「초안 보내기」 '), row.closest('.time-col')?.dataset.day].join('|') : null, mode: calMode() };`);
+        return { month: chips.length === 1 ? [chips[0].querySelector('.chip-time')?.textContent || '', (chips[0].dataset.tip || '').includes('초안 보내기 ') && (chips[0].dataset.tip || '').includes('아주 긴')].join('|') : 'chips ' + chips.length, nine: Boolean(at930), week: row ? [(row.dataset.tip || '').includes('「초안 보내기」 '), row.closest('.time-col')?.dataset.day].join('|') : null, mode: calMode() };`);
       const showCal = mode => run(mainWindow, `closeCard(false); goto('calendar'); setCalMode(${JSON.stringify(mode)}); selectedDate = ${JSON.stringify(tomorrow)}; calSyncMonth(); render(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); const s = document.querySelector('#app .time-scroll'); if (s) s.scrollTop = 8 * calHour; await new Promise(r => setTimeout(r, 120)); return true;`);
       await showCal('month'); st.calMonth = await calNow(); await calm(mainWindow); await shot(mainWindow, 'subtask-time-month-light-1180');
       await showCal('week'); st.calWeek = await calNow(); await calm(mainWindow); await shot(mainWindow, 'subtask-time-week-light-1180');
@@ -5768,6 +5844,20 @@ module.exports = async function uiSmoke({ mainWindow, widgetWindows, invoke, out
   // The spacing the owner chose on 간격 검토 2026-11-12 and the flag on its title's line, by the pixels; the list chosen again goes home (2026-11-13)
   checks.push(...await require('./ui-smoke-spacing-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm }));
   checks.push(...await require('./ui-smoke-sidebar-lists-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm }));
+  checks.push(...await require('./ui-smoke-widget-fold-1113.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm, pointer }));
+  checks.push(...await require('./ui-smoke-date-ink-1114.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm }));
+  checks.push(...await require('./ui-smoke-widget-task-drag-1114.cjs')({ mainWindow, widgetWindows, invoke, output, run, settle, expect, calm }));
+
+  // A fake Graph answering 502, then no list: this PC's tasks and their rung reminder stay; the card's error and 「마지막 동기화 …」, light and dark (2026-11-13)
+  checks.push(...await require('./ui-smoke-account-error-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm }));
+
+  // Outlook down: an add, a tick, a rename, a subtask and a delete by real input, kept here through a restart, then sent the PC's way, with the
+  // card, the dialog's line and 「확인할 변경」 light and dark (2026-11-13 offline stage 1)
+  checks.push(...await require('./ui-smoke-offline-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm, hooks }));
+
+  // Outlook down: an event renamed and given a place, one deleted and one made, by real input in the event card; kept through a restart, then sent
+  // the PC's way with the phone's notes kept; the card's line light and dark (2026-11-13 offline stage 1 for events)
+  checks.push(...await require('./ui-smoke-offline-events-1113.cjs')({ mainWindow, invoke, output, run, settle, expect, calm, hooks }));
 
   // Every description of the shortcut sheet on one line: ko and en, 기본 · 크게 · 더 크게, 1180 and 900 wide, with pictures (2026-11-12);
   // the last screen block, then only the pointer guard's check

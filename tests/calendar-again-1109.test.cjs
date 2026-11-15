@@ -71,8 +71,12 @@ test('the sidebar\'s 달력 pressed on the calendar is today and says so; elsewh
   assert.deepEqual([searching.seen.today, searching.seen.goto.join()], [0, 'calendar'], 'the first press clears the search, the next is today');
 });
 
-test('the shortcuts sheet and the guide say so', () => {
-  assert.equal(read('renderer/help.js').includes("[tr('오늘로 이동'),[['T'],['Ctrl','T'],['Ctrl','2']]]"), true);
+// The sheet gives one key per action since 2026-11-13 (owner; tests/sheet-one-key-1113.test.cjs): 오늘로 이동 is T alone. Ctrl+2 again still
+// goes to today and says so in the sidebar's tooltip (above) and in 시작하기.md (below).
+test('the shortcuts sheet lists T alone for today', () => {
+  const help = read('renderer/help.js');
+  const sheet = help.slice(help.indexOf('function shortcutGroups('), help.indexOf('function usefulShortcuts('));
+  assert.equal(sheet.includes("[tr('오늘로 이동'),[['T']]]"), true);
 });
 test('시작하기.md says so', { skip: !fs.existsSync(path.join(__dirname, '..', '시작하기.md')) && '시작하기.md is private (not in the public source)' }, () => {
   assert.equal(read('시작하기.md').includes('왼쪽 「달력」을 다시 누르면 오늘로 이동'), true);

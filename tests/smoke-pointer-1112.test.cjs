@@ -104,7 +104,9 @@ test('main.cjs makes the guard in smoke runs only and hands it to the smoke; the
   assert.match(main, /const smokePointer = smoke \? require\('\.\/lib\/smoke-pointer\.cjs'\)\.guardSmokeWindows\(\{ app, screen, main: \(\) => mainWindow \}\) : null;/);
   assert.ok(main.indexOf('const smokePointer') < main.indexOf('new BrowserWindow('), 'the guard listens before the first window');
   assert.equal((main.match(/setIgnoreMouseEvents/g) || []).length, 0, 'the app itself never changes the mouse handling');
-  assert.ok(main.includes("require('./tests/ui-smoke.cjs')({ mainWindow, widgetWindows, invoke, output, runBackup, pointer: smokePointer })"));
+  // hooks (2026-11-13 offline stage 1): main's own queue over the smoke's fake service, and the restart of its data layer (smokeHooks, smoke runs only)
+  assert.ok(main.includes("require('./tests/ui-smoke.cjs')({ mainWindow, widgetWindows, invoke, output, runBackup, pointer: smokePointer, hooks: smokeHooks })"));
+  assert.ok(main.includes('const smokeHooks = smoke ? {'), 'the hooks exist in smoke runs only');
   assert.ok(main.includes('smokePointer.release(win)'), 'DAYBOARD_SMOKE_HOLD widgets take the mouse again');
   const smoke = read('tests/ui-smoke.cjs');
   assert.ok(smoke.includes("if (process.env.DAYBOARD_SMOKE_ONLY === 'under-cursor') return require('./ui-smoke-under-cursor-1112.cjs')({ mainWindow, invoke, output, run, settle, expect, calm, pointer, stir: true });"), 'the stir on demand');

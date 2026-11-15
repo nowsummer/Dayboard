@@ -6,14 +6,18 @@
 // Loaded before app.js like calendar.js: app.js's globals are read only when these functions run.
 
 // ---- Shortcuts ----
-// A shortcut lists key combinations shown as alternatives: [['Ctrl','F'],['Ctrl','K']] reads Ctrl F / Ctrl K. A mouse action ({mouse:…}) is one
+// A shortcut lists key combinations shown as alternatives: [['Ctrl','Shift','Z'],['Ctrl','Y']] reads Ctrl Shift Z / Ctrl Y. A mouse action ({mouse:…}) is one
 // key cap holding its words, drawn by the keys' own rule (2026-11-12 owner: 「다른건 키보드 느낌인데 더블클릭은 그냥 적혀 있어서 이상해」 — over V56's
 // plain words of 2026-11-09). The class only names it; a rule of its own would draw it apart from the keys (visual-1109b V56).
 function helpKeys(combos){return h('span',{class:'keys'},combos.map((combo,i)=>[i?h('span',{class:'keys-or'},'/'):null,combo.map(k=>k&&k.mouse?h('kbd',{class:'keys-mouse'},k.mouse):h('kbd',{},k))]));}
+// One key per action on the sheet, the ? card and the tooltips (2026-11-13 owner): 다시 실행 alone shows two, Ctrl+Shift+Z and Ctrl+Y. A Ctrl
+// key other apps use for the same action still works without a row (Ctrl+K search, Ctrl+T today, Ctrl+G go to date, Ctrl+←/→ the period —
+// app.js and calendar.js take them); a single letter the sheet does not show is not taken at all (J, K and C are gone).
+// tests/sheet-one-key-1113.test.cjs.
 function shortcutGroups(){
   return [
     [tr('어디서나'),[
-      [tr('검색'),[['Ctrl','F'],['Ctrl','K']]],
+      [tr('검색'),[['Ctrl','F']]],
       [tr('새로 만들기(보는 화면에 맞게)'),[['Ctrl','N']]],
       [tr('방금 한 일 되돌리기'),[['Ctrl','Z']]],
       [tr('다시 실행'),[['Ctrl','Shift','Z'],['Ctrl','Y']]],
@@ -30,34 +34,33 @@ function shortcutGroups(){
       // one row: three kept the double click's row from fitting the smallest window
       [tr('글자 크기'),[['Ctrl','+'],['Ctrl','-'],['Ctrl','0']]]]],
     [tr('할 일'),[
+      // not a key, but nothing else tells of it, and the row's arrow is small (2026-11-08 owner); first, 모두 right under it (2026-11-13 owner)
+      [tr('하위 할 일 펼치기·접기'),[[{mouse:tr('더블클릭')}]]],
       // every task's subtasks on the screen at once (2026-11-07 owner: down opens, up folds; app.js stepFoldKey). One row: a second one made
       // the sheet scroll in the default 1180×780 window (smoke shortcuts-sheet-list-keys). Moving a task by key is gone (owner: 「굳이 필요 할까」),
       // and Shift+F10 is Windows' own key for a right click, not listed here.
       [tr('하위 할 일 모두 펼치기·접기'),[['Alt','↓'],['Alt','↑']]],
-      // not a key, but nothing else tells of it, and the row's arrow is small (2026-11-08 owner)
-      [tr('하위 할 일 펼치기·접기'),[[{mouse:tr('더블클릭')}]]],
       [tr('오른쪽 패널'),[['/']]]]],
     [tr('달력'),[
-      // Ctrl+2 again on the calendar is today too, as the sidebar's 달력 pressed again (2026-11-09 owner request; app.js takes the key)
-      [tr('오늘로 이동'),[['T'],['Ctrl','T'],['Ctrl','2']]],
-      [tr('날짜로 이동'),[['G'],['Ctrl','G']]],
+      // T and G only: Ctrl+T, Ctrl+G and Ctrl+2 again (today, as the sidebar's 달력 pressed again — its tooltip and 시작하기 say so) keep working.
+      // A new event is Ctrl+N under 어디서나.
+      [tr('오늘로 이동'),[['T']]],
+      [tr('날짜로 이동'),[['G']]],
       [tr('일·주·월 보기'),[['D'],['W'],['M']]],
-      [tr('이전 기간'),[['J'],['←']]],
-      [tr('다음 기간'),[['K'],['→']]],
+      [tr('이전·다음 기간'),[['←'],['→']]],
       [tr('월간에서 한 주씩'),[['↑'],['↓']]],
       [tr('주간·일간에서 시간 이동'),[['↑'],['↓']]],
-      [tr('새 일정'),[['C'],['Ctrl','N']]],
       [tr('오른쪽 패널'),[['/']]]]],
     [tr('메모'),[
+      // the find bar's Enter / Shift+Enter (and ↓ / ↑) are in its own ▲▼ tooltips (notefind.js), not a row here
       [tr('메모 안에서 찾기'),[['Ctrl','F']]],
-      [tr('다음·이전 찾기'),[['Enter'],['Shift','Enter']]],
       [tr('메모 목록 검색'),[['Ctrl','K']]],
       [tr('폴더 보기'),[['/']]]]],
   ];
 }
 // The few that matter on the screen in view (Notion Calendar's 「유용한 단축키」).
 function usefulShortcuts(){
-  if(view==='calendar')return [[tr('오늘로 이동'),[['T']]],[tr('날짜로 이동'),[['G']]],[tr('일·주·월 보기'),[['D'],['W'],['M']]],[tr('이전·다음 기간'),[['J'],['K']]],[tr('새 일정'),[['C']]],[tr('일정 검색'),[['Ctrl','F']]]];
+  if(view==='calendar')return [[tr('오늘로 이동'),[['T']]],[tr('날짜로 이동'),[['G']]],[tr('일·주·월 보기'),[['D'],['W'],['M']]],[tr('이전·다음 기간'),[['←'],['→']]],[tr('새 일정'),[['Ctrl','N']]],[tr('일정 검색'),[['Ctrl','F']]]];
   if(view==='notes')return [[tr('새 메모'),[['Ctrl','N']]],[tr('메모 안에서 찾기'),[['Ctrl','F']]],[tr('메모 목록 검색'),[['Ctrl','K']]],[tr('방금 한 일 되돌리기'),[['Ctrl','Z']]]];
   return [[tr('새 할 일'),[['Ctrl','N']]],[tr('할 일 검색'),[['Ctrl','F']]],[tr('방금 한 일 되돌리기'),[['Ctrl','Z']]]];
 }
@@ -96,7 +99,7 @@ function helpOpen(pinned,kb=false){
   helpMark();
   if(pinned&&kb)node.querySelector('.help-link')?.focus({preventScroll:true});
 }
-// Focus that moves away from the card and the ? (Ctrl+F, Ctrl+N, C, Tab) closes it, so the next Esc belongs to what has focus.
+// Focus that moves away from the card and the ? (Ctrl+F, Ctrl+N, Tab) closes it, so the next Esc belongs to what has focus.
 function helpFocus(e){if(helpPop&&!helpPop.node.contains(e.target)&&!e.target.closest?.('.help-button'))helpClose();}
 function helpPlace(){const button=document.querySelector('#app .help-button');if(!helpPop||!button)return;const r=button.getBoundingClientRect(),n=helpPop.node;n.style.left=Math.max(8,Math.min(r.left-8,innerWidth-n.offsetWidth-8))+'px';n.style.bottom=Math.max(8,innerHeight-r.top+8)+'px';}
 function helpClose(){

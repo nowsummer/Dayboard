@@ -91,7 +91,7 @@ test('the widget agenda drops tasks, the 더 보기 button counted, before it dr
     getComputedStyle: () => ({ paddingBottom: '0', getPropertyValue: () => '' }), showEvent() {}, eventMenu() {}, canEditEvent: () => false, deleteEventFlow() {},
     eventColor: () => '#000', isRecurring: () => false, timeLabel: () => '오전 9:00' });
   h.context.state.settings = { widgetTextSize: 'm' };
-  h.loadApp('function agenda(', 'function fitWidgetAgenda(');
+  h.loadApp('function markPast(', 'function agenda(', 'function fitWidgetAgenda('); // markPast: an event with no time is never past (2026-11-13)
   const content = h.document.createElement('div'); content.className = 'widget-calendar-content';
   const section = h.document.createElement('section'); section.className = 'widget-agenda';
   const title = h.document.createElement('div'); title.className = 'widget-agenda-title';

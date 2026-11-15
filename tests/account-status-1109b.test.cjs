@@ -7,17 +7,19 @@ const { harness } = require('./r50-F-harness.cjs');
 
 function status(sync) {
   const h = harness({ openAccounts() {}, fmtTime: () => '오후 3:00' });
-  h.loadApp('function accountStatus(');
+  h.loadApp('function syncedAt(', 'function accountStatus('); // the time's words since 2026-11-13 (tests/account-synced-1113)
   h.context.state.accounts = [{ id: 'ga', provider: 'google' }];
   h.context.state.sync = sync;
   const b = h.eval('accountStatus')();
   return b.getAttribute('title') + ' | ' + b.getAttribute('aria-label');
 }
 
+// A sync of today: since 2026-11-13 another day's says its date before the time (syncedAt), which this test is not about.
+const TODAY = (() => { const d = new Date(); d.setHours(15, 0, 0, 0); return d.toISOString(); })();
 test('F88: a sync error\'s first line goes into the account button\'s tooltip and name; without one the words are as before', () => {
-  const t = status({ error: 'Google: 다시 로그인해 주세요.\nMicrosoft: 연결이 끊겼어요.', lastSync: '2026-11-09T06:00:00.000Z' });
+  const t = status({ error: 'Google: 다시 로그인해 주세요.\nMicrosoft: 연결이 끊겼어요.', lastSync: TODAY });
   assert.equal(t, '동기화 오류 · Google: 다시 로그인해 주세요. · 마지막 동기화 오후 3:00 | 동기화 오류 · Google: 다시 로그인해 주세요. · 마지막 동기화 오후 3:00');
-  assert.equal(status({ error: null, lastSync: '2026-11-09T06:00:00.000Z' }).split(' | ')[0], '계정 1개 연결됨 · 마지막 동기화 오후 3:00');
+  assert.equal(status({ error: null, lastSync: TODAY }).split(' | ')[0], '계정 1개 연결됨 · 마지막 동기화 오후 3:00');
   const long = status({ error: 'Google: ' + '가'.repeat(120) }).split(' | ')[0];
   assert.equal(long.length <= '동기화 오류 · '.length + 80, true, 'a long reason is cut');
 });

@@ -5,8 +5,9 @@
 // Not recorded from the screen (2026-10-29 user: 「깃허브 영문 소개 페이지 gif에서 바탕화면 위젯을 소개해주는 화면에 뒷 배경이 바탕화면이
 // 아니라 내 개인 구글 크롬 화면으로 녹화가 됐어」 — the 1.2.1 English scene went public over the user's own Chrome, its bookmarks
 // and start page; then 「Electron으로 합성」): each widget is taken from its own frames, as Chromium paints them
-// (beginFrameSubscription, like scripts/readme-demo.cjs), and laid at its place over the wallpaper as Dayboard reads it for the
-// widgets' glass (lib/wallpaper.cjs) by scripts/readme-scene-compose.py, which also draws the caption. No other window, desktop
+// (beginFrameSubscription, like scripts/readme-demo.cjs), and laid at its place over the drawn wallpaper 「D 새벽 능선」 — the same
+// picture sent to each widget for its glass, never the user's wallpaper (scripts/readme-desktop.cjs, readme-wallpaper.py) — by
+// scripts/readme-scene-compose.py, which also draws the caption. No other window, desktop
 // icon, tooltip or notification can be in the picture, and the user's windows stay as they are (the widgets sit under them meanwhile).
 // Run from 개발 자료/:  node_modules/.bin/electron.cmd scripts/readme-widget-scene.cjs   (DAYBOARD_SHOTS_LANG=en for English)
 // Output: %TEMP%/dayboard-readme-scene/<ko|en>/f_<n>_<ms>.png and sample.json (or DAYBOARD_SCENE_OUT); the layers in <out>-layers.
@@ -29,7 +30,7 @@ process.chdir(APP_DIR);
 
 const { Worker } = require('node:worker_threads');
 const { app, BrowserWindow, screen, nativeImage } = require('electron');
-const { desktopSwitches, physicalRect, wallpaperLayer, compose } = require('./readme-desktop.cjs');
+const { desktopSwitches, physicalRect, wallpaperLayer, compose, checkBackdrop } = require('./readme-desktop.cjs');
 const LAYERS = `${OUT}-layers`;
 fs.rmSync(LAYERS, { recursive: true, force: true });
 fs.mkdirSync(LAYERS, { recursive: true });
@@ -138,6 +139,8 @@ app.whenReady().then(async () => {
       win.webContents.send('dayboard:backdrop', backdropAt(at, `readme:${type}:${at.x},${at.y}`));
       await wait(900);
     }
+    const keys = {}; // the drawn wallpaper behind each widget's glass, from the first frame to the last
+    for (const type of Object.keys(goal)) keys[type] = await checkBackdrop(windows[type], type);
     let n = 0; let recording = false; const lastAt = {};
     const writers = Array.from({ length: 3 }, () => new Worker(WRITER, { eval: true }));
     for (const type of Object.keys(goal)) {
@@ -190,6 +193,7 @@ app.whenReady().then(async () => {
     for (const win of Object.values(windows)) win.webContents.invalidate(); // the last hold is in the film
     await wait(120);
     recording = false;
+    for (const type of Object.keys(goal)) if ((await checkBackdrop(windows[type], type)) !== keys[type]) throw new Error(`${type}: its backdrop changed during the scene`);
     await wait(400);
     for (const win of Object.values(windows)) if (!win.isDestroyed()) win.webContents.endFrameSubscription();
     await Promise.all(writers.map(worker => new Promise(resolve => { worker.once('message', resolve); worker.postMessage({}); })));

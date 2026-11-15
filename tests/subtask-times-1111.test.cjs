@@ -270,8 +270,8 @@ test('the calendar: a subtask\'s time puts its task\'s chip at that time on that
   const chip = h.eval('calTaskChip')(copy, '2026-11-18');
   // the time after the subtasks it is theirs (2026-11-11 review: where the task's own stands it read as the task's); a month chip, one a day, keys
   // by the day alone (tests/subtask-times-review-1111.test.cjs). The chip's time in the month's short form since 2026-11-11 (「3 PM」, owner beside
-  // Notion Calendar — tests/month-time-1111.test.cjs); the tooltip keeps the full time
-  assert.equal([chip.getAttribute('data-todo-id'), chip.getAttribute('data-focus-key'), chip.querySelector('.chip-time')?.textContent, chip.title].join('|'), 't|chip-todo-t@2026-11-18|3 PM|보고 · 업무 · 하위 할 일 2개 「초안, 표」 오후 3:00');
+  // Notion Calendar, 「3pm」 since 2026-11-14 — tests/month-time-1111.test.cjs); the tooltip keeps the full time
+  assert.equal([chip.getAttribute('data-todo-id'), chip.getAttribute('data-focus-key'), chip.querySelector('.chip-time')?.textContent, chip.title].join('|'), 't|chip-todo-t@2026-11-18|3pm|보고 · 업무 · 하위 할 일 2개 「초안, 표」 오후 3:00');
   assert.equal(h.eval('calTaskChip')(copy, '2026-11-18', 'time').getAttribute('data-focus-key'), 'chip-todo-t~15:00@2026-11-18', 'in the hours, one a time');
   assert.equal(h.eval('calClockItems')([copy, days.get('2026-11-20')[1]].map(x => ({ ...x, dueDate: '2026-11-18' })), 30).map(i => i.id).join(), 'task:t~10:00,task:t~15:00', 'each its own item in the hours');
   assert.equal(/\^chip-\.\*@\(\\d\{4\}-\\d\{2\}-\\d\{2\}\)\$/.test(read('renderer/app.js')), true, 'render()\'s fall back still reads the day at the key\'s end');

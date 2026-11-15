@@ -16,6 +16,7 @@ test('V18: in the main list a subtask date follows its title by 12px; an empty o
   assert.equal(before('.tasks-view .task-step .step-date:not(.empty){margin-left:2px;margin-right:auto}'), true, 'the 10px gap + 2px = 12px after the title; the rest of the row after it (its top: the first line, 2026-11-13)');
   assert.equal(before('.tasks-view .task-step .step-date.empty{margin-left:auto}'), true, 'no date: its icon at the end as before');
   const base = css.match(/\n\.step-date\{([^}]*)\}/)[1];
-  assert.equal(base.includes('flex:none') && base.includes('font-size:12px') && base.includes('color:var(--secondary)') && base.includes('white-space:nowrap'), true, 'never shrinks, 12px --secondary');
+  // its colour one step lighter since 2026-11-14 (owner, E안): --muted, tests/date-ink-1114.test.cjs
+  assert.equal(base.includes('flex:none') && base.includes('font-size:12px') && base.includes('color:var(--muted)') && base.includes('white-space:nowrap'), true, 'never shrinks, 12px --muted');
   assert.equal(css.includes('.step-title{font-size:13px;color:var(--text);overflow-wrap:anywhere'), true, 'a long title wraps');
 });

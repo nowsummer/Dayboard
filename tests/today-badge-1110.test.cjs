@@ -1,6 +1,7 @@
 'use strict';
 // A date number has its ink in the middle of its box, everywhere by one rule with a circle or without, so it sits in the middle of a circle and on the line of its row; the 1st of a month is a number like any other,
-// with its month beside the circle (2026-11-10 owner). Measured on screen in device pixels; these keep the code that gives that result. Strings and numbers only.
+// with its month beside the circle (2026-11-10 owner); since 2026-11-13 the month is bold in the number's ink at the cell's left, on the chips' lead column.
+// Measured on screen in device pixels; these keep the code that gives that result. Strings and numbers only.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -10,6 +11,8 @@ const read = file => fs.readFileSync(path.join(__dirname, '..', 'renderer', file
 const CSS = read('styles.css'), CAL = read('calendar.js'), APP = read('app.js');
 const D = require('../renderer/domain.js');
 const em = (day, proportional) => parseFloat((D.discInk?.(day, proportional) || {})['--disc-ink']);
+const MONTH_RULE = (CSS.match(/\.calendar-grid\.rolling \.day-month\{([^}]*)\}/) || [])[1] || '';
+const MONTH_LEFT = Number((MONTH_RULE.match(/(?:^|;)left:([\d.]+)px/) || [])[1]);
 
 const NUMBER_SELECTORS = ['.date-pop-day', '.day-number', '.mini-preview-calendar span', '.time-date'];
 const discRule = () => [...CSS.matchAll(/(?:^|\n)([^\n{}]+)\{([^\n]*--disc-ink[^\n]*)\}/g)].map(m => ({ selectors: m[1].split(',').map(s => s.trim()).sort().join(' | '), body: m[2] }));
@@ -85,27 +88,34 @@ test('the 1st of a month is a number like any other: its circle holds the digit 
   assert.equal(/day-number\.first|day-number'\+\(d\.day===1/.test(CSS + CAL), false, 'no wider button for the 1st');
 });
 
-test('the month stands beside the circle, quietly, the same on any 1st', () => {
+test('the month stands at the cell\'s left on the chips\' lead column, in the number\'s ink, the same on any 1st', () => {
   assert.match(CAL, /d\.day===1\?h\('span',\{class:'day-month','aria-hidden':'true'\},calFirstMonth\(d\.key\)\):null/, 'one element outside the button, whether or not the 1st is today');
   assert.match(CAL, /const calFirstMonth=key=>D\.fromDate\(key\)\.toLocaleDateString\(I\.locale\(\),\{month:'short'\}\)/, '「11월」, 「Nov」: the app\'s language');
   assert.match(CAL, /'aria-label':d\.day===1\?calFirstLabel\(d\.key\):null/, 'read out as the full date');
-  const rule = (CSS.match(/\.calendar-grid\.rolling \.day-month\{([^}]*)\}/) || [])[1] || '';
+  const rule = MONTH_RULE;
   assert.match(rule, /position:absolute/, 'it does not move the number');
-  assert.match(rule, /right:calc\(50% \+ 16px\)/, '4px clear of the 24px circle');
+  assert.equal(/(?:^|;)right:/.test(rule), false, 'placed from the left only: a circle or a wider cell never moves it');
+  const cellPad = Number((CSS.match(/\.large \.calendar-day\{[^}]*padding:7px (\d+)px\}/) || [])[1]);
+  const chipPad = Number((CSS.match(/\.day-event\{display:flex;[^}]*padding:2px 5px 2px (\d+)px/) || [])[1]);
+  assert.equal(Number((CSS.match(/\.day-task\{display:flex;[^}]*padding:2px 5px 2px (\d+)px/) || [])[1]), chipPad, 'events and tasks share the lead column');
+  assert.ok(Math.abs(MONTH_LEFT - (cellPad + chipPad - .58)) < .005, '「1」 (left bearing .58px at 12px/600) inks on the chips\' 9px lead column: ' + MONTH_LEFT);
   assert.match(rule, /font-size:12px/);
-  assert.match(rule, /font-weight:500/);
-  assert.match(rule, /color:var\(--secondary\)/, 'not red on a 1st that is today: the circle says today');
+  assert.match(rule, /font-weight:600/, 'as heavy as today\'s number; 700 would outweigh the red circle');
+  assert.match(rule, /color:var\(--text\)/, 'the number\'s ink, not red on a 1st that is today: the circle says today');
+  assert.match(rule, /font-variant-numeric:proportional-nums/, 'the cell\'s tabular digits spread 「11월」 as 「1 1월」');
+  assert.equal(/(?:is-today|is-selected|:hover)[^{}\n]*\.day-month/.test(CSS), false, 'a circle appearing never moves or recolours the month');
   assert.match(rule, /pointer-events:none/, 'the cell keeps its clicks');
   assert.match(CSS, /\.outside \.day-month\{opacity:\.28\}/, 'as dim as the number beside it');
 });
 
-test('a cell too narrow to keep 「12월」 off its edge shows the number alone', () => {
+test('a cell too narrow to keep 「10월」 3px off the circle shows the number alone', () => {
   const hide = CSS.match(/@container \(max-width:([\d.]+)px\)\{\.calendar-grid\.rolling \.day-month\{display:none\}\}/);
   assert.equal(Boolean(hide), true, 'the cell is its own container (.large .calendar-day)');
   assert.match(CSS, /\.large \.calendar-day\{container-type:inline-size\}/);
-  // A query reads the content box (the cell less its 5px padding). 「12월」 is 25.45px wide at 12px; half a cell holds half the circle 12, the gap 4, the label and 4 clear of the edge.
-  const shownFrom = (Number(hide[1]) + .02 + 10) / 2;
-  assert.ok(shownFrom >= 12 + 4 + 25.45 + 4, 'half a cell from ' + shownFrom + 'px');
-  assert.ok(shownFrom <= 46, 'no wider than that needs: half a cell from ' + shownFrom + 'px');
-  assert.equal(84 - 10 <= Number(hide[1]), true, 'the 84px cells of the default 1180 window show the number alone, as 「12월」 would have 0.55px to the edge');
+  // A query reads the content box (the cell less 5px padding each side). 「10월」 is 23.54px at 12px/600 with proportional digits, the widest (「May」 23.46, 「12월」 23.11); the circle box starts at half the cell less 12.
+  const WIDEST = 23.54, at = Number(hide[1]), first = at + .02 + 10;
+  const clear = first / 2 - 12 - (MONTH_LEFT + WIDEST);
+  assert.ok(clear >= 3, 'the first cell that shows it keeps 3px off the circle: ' + clear.toFixed(2));
+  assert.ok(clear <= 3.5, 'and is no wider than that needs: ' + clear.toFixed(2));
+  assert.equal(84 - 10 <= at, true, 'the 84px cells of the default 1180 window show the number alone: 「10월」 would run 1.96px into the circle box');
 });

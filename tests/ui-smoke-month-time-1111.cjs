@@ -60,7 +60,7 @@ function measureMonth(kit, days, starts) {
           weight: ts ? ts.fontWeight : null, spacing: ts ? ts.letterSpacing : null, numeric: ts ? ts.fontVariantNumeric : null, size: ts ? ts.fontSize : null, color: ts ? ts.color : null,
           timeW: shown ? r2(R(t).width) : 0, titleW: r1(R(title).width), titleInside: R(title).right <= R(n).right + 0.5, h: r1(R(n).height), lead: r1(lead(n)),
           contrast: ink ? r2(ratio(ink, g)) : null, titleContrast: r2(ratio(titleInk, g)),
-          tipFull: starts[key] ? (n.getAttribute('title') || '').includes(fmtTime(new Date(starts[key]))) : null };
+          tipFull: starts[key] ? (n.getAttribute('data-tip') || '').includes(fmtTime(new Date(starts[key]))) : null };
       }) };
   });
   return { cells, limit: calMonthLimit(), lang: document.documentElement.lang };
@@ -86,14 +86,16 @@ function bandTime(kit, key) {
   return { found: true, time: true, timed: bar.classList.contains('timed'), text: t.textContent, shown: s.display !== 'none', weight: s.fontWeight, spacing: s.letterSpacing, numeric: s.fontVariantNumeric,
     size: s.fontSize, contrast: kit.r2(kit.ratio(kit.parse(s.color), kit.groundOf(bar, true))) };
 }
-// Yesterday's chip (dimmed .6 as a whole): its words, and its time and title as seen through the opacity; the row for the pictures.
+// Yesterday's chip (past, 2026-11-13: no opacity — its title in --past-ink, its time in the chips' 66% ink): its words, the opacity (1), its time and
+// title as seen on the cell, the title's colour beside --past-ink as the page resolves it; the row for the pictures.
 function pastChip(kit, day, key) {
   const chip = kit.chipIn(day, key);
   if (!chip) return { found: false, row: kit.rowOf(day) };
   const t = chip.querySelector('.chip-time'), title = chip.querySelector('.chip-title'), alpha = Number(getComputedStyle(chip).opacity), g = kit.groundOf(chip, true);
   const seen = n => { const c = kit.parse(getComputedStyle(n).color); return kit.r2(kit.ratio(kit.over([c[0], c[1], c[2], alpha], g), g)); };
   const shown = Boolean(t) && getComputedStyle(t).display !== 'none';
-  return { found: true, past: chip.classList.contains('past'), alpha, text: t ? t.textContent : null, shown, contrast: shown ? seen(t) : null, titleContrast: seen(title), row: kit.rowOf(day) };
+  const probe = document.createElement('i'); probe.style.color = 'var(--past-ink)'; document.body.append(probe); const pastInk = getComputedStyle(probe).color; probe.remove();
+  return { found: true, past: chip.classList.contains('past'), alpha, text: t ? t.textContent : null, shown, contrast: shown ? seen(t) : null, titleContrast: seen(title), titleColor: getComputedStyle(title).color, pastInk, row: kit.rowOf(day) };
 }
 // The colour --secondary paints now (it changes with prefers-contrast:more).
 function secondaryNow() { const p = document.createElement('i'); p.style.color = 'var(--secondary)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; }
@@ -280,8 +282,8 @@ module.exports = async function monthTimeSmoke({ mainWindow, invoke, output, run
       if (!live.some(x => x.kind === 'task')) fail.push('할 일 칩 없음');
       // the band (2026-11-11 review): 「8 AM」 with the chips' tracking and proportional digits, its --secondary at 500, 4.5:1 on the colour
       if (!bar.time || bar.timed || bar.text !== D.monthClock(8, 0, h24) || bar.spacing !== '-0.24px' || bar.numeric !== 'normal' || bar.weight !== '500' || bar.size !== '12px' || (bar.shown && bar.contrast < 4.5)) fail.push(`막대 ${JSON.stringify(bar)}`);
-      // yesterday's chip: the same words, dimmed as a whole (its contrast is kept in measures.json for the owner, not held to 4.5:1)
-      if (gone.found && (!gone.past || gone.text !== D.monthClock(11, 30, h24) || Math.abs(gone.alpha - 0.6) > 0.01)) fail.push(`지난 칩 ${JSON.stringify(gone)}`);
+      // yesterday's chip (2026-11-13 past events): the same words, no opacity, its title in --past-ink, its title and time 4.5:1 or more on the cell
+      if (gone.found && (!gone.past || gone.text !== D.monthClock(11, 30, h24) || Math.abs(gone.alpha - 1) > 0.01 || gone.titleColor !== gone.pastInk || gone.titleContrast < 4.5 || (gone.shown && gone.contrast < 4.5))) fail.push(`지난 칩 ${JSON.stringify(gone)}`);
       const restInk = fresh[0] ? fresh[0].color : null;
       for (const p of pointed) if (!p.missing && (!p.chipHover || !p.dayHover || p.contrast < 4.5 || p.color === restInk)) fail.push(`가리킨 칩 ${JSON.stringify(p)}`);
       if (wide && !pointed.some(p => !p.missing)) fail.push('가리킨 칩 없음');

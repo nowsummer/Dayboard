@@ -21,11 +21,11 @@ test('W1: a locked widget draws no 「null」 — the render line drops the miss
 });
 
 test('W2: the task widget lists steps as the list does (compact widget), its rows in the widget inks at 13px, the arrow hidden; drags end in widgets too', () => {
-  assert.ok(appLine('function widgetView(').includes("items.map(t=>taskRow(t,'widget',v==='today'?D.dateKey():null))"), 'the widget asks for the steps');
+  assert.ok(appLine('function widgetView(').includes("items.map(t=>{const row=taskRow(t,'widget',v==='today'?D.dateKey():null);"), 'the widget asks for the steps (each row then takes a drag in a widget of one list, tests/widget-task-drag-1114.test.cjs)');
   const row = appLine('function taskRow(');
   assert.ok(row.includes("const live=compact===true?[]:steps.filter("), 'only compact true (the 할 일 side pane, the calendar widget\'s day) keeps the count alone');
   assert.ok(row.includes("steps.length&&(folded||compact===true)?h('span',{class:'steps-label'"), 'the count when folded or compact true');
-  assert.ok(row.includes("stepRow(t,x,compact==='day'||compact==='widget'?hideDate:null)"), 'the day the widget shows is not repeated beside a step');
+  assert.ok(row.includes("stepRow(t,x,compact==='day'||compact==='widget'?hideDate:null,stepsHeaded)"), 'the day the widget shows is not repeated beside a step (stepsHeaded: under the 지난 할 일 head, tests/overdue-red-1114.test.cjs)');
   assert.ok(appLine('/* the widgets too since 2026-11-09').includes("addEventListener('dragend',endDrags,true)"), 'the drag backstops are for every window now');
   const h = harness();
   h.document.body.className = 'widget-body tasks-widget';
@@ -48,9 +48,11 @@ test('W3: the calendar widget lists the day\'s tasks and dated steps after its e
   const node = h.eval('widgetDayTasks')(day);
   assert.equal([node.className, [...node.children].map(n => n.textContent + ':' + n.className).join('|'), node.children[0].getAttribute('data-compact'), node.children[0].getAttribute('data-day')].join(' / '), 'widget-agenda-tasks / 장보기:task-row|오늘 단계:task-row day-step / true / ' + day);
   assert.equal(h.eval('widgetDayTasks')(D.dayOffset(day, 3)), null, 'a day without tasks adds nothing');
-  assert.ok(appLine('function widgetView(').includes("agenda(selectedDate,agendaOpenDay===selectedDate?Infinity:3),widgetDayTasks(selectedDate)"), 'after the events');
+  // every event of the day is drawn; fitWidgetAgenda caps them at 3 and folds them in one order (2026-11-13, tests/past-events-1113.test.cjs)
+  const view = appLine('function widgetView(');
+  assert.ok(view.includes("agenda(selectedDate,Infinity),widgetDayTasks(selectedDate)") && !view.includes('?Infinity:3'), 'after the events');
   const fit = appLine('function fitWidgetAgenda(');
-  assert.ok(fit.includes(".no-events,.task-row')].every(") && fit.includes("while(!fits()&&taskRows.length){taskRows.pop().remove();hiddenTasks++;if(!taskRows.length)section.querySelector('.widget-agenda-tasks')?.remove();settle();}") && fit.includes('tr("+{0}개 더 보기",[hidden])'), 'tasks give way first, from the last, and are counted on the button that opens the day');
+  assert.ok(fit.includes(".no-events,.task-row')].every(") && fit.includes('D.agendaGiveWay(') && !fit.includes('replaceWith(agenda(') && fit.includes('tr("+{0}개 더 보기",[hidden])'), 'rows give way in one order (ended events, tasks from the last, upcoming events), counted on the button that opens the day');
   // the today circle and the dots (2026-11-09 사용자 결정 V72 「오늘 원 22px」): 3px of the cell above a 22px circle, 1px to 4px of dots, 4px spare (3 + 22 + 1 + 4
   // + 4 = 34, the cell as it was). A day's dots sit nearer its own number than the circle of the row below (2 + 24 + 3 + 5 left them 10px from the '2' and 3px
   // from the today circle under it). The larger text size zooms all of it (--wz), so the proportions hold.

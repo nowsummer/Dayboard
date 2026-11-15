@@ -157,16 +157,23 @@ test('Google: a step\'s PATCH down during the completion is sent once more and g
   const find = title => r.store.get().tasks.find(item => item.title === title);
   const google = parent => [...r.svc.tasks.values()].filter(item => item.parent === parent).sort((x, y) => x.position.localeCompare(y.position)).map(item => `${item.title}:${item.status}`).join(' ');
   const remote = title => [...r.svc.tasks.values()].find(item => item.title === title);
+  // Since 2026-11-13 (offline stage 1, owner: a change the service cannot take now is kept on this PC and sent later): the 503 holds the ticks
+  // still to go — no error, no second try on the spot; the next read of the account sends them, on top of what Google has by then.
   r.svc.fail(new RegExp(`PATCH .*/tasks/${remote('계란').id}$`), 'down');
   let from = r.svc.calls.length;
-  await m.command('task:update', { id: find('장보기').id, completed: true });
-  assert.equal(r.svc.writes(from).filter(line => line.endsWith(remote('계란').id)).length, 2, 'the step\'s PATCH, down, then once more');
-  assert.equal([find('장보기').completed, storeView(find('장보기').steps), remote('장보기').status, google(remote('장보기').id)].join('|'), 'true|우유:true 계란:true 빵:true|completed|우유:completed 계란:completed 빵:completed', 'all done, no error');
+  const first = await m.command('task:update', { id: find('장보기').id, completed: true }).then(() => null, failure => failure);
+  assert.equal([first, r.svc.writes(from).filter(line => line.endsWith(remote('계란').id)).length].join('|'), '|1', 'no error; the step\'s PATCH tried once');
+  assert.equal([find('장보기').completed, storeView(find('장보기').steps), remote('장보기').status, google(remote('장보기').id)].join('|'), 'true|우유:true 계란:true 빵:true|completed|우유:completed 계란:needsAction 빵:needsAction', 'done here with every step ticked; Google done, two ticks still to go');
+  await r.sync.sync();
+  assert.equal([find('장보기').completed, storeView(find('장보기').steps), google(remote('장보기').id), r.store.get().outbox.items.length].join('|'), 'true|우유:true 계란:true 빵:true|우유:completed 계란:completed 빵:completed|0', 'the next read sends them: all done');
   for (let i = 0; i < 2; i++) r.svc.fail(new RegExp(`PATCH .*/tasks/${remote('창문').id}$`), 'down');
   from = r.svc.calls.length;
   const error = await m.command('task:update', { id: find('청소').id, completed: true }).then(() => null, failure => failure);
-  assert.equal(r.svc.writes(from).filter(line => line.endsWith(remote('창문').id)).length, 2, 'tried twice, not more');
-  assert.equal([Boolean(error), /하위 할 일 2개는 완료로 표시하지 못했어요\.$/.test(error?.message || ''), find('청소').completed, storeView(find('청소').steps), remote('청소').status, google(remote('청소').id)].join('|'), 'true|true|true|바닥:true 창문:false 먼지:false|completed|바닥:completed 창문:needsAction 먼지:needsAction', 'the task done, two steps open here and at Google, said in the message');
+  await r.sync.sync();
+  assert.equal([error, r.svc.writes(from).filter(line => line.endsWith(remote('창문').id)).length, find('청소').completed, storeView(find('청소').steps), google(remote('청소').id), r.store.get().outbox.items.length].join('|'), '|2|true|바닥:true 창문:true 먼지:true|바닥:completed 창문:needsAction 먼지:needsAction|1', 'down twice: still kept here, still to go, never an error');
+  r.store.mutate(state => { for (const item of state.outbox.items) delete item.nextTry; });
+  await r.sync.sync();
+  assert.equal([google(remote('청소').id), r.store.get().outbox.items.length].join('|'), '바닥:completed 창문:completed 먼지:completed|0', 'its next try sends them');
 });
 
 // ---------------- To Do's repeating tasks, through main.cjs task:update over tests/r50-A-todo-harness.cjs (as live Graph answered) ----------------

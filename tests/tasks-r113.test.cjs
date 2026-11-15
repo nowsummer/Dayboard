@@ -335,9 +335,23 @@ test('alerts: 「당일 오전 9시」 still rings when the PC wakes later that 
   assert.equal(dueAlerts({ settings: {}, events: [allDay] }, new Date(2026, 9, 27, 22, 0).getTime()).length, 0, 'not 13 hours late');
   const old = { id: 'daily', calendarId: 'c', title: '오래된', start: new Date(2016, 0, 1, 9, 10).toISOString(), end: new Date(2016, 0, 1, 9, 40).toISOString(), rrule: 'FREQ=DAILY', alert: 15 };
   const at = new Date(2026, 9, 27, 8, 56).getTime();
-  const first = performance.now(); dueAlerts({ settings: {}, events: [old] }, at); const cold = performance.now() - first;
-  const second = performance.now(); for (let i = 0; i < 20; i++) dueAlerts({ settings: {}, events: [old] }, at); const warm = (performance.now() - second) / 20;
-  assert.ok(warm < Math.max(0.5, cold / 3), `cached (${cold.toFixed(2)} ms, then ${warm.toFixed(3)} ms)`);
+  assert.equal(dueAlerts({ settings: {}, events: [old] }, at).length, 1, '09:10 with 15 minutes before: due at 08:55');
+  // Counted, not timed (2026-11-14 review C3: 20 warm calls under 0.5 ms failed about one full run in ten on a busy PC): a fresh
+  // lib/alerts.cjs over a counting expandEvent, the module's own copy put back after.
+  const file = require.resolve('../lib/alerts.cjs'), kept = require.cache[file], expand = D.expandEvent; let expansions = 0;
+  D.expandEvent = (...args) => { expansions++; return expand(...args); };
+  delete require.cache[file];
+  try {
+    const fresh = require('../lib/alerts.cjs');
+    const due = now => fresh.dueAlerts({ settings: {}, events: [old] }, now).length;
+    assert.equal(due(at), 1);
+    for (let i = 1; i <= 20; i++) due(at + i * 30000);
+    assert.equal(expansions, 1, 'twenty more checks, 30 s apart, that day: the series expanded once');
+    fresh.dueAlerts({ settings: {}, events: [{ ...old, title: '새 이름' }] }, at);
+    assert.equal(expansions, 2, 'an edit of what the expansion reads: expanded again');
+    due(new Date(2026, 9, 28, 8, 56).getTime());
+    assert.equal(expansions, 3, 'the next day: expanded again');
+  } finally { D.expandEvent = expand; require.cache[file] = kept; }
 });
 test('series: an alert for 「모든 일정」 reaches occurrences edited on their own; 하루 종일 switched without an alert maps it', () => {
   assert.equal(S.seriesAlert({ alert: null }, { alert: 10 }), null);

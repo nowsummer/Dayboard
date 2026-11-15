@@ -204,7 +204,9 @@ function mainCommands(t) {
     commit: fn => store.mutate(fn),
     // The services answer with what they keep: To Do the time, Google none.
     cloudTask: async (kind, task, l) => { sent.push(task); const { dueTime, ...rest } = task; return { ...(l.provider === 'google' ? rest : task), remoteId: 'R-' + task.id }; },
-    sync: { async mutateTask(kind, task, l) { sent.push(task); const { dueTime, ...rest } = task; return l.provider === 'google' ? rest : { ...task }; } },
+    sync: { async mutateTask(kind, task, l) { sent.push(task); const { dueTime, ...rest } = task; return l.provider === 'google' ? rest : { ...task }; },
+      // An account list's task since 2026-11-13 (lib/sync.cjs writeTask): kept here with what the service answers, as the real one commits it.
+      async writeTask(kind, task, l) { sent.push(task); const { dueTime, ...rest } = task; const kept = { ...(l.provider === 'google' ? rest : task), ...(kind === 'add' ? { remoteId: 'R-' + task.id } : {}) }; store.mutate(state => { if (kind === 'add') state.tasks.push(kept); else state.tasks = state.tasks.map(item => item.id === kept.id ? kept : item); }); return { task: kept }; } },
   };
   vm.createContext(context);
   const from = source.indexOf("    case 'task:add': {"); const to = source.indexOf("    case 'calendar:history':", from);

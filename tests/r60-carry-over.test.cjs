@@ -57,7 +57,8 @@ test('a shipped Dayboard.exe started with Chromium\'s DevTools switches ends bef
   assert.equal(value(true, false, ['lang']), false, 'other switches start as before');
   assert.equal(value(false, false, ['remote-debugging-port']), false, 'unpackaged Electron (the readme and measurement scripts) keeps CDP');
   assert.equal(value(true, true, ['remote-debugging-port']), false, 'the packaged smoke run keeps its switches');
-  const at = main.indexOf('if (DEVTOOLS_SWITCH) app.exit(1);\nelse if (!app.requestSingleInstanceLock()) app.quit();');
+  // 2026-11-13: a packaged Store copy's smoke switch ends on the same line (main.cjs STORE_SMOKE, tests/store-edition.test.cjs).
+  const at = main.indexOf('if (DEVTOOLS_SWITCH || STORE_SMOKE) app.exit(1);\nelse if (!app.requestSingleInstanceLock()) app.quit();');
   assert.ok(at > 0, 'one if-chain: with the switch nothing below runs (no lock, no whenReady)');
   assert.ok(at < main.indexOf('app.whenReady().then(async () => {\n    if (startupError)'), 'before the app is set up');
   assert.equal(main.split('requestSingleInstanceLock()').length - 1, 1);

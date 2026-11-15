@@ -10,17 +10,25 @@
     const a=new Date(`${day}T00:00:00`),b=new Date(a);b.setDate(b.getDate()+1);
     return start<b && (end>start ? end>a : start>=a);
   }
+  // When an event is over (2026-11-13 past events, owner 「예, 먼저 접기」): the whole event, not the day drawn — one over several days stays as it is
+  // to its last moment; a repeating one by its occurrence (eventsInRange expands them). All-day: the local midnight that starts its end date (as
+  // inDay reads it, one day when it has none), so today's stays until 00:00. Infinity for an event with no time: never past. The app greys an
+  // event at that moment everywhere it is drawn (app.js markPast) and the widget folds the ended ones first (agendaGiveWay).
+  function eventEndsAt(e){if(e.allDay){const s=String(e.start).slice(0,10);const end=e.end?String(e.end).slice(0,10):dayOffset(s,1);return new Date(end+'T00:00:00').getTime();}const t=Date.parse(e.end||e.start);return Number.isFinite(t)?t:Infinity;}
+  const eventPast=(e,now=Date.now())=>eventEndsAt(e)<=now;
   // A subtask's date counts for its task (2026-11-07 owner: a task due the 30th with steps due the 15th, 19th and 29th): the earliest of its own date
   // and its open steps' is when it next needs looking at, in 오늘, 예정 and the sort by date.
   // A time range's dash (2026-11-08 owner: 「오후 8:00-오후 9:00 … 반칸씩이라도 띄우는 게」): an en dash between thin spaces, as Apple's date ranges set it.
   const RANGE='\u2009–\u2009';
   // A month chip's time (2026-11-11 owner, beside Notion Calendar's 「11:30 AM 🍽️ …」: 「짧은 시간이 나을거 같아. 노션 처럼 am pm으로 하면 좀 더 줄일 수
-  // 잇지 않을까?」): 「11:30 AM」, on the hour 「9 PM」, noon 「12 PM」, midnight 「12 AM」 — Latin AM/PM in Korean too, as it is shorter than 오전/오후
-  // (Chromium 2026-11-11: the longest 50.1px against 「오전 12:01」 56.3px). A no-break space before AM/PM keeps the time in one piece; Pretendard has it
-  // at its space's 2.8px, where a narrow one (1.5px) would set AM against the digits. 24 hours: H:MM — no leading zero (「9:00」, 「0:30」), the minutes
+  // 잇지 않을까?」), then shorter again (2026-11-14 owner: 「달력에서 시간대가 글자가 더 크고 오히려 영역도 많이 차지해서 그런지 더 시간대에 집중되는
+  // 거 같지 않아?」, chose 「V3 짧은 표기만」 of six pictured — artifacts/월 칸 시간 글자 검토 2026-11-14): Google's month form, 「11:30am」, on the hour
+  // 「9pm」, noon 「12pm」, midnight 「12am」 — lowercase am/pm with no space, Latin in Korean too (shorter than 오전/오후, and the lowercase sits lower
+  // than AM/PM's capitals, so the time reads after the title). The longest 「10:44pm」 is 45.7px at 400 against 「10:44 AM」 50.1px. One piece with no
+  // space to break at. Size, weight and grey stay (styles.css: 12px, 450, 66%): only the words changed. 24 hours: H:MM — no leading zero (「9:00」, 「0:30」), the minutes
   // kept on the hour, since a bare 「21」 reads as a number and 「21시」 would be Korean alone. The month grid only (app.js fmtTime 'month'): the week,
   // the panel, the cards and every tooltip keep the full time.
-  function monthClock(hours,minutes,h24=false){const mm=pad(minutes);if(h24)return hours+':'+mm;return (minutes?(hours%12||12)+':'+mm:String(hours%12||12))+'\u00a0'+(hours<12?'AM':'PM');}
+  function monthClock(hours,minutes,h24=false){const mm=pad(minutes);if(h24)return hours+':'+mm;return (minutes?(hours%12||12)+':'+mm:String(hours%12||12))+(hours<12?'am':'pm');}
   function nextDueOf(t){let next=t.dueDate||'';for(const x of Array.isArray(t.steps)?t.steps:[])if(x.dueDate&&!x.completed&&(!next||x.dueDate<next))next=x.dueDate;return next;}
   // The open steps of open tasks due on a day, for the calendar: those with no time first, then by their time (2026-11-11), as the day's tasks are.
   function stepsDueOn(tasks,day){const out=[];for(const t of tasks||[]){if(t.completed||!Array.isArray(t.steps))continue;for(const x of t.steps)if(x.dueDate===day&&!x.completed)out.push({task:t,step:x});}const time=s=>dueTimeOk(s.step.dueTime)?s.step.dueTime:'';return out.sort((a,b)=>time(a).localeCompare(time(b)));}
@@ -525,22 +533,33 @@
   // inside the tone, styles.css's own values) and its strong one (at the gap's edge: pure black or white text, secondary nearly as
   // strong, accents mixed by inkOn strong, check circles and + nearly monochrome as on Apple's clear widgets), as the CSS variables
   // app.js applyGlass sets on the widget body. tests/lists.test.cjs checks every step of the glass with these.
+  // step: a subtask's date (2026-11-14 owner, E안). due: the orange of a task's date and time along the ink — stops on the orange's own
+  // hue (33°), a line between each (E안 #a35f0f light, #e0a050 dark). Light glass deepens it to a brown by ink .6. Dark glass first
+  // brightens it, the same orange at full brightness by .15 (in one line to the end it stayed under 3.5:1 over a clear red wallpaper,
+  // where the ink is .15), then pales it only as fast as the glass needs, to a pale apricot at the clear end, where only near-white text
+  // reads (2026-11-14 review: a line to a cream by ink .6 lost the orange from the middle of the glass on). tests/date-ink-1114.test.cjs
+  // runs both over the glass. late: a date past its moment (2026-11-14, red once) on the red of the app's --sunday hue — light #bd4552 (4.9:1 on the
+  // opaque card) deepening to a dark red at the clear end, dark #ff6a5c taken 9% to white (#ff776b: the plain one is 4.3:1 on thin dark glass over
+  // a blue wallpaper) and paled with the ink, fast to .16 (a clear red wallpaper), to a pale pink at the clear end. tests/overdue-red-1114.test.cjs.
   const GLASS_INKS={
-    light:{plain:{text:'#1c1d22',second:[44,48,60,0.82],third:[44,48,60,0.7],red:'#ff3b30',note:'#8a6604',dot:'#2a5fc4',flag:'#ff9500',check:[65,'#3a3f4a'],plus:[70,'#000000']},
-      strong:{text:'#000000',second:[0,0,0,0.9],third:[0,0,0,0.78],red:'#a8221a',note:'#372902',dot:'#11264e',flag:'#ff9500',check:[20,'#000000'],plus:[20,'#000000']}},
-    dark:{plain:{text:'#f3f4f7',second:[236,238,245,0.84],third:[236,238,245,0.72],red:'#ff453a',note:'#f6cf5c',dot:'#9dbdff',flag:'#ff9500',check:[45,'#ffffff'],plus:[45,'#ffffff']},
-      strong:{text:'#ffffff',second:[255,255,255,0.92],third:[255,255,255,0.8],red:'#ffe3e0',note:'#fbe7ae',dot:'#dde8ff',flag:'#ff9500',check:[35,'#ffffff'],plus:[35,'#ffffff']},
-      flagLift:{from:0.7,to:'#ffc46b',most:0.78}}};
+    light:{plain:{text:'#1c1d22',second:[44,48,60,0.82],third:[44,48,60,0.7],red:'#ff3b30',note:'#8a6604',dot:'#2a5fc4',flag:'#ff9500',check:[65,'#3a3f4a'],plus:[70,'#000000'],step:[44,48,60,0.7]},
+      strong:{text:'#000000',second:[0,0,0,0.9],third:[0,0,0,0.78],red:'#a8221a',note:'#372902',dot:'#11264e',flag:'#ff9500',check:[20,'#000000'],plus:[20,'#000000'],step:[0,0,0,0.78]},
+      due:[[0,'#a35f0f'],[0.6,'#5b3508']],late:[[0,'#bd4552'],[0.3,'#9f3a45'],[1,'#6a272e']]},
+    dark:{plain:{text:'#f3f4f7',second:[236,238,245,0.84],third:[236,238,245,0.72],red:'#ff453a',note:'#f6cf5c',dot:'#9dbdff',flag:'#ff9500',check:[45,'#ffffff'],plus:[45,'#ffffff'],step:[236,238,245,0.72]},
+      strong:{text:'#ffffff',second:[255,255,255,0.92],third:[255,255,255,0.8],red:'#ffe3e0',note:'#fbe7ae',dot:'#dde8ff',flag:'#ff9500',check:[35,'#ffffff'],plus:[35,'#ffffff'],step:[255,255,255,0.89]},
+      flagLift:{from:0.7,to:'#ffc46b',most:0.78},due:[[0,'#e0a050'],[0.15,'#ffb65b'],[1,'#ffeed9']],late:[[0,'#ff776b'],[0.16,'#ffa49c'],[0.4,'#ffa8a1'],[0.6,'#ffbeb8'],[0.8,'#ffd6d2'],[1,'#ffecea']]}};
   function glassInks(tone,ink){
     const set=GLASS_INKS[tone==='dark'?'dark':'light'],k=Math.min(1,Math.max(0,Number(ink)||0)),p=set.plain,q=set.strong;
     const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),lerp=(a,b)=>a+(b-a)*k;
     const hex=(a,b)=>{const x=rgb(a),y=rgb(b);return '#'+[0,1,2].map(i=>Math.round(lerp(x[i],y[i])).toString(16).padStart(2,'0')).join('');};
     /* the flag stays Apple's orange whatever the glass (2026-11-09 V67); on dark glass, past the ink where it would fall under 3:1, a lighter orange step by step (tests/lists.test.cjs) */const flag=()=>{const f=set.flagLift;if(!f||k<=f.from)return p.flag;const m=(k-f.from)/(1-f.from)*f.most,x=rgb(p.flag),y=rgb(f.to);return '#'+[0,1,2].map(i=>Math.round(x[i]+(y[i]-x[i])*m).toString(16).padStart(2,'0')).join('');};
     const rgba=(a,b)=>`rgba(${[0,1,2].map(i=>Math.round(lerp(a[i],b[i]))).join(',')},${+lerp(a[3],b[3]).toFixed(3)})`;
+    /* a task's date (due) and a past one (late): between the two stops around the ink (past the last, the last) */const ramp=s=>{let i=1;while(i<s.length-1&&k>s[i][0])i++;const m=Math.min(1,Math.max(0,(k-s[i-1][0])/(s[i][0]-s[i-1][0]))),x=rgb(s[i-1][1]),y=rgb(s[i][1]);return '#'+[0,1,2].map(j=>Math.round(x[j]+(y[j]-x[j])*m).toString(16).padStart(2,'0')).join('');};
     return {'--w-text':hex(p.text,q.text),'--w-secondary':rgba(p.second,q.second),'--w-tertiary':rgba(p.third,q.third),'--w-red':hex(p.red,q.red),
       '--w-note':hex(p.note,q.note),'--w-dot':hex(p.dot,q.dot),'--w-flag':flag(),
       '--w-check-mix':Math.round(lerp(p.check[0],q.check[0]))+'%','--w-check-with':hex(p.check[1],q.check[1]),
-      '--w-plus-mix':Math.round(lerp(p.plus[0],q.plus[0]))+'%','--w-plus-with':hex(p.plus[1],q.plus[1])};
+      '--w-plus-mix':Math.round(lerp(p.plus[0],q.plus[0]))+'%','--w-plus-with':hex(p.plus[1],q.plus[1]),
+      '--due-ink':ramp(set.due),'--w-step-date':rgba(p.step,q.step),'--w-late':ramp(set.late)};
   }
   function localCalendarHidden(state){
     if(!(state.calendars||[]).some(c=>c.provider!=='local'&&calendarWritable(c)))return false;
@@ -1152,6 +1171,11 @@
   // those into 「+n개」 first and the day's meetings stay in view, where the tasks with no time had pushed them into it). The events come
   // in eventsOn's order and keep it, the tasks are put in time order here; each item is {event} or {task}.
   function dayItems(events,tasks){const at=x=>x.task?dueAt(x.task).getTime():Date.parse(x.event.start);const timed=(events||[]).filter(e=>!e.allDay).map(event=>({event})),clocked=(tasks||[]).filter(t=>dueAt(t)).sort((a,b)=>dueAt(a)-dueAt(b)).map(task=>({task}));const out=(events||[]).filter(e=>e.allDay).map(event=>({event}));let i=0,j=0;while(i<timed.length||j<clocked.length){if(j>=clocked.length||(i<timed.length&&!(at(timed[i])>at(clocked[j]))))out.push(timed[i++]);else out.push(clocked[j++]);}for(const task of tasks||[])if(!dueAt(task))out.push({task});return out;}
+  // The order the calendar widget's agenda rows give way when the card is short (2026-11-13 owner: 「예, 먼저 접기」 — Apple's widget leaves ended
+  // events out): past = one boolean per event row in time order, tasks = the number of task rows; the result lists the rows in the order they
+  // go: the ended events, earliest first, while the day has an upcoming event or a task row; then the task rows from the last; then the upcoming
+  // events from the last. A day with neither (all over, or nothing but events) gives way from the last, as before: a past day reads from its start.
+  function agendaGiveWay(past,tasks){const ev=past.map((p,i)=>i),up=ev.filter(i=>!past[i]);const back=a=>[...a].reverse();if(!up.length&&!tasks)return back(ev).map(i=>({event:i}));return [...ev.filter(i=>past[i]).map(i=>({event:i})),...back(Array.from({length:tasks},(_,i)=>i)).map(i=>({task:i})),...back(up).map(i=>({event:i}))];}
   // The editor's quick 알림 for a timed task, in minutes before its time (Apple Reminders' early reminder): 제시간에, 5분·30분·1시간·1일 전.
   const TASK_ALERTS=[0,5,30,60,1440];
   // How many minutes before its time a timed task's reminder rings, when that reads as Apple's early-reminder words do — 제시간에, every 5
@@ -1309,7 +1333,7 @@
   const DIGIT_BEARINGS={tabular:{lead:[.05,.141,.076,.06,.043,.074,.05,.074,.049,.05],trail:[.046,.197,.065,.05,.035,.055,.05,.075,.05,.05]},proportional:{lead:[.042,.046,.045,.048,.041,.057,.042,.033,.042,.044],trail:[.044,.105,.045,.046,.039,.042,.042,.04,.041,.041]}};
   function discInk(day,proportional=false){const s=String(day),b=DIGIT_BEARINGS[proportional?'proportional':'tabular'];return {'--disc-ink':((b.trail[+s[s.length-1]]-b.lead[+s[0]])/2).toFixed(4)+'em'};}
 
-  const api={discInk,RANGE,monthClock,SHORTCUT_MAX,SHORTCUT_KEEP,applyShortcut,cleanShortcuts,shortcutKey,shortcutProblem,shortcutValue,shortcutFromValue,stretchedEvent,nextDueOf,stepsDueOn,hexToHsv,hsvToHex,appPassword,parseQuickLine,parseEvent,parseEventEn,dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassLookApp,widgetTheme,isCustomColor,clampColor,titleColor,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,parseEventKo,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,dueTimeOk,dueAt,taskBuckets,dayItems,TASK_ALERTS,alertBefore,alertReadable,defaultDueTime,STEP_ALERT_MAX,stepAlertOk,realDay,stepWhen,stepAlertAt,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
+  const api={discInk,RANGE,monthClock,SHORTCUT_MAX,SHORTCUT_KEEP,applyShortcut,cleanShortcuts,shortcutKey,shortcutProblem,shortcutValue,shortcutFromValue,stretchedEvent,nextDueOf,stepsDueOn,hexToHsv,hsvToHex,appPassword,parseQuickLine,parseEvent,parseEventEn,dateKey,weekStart,weekDays,wallMinutes,atWall,snapMinutes,spansDays,dayLayout,spanLayout,movedTimes,shiftedDays,cellsFrom,monthStart,shiftRule,instanceId,eventDate,fromDate,dayOffset,defaultEventTimes,followStart,inDay,eventEndsAt,eventPast,agendaGiveWay,matches,monthCells,LIST_ICONS,LIST_PALETTE,splitEmoji,autoColor,parseRRule,buildRRule,untilBefore,walkRRule,expandEvent,seriesPosition,eventsInRange,touchesRange,RRULE_DAYS,calendarWritable,defaultCalendarId,taskList,autoListId,accountCount,localCalendarHidden,sectionKey,orderLists,visibleState,builtInList,glassTint,glassTone,glassLook,glassLookApp,widgetTheme,isCustomColor,clampColor,titleColor,glassInks,inkOn,keepOneVisible,hidingRefusal,parseQuickKo,parseQuickEn,parseEventKo,localKey,WIDGET_MIN,WIDGET_OPEN,widgetMinimum,TEXT_SIZES,TEXT_SIZE_STEPS,textScale,textSizeStep,CAL_PANEL_WIDTH,CONTACT_EMAIL,SYNC_MONTHS,HISTORY_MONTHS,syncWindow,historyWindow,historyChunks,panelWidth,scrollThumb,scopeChoices,parseGoDate,TASK_SORTS,sortTasks,dueTimeOk,dueAt,taskBuckets,dayItems,TASK_ALERTS,alertBefore,alertReadable,defaultDueTime,STEP_ALERT_MAX,stepAlertOk,realDay,stepWhen,stepAlertAt,nextDue,ruleAfter,ALERTS_TIMED,ALERTS_ALLDAY,alertOk,alertTime,firstOccurrence};
   if(typeof module!=='undefined')module.exports=api;
   else root.DayboardDates=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -16,15 +16,16 @@ const { harness, read, D, I } = require('./r50-F-harness.cjs');
 const css = read('renderer/styles.css');
 const NBSP = ' ';
 
-test('D.monthClock: 「11:30 AM」, 「9 PM」 on the hour, noon 12 PM, midnight 12 AM; 24 hours H:MM with no leading zero and the minutes kept', () => {
-  const twelve = [[9, 0, '9 AM'], [9, 30, '9:30 AM'], [11, 30, '11:30 AM'], [12, 0, '12 PM'], [12, 30, '12:30 PM'], [0, 0, '12 AM'], [0, 30, '12:30 AM'],
-    [13, 5, '1:05 PM'], [21, 0, '9 PM'], [21, 30, '9:30 PM'], [23, 59, '11:59 PM']];
-  for (const [hh, mm, want] of twelve) assert.equal(D.monthClock(hh, mm), want.replace(' ', NBSP), `${hh}:${mm} 12h`);
+// 2026-11-14 owner (「달력에서 시간대가 글자가 더 크고 오히려 영역도 많이 차지해서 그런지 더 시간대에 집중되는 거 같지 않아?」, then 「V3 짧은 표기만」 of six
+// pictured): the 12-hour words are Google's lowercase 「11:30am」, 「9pm」 with no space — before 2026-11-14 「11:30 AM」, 「9 PM」 with a no-break space.
+test('D.monthClock: 「11:30am」, 「9pm」 on the hour, noon 12pm, midnight 12am; 24 hours H:MM with no leading zero and the minutes kept', () => {
+  const twelve = [[9, 0, '9am'], [9, 30, '9:30am'], [11, 30, '11:30am'], [12, 0, '12pm'], [12, 30, '12:30pm'], [0, 0, '12am'], [0, 30, '12:30am'],
+    [13, 5, '1:05pm'], [21, 0, '9pm'], [21, 30, '9:30pm'], [23, 59, '11:59pm']];
+  for (const [hh, mm, want] of twelve) assert.equal(D.monthClock(hh, mm), want, `${hh}:${mm} 12h`);
   const day = [[9, 0, '9:00'], [9, 30, '9:30'], [11, 30, '11:30'], [12, 0, '12:00'], [12, 30, '12:30'], [0, 0, '0:00'], [0, 30, '0:30'], [21, 0, '21:00'], [21, 30, '21:30'], [23, 59, '23:59']];
   for (const [hh, mm, want] of day) assert.equal(D.monthClock(hh, mm, true), want, `${hh}:${mm} 24h`);
-  // a no-break space, never a plain one: the time stays in one piece wherever it stands
-  assert.equal(D.monthClock(15, 0).includes(' '), false);
-  assert.equal(D.monthClock(15, 0).split(NBSP).length, 2);
+  // no space of any kind: one piece wherever it stands, and no capital AM/PM left (the lowercase sits lower than the digits' cap height)
+  for (let h = 0; h < 24; h++) for (const m of [0, 5, 30, 59]) assert.equal(/[\s\u00a0AP]/.test(D.monthClock(h, m)), false, `${h}:${m} has no space and no capital`);
 });
 
 // fmtTime as the app has it, the language and the setting as given
@@ -42,7 +43,7 @@ test('fmtTime(…, \'month\'): the same short form in Korean and English, 12 and
     for (const lang of ['ko', 'en']) {
       const h = clock(lang, '12h'), f = h.eval('fmtTime');
       assert.deepEqual([at(9, 0), at(11, 30), at(12, 0), at(0, 0), at(21, 0), at(21, 30)].map(d => f(d, 'month')),
-        ['9 AM', '11:30 AM', '12 PM', '12 AM', '9 PM', '9:30 PM'].map(s => s.replace(' ', NBSP)), `${lang} 12h`);
+        ['9am', '11:30am', '12pm', '12am', '9pm', '9:30pm'], `${lang} 12h`);
       h.context.state.settings.timeFormat = '24h';
       assert.deepEqual([at(9, 0), at(11, 30), at(12, 0), at(0, 0), at(21, 0), at(21, 30)].map(d => f(d, 'month')), ['9:00', '11:30', '12:00', '0:00', '21:00', '21:30'], `${lang} 24h`);
       assert.equal(f(at(9, 0)), '09:00', `${lang}: the full 24-hour time keeps its zero (the week, the panel, the tooltips)`);
@@ -56,20 +57,20 @@ test('fmtTime(…, \'month\'): the same short form in Korean and English, 12 and
   } finally { I.setLanguage('ko'); }
 });
 
-test('the month chip: the short time, the tooltip with the full time; on the day a night event ends, 「1 AM까지」; a task\'s chip the same', () => {
+test('the month chip: the short time, the tooltip with the full time; on the day a night event ends, 「1am까지」; a task\'s chip the same', () => {
   try {
     const h = clock('ko', '12h'), chip = h.eval('eventChip');
     const lunch = { id: 'l', title: '🍽️ 점심 약속', start: at(11, 30).toISOString(), end: at(12, 30).toISOString() };
     const node = chip(lunch, '2026-11-12');
-    assert.equal(node.querySelector('.chip-time').textContent, `11:30${NBSP}AM`);
+    assert.equal(node.querySelector('.chip-time').textContent, '11:30am');
     assert.equal(node.getAttribute('title'), `🍽️ 점심 약속 · 오전 11:30${D.RANGE}오후 12:30`, 'the tooltip keeps the full time');
     const night = { id: 'n', title: '야간', start: new Date(2026, 10, 12, 23, 0).toISOString(), end: new Date(2026, 10, 13, 1, 0).toISOString() };
-    assert.equal(chip(night, '2026-11-13').querySelector('.chip-time').textContent, `1${NBSP}AM까지`);
+    assert.equal(chip(night, '2026-11-13').querySelector('.chip-time').textContent, '1am까지');
     h.context.state.settings.timeFormat = '24h';
     assert.equal(chip({ ...lunch, start: at(9, 0).toISOString(), end: at(10, 0).toISOString() }, '2026-11-12').querySelector('.chip-time').textContent, '9:00');
     I.setLanguage('en');
     h.context.state.settings.timeFormat = '12h';
-    assert.equal(chip(night, '2026-11-13').querySelector('.chip-time').textContent, `until 1${NBSP}AM`);
+    assert.equal(chip(night, '2026-11-13').querySelector('.chip-time').textContent, 'until 1am');
     assert.equal(chip(lunch, '2026-11-12').getAttribute('title'), `🍽️ 점심 약속 · 11:30 AM${D.RANGE}12:30 PM`);
   } finally { I.setLanguage('ko'); }
   // a task in the month: the short time beside its ring; its tooltip the full time; the week's rows draw no time of their own
@@ -78,7 +79,7 @@ test('the month chip: the short time, the tooltip with the full time; on the day
   h.loadCalendar();
   const task = { id: 't', listId: 'w', dueDate: '2026-11-12', dueTime: '09:00', title: '보고서' };
   const month = h.eval('calTaskChip')(task, '2026-11-12');
-  assert.equal([month.querySelector('.chip-time').textContent, month.getAttribute('title')].join('|'), `9${NBSP}AM|보고서 · 오전 9:00 · 업무`);
+  assert.equal([month.querySelector('.chip-time').textContent, month.getAttribute('title')].join('|'), '9am|보고서 · 오전 9:00 · 업무');
   h.context.state.settings.timeFormat = '24h';
   assert.equal([h.eval('calTaskChip')(task, '2026-11-12').querySelector('.chip-time').textContent, h.eval('calTaskChip')(task, '2026-11-12').getAttribute('title')].join('|'), '9:00|보고서 · 09:00 · 업무');
   assert.equal(h.eval('calTaskChip')(task, '2026-11-12', 'time').querySelector('.chip-time'), null);
@@ -196,14 +197,14 @@ test('more contrast asked (prefers-contrast:more): the time goes back to --secon
 });
 
 test('a timed event over several days (a band, calMonthBar): the short time with the chips\' tracking and digits, its own --secondary and 500 on the colour', () => {
-  const h = harness({ eventColor: () => '#ff9500', showEvent() {}, eventMenu() {}, canEditEvent: () => false, deleteEventFlow() {}, calSuppressClick: 0, calPast: () => false });
+  const h = harness({ eventColor: () => '#ff9500', showEvent() {}, eventMenu() {}, canEditEvent: () => false, deleteEventFlow() {}, calSuppressClick: 0, markPast: n => n });
   h.loadApp('const timeFormat=', 'function fmtTime(', 'const isRecurring=', 'function timeLabel(', 'function eventChip(');
   h.loadCalendar();
   const ev = { id: 'm', title: '워크숍', start: new Date(2026, 10, 13, 8, 0).toISOString(), end: new Date(2026, 10, 15, 10, 0).toISOString() };
   const keys = D.weekDays('2026-11-13');
   const bar = h.eval('calMonthBar')({ event: ev, from: keys.indexOf('2026-11-13'), to: keys.indexOf('2026-11-15'), lane: 0, before: false, after: false }, keys, 0, null);
   const time = bar.querySelector('.chip-time');
-  assert.equal([bar.classList.contains('month-bar'), bar.classList.contains('timed'), time && time.textContent].join('|'), `true|false|8${NBSP}AM`);
+  assert.equal([bar.classList.contains('month-bar'), bar.classList.contains('timed'), time && time.textContent].join('|'), 'true|false|8am');
   assert.equal(time.matches('.day-event.month-bar .chip-time'), true);
   const BAR = '.day-event.month-bar .chip-time';
   assert.equal(lastValue(BAR, 'letter-spacing'), lastValue(TIME, 'letter-spacing'), 'the chips\' tracking');
@@ -219,7 +220,8 @@ test('a timed event over several days (a band, calMonthBar): the short time with
 test('시작하기.md says the month\'s short time', { skip: !fs.existsSync(path.join(__dirname, '..', '시작하기.md')) && '시작하기.md is private (not in the public source)' }, () => {
   const guide = read('시작하기.md');
   assert.equal(guide.includes('달력 칩은 정각이면 「오후 9시」'), false, 'the old month chip words');
-  assert.ok(guide.includes('「11:30 AM」') && guide.includes('「9 PM」') && guide.includes('「21:00」'), 'the month chips\' words in the guide');
+  assert.equal(guide.includes('「11:30 AM」') || guide.includes('「9 PM」'), false, 'the month chips\' words before 2026-11-14');
+  assert.ok(guide.includes('「11:30am」') && guide.includes('「9pm」') && guide.includes('「21:00」'), 'the month chips\' words in the guide');
 });
 test('CONTRACT.md says the month\'s short time', { skip: !fs.existsSync(path.join(__dirname, '..', 'CONTRACT.md')) && 'CONTRACT.md is private (not in the public source)' }, () => {
   const contract = read('CONTRACT.md');
@@ -245,6 +247,10 @@ test('the ink: a neutral grey from the tokens, never darker than --secondary in 
     assert.ok(ratio(titleInk, bg) - ratio(ink, bg) >= 4, `${theme}: title ${ratio(titleInk, bg).toFixed(2)} over time ${ratio(ink, bg).toFixed(2)}`);
   }
   assert.equal(lastValue('.day-task .chip-title', 'color'), lastValue('.day-event.timed .chip-title', 'color'), 'one title ink for both chips');
-  // a past chip still dims as a whole
-  assert.ok(css.includes('.day-event.past,.allday-bar.past{opacity:.6}'));
+  // a past chip (2026-11-13): no opacity on the chip; its title takes --past-ink, its bar fades by --past-mark, this time keeps the 66% ink above
+  // (fainter than --past-ink and still 4.5:1 on every ground) — tests/past-events-1113.test.cjs
+  assert.equal(css.includes('.day-event.past,.allday-bar.past{opacity:.6}'), false);
+  assert.equal(lastValue('.day-event.timed.past .chip-title', 'color'), 'var(--past-ink)');
+  assert.equal(lastValue('.day-event.past .chip-bar', 'opacity'), 'var(--past-mark)');
+  assert.equal(/\.day-event(?:\.timed)?\.past \.chip-time/.test(css), false, 'no past rule for the timed chip\'s time');
 });

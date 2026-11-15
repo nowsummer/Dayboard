@@ -170,6 +170,19 @@ function cssColour(value) {
 }
 
 test('glass text stays readable on the filtered glass over flat and two-tone wallpapers (2026-10-21 review)', () => {
+  // A past event's row in the calendar widget (2026-11-13 past events): its title takes no ink of its own and inherits the time line's
+  // --w-secondary through the cascade (a span rule that caught it painted the app's --past-ink on glass, 1.00:1), its colour bar fades by
+  // --past-mark. That ink is held to 4.5:1 on every step below, both halves; never one fainter than --w-secondary (tests/past-events-1113.test.cjs).
+  const { computed } = require('./r50-F-css.cjs');
+  const pastRow = (() => {
+    const { document } = require('./r50-F-harness.cjs').harness();
+    const make = (tag, cls, parent) => { const n = document.createElement(tag); n.className = cls; parent.append(n); return n; };
+    const agenda = make('div', 'agenda', make('section', 'widget-agenda', make('div', 'widget-body', document.body)));
+    const row = make('button', 'event-row past', agenda), line = make('span', 'event-line', row), title = make('span', 'event-title', make('strong', '', make('div', '', row)));
+    return { title: computed(title, 'color').value, line: computed(line, 'opacity').value };
+  })();
+  assert.equal(pastRow.title, 'var(--w-secondary)', 'past widget title: the time line\'s ink');
+  assert.equal(pastRow.line, 'var(--past-mark)', 'past widget bar: --past-mark');
   // The text, secondary text and accents at a tone and ink strength, as app.js applyGlass sets them (domain glassInks).
   // The opaque card of each tone (styles.css --w-solid at the solid end).
   const solidCard = Object.fromEntries([['light', '.widget-body,.widget-stage'], ['dark', '[data-theme=dark] .widget-body,[data-theme=dark] .widget-stage:not([data-widget-theme=light]),.widget-stage[data-widget-theme=dark]']]
@@ -203,6 +216,9 @@ test('glass text stays readable on the filtered glass over flat and two-tone wal
         const where = `${name} at level ${level} (${theme} theme, ${kind})`;
         assert.ok(wcag(text, bg) >= 4.5, `text on ${where}: ${wcag(text, bg).toFixed(2)}`);
         assert.ok(wcag(secondOnGlass, bg) >= (level >= 0.5 ? 4.5 : 3.5), `secondary text on ${where}: ${wcag(secondOnGlass, bg).toFixed(2)}`);
+        // the past widget title (above): --w-secondary at 4.5:1 in the clear half too (2026-11-13: 4.54 at the least) — if this fails, raise the
+        // clear half's secondary ink in GLASS_INKS or draw the past title in --w-text; never lower this
+        assert.ok(wcag(secondOnGlass, bg) >= 4.5, `past widget title on ${where}: ${wcag(secondOnGlass, bg).toFixed(2)}`);
         assert.ok(wcag(title, bg) >= 3, `list title on ${where}: ${wcag(title, bg).toFixed(2)}`);
         // Accents (the red month and today, the note title, dots, the flag, check circles and +) from the middle to the opaque end:
         // 3:1, or where the colour itself is fainter than that on the app's own solid card (a yellow check circle, the orange flag),
@@ -488,7 +504,8 @@ test('sync deletes cloud lists at the service: a list already gone counts as del
   assert.equal(store.get().accounts[0].status, 'connected', 'a refused delete does not mark the account as failing');
   failWith = 500;
   await assert.rejects(sync.mutateList('delete', cloud), /HTTP 500/);
-  assert.equal(store.get().accounts[0].status, 'error', 'a server failure is shown on the account like other writes');
+  // Since 2026-11-13 (lib/sync.cjs accountTrouble) a server failure is 「연결 안 됨」 (grey, 'offline'), as for every write and read.
+  assert.equal(store.get().accounts[0].status, 'offline', 'a server failure is shown on the account like other writes');
   assert.equal((await sync.mutateList('delete', { id: 'l', provider: 'local' })).id, 'l', 'local lists pass straight through');
   await assert.rejects(sync.mutateList('archive', cloud), /지원하지 않는 목록 변경/);
   assert.deepEqual(calls, ['delete', 'delete', 'delete', 'delete']);

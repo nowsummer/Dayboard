@@ -11,7 +11,7 @@ const now = '2026-11-09T09:00:00.000Z';
 function accountsHarness() {
   const h = harness({ calendarKey: () => false, goto() {}, openWidgetFlow() {}, providerLogo: name => h.eval('h')('span', { class: 'provider-logo ' + name }) });
   h.loadApp('let restoreFocus=null;', 'const formSnapshot=', 'function sheetScroll(', 'function modal(', 'function dismissModal(', 'const field=', 'const input=', 'function act(',
-    'const providerName=', 'const notesIntent=', 'const timeFormat=', 'function fmtTime(', 'function refreshAccounts(', 'function accountNotice(', 'function openAccounts(', 'function viewSyncLine(', 'async function connectAccount(');
+    'const providerName=', 'const notesIntent=', 'const timeFormat=', 'function fmtTime(', 'function syncedAt(', 'function refreshAccounts(', 'function accountNotice(', 'function openAccounts(', 'function viewSyncLine(', 'async function connectAccount(');
   h.context.state.accounts = [
     { id: 'ms', provider: 'microsoft', name: 'outlook@example.com', status: 'error', authFailed: true, error: '로그인 권한이 만료되었습니다. 계정 연결 설정을 확인하고 다시 로그인해 주세요.', syncTasks: true, syncCalendar: true, calendarWrite: true },
     { id: 'g', provider: 'google', name: 'google@example.com', status: 'error', authFailed: true, error: '로그인 권한이 만료되었습니다.', syncTasks: true, syncCalendar: false, calendarWrite: true, notesAccess: true },
@@ -39,6 +39,7 @@ test('V59: the provider lines say what each brings — Microsoft no longer adds 
   const h = accountsHarness();
   h.eval('openAccounts')(); await h.tick();
   const lines = [...h.modalRoot.querySelectorAll('.provider-option small')].map(n => h.text(n));
-  assert.equal(lines.join(' / '), 'To Do · Outlook 달력 / Tasks · Google 달력 / Apple 달력 (미리 알림 제외)');
-  assert.equal(I.translate('en', 'To Do · Outlook 달력'), 'To Do · Outlook calendar');
+  // the app's own words since 2026-11-13 (tests/account-add-widget-tab-1113.test.cjs)
+  assert.equal(lines.join(' / '), '할 일 · 달력 · 메모 / 할 일 · 달력 · 메모 / 달력 (미리 알림 제외)');
+  assert.equal(I.translate('en', '할 일 · 달력 · 메모'), 'Tasks · Calendar · Notes');
 });

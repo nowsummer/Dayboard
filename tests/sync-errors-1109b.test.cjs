@@ -35,6 +35,9 @@ function setup(t, providerFactory, { provider = 'microsoft', scope = 'Tasks.Read
   return { store, sync };
 }
 const failing = status => Object.assign(new Error(`거절 (HTTP ${status})`), { status });
+// A good read brings what the account has: since 2026-11-13 one with no list or no calendar where this PC holds some is a failed read
+// (lib/sync.cjs emptyRead, tests/empty-read-1113).
+const served = () => structuredClone({ lists: [list], tasks: [task], calendars: [calendar], events: [event] });
 const accountOf = store => { const account = store.get().accounts[0]; return `${account.status}|${account.authFailed ?? 'none'}`; };
 
 test('F19: deleting a task or an event the service no longer has (404·410) finishes as deleted and leaves the account connected', async t => {
@@ -56,14 +59,16 @@ test('F19: other failures of a delete still reject, and a 404 on an edit or a sp
   await assert.rejects(sync.mutateEvent('delete', { ...event, seriesId: 'S' }, calendar, { scope: 'future' }), /HTTP 404/);
 });
 
+// Since 2026-11-13 (offline spec S0.8, lib/sync.cjs accountTrouble) a 5xx or no connection marks the account 「연결 안 됨」 ('offline', grey),
+// a sign-in to renew stays 'error'; tests/offline-s0-1113 has the whole table.
 test('F63: a task write the service or the provider refuses (no status, 4xx) rejects without marking the account; 401, 5xx and no connection do', async t => {
   const cases = [
     [new Error('Microsoft To Do는 매월 마지막 날 반복을 지원하지 않습니다.'), 'connected'],
     [failing(400), 'connected'],
     [failing(409), 'connected'],
     [failing(401), 'error'],
-    [failing(503), 'error'],
-    [Object.assign(new Error('인터넷 연결 또는 서비스 응답을 확인해 주세요.'), { network: true }), 'error'],
+    [failing(503), 'offline'],
+    [Object.assign(new Error('인터넷이나 서비스의 응답이 없어요. 연결되면 동기화한 뒤 다시 해 주세요.'), { network: true }), 'offline'],
     [Object.assign(new Error('로그인 권한이 만료되었습니다.'), { auth: true }), 'error'],
   ];
   for (const [error, expected] of cases) {
@@ -106,7 +111,7 @@ test('F17: an expired Microsoft refresh token (invalid_grant) does not talk abou
 
 test('F17: a sign-in that expired marks a Google or Microsoft account authFailed; the next good sync clears it', async t => {
   let expired = true;
-  const { store, sync } = setup(t, () => ({ snapshot: async () => { if (expired) throw Object.assign(new Error('로그인 권한이 만료되었습니다.'), { auth: true }); return { lists: [], tasks: [], calendars: [], events: [] }; } }));
+  const { store, sync } = setup(t, () => ({ snapshot: async () => { if (expired) throw Object.assign(new Error('로그인 권한이 만료되었습니다.'), { auth: true }); return served(); } }));
   await sync.sync().catch(() => {});
   assert.equal(accountOf(store), 'error|true');
   expired = false;
@@ -116,7 +121,7 @@ test('F17: a sign-in that expired marks a Google or Microsoft account authFailed
 
 test('F64: the account scope reaches the provider so a turned-off half is not read', async t => {
   const seen = [];
-  const { store, sync } = setup(t, () => ({ snapshot: async (id, scope) => { seen.push(JSON.stringify(scope)); return { lists: [], tasks: [], calendars: [], events: [] }; } }));
+  const { store, sync } = setup(t, () => ({ snapshot: async (id, scope) => { seen.push(JSON.stringify(scope)); return served(); } }));
   store.mutate(state => { state.accounts[0].syncTasks = false; });
   await sync.sync();
   store.mutate(state => { state.accounts[0].syncTasks = true; state.accounts[0].syncCalendar = false; });

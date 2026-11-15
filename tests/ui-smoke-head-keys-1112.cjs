@@ -241,17 +241,18 @@ module.exports = async function headKeys({ mainWindow, invoke, output, run, sett
       const R = n => { const r = n.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
       const body = document.querySelector('#modal-root .shortcuts-body'), mouse = body.querySelector('kbd.keys-mouse');
       const keys = [...body.querySelectorAll('.keys kbd:not(.keys-mouse)')], ref = look(keys[0]);
-      const row = mouse.closest('.shortcut-row'), above = row.previousElementSibling, dt = row.querySelector('dt');
-      const c = mouse.getBoundingClientRect(), r = row.getBoundingClientRect(), d = dt.getBoundingClientRect(), k = above.querySelector('kbd').getBoundingClientRect();
+      // the double-click row is 할 일's first since 2026-11-13: it is compared with the row under it, 모두 펼치기·접기 (Alt+↓ / Alt+↑)
+      const row = mouse.closest('.shortcut-row'), below = row.nextElementSibling, dt = row.querySelector('dt');
+      const c = mouse.getBoundingClientRect(), r = row.getBoundingClientRect(), d = dt.getBoundingClientRect(), k = below.querySelector('kbd').getBoundingClientRect();
       const sheet = body.closest('.dialog').getBoundingClientRect();
       return { view: innerWidth, text: mouse.textContent, el: mouse.tagName, kids: mouse.children.length, same: look(mouse) === ref, keysSame: keys.every(n => look(n) === ref),
         differ: PROPS.filter((p, i) => look(mouse).split('|')[i] !== ref.split('|')[i]).join(), look: ref,
         cap: Math.round(c.width * 100) / 100 + 'x' + Math.round(c.height * 100) / 100, capLines: lines(mouse), labelLines: lines(dt), label: dt.textContent,
         wrapped: [...body.querySelectorAll('.shortcut-row dt')].filter(n => lines(n) > 1).map(n => n.textContent),
-        rowH: Math.round(r.height * 100) / 100, aboveH: Math.round(above.getBoundingClientRect().height * 100) / 100, belowH: Math.round(row.nextElementSibling.getBoundingClientRect().height * 100) / 100,
+        rowH: Math.round(r.height * 100) / 100, belowH: Math.round(below.getBoundingClientRect().height * 100) / 100,
         inside: c.right <= r.right + 0.5 && c.left >= d.right + 0.5 && c.right <= sheet.right, mid: Math.round(((c.top + c.bottom) / 2 - (r.top + r.bottom) / 2) * 100) / 100,
-        rightEdge: Math.round((r.right - c.right) * 100) / 100, aboveRightEdge: Math.round((r.right - [...above.querySelectorAll('kbd')].at(-1).getBoundingClientRect().right) * 100) / 100,
-        capH: Math.round(k.height * 100) / 100, crop: { l: d.left - 8, t: above.getBoundingClientRect().top - 4, r: r.right + 8, b: r.bottom + 4 } };`);
+        rightEdge: Math.round((r.right - c.right) * 100) / 100, belowRightEdge: Math.round((r.right - [...below.querySelectorAll('kbd')].at(-1).getBoundingClientRect().right) * 100) / 100,
+        capH: Math.round(k.height * 100) / 100, crop: { l: d.left - 8, t: r.top - 4, r: r.right + 8, b: below.getBoundingClientRect().bottom + 4 } };`);
     const tag = `${language}-${theme}-${w}`;
     const p = await capture(m.view);
     crop(p, m.crop, `keys-row-${tag}-x3`);
@@ -271,12 +272,12 @@ module.exports = async function headKeys({ mainWindow, invoke, output, run, sett
   mainWindow.setBounds(bounds);
   await run(mainWindow, `goto('today'); return true;`); await still();
   fs.writeFileSync(path.join(dir, 'shortcuts-mouse-cap.json'), JSON.stringify(caps, null, 1));
-  // The row keeps one line (its label too, 「Expand or collapse subtasks」 beside the 82px cap) and the height of the one-line row under it
-  // (오른쪽 패널 /); the row above (「Expand or collapse all」 and its four caps) is on one line too since its English was shortened (2026-11-12,
-  // ui-smoke-sheet-lines-1112.cjs shortcut-sheet-one-line).
+  // The row keeps one line (its label too, 「Expand or collapse subtasks」 beside the 82px cap) and the height of the one-line row under it,
+  // 「Expand or collapse all」 and its four caps (one line since its English was shortened, 2026-11-12, ui-smoke-sheet-lines-1112.cjs
+  // shortcut-sheet-one-line; under the double-click row since 2026-11-13), and ends where that row's last cap ends.
   const capOk = c => c.text === (c.tag.startsWith('ko') ? '더블클릭' : 'Double-click') && c.el === 'KBD' && c.kids === 0
     && c.same && c.keysSame && c.capLines === 1 && c.cap.endsWith('x22') && c.capH === 22 && c.labelLines === 1 && c.inside && Math.abs(c.mid) <= 0.5
-    && c.rowH === c.belowH && c.rightEdge === c.aboveRightEdge && c.card.open && c.card.caps > 0 && c.card.same;
+    && c.rowH === c.belowH && c.rightEdge === c.belowRightEdge && c.card.open && c.card.caps > 0 && c.card.same;
   expect(caps.length === 8 && caps.every(capOk), `더블클릭 키캡 ${JSON.stringify(caps.map(({ look, crop, ...c }) => c))}`);
   checks.push('shortcuts-mouse-cap');
   return checks;

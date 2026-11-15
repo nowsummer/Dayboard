@@ -12,7 +12,7 @@ test('F113: a widget\'s agenda row has a key of its own, so the dialog it opened
   const ev = { id: 'e1', title: '회의', start: '2026-11-09T09:00:00', end: '2026-11-09T10:00:00' };
   const h = harness({ isWidget: true, calendarKey: () => false, eventsOn: () => [ev], showEvent() {}, canEditEvent: () => true, deleteEventFlow() {}, eventMenu() {},
     eventColor: () => '#3478f6', isRecurring: () => false, timeLabel: () => '오전 9:00', goto() {} });
-  h.loadApp(...MODAL, 'function agenda(');
+  h.loadApp(...MODAL, 'function markPast(', 'function agenda(');
   const draw = () => h.app.replaceChildren(h.eval('agenda')('2026-11-09'));
   draw();
   const row = h.app.querySelector('.event-row');
@@ -22,7 +22,8 @@ test('F113: a widget\'s agenda row has a key of its own, so the dialog it opened
   draw(); // the save's state broadcast redraws the widget whole
   h.eval('closeModal')(true);
   const now = h.document.activeElement;
-  assert.equal(String(now === row) + '|' + (now?.className || 'body') + '|' + (now?.getAttribute?.('data-event-key') || ''), 'false|event-row|e1');
+  // the row's first class: an ended event's row is also .past (markPast, 2026-11-13)
+  assert.equal(String(now === row) + '|' + (now?.className?.split(' ')[0] || 'body') + '|' + (now?.getAttribute?.('data-event-key') || ''), 'false|event-row|e1');
 });
 
 // The dialog of tests/event-notes.test.cjs, with a repeat picker that answers 매주 once it is touched.

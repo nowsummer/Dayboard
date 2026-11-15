@@ -26,7 +26,10 @@ function appLine(prefix, { optional = false, multi = false } = {}) {
 // The builders every screen uses: $, h, icon (paths, fills), btn, ib, keyed.
 const UI_PREFIXES = ['const $=', 'const h=', 'const paths=', 'const fills=', 'function icon(', 'const btn=', 'const ib=', 'const keyTip=', 'const keyed=',
   { prefix: 'function radioKeys(', optional: true }, { prefix: 'const colorName=', optional: true }, { prefix: 'function gridTabStop(', optional: true },
-  { prefix: 'const CUSTOM_RING=', optional: true }, { prefix: 'const chooseColor=', optional: true }, { prefix: 'function customSwatch(', optional: true }]; // the three area-F helpers: absent on the baseline
+  { prefix: 'const CUSTOM_RING=', optional: true }, { prefix: 'const chooseColor=', optional: true }, { prefix: 'function customSwatch(', optional: true }, // the three area-F helpers: absent on the baseline
+  // What the account card, the account button, the edit dialog and run() read of the changes kept on this PC (2026-11-13 offline stage 1, state.held).
+  { prefix: 'const heldService=', optional: true }, { prefix: 'const heldOf=', optional: true }, { prefix: 'function heldLine(', optional: true }, { prefix: 'const heldSeen=', optional: true }, { prefix: 'const heldRowKeys=', optional: true }, { prefix: 'function heldSeenInit(', optional: true }, { prefix: 'function heldNoticeShow(', optional: true },
+  { prefix: 'function undoLetter(', optional: true }]; // the keydown line's undo/redo letter (2026-11-13 peer fix P1); absent on 1.2.12
 
 // A VM with the DOM, the real domain and dictionary, recording stubs for toast() and run(), and the caller's globals.
 function harness(extra = {}) {
@@ -36,6 +39,7 @@ function harness(extra = {}) {
   const context = {
     ...dom.globals, D, I, tr: I.tr,
     toasts, toast(text, error, action) { toasts.push({ text, error: Boolean(error), label: action?.label || '' }); }, hideToast() {},
+    toastAction: null, toastRedo: null, toastTimer: null, // app.js's own toast's 되돌리기·다시 실행 (heldNoticeShow reads them, 2026-11-13)
     // run() answers with context.answer(name, payload) when a test sets one (a throw there becomes a rejection, as a failed IPC).
     calls, run(name, payload) { calls.push({ name, payload }); return new Promise(resolve => resolve(context.answer ? context.answer(name, payload) : {})); },
     api: { invoke(name, payload) { calls.push({ name, payload, direct: true }); return Promise.resolve({}); } },

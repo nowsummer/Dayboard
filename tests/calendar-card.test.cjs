@@ -31,7 +31,7 @@ function harness(mode = 'month') {
     toLocalInput: x => x.slice(0, 16),
     state: { settings: { calendarView: mode }, calendars: [{ id: 'local-calendar', provider: 'local' }], events: [] },
     selectedDate: '2026-10-26', view: 'calendar', isWidget: false,
-    calKeyboardOpen: false, search: '', menuRoot: null,
+    calKeyboardOpen: false, search: '', menuRoot: null, datePopNode: null, // app.js's date popover (the calendar's Ctrl keys wait while it is open, 2026-11-13)
     render() {}, closeMenu() {}, $() { return null; },
     toast(text, error, action) { toasts.push({ text, error: Boolean(error), action: action?.label || '' , onClick: action?.onClick }); },
     writableCalendars() { return context.state.calendars; },
@@ -229,7 +229,7 @@ test('Ctrl+N while a repeating event waits for its scope answer keeps the card; 
   const addLine = appLines.find(line => line.startsWith('function addEvent(day,anchor)'));
   const keyLine = appLines.find(line => line.startsWith("document.addEventListener('keydown',e=>{if(calendarKey(e))return;"));
   assert.ok(addLine && keyLine, 'app.js entry points still exist');
-  call(addLine); call(keyLine);
+  call(addLine); call(appLines.find(line => line.startsWith('function undoLetter('))); call(keyLine);
   const handler = listeners.find(item => item.type === 'keydown').callback;
   handler({ key: 'n', code: 'KeyN', type: 'keydown', ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, isComposing: false, preventDefault() {} });
   assert.equal(call('calCard === editedCard'), true, 'no new card while the question is open');

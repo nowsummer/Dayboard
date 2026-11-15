@@ -2,12 +2,13 @@
 // shortcut-sheet-one-line — every row of the shortcut sheet (? → 키보드 단축키, renderer/help.js shortcutGroups, two .shortcut-col
 // columns) on one line (2026-11-12: in English three descriptions wrapped, one word alone on the second line, at 1180 and 900 wide —
 // 「Show or hide all subtasks」, 「Scroll the hours in week and day views」, 「Next / previous match」. renderer/i18n.js now has
-// 「Expand or collapse all」 — the verbs and 「or」 of the row under it, 「Expand or collapse subtasks」, after 「Show/hide all subtasks」 (2026-11-12
-// lead) —, 「Scroll the hours (week, day)」, 「Next/previous match」, the Korean unchanged). Korean and English,
+// 「Expand or collapse all」 — the verbs and 「or」 of the double-click row, 「Expand or collapse subtasks」, after 「Show/hide all subtasks」 (2026-11-12
+// lead) —, 「Scroll the hours (week, day)」, 「Next/previous match」, the Korean unchanged). Since 2026-11-13 (owner: one key per action) the sheet
+// has 24 rows — 「다음·이전 찾기」 left it, the double-click row comes first under 할 일 with 모두 right under it. Korean and English,
 // 기본 · 크게 · 더 크게, 1180×780 and 900×650: a description's lines are the distinct tops of its text's client rects (not scrollHeight),
 // the keys' line the distinct tops of their caps. The room each description has left (its row less the keys and the gap, less its text
 // unwrapped) is written per row: the sheet's column is 281 CSS px at every text size (the whole page is zoomed), so the room is the same
-// at 크게 and 더 크게; 더 크게 at 900 wide is 720 CSS px and stacks the columns. Pictures: the sheet ×2 and the three rows ×3 (with the
+// at 크게 and 더 크게; 더 크게 at 900 wide is 720 CSS px and stacks the columns. Pictures: the sheet ×2 and the two rows ×3 (with the
 // rows above and below) in output/sheet-lines-1112/, and sheet-lines.json.
 // go-to-date-sentence-case — 「날짜로 이동」 in English reads 「Go to date」 (was Apple Calendar's 「Go to Date」 among sentence-case labels, 2026-11-12
 // lead) in all four places it is said: the calendar title's tooltip, the dialog it opens, the sheet's row and the calendar's ? card; pictures of
@@ -25,9 +26,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-// The three rows that wrapped in English, by their Korean keys (help.js; the label drawn is tr(key) in either language).
-const WATCH = ['하위 할 일 모두 펼치기·접기', '주간·일간에서 시간 이동', '다음·이전 찾기'];
-const SLUG = ['all-subtasks', 'scroll-hours', 'next-previous-match'];
+// The rows that wrapped in English, by their Korean keys (help.js; the label drawn is tr(key) in either language); the third, 다음·이전 찾기,
+// left the sheet on 2026-11-13.
+const WATCH = ['하위 할 일 모두 펼치기·접기', '주간·일간에서 시간 이동'];
+const SLUG = ['all-subtasks', 'scroll-hours'];
 // A row that does not sit on one line beside its keys: its description on two lines, its keys on two, or its description wider than the room
 // it has (slack < 0) — a word that cannot break runs over the keys on one line (the description is min-width:0 in the flex row), which the
 // line count alone missed (2026-11-12 review).
@@ -68,7 +70,9 @@ module.exports = async function sheetLines({ mainWindow, invoke, output, run, se
             keyLines: new Set([...dd.querySelectorAll('kbd')].map(k => Math.round(k.getBoundingClientRect().top))).size,
             room: r2(room), slack: r2(room - natural(dt)), h: r2(r.height) };
         });
-        return { view: innerWidth, lang: document.documentElement.lang, expected: shortcutGroups().reduce((n, [, list]) => n + list.length, 0), cols: getComputedStyle(body).gridTemplateColumns, sheet: R(dialog),
+        // 할 일's first row is the double-click one (2026-11-13 owner), in either language
+        const tasksFirst = [...body.querySelectorAll('.shortcut-group')][1]?.querySelector('.shortcut-row dt')?.textContent === tr('하위 할 일 펼치기·접기');
+        return { view: innerWidth, lang: document.documentElement.lang, expected: shortcutGroups().reduce((n, [, list]) => n + list.length, 0), cols: getComputedStyle(body).gridTemplateColumns, sheet: R(dialog), tasksFirst,
           scroll: r2(dialog.scrollHeight - dialog.clientHeight), rows,
           watch: ${JSON.stringify(WATCH)}.map(key => tr(key)) };`);
       // the sheet as it opens (×2), then each watched row with its neighbours (×3), scrolled into the sheet's view first
@@ -87,7 +91,7 @@ module.exports = async function sheetLines({ mainWindow, invoke, output, run, se
         crop(p, box, `row-${tag}-${SLUG[i]}-x3`, 3);
       }
       await run(mainWindow, `closeModal(true); return true;`); await still();
-      scenes.push({ tag, view: m.view, read: `${m.rows.length}/${m.expected}`, k: Math.round(p.k * 1000) / 1000, lang: m.lang, cols: m.cols, scroll: m.scroll,
+      scenes.push({ tag, view: m.view, read: `${m.rows.length}/${m.expected}`, tasksFirst: m.tasksFirst, k: Math.round(p.k * 1000) / 1000, lang: m.lang, cols: m.cols, scroll: m.scroll,
         wrapped: m.rows.filter(broken).map(r => `${r.label} (${r.lines}/${r.keyLines}/${r.slack})`),
         tightest: m.rows.slice().sort((a, b) => a.slack - b.slack).slice(0, 4).map(r => `${r.label}: ${r.slack}`),
         watched: m.watch.map(label => m.rows.find(r => r.label === label)).filter(Boolean).map(r => ({ label: r.label, lines: r.lines, room: r.room, slack: r.slack })),
@@ -153,7 +157,7 @@ module.exports = async function sheetLines({ mainWindow, invoke, output, run, se
     await invoke('settings:update', { language: 'en', theme: 'light', textSize: 'default' });
     mainWindow.setSize(1180, 780); away();
     await run(mainWindow, `closeModal?.(true); goto('calendar'); return true;`); await still();
-    goDate.tooltip = await run(mainWindow, `return document.querySelector('#app .title-button')?.title ?? null;`);
+    goDate.tooltip = await run(mainWindow, `return document.querySelector('#app .title-button')?.dataset.tip ?? null;`);
     await run(mainWindow, `calGoToDate(); return true;`); await still();
     const R = `const R = n => { const r = n.getBoundingClientRect(); return { l: r.left - 12, t: r.top - 12, r: r.right + 12, b: r.bottom + 12 }; };`;
     const dialog = await run(mainWindow, `${R} const d = document.querySelector('#modal-root .dialog'); return d ? { title: d.querySelector('#dialog-title')?.textContent ?? null, box: R(d), view: innerWidth } : null;`);
@@ -177,8 +181,8 @@ module.exports = async function sheetLines({ mainWindow, invoke, output, run, se
   fs.writeFileSync(path.join(dir, 'card-lines.json'), JSON.stringify(cards, null, 1));
   fs.writeFileSync(path.join(dir, 'headings.json'), JSON.stringify(heads, null, 1));
   // Every scene — both languages, every text size, both windows: no description and no keys on a second line, no description wider than its
-  // room; every row of the sheet read.
-  const oneLine = s => s.rows.length > 0 && s.read === `${s.rows.length}/${s.rows.length}` && s.wrapped.length === 0 && s.lang === s.tag.slice(0, 2);
+  // room; every row of the sheet read, 24 of them, 할 일 starting with the double-click row.
+  const oneLine = s => s.rows.length === 24 && s.read === `${s.rows.length}/${s.rows.length}` && s.tasksFirst && s.wrapped.length === 0 && s.lang === s.tag.slice(0, 2);
   const summary = scenes.map(({ rows, ...s }) => s);
   expect(scenes.length === 12 && scenes.every(oneLine), `단축키 표 한 줄 ${JSON.stringify(summary)}`);
   checks.push('shortcut-sheet-one-line');

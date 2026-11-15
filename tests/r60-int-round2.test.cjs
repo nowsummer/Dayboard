@@ -25,13 +25,13 @@ test('widget-ui-rr-1: the agenda title has its own box, cut to one line in a wid
     '.widget-body .widget-agenda .event-row>div>strong>.event-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.widget-body .widget-agenda .event-row>div>strong>.chip-repeat{flex:none}']) assert.ok(round2.includes(rule), rule);
   // the grey 12px caption rules skip the title span, so the main window's agenda keeps the strong's look
-  assert.equal((css.match(/span:not\(\.event-line,\.event-title\)/g) || []).length, 3, 'the three caption selectors exclude .event-title');
+  assert.equal((css.match(/span:not\(\.event-line,\.event-title\)/g) || []).length, 5, 'the three caption selectors and the two past ones (2026-11-13) exclude .event-title');
   assert.ok(!/span:not\(\.event-line\)[,{]/.test(css), 'no caption selector still catches the title');
   const longTitle = '2026년 하반기 노동시장 동향 점검 및 대응 방향 회의';
   const build = isWidget => {
     const h = harness({ isWidget, eventsOn: () => [{ id: 'e1', title: longTitle, location: '3층 회의실' }], showEvent() {}, canEditEvent: () => true, deleteEventFlow() {}, eventMenu() {},
       eventColor: () => '#ff3b30', isRecurring: () => true, timeLabel: () => '오전 8:00–오전 9:00', goto() {}, agendaOpenDay: null });
-    h.loadApp('function agenda(');
+    h.loadApp('function markPast(', 'function agenda(');
     h.app.append(h.eval('agenda')('2026-11-02', 4));
     const row = h.app.querySelector('.event-row'), strong = row.querySelector('strong');
     return { title: strong.querySelector('.event-title')?.textContent ?? null, kids: strong.children.map(n => n.className).join(' '), tooltip: row.getAttribute('title') ?? null, time: row.querySelector('div>span')?.textContent ?? null };

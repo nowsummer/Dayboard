@@ -117,7 +117,9 @@ function mainCommands(t) {
     lookup(collection, id) { const item = store.peek(collection, V.identifier(id)); if (!item) throw new Error('항목이 없거나 이미 삭제되었습니다.'); return item; },
     commit: fn => store.mutate(fn),
     cloudTask: async (kind, task) => { sent.push(structuredClone(task)); return { ...task, remoteId: 'R-' + task.id }; },
-    sync: { async mutateTask(kind, task) { sent.push(structuredClone(task)); return { ...task }; } },
+    sync: { async mutateTask(kind, task) { sent.push(structuredClone(task)); return { ...task }; },
+      // An account list's task since 2026-11-13 (lib/sync.cjs writeTask): kept here with what the service answers, as the real one commits it.
+      async writeTask(kind, task) { sent.push(structuredClone(task)); const kept = { ...task, ...(kind === 'add' ? { remoteId: 'R-' + task.id } : {}) }; store.mutate(state => { if (kind === 'add') state.tasks.push(kept); else state.tasks = state.tasks.map(item => item.id === kept.id ? kept : item); }); return { task: kept }; } },
   };
   vm.createContext(context);
   const from = source.indexOf("    case 'task:add': {"); const to = source.indexOf("    case 'calendar:history':", from);

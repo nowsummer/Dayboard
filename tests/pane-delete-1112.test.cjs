@@ -26,10 +26,12 @@ test('the panel\'s 「할 일 삭제」 is a text box of its own class, no icon,
   const edit = appLine('function editTask(');
   const at = edit.indexOf("pane?h('footer',{class:'task-pane-foot'},(b=>{");
   assert.equal(at > 0, true, 'the panel\'s foot, the form\'s last child');
-  const dialog = edit.indexOf(":h('footer',{class:'dialog-footer split'}", at);
+  const dialog = edit.indexOf("h('footer',{class:'dialog-footer split'}", at);
   const pane = edit.slice(at, dialog);
   assert.equal(pane.includes("})(btn(tr('할 일 삭제'),async()=>{if(stepAdd?.task===t.id)stepAdd.keepOnDelete=false;"), true, 'its words, as 「일정 삭제」');
-  assert.equal(pane.endsWith(",'pane-delete')))"), true, 'class pane-delete, no icon argument (btn, the press wrapper, the footer)');
+  assert.equal(pane.includes(",'pane-delete')),"), true, 'class pane-delete, no icon argument (btn, the press wrapper)');
+  // 2026-11-13 offline stage 1: under the box, the grey line of a change still to go (heldLine), the foot's last child
+  assert.equal(/'pane-delete'\)\),\/\*[^*]*\*\/heldLine\(t\)\):$/.test(pane), true, 'then the line, then the footer closes');
   assert.equal(pane.includes("'trash'"), false, 'no trash icon');
   assert.equal(pane.includes('danger-quiet'), false, 'not the text button');
   // unchanged: the typing saved first, this PC's at once with 되돌리기 (the panel let go first; the keyboard to the row beside is deleteTaskFlow's goneFocus since 2026-11-12, tests/focus-delete-1112), an account's asked
@@ -45,7 +47,10 @@ test('the panel\'s 「할 일 삭제」 is a text box of its own class, no icon,
 test('the edit dialog keeps its bar: 삭제 a red text button with its icon at the left, the blue 저장 at the right', () => {
   const edit = appLine('function editTask(');
   // its 삭제 sends this PC's delete before the dialog closes (2026-11-12 review: the dialog gave the keyboard back to the row going away)
-  assert.equal(edit.includes(":h('footer',{class:'dialog-footer split'},btn(tr('삭제'),()=>{/* this PC's goes at once: sent first, so the dialog closing gives the keyboard back to the row going away no more (goingAway) */const local=!isWidget&&listBy(t.listId)?.provider==='local';deleteTaskFlow(t);if(local)closeModal(true);},'button danger-quiet','trash'),h('button',{class:'button primary',type:'submit'},tr('저장'))))"), true);
+  // its last child, drawn as a row of its own above them, the grey line of a change still to go (2026-11-13 offline stage 1, heldLine)
+  assert.equal(edit.includes(":h('footer',{class:'dialog-footer split'},btn(tr('삭제'),()=>{/* this PC's goes at once: sent first, so the dialog closing gives the keyboard back to the row going away no more (goingAway) */const local=!isWidget&&listBy(t.listId)?.provider==='local';deleteTaskFlow(t);if(local)closeModal(true);},'button danger-quiet','trash'),h('button',{class:'button primary',type:'submit'},tr('저장')),"), true);
+  assert.equal(/tr\('저장'\)\),\/\*[^*]*\*\/heldLine\(t\)\)\);/.test(edit), true, 'the line last in the bar');
+  assert.equal([decls('.dialog-footer>.held-line')['grid-row'], decls('.dialog-footer>.held-line')['grid-column']].join('|'), '1|1/-1', 'drawn first, on its own row (a grid while it shows: the buttons never wrap)');
   assert.equal(decls('.dialog-footer.split>.button.danger-quiet:first-child')['margin-left'], '-10px');
 });
 

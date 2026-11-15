@@ -170,7 +170,7 @@ async function launch(directory, layout, { failLoads = {} } = {}) {
     WIDGET_OPEN: D.WIDGET_OPEN, widgetMinimum: D.widgetMinimum,
     clampBounds: desktopLib.clampBounds, resizedBounds: desktopLib.resizedBounds, RESIZE_EDGES: desktopLib.RESIZE_EDGES, onScreen: desktopLib.onScreen,
     desktop: desktopLib.createDesktopManager({ native: () => world.api, handle: win => win.hwnd }),
-    widgetWindows: new Map(), boundsTimers: new Map(), widgetQueues: new Map(), backdropKeys: new Map(), revealTokens: new Map(), resizeAnchors: new Map(),
+    widgetWindows: new Map(), boundsTimers: new Map(), widgetQueues: new Map(), backdropKeys: new Map(), revealTokens: new Map(), resizeAnchors: new Map(), headMoves: new Map(),
     quitting: false, rendererFile: 'index.html',
     commit: fn => store.mutate(fn),
     lookup: (collection, id) => { const item = store.peek(collection, id); if (!item) throw new Error('없음'); return item; },

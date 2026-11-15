@@ -72,6 +72,7 @@ const FORMS = [
   'transferListDialog', 'moveCalendarDialog', 'openNoteHistory', 'noteFolderDialog', 'editTask', 'addList', 'editList', 'addGroup', 'editGroup', 'eventDialog',
   'showEvent', 'openWidgetSettings', 'openSettings', 'openEventShortcuts', 'editEventShortcut', "openAccounts tr('계정')", 'connectAccount', 'calGoToDate',
   'calCustomRepeat', 'openShortcuts',
+  'openHeldReview', // 「확인할 변경」 (2026-11-13 offline stage 1): a line per question with its choices
 ];
 
 test('every modal( call is read whole: a title and two to four arguments', () => {

@@ -16,7 +16,7 @@ const { harness, D, I } = require('./r50-F-harness.cjs');
 const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'styles.css'), 'utf8');
 
 function calendar(view = 'month', extra = {}) {
-  const h = harness({ eventsBetween: () => [], goToday() {}, addEvent() {}, dayDots: () => [], shortTitle: x => x, calendarMenu() {}, eventColor: () => '#3478f6', isLocalEvent: () => true, canEditEvent: () => true, writableCalendars: () => [], stepsFolded: () => false, ...extra });
+  const h = harness({ eventsBetween: () => [], goToday() {}, addEvent() {}, dayDots: () => [], shortTitle: x => x, calendarMenu() {}, eventColor: () => '#3478f6', isLocalEvent: () => true, canEditEvent: () => true, writableCalendars: () => [], stepsFolded: () => false, markPast: n => n, pastSweep() {}, ...extra }); // past rows: tests/past-events-1113.test.cjs
   h.context.eventChip = (e) => { const n = h.document.createElement('button'); n.className = 'day-event'; n.textContent = e.title; return n; };
   h.context.view = 'calendar';
   h.context.state.settings.calendarView = view;

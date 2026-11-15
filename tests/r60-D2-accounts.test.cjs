@@ -2,7 +2,7 @@
 // 2026-11-02 review, area D2 (accounts dialog): app-design-14 — the 할 일·달력·메모 sync toggles are the app's switch rows
 // (.checkbox-field: appearance none, 34×20) on a full-width second row of the card, 「연결 해제」 the trailing action of the
 // top-aligned first row; app-design-7 ② ⑤ — the intro sentence and the two-line iCloud paragraph are gone (the iCloud option's
-// small text carries 「Apple 달력 (미리 알림 제외)」 since 2026-11-06 — the owner read 「Apple 달력 · 미리 알림 미지원」 as neither), the connect form's credentials sentence is one line without the OneDrive clause;
+// small text carries 「달력 (미리 알림 제외)」 since 2026-11-13, 「Apple 달력 (미리 알림 제외)」 since 2026-11-06 — the owner read 「Apple 달력 · 미리 알림 미지원」 as neither), the connect form's credentials sentence is one line without the OneDrive clause;
 // app-design-6 ② — the disconnect confirm is opened with noClose (a two-button alert, no X once modal() honours it).
 // Real renderer/app.js openAccounts(), connectAccount(), accountNotice(), modal() over the small DOM of tests/r50-F-dom.cjs;
 // the stylesheet's cascade through tests/r50-F-css.cjs. Fake accounts live in the renderer `state` only.
@@ -27,7 +27,7 @@ function accountsHarness() {
     providerLogo: name => h.eval('h')('span', { class: 'provider-logo ' + name }), // the brand SVGs are not what these tests read
   });
   h.loadApp('let restoreFocus=null;', 'const formSnapshot=', 'function sheetScroll(', 'function modal(', 'function dismissModal(', 'const field=', 'const input=', 'function act(',
-    'const providerName=', 'const notesIntent=', 'const timeFormat=', 'function fmtTime(', 'function refreshAccounts(', 'function accountNotice(', 'function openAccounts(', 'function viewSyncLine(', 'async function connectAccount(');
+    'const providerName=', 'const notesIntent=', 'const timeFormat=', 'function fmtTime(', 'function syncedAt(', 'function refreshAccounts(', 'function accountNotice(', 'function openAccounts(', 'function viewSyncLine(', 'async function connectAccount(');
   h.context.state.accounts = ACCOUNTS();
   h.context.state.settings = { notesAccountId: 'fake-g' };
   // Every modal() call is recorded with its options (openAccounts opens the disconnect confirm through the global).
@@ -113,14 +113,15 @@ test('no intro sentence, no iCloud paragraph; the iCloud option says the calenda
   assert.ok(!body.textContent.includes('익숙한 목록'));
   assert.ok(!body.textContent.includes('iCloud 미리 알림은'), 'the two-line iCloud paragraph is gone');
   const options = [...body.querySelectorAll('.provider-option')].map(o => [h.text(o.querySelector('strong')), h.text(o.querySelector('small'))]);
-  // Google's line in Korean like the others (2026-11-06 review of batch A: 'Google Calendar' stood in English beside 「Outlook 달력」).
-  assert.deepEqual(options, [['Microsoft', 'To Do · Outlook 달력'], ['Google', 'Tasks · Google 달력'], ['iCloud', 'Apple 달력 (미리 알림 제외)']]);
+  // Google's line in Korean like the others (2026-11-06 review of batch A: 'Google Calendar' stood in English beside 「Outlook 달력」);
+  // since 2026-11-13 every line is in the app's own words (tests/account-add-widget-tab-1113.test.cjs).
+  assert.deepEqual(options, [['Microsoft', '할 일 · 달력 · 메모'], ['Google', '할 일 · 달력 · 메모'], ['iCloud', '달력 (미리 알림 제외)']]);
   // 2026-11-06 owner: 「“Apple 달력·미리알림 미지원” 이거만 봤을 때는 달력이랑 미리 알림 모두 미지원하는 거 같이 느껴져」 — no 「A · B 미지원」 that reads as both;
   // the review of batch A: what is left out in brackets, not a negative closing a 「·」 list (「…만 · …지원 안 함」 said it twice, 「안 함」 read as a setting).
   assert.equal(/ · [^·]*(미지원|안 함)$/.test(options[2][1]), false, 'no negative closing a list');
-  assert.equal(JSON.stringify(['Tasks · Google 달력', 'Apple 달력 (미리 알림 제외)'].map(k => I.translate('en', k))), JSON.stringify(['Tasks · Google Calendar', 'Apple Calendar (no Reminders)']));
-  assert.ok(!/reminders? (are|is) supported|supports reminders/i.test(I.translate('en', 'Apple 달력 (미리 알림 제외)')), 'never claims iCloud Reminders support (CLAUDE.md)');
-  for (const old of ['Apple 달력 · 미리 알림 미지원', 'Apple 달력만 · 미리 알림은 지원 안 함']) assert.equal(I.translate('en', old), old, 'the old words are gone from the dictionary');
+  assert.equal(JSON.stringify(['할 일 · 달력 · 메모', '달력 (미리 알림 제외)'].map(k => I.translate('en', k))), JSON.stringify(['Tasks · Calendar · Notes', 'Calendar (no Reminders)']));
+  assert.ok(!/reminders? (are|is) supported|supports reminders/i.test(I.translate('en', '달력 (미리 알림 제외)')), 'never claims iCloud Reminders support (CLAUDE.md)');
+  for (const old of ['Apple 달력 · 미리 알림 미지원', 'Apple 달력만 · 미리 알림은 지원 안 함', 'To Do · Outlook 달력', 'Tasks · Google 달력', 'Apple 달력 (미리 알림 제외)']) assert.equal(I.translate('en', old), old, 'the old words are gone from the dictionary');
 });
 
 // The iCloud connect form says what it connects and what it leaves out, where the user commits (2026-11-06 review of batch A: 「iCloud

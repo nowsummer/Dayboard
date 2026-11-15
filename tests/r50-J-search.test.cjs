@@ -37,6 +37,7 @@ function harness(events, settings = {}) {
     ib: () => ({ tag: 'button', attrs: {}, children: [] }),
     markedText: text => text, timeLabel: () => '', eventColor: () => '#007aff', eventMenu() {}, koreanDate: key => key,
     canEditEvent: () => true, isLocalEvent: () => true, isRecurring: e => Boolean(e.rrule), icon: () => null, eventChip: () => ({ tag: 'div', attrs: {}, children: [], dataset: {}, addEventListener() {}, classList: { add() {} } }),
+    markPast: n => n, pastSweep() {}, // plain records: the order is checked here, past rows in tests/past-events-1113.test.cjs
     TODAY,
   };
   vm.createContext(context);

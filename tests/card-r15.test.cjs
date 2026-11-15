@@ -16,7 +16,8 @@ const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const D = require('../renderer/domain.js');
-const { createStore } = require('../lib/store.cjs');
+const { createStore, publicRecord } = require('../lib/store.cjs');
+const O = require('../lib/outbox.cjs');
 const V = require('../lib/validate.cjs');
 const { eventFields } = require('../lib/series.cjs');
 
@@ -214,8 +215,11 @@ function mainAdd(t) {
     text: V.text, identifier: V.identifier, boolean: V.boolean, dateOnly: V.dateOnly, dateTime: V.dateTime, eventColor: V.eventColor, rruleText: V.rruleText, eventFields,
     defaultCalendarId: D.defaultCalendarId,
     commit: fn => store.mutate(fn),
-    // The service: stores it under the key and returns it, or fails.
+    // The service: stores it under the key and returns it, or fails. Since offline stage 1 for events (2026-11-13) an event that does not
+    // repeat goes by writeEvent: kept here under the id its service will give it (lib/outbox.cjs eventIdFor), a revise an update of it.
     async writeRemoteEvent(kind, event) { sent.push(event); if (failure) throw failure; return [{ ...event, id: `g-${event.key}`, remoteId: event.key }]; },
+    eventIdFor: O.eventIdFor, publicRecord, structuredClone,
+    sync: { async writeEvent(kind, event, calendar, options = {}) { sent.push({ kind, key: options.key || '', title: event.title }); if (failure) throw failure; store.mutate(state => { state.events = state.events.filter(item => item.id !== event.id).concat(event); }); return { event }; } },
     mainWindow: { isDestroyed: () => false, isVisible: () => win.shown },
     Notification: class { static isSupported() { return true; } constructor(options) { this.options = options; } on() {} show() { notes.push(this.options.title); } },
     showMain() {},
@@ -247,12 +251,14 @@ test('main: a resend of a new event on this PC returns the stored one; only a ca
 test('main: a connected calendar\'s add passes revise on only when the card sends it; a kept add failing while the window is hidden is told by Windows', async t => {
   const m = mainAdd(t);
   const base = { calendarId: 'gcal', key, title: '점심', start: '2026-11-02T03:00:00.000Z', end: '2026-11-02T04:00:00.000Z', location: '' };
-  await m.add(base); await m.add({ ...base, kept: true }); await m.add({ ...base, revise: true }); await m.add({ ...base, revise: 'yes' });
-  assert.deepEqual(m.sent.map(event => [event.key, event.revise]), [[key, undefined], [key, undefined], [key, true], [key, undefined]]);
+  await m.add(base); await m.add({ ...base, kept: true }); await m.add({ ...base, title: '점심 (고침)', revise: true }); await m.add({ ...base, title: '다른 값', revise: 'yes' });
+  // The same key again returns the event kept here (as this PC's calendar does); only a card asking for its new values (revise) changes it.
+  assert.deepEqual(m.sent.map(item => [item.kind, item.key, item.title]), [['add', key, '점심'], ['update', '', '점심 (고침)']]);
   m.fail(new Error('offline'));
-  await assert.rejects(m.add({ ...base, kept: true }), /offline/); // the window is shown: its toast tells it
+  const other = '89abcdef0123456789abcdef01234567', last = 'fedcba9876543210fedcba9876543210';
+  await assert.rejects(m.add({ ...base, key: other, kept: true }), /offline/); // the window is shown: its toast tells it
   m.win.shown = false;
-  await assert.rejects(m.add(base), /offline/); // not a kept add: the card that sent it is the one waiting
-  await assert.rejects(m.add({ ...base, kept: true }), /offline/);
+  await assert.rejects(m.add({ ...base, key: other }), /offline/); // not a kept add: the card that sent it is the one waiting
+  await assert.rejects(m.add({ ...base, key: last, kept: true }), /offline/);
   assert.deepEqual(m.notes, ['「점심」 일정을 저장하지 못했어요.'], 'one notification, for the kept add in the hidden window');
 });

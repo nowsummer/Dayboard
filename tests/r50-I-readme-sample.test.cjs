@@ -64,8 +64,9 @@ async function sample(lang) {
   return { lists, events, sidebar };
 }
 
-const NAMES = { ko: { trip: '제주 여행 준비', order: ['장보기', '집안일', '제주 여행 준비', '운동', '내 할 일', '업무'], work: '업무' },
-  en: { trip: 'Lisbon trip', order: ['Groceries', 'Home', 'Lisbon trip', 'Fitness', 'My Tasks', 'Work'], work: 'Work' } };
+// 생활 in the homepage draft's order and 업무 green, 장보기 yellow (owner, 2026-11-14: 홈페이지 초안 촬영/읽어보기.md).
+const NAMES = { ko: { trip: '제주 여행 준비', order: ['장보기', '제주 여행 준비', '운동', '집안일', '내 할 일', '업무'], work: '업무', shop: '장보기' },
+  en: { trip: 'Lisbon trip', order: ['Groceries', 'Lisbon trip', 'Fitness', 'Home', 'My Tasks', 'Work'], work: 'Work', shop: 'Groceries' } };
 
 for (const lang of ['ko', 'en']) {
   const n = NAMES[lang];
@@ -82,8 +83,11 @@ for (const lang of ['ko', 'en']) {
       const a = sidebar[i], b = sidebar[j], d = deltaE00(a.color, b.color);
       assert.ok(d >= FAMILY, `${a.name} ${a.color} and ${b.name} ${b.color}, ${j - i} row(s) apart: CIEDE2000 ${d.toFixed(1)}`);
     }
-    // The colours chosen here keep a white glyph readable (WCAG non-text 3:1).
-    for (const list of sidebar.filter(l => [n.trip, n.work].includes(l.name))) assert.ok(whiteContrast(list.color) >= 3, `${list.name} ${list.color}: white glyph ${whiteContrast(list.color).toFixed(2)}:1`);
+    // The trip colour chosen here keeps a white glyph readable (WCAG non-text 3:1). 업무 and 장보기 are the owner's picks, the
+    // pictures of every public page alike (2026-11-14).
+    for (const list of sidebar.filter(l => l.name === n.trip)) assert.ok(whiteContrast(list.color) >= 3, `${list.name} ${list.color}: white glyph ${whiteContrast(list.color).toFixed(2)}:1`);
+    assert.equal(sidebar.find(l => l.name === n.work).color.toLowerCase(), '#34c759', '업무 green, as on the homepage');
+    assert.equal(sidebar.find(l => l.name === n.shop).color.toLowerCase(), '#ffcc00', '장보기 yellow, as on the homepage');
   });
 
   test(`the calendars (${lang}) are the app's colours, apart from each other, and the event the film drags is calm`, async () => {

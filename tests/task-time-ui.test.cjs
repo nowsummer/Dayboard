@@ -218,11 +218,14 @@ test('rows: the date and time one coloured piece, a reminder from that time a di
   // The day panel names the day: the time alone.
   const panelRow = h.eval('taskRow')(task({ dueDate: day, dueTime: '14:00' }), true, day);
   assert.equal(panelRow.querySelector('.due-time').textContent, '오후 2:00');
-  // A date only keeps 1.2.10's rule: the same-day reminder said once, coloured.
+  // A date only keeps 1.2.10's rule: the same-day reminder said once, coloured; the date alone is coloured as the timed one since
+  // 2026-11-14 (owner: 「시간 없어도 주황색으로」, .due-date, tests/date-only-orange-1114.test.cjs).
   assert.equal(meta({ dueDate: day, reminderAt: at('09:30', 0) }), 'reminder-label=내일 오전 9:30');
-  assert.equal(meta({ dueDate: day }), '=내일');
+  assert.equal(meta({ dueDate: day }), 'due-date=내일');
+  assert.equal(meta({ dueDate: '2020-01-02' }).startsWith('due-date overdue='), true, 'red once past');
   const css = read('renderer/styles.css');
-  const rule = '.task-meta .due-time:not(.overdue){color:#b8721a}.task-meta .reminder-label.rel{color:inherit;opacity:.8}';
+  // the orange follows the theme (2026-11-14 owner, E안): the token --due-ink, tests/date-ink-1114.test.cjs
+  const rule = '.task-meta .due-time:not(.overdue),.task-meta .due-date:not(.overdue){color:var(--due-ink)}.task-meta .reminder-label.rel{color:inherit;opacity:.8}';
   assert.ok(css.indexOf(rule) > 0 && css.indexOf(rule) < css.indexOf('/* r60-apple'), 'the colours, before the r60-apple block');
 });
 

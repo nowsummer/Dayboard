@@ -425,7 +425,7 @@ test('Google: after a refusal the line sends no second try; words refused after 
 // first fix kept them for the task and filled them in after the next Enter (「우유빵」) or sent them as a reopened line was left; the second
 // put them back in an open empty line (the same 「우유빵」, a resend on a mere leave) or gave run()'s toast 「다시 넣기」, which the next
 // refusal covered before the first words were ever named. The REAL run(), toast() and hideToast() over the one #toast, as the app shows it. ----
-const NET = '인터넷 연결 또는 서비스 응답을 확인해 주세요. 변경을 시도했다면 다시 시도하기 전에 동기화하여 반영 여부를 확인해 주세요.'; // lib/providers/common.cjs
+const NET = '인터넷이나 서비스의 응답이 없어요. 연결되면 동기화한 뒤 다시 해 주세요.'; // lib/providers/common.cjs (2026-11-13 words)
 const AUTH = 'Microsoft 계정에 다시 로그인해 주세요.';
 const together = (words, why) => words.map(w => '「' + w + '」').join('·') + ' 하위 할 일을 넣지 못했어요. ' + why;
 function laterHarness() {
@@ -562,4 +562,50 @@ test('U4 nothing left that puts words back: no 다시 넣기, no stash, no fill 
   const src = read('renderer/app.js');
   assert.equal(["tr('다시 넣기')", 'function stepAddAgain(', 'function stepAddFill(', 'stepBack'].filter(x => src.includes(x)).join(), '');
   assert.equal(Object.hasOwn(require('../renderer/i18n.js').EN, '다시 넣기'), false);
+});
+
+// ---- Words main kept unsent (2026-11-13 offline spec S0.9, review ④): an account's task whose step insert met no connection or a server
+// error keeps that step without a service id (lib/providers/*.cjs error.partial, main.cjs task:update), and the task's next change sends it.
+// The toast said 「…넣지 못했어요」 beside a step that stood in the list; it says so now, calmly, without the service's words (their 「동기화한 뒤
+// 다시 해 주세요」 would have it typed twice); kept ones join each other, never a refusal. The broadcast of that keep usually comes before the
+// answer; when it has not, the state is read again. A refusal (4xx: not kept) keeps today's words. ----
+const kept = words => (words.length === 1 ? '「' + words[0] + '」 하위 할 일은 아직 보내지 못했어요. 이 할 일을 다시 고칠 때 함께 보내요.' : words.map(w => '「' + w + '」').join('·') + ' 하위 할 일은 아직 보내지 못했어요. 할 일을 다시 고칠 때 함께 보내요.');
+function keptHarness() {
+  const h = laterHarness(); const c = h.context;
+  c.state.lists = [{ id: 'l1', name: '장보기', provider: 'microsoft', accountId: 'a1', remoteId: 'L1' }];
+  // main as task:update has it after a write stopped at the step: the step kept (no remoteId), then the failure; `late`: its broadcast not here yet
+  const answer = c.api.invoke; let main = null;
+  c.api.invoke = async (name, payload) => {
+    if (name === 'state:get') return main || c.state;
+    if (name !== 'task:update' || !h.keep) return answer(name, payload);
+    h.calls.push({ name, payload });
+    await new Promise(resolve => setTimeout(resolve, h.delay));
+    const next = { ...c.state, tasks: c.state.tasks.map(x => x.id !== payload.id ? x : { ...x, steps: T.wantedSteps(payload, x.steps) }) };
+    if (h.keep === 'late') main = next; else { c.state = next; c.render(); }
+    throw new Error(NET);
+  };
+  return h;
+}
+
+test('U4 kept unsent (no connection, a 5xx): one calm toast says it is not sent yet and goes with the task\'s next change; the step stands; two join', async () => {
+  const h = keptHarness(); h.context.state.tasks = [task()]; h.context.render();
+  await h.pick('t1'); h.delay = 30; h.keep = 'now';
+  h.type('t1', '우유'); h.enter('t1'); await h.wait(80);
+  assert.equal([h.shown(), h.toasts.at(-1)?.error, h.titlesOf('t1'), h.field('t1')?.value].join('|'), kept(['우유']) + '/|false|우유|');
+  h.type('t1', '계란'); h.enter('t1'); await h.wait(80);
+  assert.equal([h.shown(), h.titlesOf('t1')].join('|'), kept(['우유', '계란']) + '/|우유,계란');
+});
+
+test('U4 kept unsent, its broadcast not here when the answer is: the state read again says so; a refusal on screen is not joined, nor joins it', async () => {
+  const h = keptHarness(); h.context.state.tasks = [task()]; h.context.render();
+  await h.pick('t1'); h.delay = 30; h.keep = 'late';
+  h.type('t1', '우유'); h.enter('t1'); await h.wait(80);
+  assert.equal(h.shown(), kept(['우유']) + '/', 'read again');
+  const r = keptHarness(); r.context.state.tasks = [task()]; r.context.render();
+  await r.pick('t1'); r.delay = 30; r.fail = NET;
+  r.type('t1', '빵'); r.enter('t1'); await r.wait(80);
+  const refusal = r.shown();
+  r.fail = null; r.keep = 'now';
+  r.type('t1', '버터'); r.enter('t1'); await r.wait(80);
+  assert.equal([refusal, r.shown()].join(' → '), named('빵', NET) + '/ → ' + kept(['버터']) + '/', 'each in its own words');
 });

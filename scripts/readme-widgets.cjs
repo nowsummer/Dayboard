@@ -1,8 +1,9 @@
 'use strict';
 // Desktop widget picture for the public page repository: the three widgets with the invented sample data
 // (scripts/readme-sample.cjs), attached to the real Windows desktop in a temporary profile, exactly as users see them
-// (glass over the wallpaper, no extra frame), and puts images/widgets.png together from each widget's own picture over the
-// wallpaper (scripts/readme-desktop.cjs, readme-scene-compose.py) — not from the screen, so nothing else on it can be in the photo
+// (glass over the wallpaper, no extra frame), and puts images/widgets.png together from each widget's own picture over the drawn
+// wallpaper 「D 새벽 능선」, never the user's (scripts/readme-desktop.cjs, readme-wallpaper.py, readme-scene-compose.py) — not from
+// the screen, so nothing else on it can be in the photo
 // (2026-10-29: the screen-recorded English scene of 1.2.1 went public over the user's Chrome) and the user's Dayboard can stay open.
 // (2026-10-21: the earlier picture pasted whole widget windows on a pastel background, which showed each window's
 // invisible 14px shadow margin as a pale band; that band never exists on a real desktop.)
@@ -28,7 +29,7 @@ prepareProfile(process.env.DAYBOARD_USER_DATA, LANG);
 process.chdir(APP_DIR);
 
 const { app, BrowserWindow, screen, nativeImage } = require('electron');
-const { desktopSwitches, physicalRect, wallpaperLayer, compose } = require('./readme-desktop.cjs');
+const { desktopSwitches, physicalRect, wallpaperLayer, compose, checkBackdrop } = require('./readme-desktop.cjs');
 const SCALE = Number(process.env.DAYBOARD_SCENE_SCALE) > 0 ? Number(process.env.DAYBOARD_SCENE_SCALE) : 1.25; // as the scene: at 2x a 1920 px screen is too short for the calendar widget
 desktopSwitches(app, SCALE);
 app.commandLine.appendSwitch('lang', LANG === 'en' ? 'en-US' : 'ko-KR'); // the built-in list and calendar get names in that language
@@ -90,7 +91,9 @@ app.whenReady().then(async () => {
       const win = await widgetWin(type); const at = physicalRect(screen, goal[type]);
       win.webContents.send('dayboard:backdrop', backdropAt(at, `readme:${type}:${at.x},${at.y}`));
       await wait(900); win.webContents.invalidate(); await wait(300);
+      const key = await checkBackdrop(win, type); // the drawn wallpaper behind its glass, before and after the picture
       const picture = await win.webContents.capturePage(); const size = picture.getSize();
+      if ((await checkBackdrop(win, type)) !== key) throw new Error(`${type}: its backdrop changed while it was pictured`);
       if (Math.abs(size.width - at.width) > 2 || Math.abs(size.height - at.height) > 2) throw new Error(`${type}: a ${size.width}x${size.height} picture for a ${at.width}x${at.height} place`);
       const file = `${type}.png`; fs.writeFileSync(path.join(LAYERS, file), picture.toPNG());
       meta.layers.push({ kind: type, file, t: 0, x: at.x - meta.scene.x, y: at.y - meta.scene.y, width: size.width, height: size.height });

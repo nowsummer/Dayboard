@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const { harness, D, I } = require('./r50-F-harness.cjs');
 
 function calendarHarness(view = 'month') {
-  const h = harness({ eventsBetween: () => [], goToday() {}, addEvent() {}, eventChip: () => null, dayDots: () => [], shortTitle: x => x, calendarMenu() {}, eventColor: () => '#000', isLocalEvent: () => true, canEditEvent: () => true, writableCalendars: () => [] });
+  const h = harness({ eventsBetween: () => [], goToday() {}, addEvent() {}, eventChip: () => null, dayDots: () => [], shortTitle: x => x, calendarMenu() {}, eventColor: () => '#000', isLocalEvent: () => true, canEditEvent: () => true, writableCalendars: () => [], markPast: n => n, pastSweep() {} });
   h.context.view = 'calendar';
   h.context.state.settings.calendarView = view;
   h.loadApp('const longDateFormats=', 'const koreanDate=', 'function byEventOrder(', 'function monthGrid(');

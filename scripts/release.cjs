@@ -42,6 +42,32 @@ async function github(token, method, url, body, headers = {}) {
   return data;
 }
 
+// SHA256SUMS (2026-11-14 owner): the `sha256sum` lines of the uploaded installer files, so a user can check the download.
+// It lists the digests npm run dist verified (not new reads), sorted by name, LF, ASCII, with a final newline.
+const SUMS = 'SHA256SUMS';
+function sha256Sums(entries) {
+  return [...entries].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)).map(({ name, sha256 }) => {
+    if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`SHA256SUMS: unexpected file name ${JSON.stringify(name)}`);
+    if (!/^[0-9a-f]{64}$/.test(sha256)) throw new Error(`SHA256SUMS: ${name} has no sha256 hex digest`);
+    return `${sha256}  ${name}\n`;
+  }).join('');
+}
+// The installer, its blockmap and latest.yml as npm run dist verified them, then SHA256SUMS written next to them.
+function releaseAssets(out, outputs) {
+  const digest = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  const entries = [outputs.installer, outputs.blockmap, outputs.latest];
+  const files = entries.map(entry => {
+    const file = path.join(out, entry.file);
+    assert.ok(fs.existsSync(file), `Missing ${entry.file}`);
+    assert.equal(digest(file), entry.sha256, `${entry.file} changed since npm run dist verified it`);
+    return file;
+  });
+  const sums = sha256Sums(entries.map(entry => ({ name: entry.file, sha256: entry.sha256 })));
+  const sumsFile = path.join(out, SUMS);
+  fs.writeFileSync(sumsFile, sums, 'latin1');
+  return { assets: [...files, sumsFile], sums };
+}
+
 // The draft → upload → publish steps, with GitHub passed in so a test can run them against a fake (2026-11-09 review F34).
 async function publishRelease({ call, api, tag, version, notes, branch, assets, read = file => fs.readFileSync(file), log = console.log }) {
   const existing = await call('GET', `${api}/releases/tags/${encodeURIComponent(tag)}`).catch(error => { if (error.status === 404) return null; throw error; });
@@ -53,13 +79,13 @@ async function publishRelease({ call, api, tag, version, notes, branch, assets, 
     const name = path.basename(file);
     if (uploaded.has(name)) await call('DELETE', `${api}/releases/assets/${uploaded.get(name).id}`);
     const uploadUrl = release.upload_url.replace(/\{.*\}$/, `?name=${encodeURIComponent(name)}`);
-    await call('POST', uploadUrl, read(file), { 'Content-Type': name.endsWith('.yml') ? 'text/yaml' : 'application/octet-stream' });
+    await call('POST', uploadUrl, read(file), { 'Content-Type': name === SUMS ? 'text/plain' : name.endsWith('.yml') ? 'text/yaml' : 'application/octet-stream' });
     log(`uploaded ${name}`);
   }
   // The name and notes again: a reused draft still carries the ones of the run that made it.
   return call('PATCH', `${api}/releases/${release.id}`, JSON.stringify({ name: `Dayboard ${version}`, body: notes, draft: false, make_latest: 'true' }), { 'Content-Type': 'application/json' });
 }
-module.exports = { publishRelease };
+module.exports = { publishRelease, sha256Sums, releaseAssets };
 
 if (require.main === module) (async () => {
   if (args.has('--login')) {
@@ -78,13 +104,7 @@ if (require.main === module) (async () => {
   const check = JSON.parse(fs.readFileSync(at('artifacts', 'package-verification.json'), 'utf8'));
   assert.equal(check.version, version, 'Run npm run package and npm run dist for this version first.');
   const digest = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  const out = at(pkg.build.directories.output);
-  const assets = [check.outputs.installer, check.outputs.blockmap, check.outputs.latest].map(entry => {
-    const file = path.join(out, entry.file);
-    assert.ok(fs.existsSync(file), `Missing ${entry.file}`);
-    assert.equal(digest(file), entry.sha256, `${entry.file} changed since npm run dist verified it`);
-    return file;
-  });
+  const { assets, sums } = releaseAssets(at(pkg.build.directories.output), check.outputs);
   // Official releases carry the publisher's Google client (assets/google-oauth.json, kept out of the public source),
   // so Google sign-in needs no client ID. A build without it would quietly ask every user for one.
   assert.ok(check.bundle.app['assets/google-oauth.json'], 'The build has no assets/google-oauth.json; official releases need the publisher Google client.');
@@ -98,7 +118,7 @@ if (require.main === module) (async () => {
   assert.equal(digest(at('package-lock.json')), check.bundle.lockfileSha256, 'package-lock.json changed since the build. Run npm run package and npm run dist again.');
   assert.equal(digest(at('node_modules', '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node')), check.bundle.koffiNodeSha256, 'koffi.node changed since the build. Run npm run package and npm run dist again.');
   const tag = `v${version}`;
-  if (args.has('--dry')) { const { app: _app, ...bundle } = check.bundle; console.log(JSON.stringify({ version, tag, repository: `${owner}/${repo}`, assets: assets.map(file => ({ name: path.basename(file), size: fs.statSync(file).size, sha256: digest(file) })), bundle, notes }, null, 2)); return; }
+  if (args.has('--dry')) { const { app: _app, ...bundle } = check.bundle; console.log(JSON.stringify({ version, tag, repository: `${owner}/${repo}`, assets: assets.map(file => ({ name: path.basename(file), size: fs.statSync(file).size, sha256: digest(file) })), sha256sums: sums.trimEnd().split('\n'), bundle, notes }, null, 2)); return; }
 
   const login = getToken(!args.has('--no-login'));
   if (!login) throw new Error('No GitHub sign-in on this PC. Run: npm run release -- --login');

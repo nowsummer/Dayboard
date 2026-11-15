@@ -52,7 +52,7 @@ test('F74: 되돌리기 after 완료 비우기 puts each task back in its 직접
 test('F53: a search typed with a task open in the right panel (renderMain) keeps that row marked, as render() does', () => {
   const settled = [];
   const h = harness({ view: 'l1', taskPane: { id: 't1' }, captureScroll: () => null, restoreScroll() {}, viewToolbar: () => [], calendarAfterRender() {}, noteFindAfterRender() {}, helpAfterRender() {}, glassAfterRender() {},
-    datePopSettle: () => settled.push('settle'), rangeCache: null });
+    datePopSettle: () => settled.push('settle'), rangeCache: null, pastSweep() {} });
   h.loadApp('function taskPaneMark(', 'function renderMain(');
   h.eval(`mainView = () => h('div', { class: 'task-list' }, ['t1', 't2'].map(id => h('div', { class: 'task-row', 'data-task-id': id })))`);
   const main = h.document.createElement('div'); main.className = 'main-content'; h.app.append(main);

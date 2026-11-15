@@ -26,8 +26,9 @@ const DRAG = { key: 'mom', from: '2026-10-20', to: '2026-10-22', stretchHours: 1
 // The sample's colours. The recordings write them next to their frames (writeSampleMark → sample.json), and scripts/readme-gif.py
 // joins a desktop scene only to app frames recorded with the same colours and language: a scene recorded before a colour change
 // showed the old pink trip icon for the animation's last 14 s (2026-10-28 review of r50 I).
-// Lists, in the order the sidebar draws them: 생활 (장보기, 집안일, the trip list, 운동), then 내 할 일 and 업무 — all of them in the sidebar
-// at the film's height, 업무 not faded at its foot. No two within two
+// Lists, in the order the sidebar draws them: 생활 (장보기, the trip list, 운동, 집안일), then 내 할 일 and 업무 — all of them in the sidebar
+// at the film's height, 업무 not faded at its foot. 업무 green and 장보기 yellow, in that order, as the homepage draft's pictures
+// (2026-11-14, 홈페이지 초안 촬영/읽어보기.md). No two within two
 // rows are of one colour family (tests/r50-I-readme-sample.test.cjs): the owner found green and teal two rows apart too alike
 // (2026-10-27), the trip list is not the pink that was 「너무 빨간색이라 눈아파」 (2026-10-28), and indigo #5856d6 is not used anywhere
 // (2026-11-02 owner: 「보라색도 아니고 파란색도 아닌 이 색깔은 별로」).
@@ -36,7 +37,7 @@ const DRAG = { key: 'mom', from: '2026-10-20', to: '2026-10-22', stretchHours: 1
 // list, keeps its icon.
 const EMOJI = { shop: '🛒', home: '🧺', trip: '✈️', fitness: '🏃', work: '💼', lunch: '🍽️', gym: '🏋️' };
 const COLOURS = {
-  lists: { shop: '#34c759', home: '#ff9500', trip: '#af52de', fitness: '#30b0c7', inbox: '#007aff', work: '#a2845e' },
+  lists: { shop: '#ffcc00', home: '#ff9500', trip: '#af52de', fitness: '#30b0c7', inbox: '#007aff', work: '#34c759' },
   // The calendars. The built-in one (개인) takes what the film types, so its new events have the colour of the personal ones.
   calendars: { work: '#007aff', personal: '#ff9500', fitness: '#34c759', family: '#af52de' },
 };
@@ -230,7 +231,7 @@ async function seedSample(invoke, lang = 'ko', { demo = false } = {}) {
   const personal = await invoke('group:add', { name: t.life });
   const mk = (key, icon) => invoke('list:add', { name: `${EMOJI[key]} ${t[key]}`, color: c[key], icon, groupId: personal.id });
   const lists = { work: work.id, inbox: 'local-inbox' };
-  for (const [key, icon] of [['shop', 'cart'], ['home', 'home'], ['trip', 'plane'], ['fitness', 'heart']]) lists[key] = (await mk(key, icon)).id;
+  for (const [key, icon] of [['shop', 'cart'], ['trip', 'plane'], ['fitness', 'heart'], ['home', 'home']]) lists[key] = (await mk(key, icon)).id;
 
   // ---- Tasks ----
   // Repeats and subtasks too, so the pictures show them.

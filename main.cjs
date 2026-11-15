@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu, dialog, shell, screen, safeStorage, Notification, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu, dialog, shell, screen, safeStorage, Notification, powerMonitor, net } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -8,6 +8,8 @@ const { randomUUID } = require('node:crypto');
 const { fileURLToPath } = require('node:url');
 const { spawn } = require('node:child_process');
 const { UpdateManager, releasePage, releasesPage, releaseTag, STAGING_ID } = require('./lib/updater.cjs');
+const { isStoreEdition, storeUserData, shownFolder, STORE_FOLDER, DEV_FOLDER } = require('./lib/edition.cjs');
+const { contactMailUrl } = require('./lib/contact.cjs');
 const { createStore, resolveUserDataDirectory, TRASH_DAYS, publicNote, publicRecord } = require('./lib/store.cjs');
 const { createDesktopManager, clampBounds, resizedBounds, RESIZE_EDGES, onScreen } = require('./lib/desktop.cjs');
 const { homeOf, homeOn, ownPlace, asideOf, onAnyScreen, sameRect, validHome, spotOf, rememberSpot, spotOn, createPlaceWatch, SETTLE_MS } = require('./lib/widgethome.cjs');
@@ -34,16 +36,31 @@ const { text, rawText, noteText, identifier, boolean, color, dateOnly, dateTime,
 const { dueAlerts, alertLine, pruneFired, taskDueLine, dueStepAlerts, passedStepAlerts, pastStepAlerts } = require('./lib/alerts.cjs');
 const { setRepeat, setDueTime, followDue, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries, rolledBackSteps, wantedSteps, stepsDone } = require('./lib/tasks.cjs');
 const { WARNS, isAccountList, moveSummary, settleMovesAtStart } = require('./lib/taskmove.cjs');
+const { needsSettle, settleAtStart, eventIdFor } = require('./lib/outbox.cjs');
 const { createCalendarHistory } = require('./lib/calhistory.cjs');
 const { BACKUP_LIMIT, backupRunner, parseBackup, restorePlan, applyRestore, undoRestore } = require('./lib/backup.cjs');
 const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, seriesAlert, ring, alertOtherKind, seriesAllDay, toFirstShown, shiftedForMaster, truncatedRule, keepsNothing, moveKey } = require('./lib/series.cjs');
 
 app.setName('Dayboard');
-app.setAppUserModelId('com.dayboard.desktop');
-const smoke = process.argv.includes('--smoke-test') || process.env.DAYBOARD_SMOKE_TEST === '1';
+// The Microsoft Store package (lib/edition.cjs): the Store updates it, Windows starts it and names it, and its data has a folder of its own.
+const STORE = isStoreEdition({ isPackaged: app.isPackaged });
+if (!STORE) app.setAppUserModelId('com.dayboard.desktop');
+const smokeSwitch = process.argv.includes('--smoke-test') || process.env.DAYBOARD_SMOKE_TEST === '1';
+// A packaged Store copy carries no tests (scripts/store.cjs leaves tests/ out, the bundle's smoke helpers with it), so its smoke switch is no
+// smoke run: it would load no checks and let the DevTools switches below through. It ends at once, before any folder is chosen (2026-11-13).
+const STORE_SMOKE = STORE && app.isPackaged && smokeSwitch;
+const smoke = smokeSwitch && !STORE_SMOKE;
 let startupError = null;
+let carryNotice = ''; // the Store copy's first copy of earlier data: 'failed' (every start while it fails), 'kept' or 'several' (once), lib/edition.cjs storeUserData
+let storeCarry = false; // the Store copy's folder is set here; its first copy waits for the single-instance lock below
 if (smoke) app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'dayboard-smoke-')));
+else if (STORE_SMOKE) { /* no folder: the run ends below, before the lock (DEVTOOLS_SWITCH) */ }
 else if (process.env.DAYBOARD_USER_DATA) app.setPath('userData', path.resolve(process.env.DAYBOARD_USER_DATA));
+else if (STORE) {
+  // The folder only (2026-11-14 Codex review F1/I1): copied here, before the lock, a second start would copy over the files of a Store copy
+  // already running (its first copy failed, so it is tried on every start), and two first starts would share the same .importing files.
+  try { const folder = path.join(app.getPath('appData'), app.isPackaged ? STORE_FOLDER : DEV_FOLDER); fs.mkdirSync(folder, { recursive: true }); app.setPath('userData', folder); storeCarry = true; } catch (error) { startupError = error; }
+}
 else {
   const appData = app.getPath('appData');
   try {
@@ -55,10 +72,12 @@ else {
 const userData = app.getPath('userData');
 const rendererFile = path.join(__dirname, 'renderer', 'index.html');
 const preloadFile = path.join(__dirname, 'preload.cjs');
-const desktop = createDesktopManager();
+// The smoke drags a widget's head with a pointer of its own (lib/smoke-pointer.cjs setCursor): it never moves the real mouse.
+const desktop = createDesktopManager(smoke ? { cursor: () => smokePointer.cursor() } : {});
 const widgetWindows = new Map();
 const places = createPlaceWatch(); // which widget moves are the user's own place (lib/widgethome.cjs, 2026-11-11)
 const resizeAnchors = new Map(); // widget id → { key, bounds }: the widget as a resizing drag found it (widget:resize)
+const headMoves = new Map(); // widget window id → the press on its head (desktop.grab): a widget on the desktop dragged by its head (widget:move)
 const smokeErrors = [];
 const pendingFlushes = new Map();
 const flushingWindows = new Map();
@@ -210,7 +229,7 @@ function backupFolder() {
 }
 // What the windows see: the stored state plus the app version and the update state (lib/updater.cjs).
 function publicState() {
-  return { ...store.publicState(), app: { version: app.getVersion(), update: updater ? updater.state() : null, backupFolder: backupFolder() } };
+  return { ...store.publicState(), app: { version: app.getVersion(), update: updater ? updater.state() : null, backupFolder: backupFolder(), ...(STORE ? { store: true } : {}) } };
 }
 function broadcast() {
   if (!store) return;
@@ -300,20 +319,6 @@ function checkEventAlerts() {
     } catch (error) { console.error('event alert notification failed:', error.message); }
   }
 }
-// A task written to its service (lib/sync.cjs mutateTask). Written part-way (steps), what the service now has is kept before the
-// error goes on, so a retry does not add the same steps or the same task again (2026-10-27 review).
-async function cloudTask(kind, task, list) {
-  try { return await sync.mutateTask(kind, task, list); }
-  catch (error) {
-    if (error.partial) commit(state => {
-      const { dropped, rolledFrom, resync, ...fields } = error.partial;
-      const kept = { ...task, ...fields, id: task.id, listId: list.id };
-      const at = state.tasks.findIndex(item => item.id === task.id);
-      if (at >= 0) state.tasks[at] = { ...state.tasks[at], ...kept }; else state.tasks.push(kept);
-    });
-    throw error;
-  }
-}
 const todayKey = () => localKey(new Date().toISOString());
 function listIcon(value) {
   if (value === undefined || value === null || value === '') return undefined;
@@ -365,7 +370,7 @@ const taskbarIcon = createTaskbarIcon({ screen }); // hands the taskbar the entr
 // Packaged runs keep the Start Menu shortcut (AppUserModelID for toasts, and the
 // icon the taskbar draws for our windows) pointing at the current icon.
 function ensureStartMenu() {
-  if (process.platform !== 'win32' || !app.isPackaged || smoke) return;
+  if (process.platform !== 'win32' || !app.isPackaged || smoke || STORE) return;
   try {
     createStartMenu({ programsDir: path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'), userData, iconSource: windowIcon, execPath: process.execPath, appId: 'com.dayboard.desktop', shell }).ensure();
   } catch (error) { console.warn('Start Menu shortcut:', error.message); }
@@ -565,6 +570,7 @@ async function openWidget(widget) {
     backdropKeys.delete(win.id);
     revealTokens.delete(win.id);
     resizeAnchors.delete(widget.id);
+    headMoves.delete(win.id);
     places.forget(win.id);
     widgetWindows.delete(widget.id);
     // An Explorer restart destroys child windows of the desktop host. If the
@@ -778,6 +784,9 @@ function watchWallpaper() {
   for (const name of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(name, () => { places.screens(); clearTimeout(rehomeTimer); rehomeTimer = setTimeout(rehomeWidgets, 1500); });
   // Waking or unlocking the PC can bring a screen back without a display event reaching here: a widget waiting for it goes home then too (2026-11-08).
   for (const name of ['resume', 'unlock-screen']) powerMonitor.on(name, () => { places.screens(); clearTimeout(rehomeTimer); rehomeTimer = setTimeout(rehomeWidgets, 3000); });
+  // Changes kept on this PC while their account could not be reached go once Windows is back (2026-11-13 offline stage 1, lib/sync.cjs wake):
+  // a moment after, so the network has come up.
+  for (const name of ['resume', 'unlock-screen']) powerMonitor.on(name, () => setTimeout(() => sync?.wake(), 3000).unref?.());
   setInterval(scheduleBackdropRefresh, 5 * 60 * 1000).unref?.();
 }
 function rehomeWidgets() {
@@ -845,7 +854,7 @@ function newNote(state) {
   return note;
 }
 function setLogin(enabled) {
-  if (smoke) return;
+  if (smoke || STORE) return; // the Store copy starts through the package's startup task, which the user turns on in Windows settings
   if (enabled && !app.isPackaged) throw new Error(tr('자동 시작은 배포용 Dayboard 실행 파일에서 설정해 주세요.'));
   const executable = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
   app.setLoginItemSettings({ openAtLogin: enabled, path: executable, args: ['--hidden'] });
@@ -858,6 +867,11 @@ function resolveEvent(rawId) {
   const events = store.get().events;
   const direct = events.find(entry => entry.id === id);
   if (direct) return { event: direct, recurrenceId: null };
+  // An Outlook event made here took the id Outlook gave it (lib/outbox.cjs moveEventId, 2026-11-13 offline stage 1 for events): a card, a
+  // widget or a toast's 되돌리기 still naming the old one reaches it, for a day.
+  const moved = store.read(state => state.outbox?.idMoves?.[id]?.to);
+  const followed = moved && events.find(entry => entry.id === moved);
+  if (followed) return { event: followed, recurrenceId: null };
   const at = id.indexOf('@');
   if (at > 0) {
     const master = events.find(entry => entry.id === id.slice(0, at));
@@ -922,12 +936,12 @@ async function writeRemoteEvent(kind, event, calendar, { scope = 'one', previous
 //    serializes it per widget). Local edits, widgets and window controls must stay responsive meanwhile.
 // 2. Replies to main's own round-trips to a renderer: note:save answers flushWindow, widget:painted answers revealOnDesktop.
 //    A queued command that awaits one of those (note:trash, widget:update, window:close → flushWindow) would wait behind
-//    itself for the 5 s / 4.5 s timeout, so the reply must come through here. Window controls, widget:close/resize/focus
+//    itself for the 5 s / 4.5 s timeout, so the reply must come through here. Window controls, widget:close/resize/focus/move
 //    and update:* only touch windows or the updater and take no time; widget:glass-preview only passes the slider's level on (a
 //    queued one would lag behind a drag); emoji:panel only opens Windows' emoji panel over the field that has the keyboard (a
 //    queued one could open after the user had moved on).
 // Every name is a case of command() (tests/commands.test.cjs).
-const DIRECT_COMMANDS = new Set(['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'widget:glass-preview', 'emoji:panel', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit']);
+const DIRECT_COMMANDS = new Set(['window:main', 'window:minimize', 'window:maximize', 'window:close', 'widget:open', 'widget:close', 'widget:resize', 'widget:painted', 'widget:focus', 'widget:move', 'widget:glass-preview', 'emoji:panel', 'update:check', 'update:download', 'update:install', 'update:open', 'note:save', 'account:connect', 'sync:run', 'auth:status', 'auth:cancel', 'app:quit']);
 // A folder's name from a window: what is kept (lib/notekey.cjs) or a refusal. Taken: by this PC's list or by a live note, case aside.
 function folderName(value) { const name = noteFolderName(value); if (!name) throw new Error(tr('폴더 이름을 확인해 주세요.')); return name; }
 function folderTaken(name, except) { const low = name.toLocaleLowerCase(); const state = store.get(); return [...(state.settings.noteFolders || []), ...state.notes.filter(note => !note.trashedAt && note.folder).map(note => note.folder)].some(item => item !== except && item.toLocaleLowerCase() === low); }
@@ -945,7 +959,9 @@ async function command(commandName, payload, sourceWindow) {
       // A time on its date (2026-11-05): from the editor, a title's words or 되돌리기 of a deletion (lib/tasks.cjs setDueTime).
       if (payload.dueTime !== undefined) setDueTime(task, payload.dueTime, list.provider);
       if (payload.steps !== undefined) { const steps = taskSteps(payload.steps); if (steps.length) task.steps = steps; }
-      if (list.provider !== 'local') task = { ...task, ...await cloudTask('add', task, list), id: task.id, listId: list.id };
+      // An account list's (2026-11-13 offline stage 1, lib/sync.cjs writeTask): kept here before its request leaves, sent at once while the
+      // account answers (the command waits 5 s at most), held and sent after the next read while it does not — never lost, never twice.
+      if (list.provider !== 'local') { const written = await sync.writeTask('add', { ...task, accountId: list.accountId }, list); return publicRecord('tasks', written.task || task); }
       commit(state => state.tasks.push(task)); return publicRecord('tasks', task);
     }
     case 'task:update': {
@@ -1002,6 +1018,10 @@ async function command(commandName, payload, sourceWindow) {
       }
       const completing = task.completed && !previous.completed, reopening = !task.completed && previous.completed;
       let added = null; const dropped = new Set(); let rung = [];
+      // An account list's edit (2026-11-13 offline stage 1, lib/sync.cjs writeTask): the change is kept here first, sent at once while the
+      // account answers and held while it does not; its answer is settled there (lib/outbox.cjs finishSend: settleAnswer, a moved subtask's
+      // alert). A 되돌리기 of a repeating To Do task's completion keeps its own path below (its hints, its record in undoRepairs).
+      if (list.provider !== 'local' && !hints) { const written = await sync.writeTask('update', task, list, { previous }); return publicRecord('tasks', written.task || task); }
       if (list.provider !== 'local') {
         if (hints) Object.assign(task, hints); // the 되돌리기 hints (cloudUndo, above)
         // What the service answered, or after a failure part-way (steps) what it has now: the same bookkeeping (lib/tasks.cjs
@@ -1107,9 +1127,12 @@ async function command(commandName, payload, sourceWindow) {
     case 'task:transfer': return sync.moveTask(identifier(payload.id), identifier(payload.to), { resend: payload.resend === true, accept: warnKeys(payload.accept), undo: payload.undo === true });
     case 'task:transfer-finish': return sync.finishMove(identifier(payload.id), { accept: warnKeys(payload.accept) });
     case 'task:transfer-forget': sync.forgetMove(identifier(payload.id)); return true;
+    // The owner's answer to one line of 「확인할 변경」 (2026-11-13 offline stage 1, lib/outbox.cjs resolve): nothing is asked of a service here.
+    case 'outbox:resolve': return sync.resolveHeld(typeof payload.key === 'string' ? payload.key.slice(0, 200) : '', typeof payload.choice === 'string' ? payload.choice.slice(0, 20) : '');
     case 'task:delete': {
       const task = lookup('tasks', payload.id), list = lookup('lists', task.listId);
-      if (list.provider !== 'local') await sync.mutateTask('delete', task, list);
+      // An account list's: gone here at once, its delete sent now or after the next read (lib/sync.cjs writeTask, 2026-11-13).
+      if (list.provider !== 'local') { await sync.writeTask('delete', task, list); return store.publicState(); }
       commit(state => { state.tasks = state.tasks.filter(item => item.id !== task.id); }); return store.publicState();
     }
     case 'list:add': {
@@ -1149,7 +1172,8 @@ async function command(commandName, payload, sourceWindow) {
       if ('icon' in payload) { const icon = listIcon(payload.icon); if (icon) set.icon = icon; else cleared.push('icon'); }
       if ('groupId' in payload) { const group = groupRef(payload.groupId); if (group) set.groupId = group; else cleared.push('groupId'); }
       // A renamed cloud list (including an emoji prefix) is renamed at the service, so the phone sees it too; its name comes back.
-      if (previous.provider !== 'local' && 'name' in set && set.name !== previous.name) set.name = (await sync.mutateList('update', { ...previous, ...set })).name;
+      // Kept here while the account cannot answer, sent after its next read (lib/sync.cjs writeList, 2026-11-13 offline stage 1).
+      if (previous.provider !== 'local' && 'name' in set && set.name !== previous.name) set.name = (await sync.writeList('update', { ...previous, name: set.name })).name;
       let list = null;
       commit(state => { state.lists = state.lists.map(item => { if (item.id !== previous.id) return item; list = { ...item, ...set }; for (const field of cleared) delete list[field]; return list; }); });
       return list || lookup('lists', previous.id);
@@ -1385,10 +1409,14 @@ async function command(commandName, payload, sourceWindow) {
       if (calendar.readOnly) throw new Error(tr('이 달력은 읽기 전용입니다. 다른 달력을 선택해 주세요.'));
       const allDay = payload.allDay === undefined ? false : boolean(payload.allDay, tr('하루 종일'));
       // The card's key (32 hex digits) makes a resend of the same add harmless: the same local id, or the provider finds the
-      // first one on the service (2026-10-26 review — 「다시 시도」 and the closing flush could add an event twice).
-      const key = typeof payload.key === 'string' && /^[0-9a-f]{32}$/.test(payload.key) ? payload.key : '';
-      // The same fields, checks and messages as an edit (lib/series.cjs eventFields; 2026-10-27 review: event:add repeated them).
-      const id = key ? `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}` : randomUUID();
+      // first one on the service (2026-10-26 review — 「다시 시도」 and the closing flush could add an event twice). A connected calendar's
+      // add always carries one (2026-11-13 offline spec S0.6): the widget's dialog and 복제 send none, and without it an answer lost on the
+      // way back left no way to find the event the service made — a second try added it twice. Google takes it as the event's id, iCloud
+      // as its UID, Outlook as transactionId and a tag (lib/providers/*.cjs); the record of the write keeps it (lib/outbox.cjs).
+      const key = typeof payload.key === 'string' && /^[0-9a-f]{32}$/.test(payload.key) ? payload.key : calendar.provider === 'local' ? '' : randomUUID().replace(/-/g, '');
+      // The same fields, checks and messages as an edit (lib/series.cjs eventFields; 2026-10-27 review: event:add repeated them). A connected
+      // calendar's under the id its service will give it (lib/outbox.cjs eventIdFor, 2026-11-13: Google's and iCloud's from the key itself).
+      const id = key && calendar.provider !== 'local' ? eventIdFor(calendar, key) : key ? `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}` : randomUUID();
       const event = eventFields({ title: payload.title, start: payload.start, end: payload.end, location: payload.location ?? '', notes: payload.notes ?? '', color: payload.color, rrule: payload.rrule, ...('alert' in payload ? { alert: payload.alert } : {}) }, { id, calendarId: calendar.id, provider: calendar.provider }, allDay);
       // A resend of the same key returns the first event; only a card sent again with other values (revise) updates it
       // (2026-10-26 recheck: an edit made before 「다시 시도」 was dropped; a kept add resent later overwrote edits made since).
@@ -1397,6 +1425,21 @@ async function command(commandName, payload, sourceWindow) {
       // Connected calendar: the service stores it first; what it returns (instances for a series) is kept locally. A kept add
       // that fails again while the window is hidden is told by a Windows notification (its toast is in the hidden window).
       try {
+        // 2026-11-13 offline stage 1 for events (owner: 「연결이 끊기면 다른 서비스 계정 내 할 일이나 달력이더라도 작업할 수 있게」): an event that
+        // does not repeat is kept here at once and sent now while the account answers (the command waits 5 s at most), after the next read while
+        // it does not (lib/sync.cjs writeEvent). The same key again returns it, or with other values (revise) changes it, sent or still waiting.
+        // A repeating one keeps its way — its occurrences are the service's to make (stage 2) — and waits for the connection.
+        if (!event.rrule) {
+          const existing = store.read(state => { const to = state.outbox?.idMoves?.[id]?.to; const found = state.events.find(item => item.id === id) || (to && state.events.find(item => item.id === to)); return found ? structuredClone(found) : null; });
+          if (existing && (!revise || existing.calendarId !== calendar.id)) return publicRecord('events', existing);
+          if (existing) {
+            const desired = eventFields({ title: payload.title, start: payload.start, end: payload.end, location: payload.location ?? '', notes: payload.notes ?? '', color: payload.color, ...('alert' in payload ? { alert: payload.alert } : {}) }, existing, allDay);
+            const revised = await sync.writeEvent('update', desired, calendar, { previous: existing });
+            return publicRecord('events', revised.event || desired);
+          }
+          const written = await sync.writeEvent('add', { ...event, accountId: calendar.accountId }, calendar, { key });
+          return publicRecord('events', written.event || event);
+        }
         const created = await writeRemoteEvent('add', key ? { ...event, key, ...(revise ? { revise } : {}) } : event, calendar, {});
         return created[0] || store.publicState();
       } catch (error) {
@@ -1422,6 +1465,14 @@ async function command(commandName, payload, sourceWindow) {
         if (previous.recurring && scope !== 'one' && alertOtherKind(payload, previous, store.read(state => seriesAllDay(previous, state.events)))) throw new Error(tr('하루 종일로 바꾼 회차의 알림은 「이 일정만」으로 바꿔 주세요.'));
         notesEditable(previous, payload, calendar);
         const desired = eventFields(payload, previous, allDay);
+        // An event or one occurrence (2026-11-13 offline stage 1 for events): kept here at once, sent now or after the next read, per field
+        // (lib/sync.cjs writeEvent). 「모든 일정」 and a repeat given to an event keep their way and wait for the connection (mutateEvent).
+        if (scope === 'one' && !(desired.rrule && !previous.recurring)) {
+          // An occurrence's own colour taken off while its series has one stays off it ('' — as writeRemoteEvent keeps it).
+          if ('color' in payload && !desired.color && previous.seriesId && store.read(state => Boolean(state.seriesColors?.[seriesKey(previous)]))) desired.color = '';
+          const written = await sync.writeEvent('update', desired, calendar, { previous });
+          return publicRecord('events', written.event || desired);
+        }
         const updated = await writeRemoteEvent('update', desired, calendar, { scope, previous, color: 'color' in payload ? (desired.color || null) : undefined });
         return updated.find(item => item.id === previous.id) || updated[0] || store.publicState();
       }
@@ -1577,7 +1628,7 @@ async function command(commandName, payload, sourceWindow) {
         // An answer lost on the way back leaves the original here: moving it again reaches the event already made (Codex full review F3).
         { const { id: _fresh, ...body } = outgoing; outgoing.key = moveKey(['calendar:move', from.id, source.id, to.id, body]); }
         try {
-          const created = await sync.mutateEvent('add', outgoing, to);
+          const created = await sync.mutateEvent('add', outgoing, to, { move: true }); // needs the account: refused while it is out of reach (2026-11-13)
           commit(state => {
             const ids = new Set(created.events.map(item => item.id));
             state.events = state.events.filter(item => item.id !== source.id && !ids.has(item.id)).concat(created.events.map(item => source.color ? { ...item, color: source.color } : item));
@@ -1602,7 +1653,11 @@ async function command(commandName, payload, sourceWindow) {
       const scope = scopeOf(payload.scope);
       if (calendar.provider !== 'local') {
         if (recurrenceId) throw new Error(tr('이 반복 일정은 동기화가 끝난 뒤 삭제할 수 있습니다. 잠시 후 다시 시도해 주세요.'));
-        await writeRemoteEvent('delete', event, calendar, { scope: event.recurring ? scope : 'one' });
+        const how = event.recurring ? scope : 'one';
+        // An event, one occurrence or a whole series (「모든 일정」) — gone here at once, its delete sent now or after the next read (2026-11-13
+        // offline stage 1 for events, lib/sync.cjs writeEvent); 「이후 모든 일정」 is a split and waits for the connection (mutateEvent).
+        if (how !== 'future') { await sync.writeEvent('delete', event, calendar, { scope: how }); return store.publicState(); }
+        await writeRemoteEvent('delete', event, calendar, { scope: how });
         return store.publicState();
       }
       if (event.rrule && recurrenceId && scope === 'one') {
@@ -1735,6 +1790,8 @@ async function command(commandName, payload, sourceWindow) {
         if (!['open', 'closed'].includes(payload.sidebar)) throw new Error(tr('지원하지 않는 패널 설정입니다.'));
         settings.sidebar = payload.sidebar;
       }
+      // 지난 할 일 folded in 오늘·예정 (2026-11-14, app.js overdueSet): true or false only; this PC's choice, never synced (lib/viewsync.cjs).
+      if ('overdueFolded' in payload) settings.overdueFolded = boolean(payload.overdueFolded, tr('지난 할 일'));
       if ('listOrder' in payload) settings.listOrder = idList(payload.listOrder, 500, tr('목록 순서가 올바르지 않습니다.'));
       if ('hiddenCalendars' in payload) settings.hiddenCalendars = idList(payload.hiddenCalendars, 500, tr('달력 표시 설정이 올바르지 않습니다.'));
       if ('hiddenSections' in payload) settings.hiddenSections = idList(payload.hiddenSections, 100, tr('계정 표시 설정이 올바르지 않습니다.'));
@@ -1784,6 +1841,11 @@ async function command(commandName, payload, sourceWindow) {
       if ('syncTasks' in payload) flags.syncTasks = boolean(payload.syncTasks, tr('할 일 동기화'));
       if ('syncCalendar' in payload) flags.syncCalendar = boolean(payload.syncCalendar, tr('달력 동기화'));
       if (account.provider === 'icloud') flags.syncTasks = false;
+      // 「할 일」 off would take the account's lists off this PC with changes still to go (2026-11-13 offline stage 1): refused until they went;
+      // a disconnect keeps them in 「보관본」 lists.
+      if (flags.syncTasks === false && account.syncTasks !== false && sync.holding(account.id)) throw new Error(tr('보낼 변경이 있어 지금은 끌 수 없어요. 연결을 해제하면 보관본에 남아요.'));
+      // 「달력」 the same over held events (2026-11-13 offline stage 1 for events): a read without the calendars would take them off this PC.
+      if (flags.syncCalendar === false && account.syncCalendar !== false && sync.holding(account.id, 'events')) throw new Error(tr('보낼 변경이 있어 지금은 끌 수 없어요. 연결을 해제하면 보관본에 남아요.'));
       // 「메모」: one Google or Microsoft account holds the notes (settings.notesAccountId). Turning it on chooses this account (it takes
       // effect once this sign-in has the notes grant); turning it off stops notes sync — it never moves to another account.
       let notesChoice;
@@ -1888,6 +1950,26 @@ async function command(commandName, payload, sourceWindow) {
       if (!entry || !desktop.isAttached(entry[1])) return false;
       try { return desktop.focus(entry[1]); } catch { return false; }
     }
+    case 'widget:move': {
+      // A widget on the desktop dragged by its head (app.js headMove; 2026-11-13 owner: 「첫번째꺼 … 더블 클릭해보는데 하위목록 안 접혀, 두
+      // 번째꺼는 접히는데」): there the head has no -webkit-app-region, whose hit test Chromium scaled for the main screen and not the widget's
+      // own (lib/desktop.cjs grab). phase 'start' keeps where the press found the window and the pointer; 'move' and 'end' put the window
+      // where the pointer now is, in screen pixels; 'end' forgets the press. Only its own window, attached and not held in place.
+      const entry = [...widgetWindows].find(([, win]) => win === sourceWindow);
+      if (!entry || !['start', 'move', 'end'].includes(payload.phase)) return false;
+      const [id, win] = entry;
+      const locked = store.read(s => Boolean(s.widgets.find(item => item.id === id)?.locked));
+      if (locked || !desktop.isAttached(win)) { headMoves.delete(win.id); return false; }
+      try {
+        if (payload.phase === 'start') { const grab = desktop.grab(win); if (grab) headMoves.set(win.id, grab); else headMoves.delete(win.id); return Boolean(grab); }
+        const grab = headMoves.get(win.id);
+        if (payload.phase === 'end') headMoves.delete(win.id);
+        if (!grab) return false;
+        const moved = desktop.follow(win, grab);
+        if (moved) places.user(win.id); // the user's own place (keepPlace), as 'will-move' marks a drag of a widget not on the desktop
+        return moved;
+      } catch { headMoves.delete(win.id); return false; }
+    }
     case 'widget:glass-preview': {
       // A glass slider while it is dragged — the 「바탕화면 위젯」 screen, Settings, a widget's own settings (2026-10-28 user: the widgets
       // change step by step): the level goes to each widget window to show; nothing is saved (the slider's release saves it,
@@ -1929,15 +2011,22 @@ async function command(commandName, payload, sourceWindow) {
       if (entry) return command('widget:close', { id: entry[0] }, sourceWindow);
       return closeWindow(sourceWindow);
     }
-    case 'update:check': if (!updater) throw new Error(tr('업데이트를 확인할 수 없는 실행 방식이에요.')); await updater.check({ manual: true }); return publicState();
-    case 'update:download': if (!updater) throw new Error(tr('업데이트를 확인할 수 없는 실행 방식이에요.')); await updater.download(); return publicState();
-    case 'update:install': if (!updater) throw new Error(tr('업데이트를 확인할 수 없는 실행 방식이에요.')); return { ok: await updater.install() };
+    // The Store copy is updated by the Microsoft Store only (2026-11-13 review): no check, download or GitHub page here either, although its
+    // settings sheet draws no update line that would ask.
+    case 'update:check': if (STORE) throw new Error(tr('Microsoft Store가 업데이트해요.')); if (!updater) throw new Error(tr('업데이트를 확인할 수 없는 실행 방식이에요.')); await updater.check({ manual: true }); return publicState();
+    case 'update:download': if (STORE) throw new Error(tr('Microsoft Store가 업데이트해요.')); if (!updater) throw new Error(tr('업데이트를 확인할 수 없는 실행 방식이에요.')); await updater.download(); return publicState();
+    case 'update:install': if (STORE) throw new Error(tr('Microsoft Store가 업데이트해요.')); if (!updater) throw new Error(tr('업데이트를 확인할 수 없는 실행 방식이에요.')); return { ok: await updater.install() };
     // Only the two fixed GitHub pages: the version's release notes, or every release (the update history).
-    case 'update:open': { const current = updater ? updater.state() : null; await shell.openExternal(payload.all ? (current?.releasesUrl || releasesPage()) : (current?.releaseUrl || releasePage())); return true; }
+    case 'update:open': { if (STORE) throw new Error(tr('Microsoft Store가 업데이트해요.')); const current = updater ? updater.state() : null; await shell.openExternal(payload.all ? (current?.releasesUrl || releasesPage()) : (current?.releaseUrl || releasePage())); return true; }
+    // Settings 「문의」 (2026-11-14 owner): a new mail to Dayboard's address with the app version, the Windows version and the copy filled in.
+    // Built here from those alone (lib/contact.cjs); the page sends nothing, so external:open below still opens only the bare address.
+    case 'contact:mail': await shell.openExternal(contactMailUrl({ version: app.getVersion(), release: os.release(), edition: STORE ? 'store' : 'github', lang: i18n.getLanguage() })); return true;
     case 'external:open': {
       const url = new URL(text(payload.url, tr('주소'), 2048));
       // Mail to Dayboard's own address (settings 「문의」), nothing else: no other address, no subject or body from the page.
       if (url.protocol === 'mailto:' && decodeURIComponent(url.pathname) === CONTACT_EMAIL && !url.search && !url.hash) { await shell.openExternal(`mailto:${CONTACT_EMAIL}`); return true; }
+      // The Store copy's one way to its startup task (settings 「Windows 시작 시 실행」): this page of Windows settings, nothing else of ms-settings.
+      if (STORE && url.href === 'ms-settings:startupapps') { await shell.openExternal('ms-settings:startupapps'); return true; }
       // Only the https hosts the page links to (renderer/app.js connectAccount: Apple account, Google Cloud console, Microsoft Entra) — defence in
       // depth against a page gone wrong (2026-11-02 review security-7); a new external link is added here too (CONTRACT.md). The loopback test
       // stays, and the list also closes the forms it misses, such as [::ffff:7f00:1].
@@ -2072,7 +2161,7 @@ function createUpdater() {
 // The startup entry follows the copy that runs now (the installed copy replaces a portable bundle), unless the user
 // turned Dayboard off in Task Manager's startup list.
 function repointLogin() {
-  if (smoke || !app.isPackaged || !store.get().settings.launchAtLogin) return;
+  if (smoke || STORE || !app.isPackaged || !store.get().settings.launchAtLogin) return;
   const executable = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
   try {
     const current = app.getLoginItemSettings({ path: executable, args: ['--hidden'] });
@@ -2121,6 +2210,30 @@ function applyLanguage() {
   if (tray) trayMenu();
 }
 
+// The account queue (lib/sync.cjs) over this store. `dependencies`: the smoke's fake service only (tests/ui-smoke-offline-1113.cjs); whether
+// the PC has a network at all is Electron's own reading (net.isOnline — false is a strong sign none answers, 2026-11-13 offline stage 1).
+function makeSync(dependencies = {}) {
+  return createSync({ store, safeStorage, shell, userData, onChange: broadcast,
+    beforeNotesApply: () => Promise.all(BrowserWindow.getAllWindows().map(win => flushWindow(win, 'notes'))),
+    onNotesRemoved: ({ widgetIds }) => { for (const id of widgetIds) widgetWindows.get(id)?.destroy(); },
+    dependencies: { online: () => net.isOnline(), ...dependencies } });
+}
+// Smoke runs only (tests/ui-smoke-offline-1113.cjs): main's own queue over a fake service, and a restart of the data layer as a start does it —
+// the data file read again, what a stop left on its way settled (settleAtStart), a new queue — the windows then reload.
+const smokeHooks = smoke ? {
+  store: () => store,
+  useSync(dependencies) { sync?.dispose(); sync = makeSync(dependencies); return sync; },
+  restart(dependencies) {
+    sync?.dispose();
+    store = createStore(userData);
+    if (store.read(state => needsSettle(state))) store.mutate(state => settleAtStart(state));
+    sync = makeSync(dependencies);
+    // The older calendar tier holds the store it was made with: made again over this one, so nothing writes the file from the old copy.
+    history?.dispose?.();
+    history = createCalendarHistory({ userData, store, fetchEvents: (accountId, calendarId, range) => sync.historyEvents(accountId, calendarId, range), onChange: broadcast });
+    return sync;
+  },
+} : null;
 async function runSmokeTest() {
   const output = process.env.DAYBOARD_SMOKE_OUTPUT ? path.resolve(process.env.DAYBOARD_SMOKE_OUTPUT) : path.join(userData, 'smoke');
   fs.mkdirSync(output, { recursive: true });
@@ -2146,7 +2259,7 @@ async function runSmokeTest() {
     }
     await mainWindow.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     fs.writeFileSync(path.join(output, 'main.png'), (await mainWindow.webContents.capturePage()).toPNG());
-    const extra = await require('./tests/ui-smoke.cjs')({ mainWindow, widgetWindows, invoke, output, runBackup, pointer: smokePointer });
+    const extra = await require('./tests/ui-smoke.cjs')({ mainWindow, widgetWindows, invoke, output, runBackup, pointer: smokePointer, hooks: smokeHooks });
     report.checks.push(...extra);
     // A reminder that is already due must be recorded as fired exactly once.
     const reminded = await invoke('task:add', { title: tr('Dayboard 알림 시험'), reminderAt: new Date(Date.now() - 60000).toISOString() });
@@ -2213,7 +2326,7 @@ const QUIT_FOR_INSTALL = '--quit-for-install';
 // --remote-debugging-port / -pipe would let a local program drive its pages and their IPC, so it does not start (no script uses CDP on the
 // packaged exe; the smoke run keeps its switches; no lock, no window: the chain below never registers whenReady) (2026-11-02 r60 carry-over S2-1).
 const DEVTOOLS_SWITCH = app.isPackaged && !smoke && (app.commandLine.hasSwitch('remote-debugging-port') || app.commandLine.hasSwitch('remote-debugging-pipe'));
-if (DEVTOOLS_SWITCH) app.exit(1);
+if (DEVTOOLS_SWITCH || STORE_SMOKE) app.exit(1);
 else if (!app.requestSingleInstanceLock()) app.quit();
 else if (process.argv.includes(QUIT_FOR_INSTALL)) {
   // The packaging trial run (scripts/bundle-swap.cjs probeBundle, its own DAYBOARD_USER_DATA profile) reads back the engine this exe really
@@ -2221,6 +2334,9 @@ else if (process.argv.includes(QUIT_FOR_INSTALL)) {
   if (process.env.DAYBOARD_USER_DATA) { try { fs.mkdirSync(userData, { recursive: true }); fs.writeFileSync(path.join(userData, 'engine.json'), JSON.stringify({ electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node })); } catch { /* the trial run then fails on the missing file */ } }
   app.exit(0);
 } else {
+  // The Store copy's first copy of earlier data, now that this run holds the lock (lib/edition.cjs storeUserData). Synchronous, before any
+  // window; it returns the folder set above.
+  if (storeCarry && !startupError) { try { storeUserData({ appData: app.getPath('appData'), dev: !app.isPackaged, onNotice: kind => { carryNotice = kind; } }); } catch (error) { startupError = error; } }
   // 'second-instance' comes synchronously from Chromium's WM_COPYDATA handler, which can run inside
   // a native call that pumps messages; creating the window there would nest koffi calls (crash).
   app.on('second-instance', (_event, argv) => setImmediate(() => { if (Array.isArray(argv) && argv.includes(QUIT_FOR_INSTALL)) app.quit(); else showMain(); }));
@@ -2230,16 +2346,17 @@ else if (process.argv.includes(QUIT_FOR_INSTALL)) {
     // the shipped app should not have; the renderer's own keys (글자 크기 Ctrl+= / Ctrl+- / Ctrl+0) and text editing work without it.
     Menu.setApplicationMenu(null);
     applyLanguage();
-    store = createStore(userData);
+    // The Store copy's messages name its folder where Explorer finds it (lib/edition.cjs shownFolder, 2026-11-13 review).
+    store = createStore(userData, STORE ? { shown: shownFolder(userData, { appData: app.getPath('appData'), localAppData: process.env.LOCALAPPDATA }) } : {});
     // A move to a connected list that was under way when Dayboard stopped may have gone through: it waits for the user (lib/taskmove.cjs).
     if ((store.get().taskMoves || []).length) store.mutate(settleMovesAtStart);
+    // An account write Dayboard stopped with may have reached the service: kept as unsure, never resent from here (lib/outbox.cjs).
+    if (store.read(state => needsSettle(state))) store.mutate(state => settleAtStart(state));
     if (smoke) store.mutate(state => { state.settings.tourDone = true; }); // the tour for new users would cover the checks
     applyLanguage();
     // A note deleted on another PC also closes the widgets showing it (their records are already gone).
     // Before a sync replaces or removes notes here, every window saves its unsaved typing, so nothing typed is overwritten.
-    sync = createSync({ store, safeStorage, shell, userData, onChange: broadcast,
-      beforeNotesApply: () => Promise.all(BrowserWindow.getAllWindows().map(win => flushWindow(win, 'notes'))),
-      onNotesRemoved: ({ widgetIds }) => { for (const id of widgetIds) widgetWindows.get(id)?.destroy(); } });
+    sync = makeSync();
     // The years of connected calendars before the recent window, in files of their own (lib/calhistory.cjs, 2026-10-30).
     history = createCalendarHistory({ userData, store, fetchEvents: (accountId, calendarId, range) => sync.historyEvents(accountId, calendarId, range), onChange: broadcast });
     ensureStartMenu();
@@ -2269,10 +2386,25 @@ else if (process.argv.includes(QUIT_FOR_INSTALL)) {
     });
     createTray();
     watchWallpaper();
-    if (!smoke) { createUpdater(); trayMenu(); repointLogin(); }
+    // The network back (net.isOnline from false to true): the accounts holding changes are tried at once (2026-11-13 offline stage 1).
+    if (!smoke) { let wasOnline = net.isOnline(); setInterval(() => { const now = net.isOnline(); if (now && !wasOnline) sync?.wake(); wasOnline = now; }, 10000).unref(); }
+    if (!smoke) { if (!STORE) createUpdater(); trayMenu(); repointLogin(); }
     // An update restart (--updated) comes back like a login start: widgets on the desktop, the window in the tray.
     if ((!process.argv.includes('--hidden') && !process.argv.includes('--updated')) || smoke) showMain();
     await reopenWidgets();
+    // Said over the window at start (lib/edition.cjs storeUserData, 2026-11-13 review). 'failed': the earlier data could not be copied and is
+    // tried again next time; no carried-over.txt is written, so it is said on every start while the copy keeps failing, each of them opening
+    // without that data. 'kept': the Store copy already held what the user wrote and kept it; said once, on the start that settled it.
+    // 'several': more than one old folder holds data, so none was picked; said once (2026-11-14).
+    if (carryNotice) {
+      const [message, detail] = carryNotice === 'kept'
+        ? [tr('이전 Dayboard 자료를 가져오지 않았어요'), tr('여기에 적은 내용이 있어 그대로 두었어요. 이전 자료는 설정의 「백업에서 되살리기」로 더할 수 있어요.')]
+        : carryNotice === 'several'
+          ? [tr('이전 Dayboard 자료를 가져오지 않았어요'), tr('이전 자료 폴더가 여러 개라 고르지 않았어요. 설정의 「백업에서 되살리기」로 더할 수 있어요.')]
+          : [tr('이전 Dayboard 자료를 가져오지 못했어요'), tr('다음에 Dayboard를 켤 때 다시 가져와요.')];
+      const options = { type: 'info', title: 'Dayboard', message, detail, buttons: [tr('닫기')], noLink: true };
+      (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options)).catch(() => {});
+    }
     if (smoke) await runSmokeTest();
     else {
       // Accounts, then notes, every 5 minutes and at start; notes also when Dayboard comes back to the front (at most once a

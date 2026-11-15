@@ -85,10 +85,12 @@ const LANED = ['state:get', 'task:add', 'task:update', 'task:holds', 'task:delet
   'settings:update', 'account:update', 'account:disconnect', 'widget:update', 'external:open', 'backup:export', 'backup:restore', 'backup:undo', 'backup:folder', 'demo:load',
   'task:transfer', 'task:transfer-check', 'task:transfer-forget', // 2026-10-30: this PC's tasks to a connected list (lib/taskmove.cjs)
   'calendar:history', 'calendar:history-search', // 2026-10-30: the older calendar tier (lib/calhistory.cjs), read-only
-  'task:transfer-finish']; // 2026-11-04: an original a move kept at its service deleted (lib/sync.cjs finishMove)
+  'task:transfer-finish', // 2026-11-04: an original a move kept at its service deleted (lib/sync.cjs finishMove)
+  'outbox:resolve', // 2026-11-13 offline stage 1: an answer in 「확인할 변경」 (lib/outbox.cjs resolve)
+  'contact:mail']; // 2026-11-14: settings 「문의」 opens a mail with the versions filled in (lib/contact.cjs)
 
-test('laneOf: a rule for each of the 45 commands that take a lane, none for the 20 direct ones; an unknown name is exclusive', () => {
-  assert.equal(DIRECT.length + LANED.length, 65);
+test('laneOf: a rule for each of the 47 commands that take a lane, none for the 20 direct ones; an unknown name is exclusive', () => {
+  assert.equal(DIRECT.length + LANED.length, 67);
   assert.deepEqual(Object.keys(COMMAND_LANES).sort(), [...LANED].sort());
   const store = fakeStore();
   for (const name of DIRECT) assert.equal(laneOf(name, {}, store), EXCLUSIVE, `${name} never comes to the lanes; conservative if it did`);
@@ -153,15 +155,17 @@ test('laneOf: this PC\'s items are local, connected items remote, connected list
   for (const name of ['event:update', 'event:delete', 'event:color']) {
     assert.equal(laneOf(name, { id: 'local-event' }, s), LOCAL, name);
     assert.equal(laneOf(name, { id: 'local-series@2026-11-01' }, s), LOCAL, `${name} of an occurrence of this PC's series`);
-    assert.equal(laneOf(name, { id: 'cloud-event' }, s), REMOTE, name);
+    // A colour is this PC's own, written at once, connected or not: local since 2026-11-13 (offline spec S0.7, tests/offline-s0-1113).
+    assert.equal(laneOf(name, { id: 'cloud-event' }, s), name === 'event:color' ? LOCAL : REMOTE, name);
     assert.equal(laneOf(name, { id: 'orphan-event' }, s), EXCLUSIVE, `${name}: its calendar is gone`);
     assert.equal(laneOf(name, { id: 'nope@2026-11-01' }, s), EXCLUSIVE, name);
     assert.equal(laneOf(name, { id: ['local-event'] }, s), EXCLUSIVE, `${name}: a malformed id`);
   }
-  // Calendars: this PC's (archives too) local; a connected one, and moving a calendar's events to an account, exclusive.
+  // Calendars: this PC's (archives too) local, a connected one's colour too (2026-11-13); moving a calendar's events to an account, exclusive.
   assert.equal(laneOf('calendar:update', { id: 'local-calendar', color: '#ffffff' }, s), LOCAL);
   assert.equal(laneOf('calendar:update', { id: 'archive', color: null }, s), LOCAL, 'an archive is this PC\'s');
-  assert.equal(laneOf('calendar:update', { id: 'cloud-cal', color: '#ffffff' }, s), EXCLUSIVE);
+  assert.equal(laneOf('calendar:update', { id: 'cloud-cal', color: '#ffffff' }, s), LOCAL, 'its colour is this PC\'s own');
+  assert.equal(laneOf('calendar:update', { id: 'nope' }, s), EXCLUSIVE);
   assert.equal(laneOf('calendar:delete', { id: 'archive' }, s), LOCAL);
   assert.equal(laneOf('calendar:delete', { id: 'ro-cal' }, s), EXCLUSIVE);
   assert.equal(laneOf('calendar:delete', { id: 'nope' }, s), EXCLUSIVE);

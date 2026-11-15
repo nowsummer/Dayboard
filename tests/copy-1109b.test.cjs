@@ -59,7 +59,8 @@ test('short English labels are sentence case outside names', () => {
   const NAMES = new Set(['My Lists', 'All Notes', 'Recently Deleted', 'My Tasks', 'Google Calendar', 'Apple Calendar', 'iCloud Calendar', 'Outlook Calendar',
     'Google Tasks', 'Microsoft To Do', 'Apple Account', 'Apple Account email', 'Open Apple Account', 'Open Dayboard', 'Quit Dayboard', 'Hide in Dayboard',
     'Launch at Windows startup', 'Sign in with Microsoft', 'Sign in with Google', 'Welcome to Dayboard', 'Tasks, Calendar, Notes, Widgets', 'Call Mom',
-    'Apple Calendar (no Reminders)', 'Tasks · Google Calendar', '{0} · Read-only', 'Version {0} · Checking…', 'Leave out of All', 'Put back in All']);
+    'Calendar (no Reminders)', '{0} · Read-only', 'Version {0} · Checking…', 'Leave out of All', 'Put back in All',
+    'Move to My Tasks']); // 「확인할 변경」's choice for a new task not known to have reached its service (2026-11-13): My Tasks is the list's name
   const wrong = [];
   for (const value of Object.values(EN)) {
     const words = value.replace(/…$/, '').split(' ');
