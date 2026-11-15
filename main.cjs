@@ -37,6 +37,7 @@ const { dueAlerts, alertLine, pruneFired, taskDueLine, dueStepAlerts, passedStep
 const { setRepeat, setDueTime, followDue, localRepeat, cloudUndo, placeInOrder, settleAnswer, rolledSeries, rolledBackSteps, wantedSteps, stepsDone } = require('./lib/tasks.cjs');
 const { WARNS, isAccountList, moveSummary, settleMovesAtStart } = require('./lib/taskmove.cjs');
 const { needsSettle, settleAtStart, eventIdFor } = require('./lib/outbox.cjs');
+const { settleStart } = require('./lib/startsettle.cjs');
 const { createCalendarHistory } = require('./lib/calhistory.cjs');
 const { BACKUP_LIMIT, backupRunner, parseBackup, restorePlan, applyRestore, undoRestore } = require('./lib/backup.cjs');
 const { occurrenceOf, eventFields, exceptionsOf, seriesShift, onOrAfter, seriesMapper, detach, seriesColour, paint, seriesAlert, ring, alertOtherKind, seriesAllDay, toFirstShown, shiftedForMaster, truncatedRule, keepsNothing, moveKey } = require('./lib/series.cjs');
@@ -2349,9 +2350,10 @@ else if (process.argv.includes(QUIT_FOR_INSTALL)) {
     // The Store copy's messages name its folder where Explorer finds it (lib/edition.cjs shownFolder, 2026-11-13 review).
     store = createStore(userData, STORE ? { shown: shownFolder(userData, { appData: app.getPath('appData'), localAppData: process.env.LOCALAPPDATA }) } : {});
     // A move to a connected list that was under way when Dayboard stopped may have gone through: it waits for the user (lib/taskmove.cjs).
-    if ((store.get().taskMoves || []).length) store.mutate(settleMovesAtStart);
     // An account write Dayboard stopped with may have reached the service: kept as unsure, never resent from here (lib/outbox.cjs).
-    if (store.read(state => needsSettle(state))) store.mutate(state => settleAtStart(state));
+    // Both in lib/startsettle.cjs (2026-11-15 review R3): a save that fails for a moment (a locked data file) is tried again for a few seconds
+    // here, before any window or command, instead of ending the start with 「Dayboard를 열 수 없습니다」.
+    await settleStart(store, { log: error => console.error('start settle failed:', error.message) });
     if (smoke) store.mutate(state => { state.settings.tourDone = true; }); // the tour for new users would cover the checks
     applyLanguage();
     // A note deleted on another PC also closes the widgets showing it (their records are already gone).
